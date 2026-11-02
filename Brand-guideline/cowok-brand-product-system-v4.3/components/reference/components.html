@@ -1,0 +1,171 @@
+<!doctype html>
+<html data-theme="warm" data-focus="normal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cowok.ai Core Components v1.0</title>
+<style>
+
+:root,html[data-theme="warm"]{
+--bg-canvas:#F7F5F0;--bg-workspace:#FFFDFC;--bg-surface:#FFFFFF;--bg-subtle:#F2F0EB;--bg-raised:#FFFFFF;
+--bg-hover:#F5F7FA;--bg-selected:#EDF4FF;--text-primary:#081E3A;--text-secondary:#344054;--text-muted:#667085;--text-disabled:#98A2B3;
+--text-on-action:#FFFFFF;--border-default:#E6E2DB;--border-strong:#D6D1C8;--border-focus:#90AEFF;
+--human:#4B7FFF;--human-soft:#EDF3FF;--agent:#E89A35;--agent-soft:#FFF3E3;
+--action:#081E3A;--action-hover:#102A50;--link:#0057FF;
+--success:#3E8A5D;--warning:#A87424;--error:#B45555;--info:#4B7FFF;
+--shadow:0 8px 24px rgba(8,30,58,.08);
+}
+html[data-theme="dim"]{
+--bg-canvas:#ECEAE4;--bg-workspace:#F4F2ED;--bg-surface:#FAF9F6;--bg-subtle:#E5E2DB;--bg-raised:#FAF9F6;
+--bg-hover:#EEECE7;--bg-selected:#E7EEF9;--text-primary:#182230;--text-secondary:#475467;--text-muted:#667085;--text-disabled:#98A2B3;
+--text-on-action:#FFFFFF;--border-default:#D8D4CC;--border-strong:#C8C2B8;--border-focus:#8099D8;
+--human:#5579C9;--human-soft:#E9EEF8;--agent:#B9772B;--agent-soft:#F5EEE5;
+--action:#182230;--action-hover:#253248;--link:#315FB6;
+--success:#4F7D60;--warning:#8D6B36;--error:#9B5E5E;--info:#5579C9;
+--shadow:0 8px 24px rgba(24,34,48,.07);
+}
+html[data-theme="night"]{
+--bg-canvas:#0B1220;--bg-workspace:#111827;--bg-surface:#172033;--bg-subtle:#1C2940;--bg-raised:#22314B;
+--bg-hover:#17263D;--bg-selected:#16294A;--text-primary:#F1F5F9;--text-secondary:#CBD5E1;--text-muted:#94A3B8;--text-disabled:#64748B;
+--text-on-action:#081E3A;--border-default:#26354D;--border-strong:#344761;--border-focus:#6C8FD9;
+--human:#4D86FF;--human-soft:#152A4C;--agent:#FF9A2F;--agent-soft:#211B16;
+--action:#F1F5F9;--action-hover:#FFFFFF;--link:#6F9BFF;
+--success:#69A77F;--warning:#C79B59;--error:#D17878;--info:#6F9BFF;
+--shadow:0 12px 32px rgba(0,0,0,.28);
+}
+html[data-theme="night"][data-focus="low"]{
+--human:#65789E;--agent:#8F765E;--success:#72877A;--warning:#8B7D68;--error:#8B7070;
+--human-soft:color-mix(in srgb,var(--bg-surface) 88%,#7E90B4 12%);
+--agent-soft:color-mix(in srgb,var(--bg-surface) 92%,#FF8A00 8%);
+}
+
+*{box-sizing:border-box} body{margin:0;font-family:Geist,Inter,system-ui;background:var(--bg-canvas);color:var(--text-primary)}
+button,input,select{font:inherit} main{max-width:1500px;margin:auto;padding:30px}
+.header{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:20px}
+.header h1{margin:0;letter-spacing:-.035em} .muted{color:var(--text-muted)}
+.controls{display:flex;gap:6px;flex-wrap:wrap} .controls button{border:1px solid var(--border-default);background:var(--bg-surface);color:var(--text-primary);padding:8px 11px;border-radius:9px;cursor:pointer}
+.focus{display:none} html[data-theme="night"] .focus{display:inline-block}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.section{background:var(--bg-surface);border:1px solid var(--border-default);border-radius:16px;padding:18px}
+.section h2{font-size:16px;margin:0 0 14px} .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border-radius:9px;padding:9px 12px;border:1px solid transparent;font-weight:600;cursor:pointer}
+.primary{background:var(--action);color:var(--text-on-action)} .secondary{background:var(--bg-surface);color:var(--text-primary);border-color:var(--border-default)}
+.ghost{background:transparent;color:var(--text-secondary)} .human{background:var(--human);color:white} .agent{background:var(--agent);color:#081E3A}
+.danger{background:var(--error);color:white}
+.field{display:grid;gap:6px;min-width:240px} .field label{font-size:12px;color:var(--text-secondary)}
+.input,.select{background:var(--bg-surface);color:var(--text-primary);border:1px solid var(--border-default);padding:10px 11px;border-radius:9px;outline:none}
+.input:focus,.select:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px color-mix(in srgb,var(--border-focus) 20%,transparent)}
+.tabs{display:flex;border-bottom:1px solid var(--border-default);gap:20px} .tab{padding:10px 1px;color:var(--text-muted);font-size:13px;border-bottom:2px solid transparent}
+.tab.active{color:var(--text-primary);border-color:var(--text-primary);font-weight:600}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;font-size:11px;background:var(--bg-subtle);color:var(--text-secondary)}
+.badge.human-b{background:var(--human-soft);color:var(--human)} .badge.agent-b{background:var(--agent-soft);color:var(--agent)}
+.badge.success{color:var(--success)} .badge.warning{color:var(--warning)} .badge.error{color:var(--error)}
+.card{background:var(--bg-surface);border:1px solid var(--border-default);padding:14px;border-radius:12px;min-width:180px}
+.card.subtle{background:var(--bg-subtle)} .card.raised{background:var(--bg-raised);box-shadow:var(--shadow)} .card.selected{background:var(--bg-selected);border-color:var(--border-focus)}
+.table{width:100%;border-collapse:collapse} .table th{font-size:10px;text-transform:uppercase;letter-spacing:.05em;text-align:left;color:var(--text-muted);padding:9px;border-bottom:1px solid var(--border-default)}
+.table td{font-size:12px;padding:10px 9px;border-bottom:1px solid var(--border-default)} .table tr:hover td{background:var(--bg-hover)}
+.modal{background:var(--bg-raised);border:1px solid var(--border-default);border-radius:16px;padding:18px;box-shadow:var(--shadow);max-width:430px}
+.toast{display:flex;gap:9px;align-items:flex-start;border:1px solid var(--border-default);background:var(--bg-raised);padding:10px 12px;border-radius:11px;min-width:250px}
+.dot{width:8px;height:8px;border-radius:50%;margin-top:5px;background:var(--info)} .toast.success .dot{background:var(--success)} .toast.warning .dot{background:var(--warning)} .toast.error .dot{background:var(--error)}
+.chip{padding:7px 9px;border-radius:9px;font-size:12px;border:1px solid var(--border-default);background:var(--bg-surface)} .chip.human-c{border-color:color-mix(in srgb,var(--human) 30%,var(--border-default));color:var(--human)}
+.chip.agent-c{border-color:color-mix(in srgb,var(--agent) 30%,var(--border-default));color:var(--agent)}
+.review{background:var(--bg-subtle);border:1px solid var(--border-default);border-left:3px solid var(--agent);padding:14px;border-radius:12px}
+.activity{display:grid;grid-template-columns:32px 1fr auto;gap:10px;align-items:start;padding:9px;border-radius:10px} .activity:hover{background:var(--bg-hover)}
+.avatar{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:11px;font-weight:700} .avatar.a{background:var(--agent-soft);color:var(--agent)} .avatar.h{background:var(--human-soft);color:var(--human)}
+.auto{display:flex;align-items:center;justify-content:space-between;padding:11px;border:1px solid var(--border-default);border-radius:10px;background:var(--bg-surface)}
+.state{font-size:11px;color:var(--text-muted)} .state.running{color:var(--human)} .state.reviewing{color:var(--agent)} .state.done{color:var(--success)} .state.failed{color:var(--error)}
+.note{grid-column:1/-1;background:var(--bg-subtle);border:1px solid var(--border-default);padding:14px;border-radius:12px;font-size:12px;color:var(--text-secondary)}
+@media(max-width:900px){.grid{grid-template-columns:1fr} .header{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<main>
+<div class="header">
+  <div><h1>Core Components v1.0</h1><p class="muted">Semantic components for Human + Agent long-session workspace.</p></div>
+  <div class="controls">
+    <button onclick="theme('warm')">Warm Light</button>
+    <button onclick="theme('dim')">Focus Light</button>
+    <button onclick="theme('night')">Night</button>
+    <button class="focus" onclick="focusMode()">Low-chroma</button>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="section">
+    <h2>Buttons</h2>
+    <div class="row">
+      <button class="btn primary">Primary</button><button class="btn secondary">Secondary</button><button class="btn ghost">Ghost</button>
+      <button class="btn human">Human Action</button><button class="btn agent">Agent Action</button><button class="btn danger">Danger</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Inputs & Select</h2>
+    <div class="row">
+      <div class="field"><label>Workflow name</label><input class="input" value="Q4 Growth Campaign"></div>
+      <div class="field"><label>Owner</label><select class="select"><option>Research Agent</option><option>Mai</option></select></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Tabs</h2>
+    <div class="tabs"><span class="tab active">Overview</span><span class="tab">Workflow</span><span class="tab">Activity</span><span class="tab">Knowledge</span></div>
+  </div>
+
+  <div class="section">
+    <h2>Badges / Status</h2>
+    <div class="row"><span class="badge">Neutral</span><span class="badge human-b">Human</span><span class="badge agent-b">Agent</span><span class="badge success">Completed</span><span class="badge warning">Warning</span><span class="badge error">Failed</span></div>
+  </div>
+
+  <div class="section">
+    <h2>Cards</h2>
+    <div class="row"><div class="card">Default</div><div class="card subtle">Subtle</div><div class="card raised">Raised</div><div class="card selected">Selected</div></div>
+  </div>
+
+  <div class="section">
+    <h2>Human / Agent Chips</h2>
+    <div class="row"><span class="chip human-c">Human · Mai</span><span class="chip agent-c">Agent · Research</span><span class="chip">Human + Agent</span></div>
+  </div>
+
+  <div class="section" style="grid-column:1/-1">
+    <h2>Table</h2>
+    <table class="table"><thead><tr><th>Work item</th><th>Owner</th><th>Status</th><th>Updated</th></tr></thead>
+    <tbody><tr><td>Distributor research</td><td>Research Agent</td><td><span class="state running">Running</span></td><td>Now</td></tr>
+    <tr><td>Campaign positioning</td><td>Mai</td><td><span class="state reviewing">Review</span></td><td>8m</td></tr>
+    <tr><td>Market brief</td><td>Human + Agent</td><td><span class="state done">Completed</span></td><td>1h</td></tr></tbody></table>
+  </div>
+
+  <div class="section">
+    <h2>Modal / Dialog</h2>
+    <div class="modal"><b>Execute workflow?</b><p class="muted" style="font-size:12px">This will trigger 4 Agent actions. No external communication will be sent without review.</p><div class="row"><button class="btn primary">Continue</button><button class="btn secondary">Cancel</button></div></div>
+  </div>
+
+  <div class="section">
+    <h2>Toast</h2>
+    <div class="row" style="align-items:stretch"><div class="toast success"><i class="dot"></i><div><b style="font-size:12px">Completed</b><div class="muted" style="font-size:11px">Insight brief is ready.</div></div></div><div class="toast warning"><i class="dot"></i><div><b style="font-size:12px">Review needed</b><div class="muted" style="font-size:11px">3 actions need approval.</div></div></div></div>
+  </div>
+
+  <div class="section">
+    <h2>Review required</h2>
+    <div class="review"><b>Campaign Agent proposes 6 changes</b><p class="muted" style="font-size:12px">Neutral container, Agent accent only where meaningful.</p><button class="btn agent">Review changes</button></div>
+  </div>
+
+  <div class="section">
+    <h2>Agent activity</h2>
+    <div class="activity"><div class="avatar a">A</div><div><b style="font-size:12px">Research Agent</b><div class="muted" style="font-size:11px">Summarized 18 relevant signals.</div></div><span class="muted" style="font-size:10px">2m</span></div>
+    <div class="activity"><div class="avatar h">H</div><div><b style="font-size:12px">Mai reviewed output</b><div class="muted" style="font-size:11px">Removed 2 weak assumptions.</div></div><span class="muted" style="font-size:10px">8m</span></div>
+  </div>
+
+  <div class="section">
+    <h2>Automation states</h2>
+    <div style="display:grid;gap:8px"><div class="auto"><span>Lead enrichment</span><span class="state running">Running</span></div><div class="auto"><span>Partner outreach</span><span class="state reviewing">Review</span></div><div class="auto"><span>Weekly brief</span><span class="state done">Completed</span></div><div class="auto"><span>CRM sync</span><span class="state failed">Failed</span></div></div>
+  </div>
+
+  <div class="note"><b>Component rule:</b> components never own hex colors. They consume semantic roles from Visual Foundations v1.1; Iconography v2.0 inherits <code>currentColor</code>. Low-chroma is available only in Night mode.</div>
+</div>
+</main>
+<script>
+function theme(t){document.documentElement.dataset.theme=t;document.documentElement.dataset.focus='normal'}
+function focusMode(){if(document.documentElement.dataset.theme!=='night')return;document.documentElement.dataset.focus=document.documentElement.dataset.focus==='low'?'normal':'low'}
+</script>
+</body></html>

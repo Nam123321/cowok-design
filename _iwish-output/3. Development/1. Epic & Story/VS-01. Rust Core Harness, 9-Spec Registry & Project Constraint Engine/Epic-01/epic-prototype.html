@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="warm">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:;">
+  <title>UI/UX OS (FlowForge Harness OS) — Epic 01 Interactive Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       1. BRAND TOKENS (Brand-guideline/cowok-brand-product-system-v4.3/tokens.css)
+       100% Pure Vanilla CSS Custom Properties — Zero Tailwind (ADR-003)
+       ========================================================================== */
+    :root, html[data-theme="warm"] {
+      --bg-canvas: #F7F5F0;
+      --bg-workspace: #FFFDFC;
+      --bg-surface: #FFFFFF;
+      --bg-subtle: #F2F0EB;
+      --bg-raised: #FFFFFF;
+      --bg-hover: #F5F7FA;
+      --bg-selected: #EDF4FF;
+      --text-primary: #081E3A;
+      --text-secondary: #344054;
+      --text-muted: #667085;
+      --text-disabled: #98A2B3;
+      --text-on-action: #FFFFFF;
+      --border-default: #E6E2DB;
+      --border-strong: #D6D1C8;
+      --border-focus: #90AEFF;
+      --human-accent: #4B7FFF;
+      --human-soft: #EDF3FF;
+      --agent-accent: #E89A35;
+      --agent-soft: #FFF3E3;
+      --action-primary: #081E3A;
+      --action-primary-hover: #102A50;
+      --action-link: #0057FF;
+      --status-ok: #12B76A;
+      --status-ok-bg: #ECFDF3;
+      --status-warn: #E89A35;
+      --status-warn-bg: #FFF3E3;
+      --status-danger: #F04438;
+      --status-danger-bg: #FEF3F2;
+      --shadow-sm: 0 2px 8px rgba(8, 30, 58, 0.05);
+      --shadow-md: 0 10px 28px rgba(8, 30, 58, 0.09);
+    }
+
+    html[data-theme="dim"] {
+      --bg-canvas: #ECEAE4;
+      --bg-workspace: #F4F2ED;
+      --bg-surface: #FAF9F6;
+      --bg-subtle: #E5E2DB;
+      --bg-raised: #FAF9F6;
+      --bg-hover: #EEECE7;
+      --bg-selected: #E7EEF9;
+      --text-primary: #182230;
+      --text-secondary: #475467;
+      --text-muted: #667085;
+      --text-disabled: #98A2B3;
+      --text-on-action: #FFFFFF;
+      --border-default: #D8D4CC;
+      --border-strong: #C8C2B8;
+      --border-focus: #8099D8;
+      --human-accent: #5579C9;
+      --human-soft: #E9EEF8;
+      --agent-accent: #B9772B;
+      --agent-soft: #F5EEE5;
+      --action-primary: #182230;
+      --action-primary-hover: #253248;
+      --action-link: #315FB6;
+      --status-ok: #0F9D58;
+      --status-ok-bg: #E3F5EC;
+      --status-warn: #B9772B;
+      --status-warn-bg: #F5EEE5;
+      --status-danger: #D93829;
+      --status-danger-bg: #FBEAE8;
+    }
+
+    html[data-theme="night"] {
+      --bg-canvas: #0B1220;
+      --bg-workspace: #111827;
+      --bg-surface: #172033;
+      --bg-subtle: #1C2940;
+      --bg-raised: #22314B;
+      --bg-hover: #17263D;
+      --bg-selected: #16294A;
+      --text-primary: #F1F5F9;
+      --text-secondary: #CBD5E1;
+      --text-muted: #94A3B8;
+      --text-disabled: #64748B;
+      --text-on-action: #081E3A;
+      --border-default: #26354D;
+      --border-strong: #344761;
+      --border-focus: #6C8FD9;
+      --human-accent: #4D86FF;
+      --human-soft: #152A4C;
+      --agent-accent: #FF9A2F;
+      --agent-soft: #211B16;
+      --action-primary: #F1F5F9;
+      --action-primary-hover: #FFFFFF;
+      --action-link: #6F9BFF;
+      --status-ok: #34D399;
+      --status-ok-bg: rgba(16, 185, 129, 0.16);
+      --status-warn: #FF9A2F;
+      --status-warn-bg: rgba(255, 154, 47, 0.16);
+      --status-danger: #F87171;
+      --status-danger-bg: rgba(240, 68, 56, 0.18);
+      --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.35);
+      --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    html[data-theme="night"][data-focus="low"] {
+      --human-accent: #65789E;
+      --agent-accent: #8F765E;
+      --human-soft: #1B263B;
+      --agent-soft: #23201C;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      line-height: 1.5;
+      font-size: 13.5px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    code, pre, .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ==========================================================================
+       2. REGISTERED COMPONENT CLASSES (2.11. component-registry.md)
+       ========================================================================== */
+    .ff-icon {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 1.85;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      flex-shrink: 0;
+    }
+
+    /* CMP-02: <AppShell /> */
+    .ff-shell__topbar {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-default);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .ff-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ff-brand__badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: var(--action-primary);
+      color: var(--text-on-action);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+    }
+
+    .ff-brand__title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .ff-brand__subtitle {
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    .ff-daemon-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ff-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 500;
+      border: 1px solid var(--border-default);
+      background: var(--bg-subtle);
+      color: var(--text-secondary);
+    }
+
+    .ff-pill--ok {
+      background: var(--status-ok-bg);
+      color: var(--status-ok);
+      border-color: rgba(18, 183, 106, 0.3);
+    }
+
+    .ff-pill--warn {
+      background: var(--status-warn-bg);
+      color: var(--status-warn);
+      border-color: rgba(232, 154, 53, 0.35);
+    }
+
+    .ff-pill--danger {
+      background: var(--status-danger-bg);
+      color: var(--status-danger);
+      border-color: rgba(240, 68, 56, 0.35);
+    }
+
+    .ff-pill--human {
+      background: var(--human-soft);
+      color: var(--human-accent);
+      border-color: var(--border-focus);
+    }
+
+    .ff-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Navigation Tabs & Theme Switcher */
+    .ff-subbar {
+      background: var(--bg-workspace);
+      border-bottom: 1px solid var(--border-default);
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .ff-story-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .ff-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-default);
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .ff-tab:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-strong);
+      transform: translateY(-1px);
+    }
+
+    .ff-tab.active {
+      background: var(--human-soft);
+      color: var(--human-accent);
+      border-color: var(--human-accent);
+      box-shadow: 0 0 0 1px var(--human-accent);
+    }
+
+    /* Metric Line [Section 5.10] */
+    .ff-metric-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 14px 20px 6px;
+    }
+
+    .ff-metric-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: 10px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ff-metric-card__label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .ff-metric-card__value {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .ff-metric-card__sub {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    /* Edge-Case Simulator Strip */
+    .ff-sim-bar {
+      margin: 8px 20px;
+      padding: 10px 14px;
+      background: var(--bg-surface);
+      border: 1px dashed var(--border-strong);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .ff-sim-bar__title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ff-sim-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .ff-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 11px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--border-default);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s ease;
+    }
+
+    .ff-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-strong);
+    }
+
+    .ff-btn:active {
+      transform: scale(0.96);
+    }
+
+    .ff-btn--primary {
+      background: var(--human-accent);
+      color: #FFFFFF;
+      border-color: var(--human-accent);
+    }
+
+    .ff-btn--primary:hover {
+      background: var(--action-link);
+    }
+
+    .ff-btn--agent {
+      background: var(--agent-soft);
+      color: var(--agent-accent);
+      border-color: rgba(232, 154, 53, 0.45);
+    }
+
+    .ff-btn--danger {
+      background: var(--status-danger-bg);
+      color: var(--status-danger);
+      border-color: rgba(240, 68, 56, 0.4);
+    }
+
+    /* StaleFileConflictBanner [Section 5.12] */
+    .ff-conflict-banner {
+      margin: 4px 20px 8px;
+      padding: 12px 16px;
+      background: var(--status-danger-bg);
+      border: 1.5px solid var(--status-danger);
+      border-radius: 10px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .ff-conflict-banner.visible {
+      display: flex;
+    }
+
+    /* Debounce Indicator Banner */
+    .ff-debounce-banner {
+      margin: 4px 20px 8px;
+      padding: 9px 14px;
+      background: var(--agent-soft);
+      border: 1px solid var(--agent-accent);
+      border-radius: 8px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--agent-accent);
+      font-weight: 600;
+    }
+
+    .ff-debounce-banner.visible {
+      display: flex;
+    }
+
+    /* Main 12-Column Workspace Layout */
+    .ff-workspace-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 280px 1fr 340px;
+      gap: 14px;
+      padding: 6px 20px 20px;
+      align-items: start;
+    }
+
+    .ff-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: 12px;
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .ff-panel__header {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border-default);
+      background: var(--bg-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 12.5px;
+    }
+
+    .ff-panel__body {
+      padding: 12px 14px;
+    }
+
+    /* CMP-04: <SpecTreeExplorer /> */
+    .ff-spec-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .ff-spec-item {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .ff-spec-item:hover {
+      background: var(--bg-hover);
+    }
+
+    .ff-spec-item.active {
+      background: var(--bg-selected);
+      border-color: var(--border-focus);
+    }
+
+    .ff-spec-item__top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .ff-spec-item__meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* DataTableView [Section 5.21] */
+    .ff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    .ff-table th {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--border-strong);
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: var(--bg-subtle);
+    }
+
+    .ff-table td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--border-default);
+      vertical-align: middle;
+    }
+
+    .ff-table tr:hover td {
+      background: var(--bg-hover);
+    }
+
+    /* Code Split Box */
+    .ff-code-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .ff-code-box {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-default);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 11.5px;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.45;
+    }
+
+    /* Screen Visibility */
+    .ff-screen {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .ff-screen.active {
+      display: flex;
+    }
+
+    /* CMP-13: <CowokOrchestratorBar /> / RightDrawer */
+    .ff-chat-bubble {
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      margin-bottom: 10px;
+      border: 1px solid var(--border-default);
+    }
+
+    .ff-chat-bubble--agent {
+      background: var(--agent-soft);
+      border-color: rgba(232, 154, 53, 0.35);
+    }
+
+    .ff-chat-bubble--human {
+      background: var(--human-soft);
+      border-color: var(--border-focus);
+    }
+
+    .ff-log-console {
+      background: #0B1220;
+      color: #E2E8F0;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 11px;
+      max-height: 195px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border: 1px solid #26354D;
+    }
+
+    .ff-textarea {
+      width: 100%;
+      min-height: 115px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-workspace);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      resize: vertical;
+    }
+
+    .ff-select, .ff-input {
+      padding: 6px 10px;
+      border-radius: 7px;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      font-size: 12px;
+    }
+
+    @media (max-width: 1180px) {
+      .ff-metric-strip {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .ff-workspace-grid {
+        grid-template-columns: 1fr;
+      }
+      .ff-code-split {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================================================
+       CMP-02: <AppShell /> Top Daemon Control Plane Bar
+       ======================================================================== -->
+  <header class="ff-shell__topbar" data-ff-id="app-shell-topbar">
+    <div class="ff-brand">
+      <div class="ff-brand__badge" data-ff-id="brand-logo">FF</div>
+      <div>
+        <div class="ff-brand__title" data-ff-id="epic-title">UI/UX OS (FlowForge Harness OS) — Epic 01 Control Plane</div>
+        <div class="ff-brand__subtitle">VS-01: Rust Core Harness, 9-Spec Registry &amp; Project Constraint Engine • Stitch Screen <code>223e92c3f6c64c72bfd928cc660710ae</code></div>
+      </div>
+    </div>
+
+    <div class="ff-daemon-bar">
+      <span class="ff-pill ff-pill--ok mono" id="daemon-endpoint-pill" data-ff-id="daemon-endpoint-pill">
+        <span class="ff-dot"></span>
+        127.0.0.1:4170 (.uxui-os/daemon.lock • PID 48219)
+      </span>
+      <span class="ff-pill ff-pill--human mono" id="sqlite-wal-pill" data-ff-id="sqlite-wal-pill">
+        SQLite WAL • 16/16 Tables • 8.4ms Cold Start
+      </span>
+      <span class="ff-pill mono" id="lane-indicator-pill" data-ff-id="lane-indicator-pill">
+        LANE_1_DETERMINISTIC (0 LLM Tokens)
+      </span>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       Sub-navigation: Story Screen Switcher & 4-Mode Brand Theme Switcher
+       ======================================================================== -->
+  <nav class="ff-subbar" data-ff-id="story-navigation-bar">
+    <div class="ff-story-tabs">
+      <button class="ff-tab active" data-ff-id="nav-screen-01-1" onclick="switchScreen('01.1')">
+        <svg class="ff-icon" viewBox="0 0 24 24"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+        Story 01.1: 11-Crate Workspace &amp; ts-rs Contracts
+      </button>
+      <button class="ff-tab" data-ff-id="nav-screen-01-2" onclick="switchScreen('01.2')">
+        <svg class="ff-icon" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        Story 01.2: 16-Table SQLite WAL &amp; 2-Way File Sync (OCC)
+      </button>
+      <button class="ff-tab" data-ff-id="nav-screen-01-3" onclick="switchScreen('01.3')">
+        <svg class="ff-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        Story 01.3: Axum Daemon &amp; 9-Spec Synthesis Studio
+      </button>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:11.5px; color:var(--text-muted); font-weight:600;">Theme (tokens.css):</span>
+      <select class="ff-select" data-ff-id="theme-switcher-select" onchange="setTheme(this.value)">
+        <option value="warm">Warm Paper (#F7F5F0 — Default)</option>
+        <option value="dim">Dim Studio (#ECEAE4)</option>
+        <option value="night">Night Charcoal (#0B1220)</option>
+        <option value="night-low">Night Low-Focus (Muted Accents)</option>
+      </select>
+    </div>
+  </nav>
+
+  <!-- ========================================================================
+       Metric Line [Section 5.10]: 4-Card Top KPI Strip
+       ======================================================================== -->
+  <section class="ff-metric-strip" data-ff-id="epic-01-metric-strip">
+    <div class="ff-metric-card" data-ff-id="kpi-card-9-specs">
+      <div class="ff-metric-card__label">
+        <span>9 Foundational Specs Vault</span>
+        <span class="ff-pill ff-pill--ok mono" id="kpi-spec-gate-pill">9/9 Indexed</span>
+      </div>
+      <div class="ff-metric-card__value" id="kpi-provenance-summary">18 Confirmed • 5 Inferred • 2 Missing</div>
+      <div class="ff-metric-card__sub">
+        <span>whitelist: <code>CanonicalSpecKey</code> (01..09)</span>
+      </div>
+    </div>
+
+    <div class="ff-metric-card" data-ff-id="kpi-card-ts-rs">
+      <div class="ff-metric-card__label">
+        <span>Domain Type Sync (ts-rs)</span>
+        <span class="ff-pill ff-pill--human mono" id="kpi-tsrs-status">0% Drift</span>
+      </div>
+      <div class="ff-metric-card__value">11 Crates + pnpm</div>
+      <div class="ff-metric-card__sub">
+        <span id="kpi-int64-guard-text">Tagged Enum &amp; MAX_SAFE_INTEGER Guard Active</span>
+      </div>
+    </div>
+
+    <div class="ff-metric-card" data-ff-id="kpi-sqlite-wal-status">
+      <div class="ff-metric-card__label">
+        <span>SQLite WAL &amp; 2-Way Sync</span>
+        <span class="ff-pill ff-pill--ok mono" id="kpi-watcher-pill">Watcher Ready</span>
+      </div>
+      <div class="ff-metric-card__value" id="kpi-occ-state">SHA-256 OCC Clean</div>
+      <div class="ff-metric-card__sub">
+        <span>Hash-Gated Echo Suppression • 50ms 0-Byte Debounce</span>
+      </div>
+    </div>
+
+    <div class="ff-metric-card" data-ff-id="kpi-card-brand-lineage">
+      <div class="ff-metric-card__label">
+        <span>Cross-Project Brand Lineage</span>
+        <span class="ff-pill ff-pill--agent mono" id="kpi-lineage-badge">Inherited</span>
+      </div>
+      <div class="ff-metric-card__value" id="kpi-brand-preset-name">cowok-v4.3</div>
+      <div class="ff-metric-card__sub">
+        <span id="kpi-lineage-sha" class="mono">source_sha256: 9f81c4...e210 (In Sync)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       Interactive Edge-Case & Fault Injection Bar (EC-E01-01 .. EC-E01-08)
+       ======================================================================== -->
+  <section class="ff-sim-bar" data-ff-id="edge-case-simulator-bar">
+    <div class="ff-sim-bar__title">
+      <svg class="ff-icon" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>Zero-Trust Edge-Case Simulator (Click to test AC &amp; FMEA Boundaries):</span>
+    </div>
+    <div class="ff-sim-actions">
+      <button class="ff-btn" data-ff-id="btn-ec-01-echo-suppression" onclick="triggerEchoSuppression()">
+        [EC-E01-01] Atomic Save Echo Guard
+      </button>
+      <button class="ff-btn ff-btn--danger" data-ff-id="btn-ec-02-stale-file-409" onclick="triggerStaleFile409()">
+        [EC-E01-02] Simulate 409 STALE_FILE OCC
+      </button>
+      <button class="ff-btn" data-ff-id="btn-ec-03-invalid-spec-key" onclick="triggerInvalidSpecKey()">
+        [EC-E01-03] Path Traversal (../secret.md)
+      </button>
+      <button class="ff-btn ff-btn--agent" data-ff-id="btn-ec-04-zero-byte-save" onclick="triggerZeroByteSave()">
+        [EC-E01-04] 0-Byte IDE Save (50ms Debounce)
+      </button>
+      <button class="ff-btn" data-ff-id="btn-ec-06-unsafe-int64" onclick="triggerUnsafeInt64()">
+        [KU-01.1] Test u64 &gt; MAX_SAFE_INTEGER
+      </button>
+      <button class="ff-btn" data-ff-id="btn-ec-07-port-fallback" onclick="triggerPortFallback()">
+        [AS-01.1] Port 4170 Collision &rarr; 4171
+      </button>
+      <button class="ff-btn ff-btn--agent" data-ff-id="btn-ec-08-sparse-brief" onclick="triggerSparseBrief()">
+        [AS-01.1] Sparse Brief (&lt;50 Words) Gate
+      </button>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       StaleFileConflictBanner [Section 5.12] (Hidden until 409 STALE_FILE)
+       ======================================================================== -->
+  <div class="ff-conflict-banner" id="stale-file-banner" data-ff-id="banner-stale-file-conflict">
+    <div>
+      <div style="font-weight:700; color:var(--status-danger); font-size:13.5px; display:flex; align-items:center; gap:8px;">
+        <svg class="ff-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        HTTP 409 STALE_FILE — External Edit Detected in IDE / Execution Bot on <code>06-design-system.md</code>
+      </div>
+      <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">
+        Your browser draft was based on <code>expected_sha256: 8f3a91c2...40b1</code>, but disk/SQLite is now at <code>actual_sha256: e41b07d9...99a4</code> (modified by Cursor IDE 2s ago).
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="ff-btn ff-btn--primary" data-ff-id="btn-conflict-reload-disk" onclick="resolveConflict('reload')">
+        Reload Disk Revision (Recommended — Safe)
+      </button>
+      <button class="ff-btn ff-btn--danger" data-ff-id="btn-conflict-force-overwrite" onclick="resolveConflict('overwrite')">
+        Force Overwrite with New Expected SHA-256
+      </button>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       0-Byte IDE Truncation 50ms Debounce Micro-Banner
+       ======================================================================== -->
+  <div class="ff-debounce-banner" id="debounce-banner" data-ff-id="badge-fs-debounce-state">
+    <span>⏳ [UU-01.2 / EC-E01-04] Transient 0-byte file detected on 06-design-system.md during IDE atomic save — holding 50ms debounce window before SQLite sync...</span>
+    <span class="mono">READ #1 (0B) &rarr; WAIT 50ms &rarr; READ #2 (4,182B Stable)</span>
+  </div>
+
+  <!-- ========================================================================
+       Main 12-Column Workspace Container
+       ======================================================================== -->
+  <main class="ff-workspace-grid">
+
+    <!-- LEFT COLUMN: CMP-04 <SpecTreeExplorer /> (9 Foundational Specs) -->
+    <aside class="ff-panel" data-ff-id="spec-tree-explorer">
+      <div class="ff-panel__header">
+        <span>9 Foundational Project Specs</span>
+        <span class="mono" style="font-size:11px; color:var(--text-muted);">product/specs/</span>
+      </div>
+      <div class="ff-panel__body">
+        <ul class="ff-spec-list" id="spec-tree-list">
+          <!-- Populated dynamically via JS -->
+        </ul>
+      </div>
+    </aside>
+
+    <!-- CENTER COLUMN: Multi-Screen Story Switcher Views -->
+    <section>
+
+      <!-- ====================================================================
+           SCREEN 1: STORY 01.1 — 11-CRATE WORKSPACE & TS-RS DOMAIN CONTRACTS
+           ==================================================================== -->
+      <div class="ff-screen active" id="screen-01.1" data-ff-id="screen-story-01-1">
+        <div class="ff-panel">
+          <div class="ff-panel__header">
+            <span>Story 01.1 — 11-Crate Cargo Workspace Topology &amp; Deterministic DAG</span>
+            <button class="ff-btn ff-btn--primary" data-ff-id="btn-verify-ts-rs-parity" onclick="runTsRsCheck()">
+              Run cargo test -p domain --features ts-binding
+            </button>
+          </div>
+          <div class="ff-panel__body">
+            <table class="ff-table" data-ff-id="table-cargo-crates">
+              <thead>
+                <tr>
+                  <th>Crate / Package</th>
+                  <th>Layer &amp; Responsibility</th>
+                  <th>Internal Dependencies</th>
+                  <th>ts-rs / Zod Export Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="mono"><strong>crates/domain</strong></td>
+                  <td>Root Substrate Types, 9-Spec Keys, <code>HarnessError</code></td>
+                  <td class="mono">[] (Zero Internal Deps)</td>
+                  <td><span class="ff-pill ff-pill--ok mono">16/16 Structs Synced</span></td>
+                </tr>
+                <tr>
+                  <td class="mono"><strong>crates/spec-registry</strong></td>
+                  <td>16-Table SQLite WAL + 2-Way Atomic File Sync</td>
+                  <td class="mono">[domain]</td>
+                  <td><span class="ff-pill ff-pill--ok mono">Provenance + OCC Ready</span></td>
+                </tr>
+                <tr>
+                  <td class="mono"><strong>crates/constraint-engine</strong></td>
+                  <td>Project-Scoped CSS/Token/Icon Policy &amp; <code>&lt;1ms data-ff-id</code></td>
+                  <td class="mono">[domain, spec-registry]</td>
+                  <td><span class="ff-pill ff-pill--ok mono">Rule AST Bound</span></td>
+                </tr>
+                <tr>
+                  <td class="mono"><strong>crates/harness-daemon</strong></td>
+                  <td>Loopback Axum HTTP/WS Control Plane (<code>127.0.0.1:4170</code>)</td>
+                  <td class="mono">[domain, spec-registry, ...]</td>
+                  <td><span class="ff-pill ff-pill--ok mono">REST + Lockfile Ready</span></td>
+                </tr>
+                <tr>
+                  <td class="mono"><strong>+ 7 Downstream Crates</strong></td>
+                  <td><code>flow-graph</code>, <code>html-forge</code>, <code>presentation-cms</code>, <code>plugin-host</code>, <code>rea-bridge</code>, <code>bot-fleet</code>, <code>mcp-gateway</code></td>
+                  <td class="mono">[domain, spec-registry]</td>
+                  <td><span class="ff-pill ff-pill--human mono">Workspace Compiled</span></td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="ff-code-split">
+              <div>
+                <div style="font-size:11.5px; font-weight:700; margin-bottom:4px; color:var(--text-secondary);">
+                  Rust Source (<code>crates/domain/src/lib.rs</code>)
+                </div>
+                <div class="ff-code-box mono" id="rust-contract-code">#[derive(Serialize, Deserialize, TS, JsonSchema)]
+#[serde(tag = "kind", content = "payload")]
+#[ts(export)]
+pub enum HarnessError {
+    StaleFile {
+        spec_key: CanonicalSpecKey,
+        expected_sha256: String,
+        actual_sha256: String,
+    },
+    InvalidSpecKey { raw_key: String },
+    PathTraversalDenied { attempted: String },
+}</div>
+              </div>
+              <div>
+                <div style="font-size:11.5px; font-weight:700; margin-bottom:4px; color:var(--text-secondary);">
+                  Generated TypeScript &amp; Zod (<code>packages/shared-types/src/generated/</code>)
+                </div>
+                <div class="ff-code-box mono" id="ts-contract-code">export type HarnessError =
+  | { kind: "StaleFile"; payload: {
+      spec_key: CanonicalSpecKey;
+      expected_sha256: string;
+      actual_sha256: string;
+    }}
+  | { kind: "InvalidSpecKey"; payload: { raw_key: string } }
+  | { kind: "PathTraversalDenied"; payload: { attempted: string } };
+// SafeInt64 Guard: z.number().int().lte(Number.MAX_SAFE_INTEGER)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================================================================
+           SCREEN 2: STORY 01.2 — 16-TABLE SQLITE WAL & 2-WAY FILE SYNC / OCC
+           ==================================================================== -->
+      <div class="ff-screen" id="screen-01.2" data-ff-id="screen-story-01-2">
+        <div class="ff-panel">
+          <div class="ff-panel__header">
+            <span>Story 01.2 — 2-Way Disk &harr; SQLite WAL Editor (<code id="active-spec-filename">06-design-system.md</code>)</span>
+            <div style="display:flex; gap:8px;">
+              <span class="ff-pill mono" id="editor-sha-pill" data-ff-id="editor-sha-pill">expected_sha256: 8f3a91c2...40b1</span>
+              <button class="ff-btn ff-btn--primary" data-ff-id="btn-save-spec-atomic" onclick="saveActiveSpec()">
+                Atomic Save (.tmp &rarr; sync_all &rarr; rename)
+              </button>
+            </div>
+          </div>
+          <div class="ff-panel__body">
+            <textarea class="ff-textarea" id="spec-markdown-editor" data-ff-id="spec-markdown-editor"># 06. Design System &amp; Token Contract
+- [CONFIRMED] Primary Surface Palette: Warm Paper (#F7F5F0), Navy Ink (#081E3A), Human Cobalt (#4B7FFF), Agent Amber (#E89A35).
+- [CONFIRMED] Styling Policy (ADR-003): 100% Pure Vanilla CSS Custom Properties via tokens.css (Zero Tailwind).
+- [INFERRED] Iconography: 145 SVG Brand Icons (stroke-width="1.85", round caps).
+- [MISSING] Dark-Mode Contrast Exception Rules for Embedded 3D Canvas Widgets.</textarea>
+
+            <div style="margin-top:12px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+              <div style="font-size:12px; font-weight:700;">16-Table SQLite WAL Registry Status (<code>PRAGMA journal_mode=WAL; busy_timeout=5000; foreign_keys=ON</code>)</div>
+              <span class="ff-pill ff-pill--ok mono">16/16 Tables Migrated in 8.4ms</span>
+            </div>
+
+            <table class="ff-table" style="margin-top:8px;" data-ff-id="table-sqlite-16">
+              <thead>
+                <tr>
+                  <th>Stream Partition</th>
+                  <th>SQLite Tables (16 Total)</th>
+                  <th>Sync &amp; Integrity Mechanism</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Stream 1: Kernel &amp; Specs</strong></td>
+                  <td class="mono">PROJECTS, PROJECT_SPECS, SPEC_REVISIONS, CONSTRAINT_PROFILES, CONSTRAINT_RULES</td>
+                  <td>Atomic <code>.tmp.&lt;uuid&gt;</code> rename + SHA-256 OCC + Cross-Project Lineage</td>
+                </tr>
+                <tr>
+                  <td><strong>Stream 2: Flow &amp; Preview</strong></td>
+                  <td class="mono">FLOW_GRAPHS, FLOW_NODES, FLOW_EDGES, SCREEN_ARTIFACTS</td>
+                  <td>XYFlow DAG Topology + <code>data-ff-id</code> Anchor Indexing</td>
+                </tr>
+                <tr>
+                  <td><strong>Stream 3: 16:9 Deck CMS</strong></td>
+                  <td class="mono">PRESENTATION_DECKS, DECK_SLIDES, WORDING_SLOTS</td>
+                  <td><code>&lt;16ms</code> Dual-Pane Wording Sync &amp; Slide Lock</td>
+                </tr>
+                <tr>
+                  <td><strong>Stream 4 &amp; 5: Plugins &amp; OPC Fleet</strong></td>
+                  <td class="mono">SKILL_PLUGINS, MODEL_TOURNAMENTS, BOT_JOBS, GATE_REPORTS</td>
+                  <td><code>agentskills.io</code> Manifests + Verify Ladder <code>E1..E4</code></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================================================================
+           SCREEN 3: STORY 01.3 — AXUM DAEMON & 9-SPEC SYNTHESIS STUDIO
+           ==================================================================== -->
+      <div class="ff-screen" id="screen-01.3" data-ff-id="screen-story-01-3">
+        <div class="ff-panel">
+          <div class="ff-panel__header">
+            <span>Story 01.3 — 9-Spec Synthesis Pipeline &amp; Cross-Project Brand Inheritance</span>
+            <button class="ff-btn ff-btn--primary" data-ff-id="btn-run-9-spec-synthesis" onclick="runSynthesisPipeline()">
+              POST /api/v1/projects/:id/specs/synthesize
+            </button>
+          </div>
+          <div class="ff-panel__body">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
+              <div>
+                <label style="font-size:11.5px; font-weight:700; display:block; margin-bottom:4px;">Cross-Project Brand Inheritance (<code>inherit_brand_from_project_id</code>):</label>
+                <select class="ff-select" style="width:100%;" id="brand-inherit-select" data-ff-id="select-inherit-brand-project" onchange="updateBrandLineage(this.value)">
+                  <option value="cowok-brand-product-system-v4.3">cowok-brand-product-system-v4.3 (Warm Paper #F7F5F0 + 145 SVG Icons)</option>
+                  <option value="acme-fintech-clean-v2.1">acme-fintech-clean-v2.1 (Swiss Grid + Strict Tokens)</option>
+                  <option value="none">None (Synthesize New Brand &amp; Design Direction from Scratch)</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11.5px; font-weight:700; display:block; margin-bottom:4px;">Seed Product Brief Input (<span id="brief-word-count">64 words</span>):</label>
+                <input class="ff-input" style="width:100%;" id="brief-input-box" data-ff-id="input-product-brief" value="Build UI/UX OS (FlowForge Harness OS) with a Rust Day-1 core, 9 Foundational Specs Vault, Project-Scoped Configurable Constraints (CSS policy, tokens, iconography), Flow-First XYFlow preview, Dual-Pane 16:9 HTML Presentation CMS, agentskills.io plugin hub, and cowok Master Orchestrator + advisor Dr. Eggbot fleet." />
+              </div>
+            </div>
+
+            <table class="ff-table" data-ff-id="table-9-specs-synthesis">
+              <thead>
+                <tr>
+                  <th>CanonicalSpecKey</th>
+                  <th>Provenance Breakdown</th>
+                  <th>SHA-256 Revision</th>
+                  <th>Lineage / Sync Status</th>
+                </tr>
+              </thead>
+              <tbody id="synthesis-table-body">
+                <!-- Populated dynamically via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT COLUMN: CMP-13 <CowokOrchestratorBar /> & advisor (Dr. Eggbot) + Live Telemetry -->
+    <aside class="ff-panel" data-ff-id="cowok-advisor-drawer">
+      <div class="ff-panel__header">
+        <span>🤖 cowok &amp; advisor (Dr. Eggbot)</span>
+        <span class="ff-pill ff-pill--agent mono">2 Open Questions</span>
+      </div>
+      <div class="ff-panel__body">
+        <div class="ff-chat-bubble ff-chat-bubble--agent" data-ff-id="advisor-clarification-card">
+          <div style="font-weight:700; font-size:12px; color:var(--agent-accent); margin-bottom:4px;">
+            🥚 advisor (Dr. Eggbot) — Provenance Guard [AS-01.1]
+          </div>
+          <div style="font-size:12px; color:var(--text-primary);" id="eggbot-message">
+            I scanned all 9 Foundational Specs using 0-token SQLite metadata (<code>BS-01.2</code>). Two sections in <code>06-design-system.md</code> and <code>09-data-and-copy.md</code> are tagged <strong>[MISSING]</strong>. Click below to confirm and unlock Stage 2 Flow Generation:
+          </div>
+          <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+            <button class="ff-btn ff-btn--primary" data-ff-id="btn-confirm-missing-specs" onclick="confirmMissingSpecs()">
+              ✓ Confirm Missing Sections &rarr; Upgrade to [CONFIRMED]
+            </button>
+            <button class="ff-btn" data-ff-id="btn-simulate-upstream-brand-update" onclick="simulateUpstreamBrandDrift()">
+              ↻ Check Upstream Brand Lineage Drift (BS-01.1)
+            </button>
+          </div>
+        </div>
+
+        <div class="ff-chat-bubble ff-chat-bubble--human">
+          <div style="font-weight:700; font-size:11.5px; color:var(--human-accent); margin-bottom:3px;">
+            🧭 UX Consultation Guidance (Stitch + Socratic Debate)
+          </div>
+          <div style="font-size:11.5px; color:var(--text-secondary);">
+            • <strong>[CONFIRMED]</strong>: Human-verified ground truth.<br/>
+            • <strong>[INFERRED]</strong>: Synthesized by AI — review recommended.<br/>
+            • <strong>[MISSING]</strong>: Hard blocker — never hallucinated on sparse briefs.
+          </div>
+        </div>
+
+        <div style="font-size:11.5px; font-weight:700; margin:10px 0 6px; display:flex; justify-content:space-between;">
+          <span>Live Daemon &amp; Watcher Telemetry</span>
+          <span class="mono" style="color:var(--status-ok);">STREAMING</span>
+        </div>
+        <div class="ff-log-console mono" id="telemetry-log" data-ff-id="telemetry-log-console">
+          <div>[15:00:01] [BOOT] harness-daemon bound 127.0.0.1:4170 (.uxui-os/daemon.lock)</div>
+          <div>[15:00:01] [WAL] 16 SQLite tables verified in 8.4ms (foreign_keys=ON)</div>
+          <div>[15:00:02] [TS-RS] 16 domain structs exported to @uxui-os/shared-types</div>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <script>
+    const specsData = [
+      { key: "01-product-overview.md", confirmed: 3, inferred: 0, missing: 0, sha: "3a91f0c2...11b8", lineage: "Local Brief" },
+      { key: "02-target-personas-and-jtbd.md", confirmed: 2, inferred: 1, missing: 0, sha: "7c42d1a9...08e4", lineage: "Local Brief" },
+      { key: "03-user-flows-and-portals.md", confirmed: 2, inferred: 1, missing: 0, sha: "5b19e8f3...72a1", lineage: "Local Brief" },
+      { key: "04-design-direction.md", confirmed: 2, inferred: 0, missing: 0, sha: "9f81c4d0...e210", lineage: "Inherited: cowok-v4.3" },
+      { key: "05-information-architecture.md", confirmed: 2, inferred: 1, missing: 0, sha: "1d84a6b5...39c0", lineage: "Local Brief" },
+      { key: "06-design-system.md", confirmed: 2, inferred: 1, missing: 1, sha: "8f3a91c2...40b1", lineage: "Local + cowok-v4.3" },
+      { key: "07-component-registry.md", confirmed: 2, inferred: 0, missing: 0, sha: "6e20b7c4...55f2", lineage: "16 Core Components" },
+      { key: "08-brand-guidelines.md", confirmed: 2, inferred: 0, missing: 0, sha: "4a73e9d1...84b6", lineage: "Inherited: cowok-v4.3" },
+      { key: "09-data-and-copy.md", confirmed: 1, inferred: 1, missing: 1, sha: "2c95f1e8...63d7", lineage: "Local Brief" }
+    ];
+
+    let activeSpecIndex = 5;
+
+    function logEvent(tag, msg) {
+      const box = document.getElementById("telemetry-log");
+      const now = new Date().toTimeString().split(" ")[0];
+      const line = document.createElement("div");
+      line.textContent = `[${now}] [${tag}] ${msg}`;
+      box.prepend(line);
+    }
+
+    function renderSpecViews() {
+      const tree = document.getElementById("spec-tree-list");
+      const tbody = document.getElementById("synthesis-table-body");
+      tree.innerHTML = "";
+      tbody.innerHTML = "";
+
+      let totalC = 0, totalI = 0, totalM = 0;
+
+      specsData.forEach((s, idx) => {
+        totalC += s.confirmed;
+        totalI += s.inferred;
+        totalM += s.missing;
+
+        const statusBadge = s.missing > 0
+          ? `<span class="ff-pill ff-pill--danger mono">[MISSING: ${s.missing}]</span>`
+          : (s.inferred > 0
+            ? `<span class="ff-pill ff-pill--warn mono">[INFERRED: ${s.inferred}]</span>`
+            : `<span class="ff-pill ff-pill--ok mono">[CONFIRMED]</span>`);
+
+        const li = document.createElement("li");
+        li.className = "ff-spec-item" + (idx === activeSpecIndex ? " active" : "");
+        li.setAttribute("data-ff-id", "spec-tree-item-" + s.key);
+        li.onclick = () => selectSpec(idx);
+        li.innerHTML = `
+          <div class="ff-spec-item__top">
+            <span class="mono">${s.key}</span>
+            ${statusBadge}
+          </div>
+          <div class="ff-spec-item__meta">
+            <span class="mono">sha256: ${s.sha}</span>
+            <span>${s.lineage}</span>
+          </div>
+        `;
+        tree.appendChild(li);
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="mono"><strong>${s.key}</strong></td>
+          <td>
+            <span class="ff-pill ff-pill--ok mono">${s.confirmed} CONFIRMED</span>
+            <span class="ff-pill ff-pill--warn mono">${s.inferred} INFERRED</span>
+            ${s.missing > 0 ? `<span class="ff-pill ff-pill--danger mono">${s.missing} MISSING</span>` : ""}
+          </td>
+          <td class="mono">${s.sha}</td>
+          <td><span class="ff-pill mono">${s.lineage}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById("kpi-provenance-summary").textContent =
+        `${totalC} Confirmed • ${totalI} Inferred • ${totalM} Missing`;
+      const gatePill = document.getElementById("kpi-spec-gate-pill");
+      if (totalM === 0) {
+        gatePill.className = "ff-pill ff-pill--ok mono";
+        gatePill.textContent = "READY FOR FLOWS";
+      } else {
+        gatePill.className = "ff-pill ff-pill--warn mono";
+        gatePill.textContent = `${totalM} MISSING BLOCKERS`;
+      }
+    }
+
+    function selectSpec(idx) {
+      activeSpecIndex = idx;
+      const spec = specsData[idx];
+      document.getElementById("active-spec-filename").textContent = spec.key;
+      document.getElementById("editor-sha-pill").textContent = `expected_sha256: ${spec.sha}`;
+      renderSpecViews();
+      logEvent("SELECT", `Loaded ${spec.key} (sha256=${spec.sha}) via 0-token SQLite index`);
+    }
+
+    function switchScreen(screenId) {
+      document.querySelectorAll(".ff-screen").forEach(el => el.classList.remove("active"));
+      document.getElementById("screen-" + screenId).classList.add("active");
+      document.querySelectorAll(".ff-tab").forEach(el => el.classList.remove("active"));
+      const btnId = "nav-screen-" + screenId.replace(".", "-");
+      const btn = document.querySelector(`[data-ff-id="${btnId}"]`);
+      if (btn) btn.classList.add("active");
+      logEvent("NAV", `Switched active view to Story ${screenId}`);
+    }
+
+    function setTheme(mode) {
+      const html = document.documentElement;
+      if (mode === "night-low") {
+        html.setAttribute("data-theme", "night");
+        html.setAttribute("data-focus", "low");
+      } else {
+        html.setAttribute("data-theme", mode);
+        html.removeAttribute("data-focus");
+      }
+      logEvent("THEME", `Applied tokens.css theme mode: ${mode}`);
+    }
+
+    function runTsRsCheck() {
+      document.getElementById("kpi-tsrs-status").textContent = "100% Verified";
+      logEvent("TS-RS", "Exported 16 structs to packages/shared-types/src/generated/ (git diff --exit-code = 0)");
+    }
+
+    function saveActiveSpec() {
+      const s = specsData[activeSpecIndex];
+      s.sha = "c74e10a8...92d4";
+      document.getElementById("editor-sha-pill").textContent = `expected_sha256: ${s.sha}`;
+      renderSpecViews();
+      logEvent("ATOMIC-SAVE", `Wrote .tmp.<uuid> -> sync_all() -> rename(${s.key}) -> new sha256=${s.sha}`);
+    }
+
+    function triggerEchoSuppression() {
+      logEvent("NOTIFY-GUARD", "[EC-E01-01] FSEvents change detected on 06-design-system.md: disk_sha256 == db_sha256 -> NO-OP (Echo loop suppressed)");
+      document.getElementById("kpi-watcher-pill").textContent = "Echo Suppressed (0 Loops)";
+    }
+
+    function triggerStaleFile409() {
+      switchScreen("01.2");
+      document.getElementById("stale-file-banner").classList.add("visible");
+      document.getElementById("kpi-occ-state").textContent = "409 STALE_FILE Conflict";
+      logEvent("HTTP-409", "[EC-E01-02] PUT /api/v1/projects/p1/specs/06-design-system.md rejected: expected 8f3a91c2 != actual e41b07d9");
+    }
+
+    function resolveConflict(action) {
+      document.getElementById("stale-file-banner").classList.remove("visible");
+      specsData[5].sha = action === "reload" ? "e41b07d9...99a4" : "f109b8e2...31a0";
+      document.getElementById("kpi-occ-state").textContent = "SHA-256 OCC Clean";
+      renderSpecViews();
+      logEvent("OCC-RESOLVED", `409 STALE_FILE resolved via '${action.toUpperCase()}' -> active sha256=${specsData[5].sha}`);
+    }
+
+    function triggerInvalidSpecKey() {
+      logEvent("HTTP-422", "[EC-E01-03 / AS-01.2] Rejected key '../secret.md': HarnessError::InvalidSpecKey (Strict 9-Key Whitelist + canonicalize() Jail)");
+      document.getElementById("eggbot-message").innerHTML =
+        "⚠️ <strong>Security Guard Triggered (EC-E01-03):</strong> Attempted write to <code>../secret.md</code> was blocked at serde deserialization because it is outside the 9-key <code>CanonicalSpecKey</code> whitelist.";
+    }
+
+    function triggerZeroByteSave() {
+      const banner = document.getElementById("debounce-banner");
+      banner.classList.add("visible");
+      logEvent("DEBOUNCE-50MS", "[EC-E01-04 / UU-01.2] IDE truncated 06-design-system.md to 0 bytes; holding 50ms debounce window...");
+      setTimeout(() => {
+        banner.classList.remove("visible");
+        logEvent("DEBOUNCE-OK", "[EC-E01-04] After 50ms debounce, file size stabilized at 4,182 bytes. Zero data loss.");
+      }, 2400);
+    }
+
+    function triggerUnsafeInt64() {
+      switchScreen("01.1");
+      document.getElementById("kpi-int64-guard-text").textContent = "Blocked u64 > 9007199254740991 (KU-01.1)";
+      logEvent("KU-01.1", "Rejected unsafe 64-bit integer 9007199254740999 (> Number.MAX_SAFE_INTEGER) in ts-rs Zod boundary test");
+    }
+
+    function triggerPortFallback() {
+      const pill = document.getElementById("daemon-endpoint-pill");
+      pill.className = "ff-pill ff-pill--warn mono";
+      pill.innerHTML = `<span class="ff-dot"></span> 127.0.0.1:4171 (Fallback from 4170 • .uxui-os/daemon.lock Updated)`;
+      logEvent("PORT-FALLBACK", "[AS-01.1 / EC-E01-07] Port 4170 EADDRINUSE -> Bound 127.0.0.1:4171 and atomically updated .uxui-os/daemon.lock");
+    }
+
+    function triggerSparseBrief() {
+      switchScreen("01.3");
+      document.getElementById("brief-input-box").value = "Make a landing page for our new AI app.";
+      document.getElementById("brief-word-count").textContent = "9 words (SPARSE BRIEF < 50)";
+      specsData[5].missing = 3;
+      specsData[8].missing = 2;
+      renderSpecViews();
+      document.getElementById("eggbot-message").innerHTML =
+        "🛑 <strong>Sparse Brief Fallback Guard (EC-E01-08 / AS-01.1):</strong> Brief has only 9 words. Pipeline refused to hallucinate <code>[CONFIRMED]</code> sections and tagged 5 missing slots as <code>[MISSING]</code>.";
+      logEvent("SPARSE-BRIEF", "[EC-E01-08] Brief < 50 words: tagged unstated sections as [INFERRED]/[MISSING] instead of hallucinating");
+    }
+
+    function confirmMissingSpecs() {
+      specsData.forEach(s => {
+        s.confirmed += s.missing;
+        s.missing = 0;
+      });
+      renderSpecViews();
+      document.getElementById("eggbot-message").innerHTML =
+        "✅ <strong>All 9 Foundational Specs Verified!</strong> Zero <code>[MISSING]</code> blockers remain. Downstream Flow-First Canvas (Epic 04) and 16:9 Presentation CMS (Epic 06) are now unlocked.";
+      logEvent("PROVENANCE", "Upgraded all [MISSING] sections to [CONFIRMED] and recorded immutable SPEC_REVISIONS entry");
+    }
+
+    function updateBrandLineage(val) {
+      document.getElementById("kpi-brand-preset-name").textContent = val === "none" ? "Custom Scratch" : val.slice(0, 14);
+      logEvent("LINEAGE", `[BS-01.1] Updated inherit_brand_from_project_id = ${val}`);
+    }
+
+    function simulateUpstreamBrandDrift() {
+      document.getElementById("kpi-lineage-badge").className = "ff-pill ff-pill--warn mono";
+      document.getElementById("kpi-lineage-badge").textContent = "Upstream Updated";
+      document.getElementById("kpi-lineage-sha").textContent = "upstream: d402a1 != local: 9f81c4";
+      logEvent("BS-01.1", "Detected upstream Brand Guideline update on cowok-brand-product-system-v4.3 (04-design-direction.md & 08-brand-guidelines.md)");
+    }
+
+    function runSynthesisPipeline() {
+      logEvent("SYNTHESIZE", "POST /api/v1/projects/p1/specs/synthesize completed in 14ms -> 9/9 specs indexed in SQLite WAL");
+      renderSpecViews();
+    }
+
+    renderSpecViews();
+  </script>
+</body>
+</html>

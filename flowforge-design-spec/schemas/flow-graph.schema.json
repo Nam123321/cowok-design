@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FlowGraphV1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "sourceCommit",
+    "nodes",
+    "edges"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "projectId": {
+      "type": "string"
+    },
+    "sourceCommit": {
+      "type": "string"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "route",
+          "fixtureRef",
+          "viewport"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "route": {
+            "type": "string"
+          },
+          "componentRef": {
+            "type": "string"
+          },
+          "fixtureRef": {
+            "type": "string"
+          },
+          "viewport": {
+            "enum": [
+              "desktop",
+              "tablet",
+              "mobile"
+            ]
+          },
+          "expectedAssertions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "from",
+          "to",
+          "event"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "guard": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

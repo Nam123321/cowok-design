@@ -1,0 +1,3 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="pin-off">
+  <line x1="2" y1="2" x2="22" y2="22"></line><line x1="12" y1="17" x2="12" y2="22"></line><path d="M9 9v3H5v1.5c0 1.5 1.5 3 1.5 3h6.5"></path><path d="M15 9.34V5h4h-3.34"></path><line x1="9" y1="5" x2="15" y2="5"></line>
+</svg>

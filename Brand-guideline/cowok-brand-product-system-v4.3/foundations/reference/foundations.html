@@ -1,0 +1,77 @@
+<!doctype html><html data-theme="warm"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cowok.ai Visual Foundations v1.1</title><style>
+:root,html[data-theme="warm"]{
+--bg-canvas:#F7F5F0;--bg-workspace:#FFFDFC;--bg-surface:#FFFFFF;--bg-subtle:#F2F0EB;--bg-raised:#FFFFFF;
+--bg-hover:#F5F7FA;--bg-selected:#EDF4FF;
+--text-primary:#081E3A;--text-secondary:#344054;--text-muted:#667085;--text-disabled:#98A2B3;--text-on-action:#FFFFFF;
+--border-default:#E6E2DB;--border-strong:#D6D1C8;--border-focus:#90AEFF;
+--human-accent:#4B7FFF;--human-soft:#EDF3FF;--agent-accent:#E89A35;--agent-soft:#FFF3E3;
+--action-primary:#081E3A;--action-primary-hover:#102A50;--action-link:#0057FF;
+}
+html[data-theme="dim"]{
+--bg-canvas:#ECEAE4;--bg-workspace:#F4F2ED;--bg-surface:#FAF9F6;--bg-subtle:#E5E2DB;--bg-raised:#FAF9F6;
+--bg-hover:#EEECE7;--bg-selected:#E7EEF9;
+--text-primary:#182230;--text-secondary:#475467;--text-muted:#667085;--text-disabled:#98A2B3;--text-on-action:#FFFFFF;
+--border-default:#D8D4CC;--border-strong:#C8C2B8;--border-focus:#8099D8;
+--human-accent:#5579C9;--human-soft:#E9EEF8;--agent-accent:#B9772B;--agent-soft:#F5EEE5;
+--action-primary:#182230;--action-primary-hover:#253248;--action-link:#315FB6;
+}
+html[data-theme="night"]{
+--bg-canvas:#0B1220;--bg-workspace:#111827;--bg-surface:#172033;--bg-subtle:#1C2940;--bg-raised:#22314B;
+--bg-hover:#17263D;--bg-selected:#16294A;
+--text-primary:#F1F5F9;--text-secondary:#CBD5E1;--text-muted:#94A3B8;--text-disabled:#64748B;--text-on-action:#081E3A;
+--border-default:#26354D;--border-strong:#344761;--border-focus:#6C8FD9;
+--human-accent:#4D86FF;--human-soft:#152A4C;--agent-accent:#FF9A2F;--agent-soft:#211B16;
+--action-primary:#F1F5F9;--action-primary-hover:#FFFFFF;--action-link:#6F9BFF;
+}
+html[data-theme="night"][data-focus="low"]{
+--human-accent:#65789E;--agent-accent:#8F765E;
+--human-soft:color-mix(in srgb,var(--bg-surface) 88%,#7E90B4 12%);
+--agent-soft:color-mix(in srgb,var(--bg-surface) 92%,#FF8A00 8%);
+}
+
+*{box-sizing:border-box}body{margin:0;font-family:Geist,Inter,system-ui;background:var(--bg-canvas);color:var(--text-primary)}
+main{max-width:1300px;margin:auto;padding:32px}.top{display:flex;justify-content:space-between;gap:20px;align-items:center}
+.switch{display:flex;gap:6px;background:var(--bg-subtle);padding:5px;border:1px solid var(--border-default);border-radius:12px}
+button{font:inherit}.switch button{border:0;background:transparent;color:var(--text-muted);padding:8px 11px;border-radius:8px;cursor:pointer}
+.switch button.on{background:var(--bg-surface);color:var(--text-primary);font-weight:600}
+.card{background:var(--bg-surface);border:1px solid var(--border-default);border-radius:16px;padding:20px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.section{margin-top:18px}
+h1{letter-spacing:-.035em}.token{padding:12px;border:1px solid var(--border-default);border-radius:12px;background:var(--bg-subtle)}
+.token b{display:block;font-size:12px}.token span{display:block;color:var(--text-muted);font-size:11px;margin-top:4px}
+.samples{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.btn{border-radius:9px;padding:9px 12px;font-weight:600;border:1px solid var(--border-default)}
+.primary{background:var(--action-primary);color:var(--text-on-action);border-color:transparent}.secondary{background:var(--bg-surface);color:var(--text-primary)}
+.human{background:var(--human-accent);color:white;border-color:transparent}.agent{background:var(--agent-accent);color:#081E3A;border-color:transparent}
+.input{background:var(--bg-surface);color:var(--text-primary);border:1px solid var(--border-default);padding:10px 12px;border-radius:9px}
+.review{background:var(--bg-subtle);border:1px solid var(--border-default);border-left:3px solid var(--agent-accent);padding:14px;border-radius:12px}
+.muted{color:var(--text-muted)}.focusToggle{display:none}
+html[data-theme="night"] .focusToggle{display:inline-block}
+@media(max-width:800px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+</style></head><body><main>
+<div class="top"><div><h1>Visual Foundations v1.1</h1><p class="muted">Semantic abstraction for long-session themes.</p></div>
+<div class="switch"><button data-t="warm" class="on">Warm Light</button><button data-t="dim">Focus Light</button><button data-t="night">Night</button><button class="focusToggle" id="focus">Low-chroma</button></div></div>
+
+<div class="section grid">
+<div class="card"><h3>Surface hierarchy</h3><div class="token"><b>Canvas</b><span>Global background</span></div><br><div class="token" style="background:var(--bg-surface)"><b>Surface</b><span>Cards / tables / inputs</span></div></div>
+<div class="card"><h3>Text hierarchy</h3><p style="color:var(--text-primary)">Primary text</p><p style="color:var(--text-secondary)">Secondary text</p><p style="color:var(--text-muted)">Muted metadata</p></div>
+<div class="card"><h3>Human / Agent</h3><div class="samples"><button class="btn human">Human Action</button><button class="btn agent">Agent Action</button></div><p class="muted">Use only when ownership/action is semantic.</p></div>
+</div>
+
+<div class="section card"><h3>Buttons</h3><div class="samples"><button class="btn primary">Primary</button><button class="btn secondary">Secondary</button><button class="btn human">Human Action</button><button class="btn agent">Agent Action</button></div></div>
+
+<div class="section card"><h3>Input</h3><input class="input" value="Search workflows, people or agents…" style="width:min(520px,100%)"></div>
+
+<div class="section card"><h3>Review-required abstraction</h3><div class="review"><b>Review required</b><p class="muted">Neutral surface. Orange is confined to edge/action emphasis instead of filling the whole container.</p><button class="btn agent">Review changes</button></div></div>
+</main>
+<script>
+const root=document.documentElement;
+document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{
+ root.dataset.theme=b.dataset.t; root.dataset.focus='normal';
+ document.querySelectorAll('[data-t]').forEach(x=>x.classList.toggle('on',x===b));
+ document.getElementById('focus').classList.remove('on');
+});
+document.getElementById('focus').onclick=e=>{
+ if(root.dataset.theme!=='night')return;
+ const low=root.dataset.focus==='low';root.dataset.focus=low?'normal':'low';e.target.classList.toggle('on',!low);
+};
+</script></body></html>

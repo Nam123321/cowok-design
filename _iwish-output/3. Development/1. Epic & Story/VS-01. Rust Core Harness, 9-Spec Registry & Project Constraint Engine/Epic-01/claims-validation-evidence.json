@@ -1,0 +1,8 @@
+{
+  "gate": "validate-claims",
+  "epic_id": "Epic-01",
+  "claims_count": 3,
+  "validated_at": "2026-11-02T07:26:53.823476+00:00",
+  "offline_drift_provisional": false,
+  "status": "APPROVED"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "uxui-os",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UI/UX OS (FlowForge Harness OS) \u2014 Day-1 Rust Core + React 19 Hybrid Monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

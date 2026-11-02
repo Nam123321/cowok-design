@@ -1,0 +1,12 @@
+epic_id: Epic-01
+value_stream: VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine
+claims:
+  - model: Project
+    intent: OWNS
+    rationale: Primary lifecycle and schema ownership for PROJECTS table in Epic-01 (Story 01.1, Story 01.2, Story 01.3)
+  - model: ProjectSpec
+    intent: OWNS
+    rationale: Primary lifecycle and SHA-256 StaleFile OCC ownership for the 9 Foundational Project Context Specs (PROJECT_SPECS table) in Epic-01
+  - model: SpecRevision
+    intent: OWNS
+    rationale: Primary lifecycle ownership for the append-only SPEC_REVISIONS audit and cross-project lineage ledger in Epic-01

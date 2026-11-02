@@ -1,0 +1,15 @@
+{
+  "projectId": "9168334019814804214",
+  "projectName": "projects/9168334019814804214",
+  "title": "UI/UX OS (FlowForge Harness OS) — Master Design System",
+  "designSystem": "assets/8dea0cc19e8c48d193f6550232507a0f",
+  "screens": {
+    "Epic-01": {
+      "screenId": "223e92c3f6c64c72bfd928cc660710ae",
+      "screenName": "projects/9168334019814804214/screens/223e92c3f6c64c72bfd928cc660710ae",
+      "title": "FlowForge Harness OS — Epic 01 Control Plane",
+      "screenshot": "projects/9168334019814804214/files/a1347dc970c9453fb84a861e2807a87a",
+      "htmlCode": "projects/9168334019814804214/files/668e1f43455e4fb6b7f4e000628e2052"
+    }
+  }
+}

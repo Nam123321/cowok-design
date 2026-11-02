@@ -1,0 +1,609 @@
+{
+  "schema_version": "2.0.0",
+  "project_slug": "uxui-os",
+  "total_epics": 12,
+  "total_stories": 36,
+  "nodes": {
+    "01.1": {
+      "story_id": "01.1",
+      "epic_id": "01",
+      "title": "Khởi tạo Hybrid Monorepo (11 Rust Crates + pnpm) & crates/domain Type Sync",
+      "status": "ready-for-dev",
+      "dependencies": []
+    },
+    "01.2": {
+      "story_id": "01.2",
+      "epic_id": "01",
+      "title": "Xây dựng crates/spec-registry với rusqlite SQLite WAL (16 Bảng) & 2-Way File Sync",
+      "status": "planned",
+      "dependencies": [
+        "01.1"
+      ]
+    },
+    "01.3": {
+      "story_id": "01.3",
+      "epic_id": "01",
+      "title": "Xây dựng crates/harness-daemon (Axum + Tokio) & 9-Spec Synthesis Pipeline",
+      "status": "planned",
+      "dependencies": [
+        "01.2"
+      ]
+    },
+    "02.1": {
+      "story_id": "02.1",
+      "epic_id": "02",
+      "title": "Bộ định tuyến Task Horizon (short / mid / long) & Cross-Department Context Slicer",
+      "status": "ready-for-dev",
+      "dependencies": [
+        "01.2"
+      ]
+    },
+    "02.2": {
+      "story_id": "02.2",
+      "epic_id": "02",
+      "title": "Token Budget Governor (<= 1,500 Input Tokens) & Deterministic Prompt Compiler",
+      "status": "planned",
+      "dependencies": [
+        "02.1"
+      ]
+    },
+    "02.3": {
+      "story_id": "02.3",
+      "epic_id": "02",
+      "title": "Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter)",
+      "status": "planned",
+      "dependencies": [
+        "02.2"
+      ]
+    },
+    "03.1": {
+      "story_id": "03.1",
+      "epic_id": "03",
+      "title": "Động cơ Ràng buộc Cấu hình theo Dự án (PROJECT_CONSTRAINTS) & oxc AST Linter",
+      "status": "ready-for-dev",
+      "dependencies": [
+        "01.2"
+      ]
+    },
+    "03.2": {
+      "story_id": "03.2",
+      "epic_id": "03",
+      "title": "Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons)",
+      "status": "planned",
+      "dependencies": [
+        "03.1"
+      ]
+    },
+    "03.3": {
+      "story_id": "03.3",
+      "epic_id": "03",
+      "title": "Deterministic data-ff-id AST Injector & <1ms Surgical Patcher",
+      "status": "planned",
+      "dependencies": [
+        "03.1"
+      ]
+    },
+    "04.1": {
+      "story_id": "04.1",
+      "epic_id": "04",
+      "title": "Giao diện Workbench Shell, <BrandIcon /> & Canvas @xyflow/react v12 (ScreenState + Transition)",
+      "status": "planned",
+      "dependencies": [
+        "01.3",
+        "03.2"
+      ]
+    },
+    "04.2": {
+      "story_id": "04.2",
+      "epic_id": "04",
+      "title": "State-Hydrated Sandboxed Live Preview & Multi-Viewport Switcher (1440 / 768 / 390)",
+      "status": "planned",
+      "dependencies": [
+        "04.1"
+      ]
+    },
+    "04.3": {
+      "story_id": "04.3",
+      "epic_id": "04",
+      "title": "Element-Anchored Comments (data-ff-id) & Stale Anchor Detection (stale_mapping)",
+      "status": "planned",
+      "dependencies": [
+        "04.2",
+        "03.3"
+      ]
+    },
+    "05.1": {
+      "story_id": "05.1",
+      "epic_id": "05",
+      "title": "Trình biên dịch Structured Design Intent (SDI) (DesignIntentV1) & Visual Clarification (2-3 Phương án)",
+      "status": "planned",
+      "dependencies": [
+        "02.2",
+        "04.3"
+      ]
+    },
+    "05.2": {
+      "story_id": "05.2",
+      "epic_id": "05",
+      "title": "Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject",
+      "status": "planned",
+      "dependencies": [
+        "05.1"
+      ]
+    },
+    "05.3": {
+      "story_id": "05.3",
+      "epic_id": "05",
+      "title": "Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR",
+      "status": "planned",
+      "dependencies": [
+        "05.2"
+      ]
+    },
+    "06.1": {
+      "story_id": "06.1",
+      "epic_id": "06",
+      "title": "Khung trình chiếu 16:9 HTML Slide Engine (1920x1080) & 8 Layout Templates chuẩn Dự án",
+      "status": "planned",
+      "dependencies": [
+        "03.2",
+        "04.1"
+      ]
+    },
+    "06.2": {
+      "story_id": "06.2",
+      "epic_id": "06",
+      "title": "Giao diện Dual-Pane Human CMS Texting Editor đồng bộ <16ms qua data-ff-id",
+      "status": "planned",
+      "dependencies": [
+        "06.1",
+        "03.3"
+      ]
+    },
+    "06.3": {
+      "story_id": "06.3",
+      "epic_id": "06",
+      "title": "Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen Mode",
+      "status": "planned",
+      "dependencies": [
+        "06.2"
+      ]
+    },
+    "07.1": {
+      "story_id": "07.1",
+      "epic_id": "07",
+      "title": "Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9",
+      "status": "planned",
+      "dependencies": [
+        "05.2",
+        "06.2"
+      ]
+    },
+    "07.2": {
+      "story_id": "07.2",
+      "epic_id": "07",
+      "title": "Lớp phủ Visual QC Overlay & Vòng lặp Auto-Fix 1-Click trên Workbench",
+      "status": "planned",
+      "dependencies": [
+        "07.1"
+      ]
+    },
+    "07.3": {
+      "story_id": "07.3",
+      "epic_id": "07",
+      "title": "Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)",
+      "status": "planned",
+      "dependencies": [
+        "07.1",
+        "06.3"
+      ]
+    },
+    "08.1": {
+      "story_id": "08.1",
+      "epic_id": "08",
+      "title": "Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills)",
+      "status": "ready-for-dev",
+      "dependencies": [
+        "01.2",
+        "02.1"
+      ]
+    },
+    "08.2": {
+      "story_id": "08.2",
+      "epic_id": "08",
+      "title": "Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager)",
+      "status": "planned",
+      "dependencies": [
+        "08.1"
+      ]
+    },
+    "08.3": {
+      "story_id": "08.3",
+      "epic_id": "08",
+      "title": "Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler)",
+      "status": "planned",
+      "dependencies": [
+        "08.2"
+      ]
+    },
+    "09.1": {
+      "story_id": "09.1",
+      "epic_id": "09",
+      "title": "Xây dựng crates/design-rea-forge (Trích xuất Design DNA & Ranh giới Design-Only)",
+      "status": "planned",
+      "dependencies": [
+        "03.1",
+        "08.2"
+      ]
+    },
+    "09.2": {
+      "story_id": "09.2",
+      "epic_id": "09",
+      "title": "Tích hợp Jev Choice (<2ms Routing), Jev Noul (<1ms Pre-Filter) & Speculative Multi-Head (crates/jev-engine)",
+      "status": "planned",
+      "dependencies": [
+        "03.2",
+        "08.1"
+      ]
+    },
+    "09.3": {
+      "story_id": "09.3",
+      "epic_id": "09",
+      "title": "Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile OCC & 3-Strike Breaker",
+      "status": "planned",
+      "dependencies": [
+        "09.2"
+      ]
+    },
+    "10.1": {
+      "story_id": "10.1",
+      "epic_id": "10",
+      "title": "Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z)",
+      "status": "planned",
+      "dependencies": [
+        "05.2",
+        "08.2",
+        "09.2"
+      ]
+    },
+    "10.2": {
+      "story_id": "10.2",
+      "epic_id": "10",
+      "title": "Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)",
+      "status": "planned",
+      "dependencies": [
+        "10.1",
+        "09.3"
+      ]
+    },
+    "10.3": {
+      "story_id": "10.3",
+      "epic_id": "10",
+      "title": "Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode)",
+      "status": "planned",
+      "dependencies": [
+        "10.2"
+      ]
+    },
+    "11.1": {
+      "story_id": "11.1",
+      "epic_id": "11",
+      "title": "POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway",
+      "status": "planned",
+      "dependencies": [
+        "02.3",
+        "09.3"
+      ]
+    },
+    "11.2": {
+      "story_id": "11.2",
+      "epic_id": "11",
+      "title": "Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging)",
+      "status": "planned",
+      "dependencies": [
+        "11.1",
+        "10.3"
+      ]
+    },
+    "11.3": {
+      "story_id": "11.3",
+      "epic_id": "11",
+      "title": "Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền",
+      "status": "planned",
+      "dependencies": [
+        "11.1",
+        "10.2"
+      ]
+    },
+    "12.1": {
+      "story_id": "12.1",
+      "epic_id": "12",
+      "title": "Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx)",
+      "status": "planned",
+      "dependencies": [
+        "07.3",
+        "11.3"
+      ]
+    },
+    "12.2": {
+      "story_id": "12.2",
+      "epic_id": "12",
+      "title": "Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai",
+      "status": "planned",
+      "dependencies": [
+        "12.1"
+      ]
+    },
+    "12.3": {
+      "story_id": "12.3",
+      "epic_id": "12",
+      "title": "Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD",
+      "status": "planned",
+      "dependencies": [
+        "12.1"
+      ]
+    }
+  },
+  "edges": [
+    {
+      "from": "01.1",
+      "to": "01.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "01.2",
+      "to": "01.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "01.2",
+      "to": "02.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "02.1",
+      "to": "02.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "02.2",
+      "to": "02.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "01.2",
+      "to": "03.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "03.1",
+      "to": "03.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "03.1",
+      "to": "03.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "01.3",
+      "to": "04.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "03.2",
+      "to": "04.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "04.1",
+      "to": "04.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "04.2",
+      "to": "04.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "03.3",
+      "to": "04.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "02.2",
+      "to": "05.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "04.3",
+      "to": "05.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "05.1",
+      "to": "05.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "05.2",
+      "to": "05.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "03.2",
+      "to": "06.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "04.1",
+      "to": "06.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "06.1",
+      "to": "06.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "03.3",
+      "to": "06.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "06.2",
+      "to": "06.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "05.2",
+      "to": "07.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "06.2",
+      "to": "07.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "07.1",
+      "to": "07.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "07.1",
+      "to": "07.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "06.3",
+      "to": "07.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "01.2",
+      "to": "08.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "02.1",
+      "to": "08.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "08.1",
+      "to": "08.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "08.2",
+      "to": "08.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "03.1",
+      "to": "09.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "08.2",
+      "to": "09.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "03.2",
+      "to": "09.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "08.1",
+      "to": "09.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "09.2",
+      "to": "09.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "05.2",
+      "to": "10.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "08.2",
+      "to": "10.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "09.2",
+      "to": "10.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "10.1",
+      "to": "10.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "09.3",
+      "to": "10.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "10.2",
+      "to": "10.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "02.3",
+      "to": "11.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "09.3",
+      "to": "11.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "11.1",
+      "to": "11.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "10.3",
+      "to": "11.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "11.1",
+      "to": "11.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "10.2",
+      "to": "11.3",
+      "type": "story_dependency"
+    },
+    {
+      "from": "07.3",
+      "to": "12.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "11.3",
+      "to": "12.1",
+      "type": "story_dependency"
+    },
+    {
+      "from": "12.1",
+      "to": "12.2",
+      "type": "story_dependency"
+    },
+    {
+      "from": "12.1",
+      "to": "12.3",
+      "type": "story_dependency"
+    }
+  ]
+}

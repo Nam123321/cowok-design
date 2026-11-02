@@ -1,0 +1,175 @@
+{
+  "meta": {
+    "brand": "cowok.ai",
+    "version": "1.0.0",
+    "dependsOn": [
+      "Visual Foundations v1.1",
+      "Iconography v1.2",
+      "Core Components v1.0",
+      "Product Patterns v1.0"
+    ],
+    "centralIdea": "Human judgment. Agent execution. One workflow.",
+    "canonicalFlow": [
+      "request",
+      "interpret",
+      "draft",
+      "review",
+      "execute",
+      "report"
+    ]
+  },
+  "agentStates": [
+    {
+      "id": "idle",
+      "label": "Idle",
+      "meaning": "Agent is available but not executing work.",
+      "attention": "none"
+    },
+    {
+      "id": "interpreting",
+      "label": "Interpreting",
+      "meaning": "Agent is resolving intent, context and constraints.",
+      "attention": "low"
+    },
+    {
+      "id": "working",
+      "label": "Working",
+      "meaning": "Agent is actively executing internal work.",
+      "attention": "low"
+    },
+    {
+      "id": "draftReady",
+      "label": "Draft ready",
+      "meaning": "Output is ready for Human review or downstream workflow.",
+      "attention": "medium"
+    },
+    {
+      "id": "reviewRequired",
+      "label": "Review required",
+      "meaning": "Human judgment is required before further execution.",
+      "attention": "high"
+    },
+    {
+      "id": "executing",
+      "label": "Executing",
+      "meaning": "Approved action is being carried out.",
+      "attention": "medium"
+    },
+    {
+      "id": "completed",
+      "label": "Completed",
+      "meaning": "Work finished and outcome/report is available.",
+      "attention": "low"
+    },
+    {
+      "id": "failed",
+      "label": "Failed",
+      "meaning": "Execution failed or cannot continue safely.",
+      "attention": "high"
+    },
+    {
+      "id": "blocked",
+      "label": "Blocked",
+      "meaning": "Agent cannot proceed due to missing permission/context/dependency.",
+      "attention": "high"
+    }
+  ],
+  "riskModel": [
+    {
+      "level": "R0",
+      "name": "Informational",
+      "examples": [
+        "summarize",
+        "search",
+        "analyze",
+        "draft"
+      ],
+      "defaultReview": "none",
+      "execution": "no external side effect"
+    },
+    {
+      "level": "R1",
+      "name": "Low-impact reversible",
+      "examples": [
+        "update internal draft",
+        "tag record",
+        "reorder task"
+      ],
+      "defaultReview": "optional",
+      "execution": "allowed when policy permits"
+    },
+    {
+      "level": "R2",
+      "name": "Operational change",
+      "examples": [
+        "modify workflow",
+        "update CRM record",
+        "change scheduled task"
+      ],
+      "defaultReview": "required",
+      "execution": "Human approval before action"
+    },
+    {
+      "level": "R3",
+      "name": "External / financial / bulk",
+      "examples": [
+        "send external communication",
+        "financial transaction",
+        "bulk record change"
+      ],
+      "defaultReview": "required + impact summary",
+      "execution": "explicit Human confirmation"
+    }
+  ],
+  "provenance": {
+    "showWhenMeaningful": [
+      "source documents",
+      "tool/action used",
+      "workflow/project context",
+      "data freshness",
+      "owner/approver",
+      "execution timestamp",
+      "result or external effect"
+    ],
+    "doNotExpose": [
+      "private chain-of-thought",
+      "hidden internal reasoning traces"
+    ],
+    "explanationStyle": "Operational summary: what was considered, what changed, evidence/source, uncertainty, and next action."
+  },
+  "reviewPattern": {
+    "questions": [
+      "What is proposed?",
+      "Why is it proposed?",
+      "What will change?",
+      "What is the impact?",
+      "What evidence supports it?",
+      "What can the Human do?"
+    ],
+    "actions": [
+      "approve",
+      "edit",
+      "reject",
+      "ask-for-more-context"
+    ]
+  },
+  "supervisor": {
+    "purpose": "Control execution quality, risk, permission and workflow compliance.",
+    "checks": [
+      "risk level",
+      "required Human approval",
+      "tool permission",
+      "data/source validity",
+      "workflow stage",
+      "execution result",
+      "exception handling"
+    ],
+    "principle": "Supervisor is usually invisible when everything is healthy; surface only when intervention is needed."
+  },
+  "automation": {
+    "healthy": "quiet",
+    "reviewRequired": "elevated",
+    "failed": "elevated",
+    "externalAction": "requires visible approval when policy/risk demands it"
+  }
+}

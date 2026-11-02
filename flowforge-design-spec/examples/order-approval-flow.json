@@ -1,0 +1,150 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectId": "order-demo",
+  "sourceCommit": "seed-template-v1",
+  "nodes": [
+    {
+      "id": "login",
+      "name": "Login",
+      "route": "/login",
+      "componentRef": "AppPage",
+      "fixtureRef": "login",
+      "viewport": "desktop",
+      "expectedAssertions": []
+    },
+    {
+      "id": "dashboard",
+      "name": "Dashboard",
+      "route": "/dashboard",
+      "componentRef": "AppPage",
+      "fixtureRef": "dashboard",
+      "viewport": "desktop",
+      "expectedAssertions": []
+    },
+    {
+      "id": "order-list",
+      "name": "Order List",
+      "route": "/order-list",
+      "componentRef": "AppPage",
+      "fixtureRef": "order-list",
+      "viewport": "desktop",
+      "expectedAssertions": []
+    },
+    {
+      "id": "order-detail-pending",
+      "name": "Order Detail Pending",
+      "route": "/orders/1024",
+      "componentRef": "OrderDetailPage",
+      "fixtureRef": "order-detail-pending",
+      "viewport": "desktop",
+      "expectedAssertions": []
+    },
+    {
+      "id": "confirmation-modal",
+      "name": "Confirmation Modal",
+      "route": "/orders/1024",
+      "componentRef": "OrderDetailPage",
+      "fixtureRef": "confirmation-modal",
+      "viewport": "desktop",
+      "expectedAssertions": []
+    },
+    {
+      "id": "submitting",
+      "name": "Submitting",
+      "route": "/orders/1024",
+      "componentRef": "OrderDetailPage",
+      "fixtureRef": "submitting",
+      "viewport": "desktop",
+      "expectedAssertions": []
+    },
+    {
+      "id": "approved",
+      "name": "Approved",
+      "route": "/orders/1024",
+      "componentRef": "OrderDetailPage",
+      "fixtureRef": "approved",
+      "viewport": "desktop",
+      "expectedAssertions": []
+    },
+    {
+      "id": "error",
+      "name": "Error",
+      "route": "/orders/1024",
+      "componentRef": "OrderDetailPage",
+      "fixtureRef": "error",
+      "viewport": "desktop",
+      "expectedAssertions": []
+    },
+    {
+      "id": "permission-denied",
+      "name": "Permission Denied",
+      "route": "/orders/1024",
+      "componentRef": "OrderDetailPage",
+      "fixtureRef": "permission-denied",
+      "viewport": "desktop",
+      "expectedAssertions": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "from": "login",
+      "to": "dashboard",
+      "event": "login.success"
+    },
+    {
+      "id": "e1",
+      "from": "dashboard",
+      "to": "order-list",
+      "event": "navigate.orders"
+    },
+    {
+      "id": "e2",
+      "from": "order-list",
+      "to": "order-detail-pending",
+      "event": "order.open"
+    },
+    {
+      "id": "e3",
+      "from": "order-detail-pending",
+      "to": "confirmation-modal",
+      "event": "approve.click"
+    },
+    {
+      "id": "e4",
+      "from": "confirmation-modal",
+      "to": "submitting",
+      "event": "confirm"
+    },
+    {
+      "id": "e5",
+      "from": "confirmation-modal",
+      "to": "order-detail-pending",
+      "event": "cancel"
+    },
+    {
+      "id": "e6",
+      "from": "submitting",
+      "to": "approved",
+      "event": "request.success"
+    },
+    {
+      "id": "e7",
+      "from": "submitting",
+      "to": "error",
+      "event": "request.error"
+    },
+    {
+      "id": "e8",
+      "from": "error",
+      "to": "submitting",
+      "event": "retry"
+    },
+    {
+      "id": "e9",
+      "from": "order-detail-pending",
+      "to": "permission-denied",
+      "event": "authorization.denied"
+    }
+  ]
+}

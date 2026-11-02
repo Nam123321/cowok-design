@@ -1,0 +1,328 @@
+{
+  "schema_version": "1.0.0",
+  "project_slug": "uxui-os",
+  "verified_state_sha": "836386ce391c003397751ec60b088ba3269f5379c72482af3bfb4178b88dea27",
+  "generated_at": "2026-11-02T13:26:57.887373",
+  "maturity_baseline_epics": [],
+  "waves": [
+    {
+      "wave_id": 1,
+      "wave_name": "Horizon 1: Foundational Rust Core, 9-Spec Vault, Project Constraint Engine & Built-in Skills",
+      "status": "active",
+      "epics": [
+        "01",
+        "02",
+        "03",
+        "08"
+      ],
+      "sub_epic_slices": [],
+      "vertical_value_slice": "Khởi tạo monorepo 11 Rust crates + `pnpm`, vận hành 16 bảng SQLite WAL, bộ cắt lát ngữ cảnh JIT ($\\le 1,500$ tokens), động cơ ràng buộc cấu hình theo dự án (`oxc` AST `<1ms`), và đóng gói 6 Built-in Skills chuẩn `agentskills.io`.",
+      "parallel_tracks": [
+        "Stream-1",
+        "Stream-4"
+      ],
+      "stream_execution_chains": [
+        {
+          "stream_id": "Stream-1",
+          "stream_name": "Core Harness & Constraint Engine",
+          "schema_domain": "`core_specs.prisma`",
+          "causal_steps": [
+            "01",
+            "02",
+            "03"
+          ],
+          "closed_epics": [
+            "01",
+            "02",
+            "03"
+          ],
+          "vertical_layers_covered": [
+            "L1_SUBSTRATE_SCHEMA",
+            "L2_ENGINE_API",
+            "L3_SDK_UI_E2E"
+          ]
+        },
+        {
+          "stream_id": "Stream-4",
+          "stream_name": "`agentskills.io` & Plugin Lifecycle",
+          "schema_domain": "`skills_rea.prisma`",
+          "causal_steps": [
+            "08"
+          ],
+          "closed_epics": [
+            "08"
+          ],
+          "vertical_layers_covered": [
+            "L1_SUBSTRATE_SCHEMA",
+            "L2_ENGINE_API",
+            "L3_SDK_UI_E2E"
+          ]
+        }
+      ]
+    },
+    {
+      "wave_id": 2,
+      "wave_name": "Horizon 2: Flow-First Executable Workbench, Dual-Pane 16:9 Presentation CMS & JEV / REA Engine",
+      "status": "pending",
+      "epics": [
+        "04",
+        "06",
+        "09"
+      ],
+      "sub_epic_slices": [],
+      "vertical_value_slice": "Ra mắt giao diện Flow-First (`ScreenState` + `Transition`, State-Hydrated Live Preview, Element-Anchored Comments), giao diện Dual-Pane 16:9 Presentation CMS (`<16ms` sync), cùng bộ tăng tốc `JEV — TypeSafe` và `Design-Only REA Forge`.",
+      "parallel_tracks": [
+        "Stream-2",
+        "Stream-3",
+        "Stream-4"
+      ],
+      "stream_execution_chains": [
+        {
+          "stream_id": "Stream-2",
+          "stream_name": "Flow-First Design Workbench",
+          "schema_domain": "`flow_preview.prisma`",
+          "causal_steps": [
+            "04"
+          ],
+          "closed_epics": [
+            "04"
+          ],
+          "vertical_layers_covered": [
+            "L1_SUBSTRATE_SCHEMA",
+            "L2_ENGINE_API",
+            "L3_SDK_UI_E2E"
+          ]
+        },
+        {
+          "stream_id": "Stream-3",
+          "stream_name": "16:9 Presentation & CMS Studio",
+          "schema_domain": "`presentation_cms.prisma`",
+          "causal_steps": [
+            "06"
+          ],
+          "closed_epics": [
+            "06"
+          ],
+          "vertical_layers_covered": [
+            "L1_SUBSTRATE_SCHEMA",
+            "L2_ENGINE_API",
+            "L3_SDK_UI_E2E"
+          ]
+        },
+        {
+          "stream_id": "Stream-4",
+          "stream_name": "REA Forge & `JEV — TypeSafe`",
+          "schema_domain": "`skills_rea.prisma`",
+          "causal_steps": [
+            "09"
+          ],
+          "closed_epics": [
+            "09"
+          ],
+          "vertical_layers_covered": [
+            "L1_SUBSTRATE_SCHEMA",
+            "L2_ENGINE_API",
+            "L3_SDK_UI_E2E"
+          ]
+        }
+      ]
+    },
+    {
+      "wave_id": 3,
+      "wave_name": "Horizon 3: SDI Visual Clarification, 17-Rule Visual Eval Gate & `cowok` / `advisor` Autonomous OPC Fleet",
+      "status": "pending",
+      "epics": [
+        "05",
+        "07",
+        "10"
+      ],
+      "sub_epic_slices": [],
+      "vertical_value_slice": "Hoàn thiện trình biên dịch `DesignIntentV1` + 2–3 phương án Visual Clarification + `ChangeProposal` Diff Gate, bộ kiểm định 17 quy tắc + xuất HTML/PDF/Repo ZIP, và vận hành đội hình Execution Agents tự hành dưới sự chỉ huy của **`cowok`** & **`advisor`** (`$UIUX_LIVE_SPEC` `<50ms` PTY + Tournament Mode).",
+      "parallel_tracks": [
+        "Stream-2",
+        "Stream-3",
+        "Stream-5"
+      ],
+      "stream_execution_chains": [
+        {
+          "stream_id": "Stream-2",
+          "stream_name": "SDI & ChangeProposal Gate",
+          "schema_domain": "`flow_preview.prisma`",
+          "causal_steps": [
+            "05"
+          ],
+          "closed_epics": [
+            "05"
+          ],
+          "vertical_layers_covered": [
+            "L1_SUBSTRATE_SCHEMA",
+            "L2_ENGINE_API",
+            "L3_SDK_UI_E2E"
+          ]
+        },
+        {
+          "stream_id": "Stream-3",
+          "stream_name": "17-Rule Eval & Exporter",
+          "schema_domain": "`presentation_cms.prisma`",
+          "causal_steps": [
+            "07"
+          ],
+          "closed_epics": [
+            "07"
+          ],
+          "vertical_layers_covered": [
+            "L1_SUBSTRATE_SCHEMA",
+            "L2_ENGINE_API",
+            "L3_SDK_UI_E2E"
+          ]
+        },
+        {
+          "stream_id": "Stream-5",
+          "stream_name": "`cowok` & `advisor` OPC Fleet",
+          "schema_domain": "`opc_fleet.prisma`",
+          "causal_steps": [
+            "10"
+          ],
+          "closed_epics": [
+            "10"
+          ],
+          "vertical_layers_covered": [
+            "L1_SUBSTRATE_SCHEMA",
+            "L2_ENGINE_API",
+            "L3_SDK_UI_E2E"
+          ]
+        }
+      ]
+    },
+    {
+      "wave_id": 4,
+      "wave_name": "Horizon 4: POSIX BYOS/BYOK Sandbox, Universal Open MCP Server & 4-Channel Distribution",
+      "status": "pending",
+      "epics": [
+        "11",
+        "12"
+      ],
+      "sub_epic_slices": [],
+      "vertical_value_slice": "Đóng gói hoàn chỉnh sandbox BYOS (`0600` FD + `setpgid`), rèn tool tạm thời an toàn, máy chủ Universal Open MCP (4 tầng quyền hạn) cho Cowok.ai/Claude/Codex/AGY, và xuất bản trên cả 4 kênh phân phối (CLI, Tauri v2 Desktop, Cowok Plugin, Docker).",
+      "parallel_tracks": [
+        "Stream-5"
+      ],
+      "stream_execution_chains": [
+        {
+          "stream_id": "Stream-5",
+          "stream_name": "Universal MCP & 4-Channel Release",
+          "schema_domain": "`opc_fleet.prisma`",
+          "causal_steps": [
+            "11",
+            "12"
+          ],
+          "closed_epics": [
+            "11",
+            "12"
+          ],
+          "vertical_layers_covered": [
+            "L1_SUBSTRATE_SCHEMA",
+            "L2_ENGINE_API",
+            "L3_SDK_UI_E2E"
+          ]
+        }
+      ]
+    }
+  ],
+  "allowed_stories_by_wave": {
+    "wave_1": [
+      "01.1",
+      "01.2",
+      "01.3",
+      "02.1",
+      "02.2",
+      "02.3",
+      "03.1",
+      "03.2",
+      "03.3",
+      "08.1",
+      "08.2",
+      "08.3"
+    ],
+    "wave_2": [
+      "04.1",
+      "04.2",
+      "04.3",
+      "06.1",
+      "06.2",
+      "06.3",
+      "09.1",
+      "09.2",
+      "09.3"
+    ],
+    "wave_3": [
+      "05.1",
+      "05.2",
+      "05.3",
+      "07.1",
+      "07.2",
+      "07.3",
+      "10.1",
+      "10.2",
+      "10.3"
+    ],
+    "wave_4": [
+      "11.1",
+      "11.2",
+      "11.3",
+      "12.1",
+      "12.2",
+      "12.3"
+    ]
+  },
+  "immediate_p0_action_slices": [
+    {
+      "slice_id": "H1.S1",
+      "epic_id": "01",
+      "name": "Core Harness & Constraint Engine: Lead Epic 01 (Cargo Workspace, Domain Contracts (ts-rs) & 16-Table SQLite Registry)",
+      "story_ids": [
+        "01.1",
+        "01.2",
+        "01.3"
+      ],
+      "track": "Stream-1",
+      "rationale": "In-degree 0 substrate anchor for Stream-1 in Horizon 1, unblocking subsequent intra-stream causal steps."
+    },
+    {
+      "slice_id": "H1.S2",
+      "epic_id": "08",
+      "name": "`agentskills.io` & Plugin Lifecycle: Lead Epic 08 (agentskills.io Repackager Engine, 6 Built-in Harness Skills & GitHub Cron Lifecycle)",
+      "story_ids": [
+        "08.1",
+        "08.2",
+        "08.3"
+      ],
+      "track": "Stream-4",
+      "rationale": "In-degree 0 substrate anchor for Stream-4 in Horizon 1, unblocking subsequent intra-stream causal steps."
+    }
+  ],
+  "track_concurrency_quotas": {
+    "Stream-1": 1,
+    "Stream-4": 1,
+    "Stream-2": 1,
+    "Stream-3": 1,
+    "Stream-5": 1
+  },
+  "db_write_set_table_allocation": {
+    "core_specs:PrimaryEntities": "Stream-1",
+    "core_specs:OperationalEvents": "Stream-1",
+    "core_specs:ConfigPolicies": "Stream-1",
+    "skills_rea:PrimaryEntities": "Stream-4",
+    "skills_rea:OperationalEvents": "Stream-4",
+    "skills_rea:ConfigPolicies": "Stream-4",
+    "flow_preview:PrimaryEntities": "Stream-2",
+    "flow_preview:OperationalEvents": "Stream-2",
+    "flow_preview:ConfigPolicies": "Stream-2",
+    "presentation_cms:PrimaryEntities": "Stream-3",
+    "presentation_cms:OperationalEvents": "Stream-3",
+    "presentation_cms:ConfigPolicies": "Stream-3",
+    "opc_fleet:PrimaryEntities": "Stream-5",
+    "opc_fleet:OperationalEvents": "Stream-5",
+    "opc_fleet:ConfigPolicies": "Stream-5"
+  }
+}

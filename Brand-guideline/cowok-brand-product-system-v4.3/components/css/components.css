@@ -1,0 +1,33 @@
+
+:root,html[data-theme="warm"]{
+--bg-canvas:#F7F5F0;--bg-workspace:#FFFDFC;--bg-surface:#FFFFFF;--bg-subtle:#F2F0EB;--bg-raised:#FFFFFF;
+--bg-hover:#F5F7FA;--bg-selected:#EDF4FF;--text-primary:#081E3A;--text-secondary:#344054;--text-muted:#667085;--text-disabled:#98A2B3;
+--text-on-action:#FFFFFF;--border-default:#E6E2DB;--border-strong:#D6D1C8;--border-focus:#90AEFF;
+--human:#4B7FFF;--human-soft:#EDF3FF;--agent:#E89A35;--agent-soft:#FFF3E3;
+--action:#081E3A;--action-hover:#102A50;--link:#0057FF;
+--success:#3E8A5D;--warning:#A87424;--error:#B45555;--info:#4B7FFF;
+--shadow:0 8px 24px rgba(8,30,58,.08);
+}
+html[data-theme="dim"]{
+--bg-canvas:#ECEAE4;--bg-workspace:#F4F2ED;--bg-surface:#FAF9F6;--bg-subtle:#E5E2DB;--bg-raised:#FAF9F6;
+--bg-hover:#EEECE7;--bg-selected:#E7EEF9;--text-primary:#182230;--text-secondary:#475467;--text-muted:#667085;--text-disabled:#98A2B3;
+--text-on-action:#FFFFFF;--border-default:#D8D4CC;--border-strong:#C8C2B8;--border-focus:#8099D8;
+--human:#5579C9;--human-soft:#E9EEF8;--agent:#B9772B;--agent-soft:#F5EEE5;
+--action:#182230;--action-hover:#253248;--link:#315FB6;
+--success:#4F7D60;--warning:#8D6B36;--error:#9B5E5E;--info:#5579C9;
+--shadow:0 8px 24px rgba(24,34,48,.07);
+}
+html[data-theme="night"]{
+--bg-canvas:#0B1220;--bg-workspace:#111827;--bg-surface:#172033;--bg-subtle:#1C2940;--bg-raised:#22314B;
+--bg-hover:#17263D;--bg-selected:#16294A;--text-primary:#F1F5F9;--text-secondary:#CBD5E1;--text-muted:#94A3B8;--text-disabled:#64748B;
+--text-on-action:#081E3A;--border-default:#26354D;--border-strong:#344761;--border-focus:#6C8FD9;
+--human:#4D86FF;--human-soft:#152A4C;--agent:#FF9A2F;--agent-soft:#211B16;
+--action:#F1F5F9;--action-hover:#FFFFFF;--link:#6F9BFF;
+--success:#69A77F;--warning:#C79B59;--error:#D17878;--info:#6F9BFF;
+--shadow:0 12px 32px rgba(0,0,0,.28);
+}
+html[data-theme="night"][data-focus="low"]{
+--human:#65789E;--agent:#8F765E;--success:#72877A;--warning:#8B7D68;--error:#8B7070;
+--human-soft:color-mix(in srgb,var(--bg-surface) 88%,#7E90B4 12%);
+--agent-soft:color-mix(in srgb,var(--bg-surface) 92%,#FF8A00 8%);
+}

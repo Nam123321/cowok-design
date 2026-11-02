@@ -1,0 +1,46 @@
+{
+  "tool_id": "architecture-coherence-checker-v2-compiled",
+  "target": "/Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-01",
+  "adr_registry_count": 152,
+  "stories_scanned": 3,
+  "total_findings": 3,
+  "conflicts": 0,
+  "warnings": 0,
+  "passes": 3,
+  "overall_status": "PASS",
+  "findings": [
+    {
+      "severity": "PASS",
+      "type": "aligned",
+      "message": "Story uses 'sqlite' — aligned with active ADR ADR-2.17.",
+      "story_tech": "sqlite",
+      "adr_tech": "sqlite",
+      "adr_id": "ADR-2.17",
+      "source_file": "story.md",
+      "context": "",
+      "story_id": "Story-01.1"
+    },
+    {
+      "severity": "PASS",
+      "type": "aligned",
+      "message": "Story uses 'sqlite' — aligned with active ADR ADR-2.17.",
+      "story_tech": "sqlite",
+      "adr_tech": "sqlite",
+      "adr_id": "ADR-2.17",
+      "source_file": "story.md",
+      "context": "",
+      "story_id": "Story-01.2"
+    },
+    {
+      "severity": "PASS",
+      "type": "aligned",
+      "message": "Story uses 'sqlite' — aligned with active ADR ADR-2.17.",
+      "story_tech": "sqlite",
+      "adr_tech": "sqlite",
+      "adr_id": "ADR-2.17",
+      "source_file": "story.md",
+      "context": "",
+      "story_id": "Story-01.3"
+    }
+  ]
+}

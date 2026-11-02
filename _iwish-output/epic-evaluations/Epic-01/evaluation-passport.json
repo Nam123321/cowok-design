@@ -1,0 +1,121 @@
+{
+  "schema_version": "epic-evaluation-passport/v1",
+  "epic_id": "Epic-01",
+  "feature_group": "VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine",
+  "created_at": "2026-11-02T07:16:00Z",
+  "updated_at": "2026-11-02T14:21:02+07:00",
+  "context_digest": "ec3b0e2e3bfa46fa1fd23d03ccc74ec1d15972f17de8f28bff1c62b8e99e15cd",
+  "context_files": [
+    {
+      "path": "_iwish-output/2. Product Planning/2.1. product-brief-or-prd.md",
+      "sha256": "ccf25dd83a3d8ad16ec6f34d8e815cad39e14b0ba71dd18cb1713ba8d0565770"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.4. epics-and-stories.md",
+      "sha256": "31549f11a8cbf24be2464667e545a6ec7d3355353a992553ff7f9aae110d2bd5"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.6. feature-hierarchy.md",
+      "sha256": "2bb22bb91440edcdbe3293f8d6c3be3cac0b5a1f2cd3b827aa2d2ca6ff128091"
+    },
+    {
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-01/epic.md",
+      "sha256": "0c1fd01068507d3de4429d6421e2ebdcc9a447453f38f29d311274af601b53ed"
+    }
+  ],
+  "evaluation_integrity": "VERIFIED",
+  "epic_readiness": "READY",
+  "story_creation_envelope": {
+    "max_phase": "IMPLEMENT",
+    "allowed_story_ids": [
+      "01.1",
+      "01.2",
+      "01.3"
+    ],
+    "blocked_story_ids": [],
+    "remediation_lane": false
+  },
+  "plugin_boundary": {
+    "applicability": "NOT_APPLICABLE",
+    "report_ref": "_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-01/plugin-boundary-review.md",
+    "candidate_parts": [
+      {
+        "id": "crates/domain",
+        "classification": "CORE_ONLY"
+      },
+      {
+        "id": "crates/spec-registry",
+        "classification": "CORE_ONLY"
+      },
+      {
+        "id": "crates/harness-daemon",
+        "classification": "CORE_ONLY"
+      }
+    ]
+  },
+  "party_mode": {
+    "rounds": 2,
+    "roles": [
+      "PM",
+      "Architect",
+      "Review",
+      "Data-Architect",
+      "AI-Engineer"
+    ],
+    "consensus_summary": "Converged on 11-crate workspace topology, ts-rs zero-drift type bridge, 16-table SQLite WAL with Hash-Gated Watcher Suppression, SHA-256 StaleFile OCC, and 9-Spec provenance tagging (CONFIRMED/INFERRED/MISSING).",
+    "pushback_patterns": [
+      "Prevent infinite FSEvents notify watcher echo loops via disk_sha256 == db_sha256 suppression",
+      "Enforce mandatory expected_sha256 OCC to prevent Human vs Bot lost updates",
+      "Lock CanonicalSpecKey 9-variant enum to block path traversal"
+    ]
+  },
+  "unknowns": {
+    "depth": "full",
+    "quadrants": [
+      "known_unknowns",
+      "unknown_unknowns",
+      "assumptions",
+      "blind_spots"
+    ],
+    "critical_open": [],
+    "macro_open": []
+  },
+  "evidence_receipts": [
+    {
+      "id": "epic-01-party-mode-transcript",
+      "path": "_iwish-output/epic-evaluations/Epic-01/party-mode-transcript.md",
+      "sha256": "cf8dc5ce3849095e76f16463d11c595b0d706bbdc8b149609551b33448febc52"
+    },
+    {
+      "id": "epic-01-unknowns-report",
+      "path": "_iwish-output/unknowns/reports/unknowns-report-epic-01.md",
+      "sha256": "8284c13907314e7bba36572281e25128b5291467fbdecb316bc017ef336297a5"
+    },
+    {
+      "id": "epic-01-evaluation-report",
+      "path": "_iwish-output/epic-evaluations/Epic-01/evaluation-report.md",
+      "sha256": "5d251cae72b1a1a02b3464db3bfa35a03bee3390cfad473606c0b1384a7744cd"
+    },
+    {
+      "id": "epic-01-architecture-coherence",
+      "path": "_iwish-output/epic-evaluations/Epic-01/architecture-coherence.json",
+      "sha256": "31986d66c8dea41bae17f366547a107416b2018d68c4445e3021f6dde209dfd7"
+    },
+    {
+      "id": "epic-01-plugin-boundary-review",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-01/plugin-boundary-review.md",
+      "sha256": "448ad35ba4fe7c1ac6bb60cd05ced6053a825c6d10b2b0f8b5900001eb3a9278"
+    },
+    {
+      "id": "epic-01-agent-surface-map",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-01/agent-surface-map.md",
+      "sha256": "5a8eee8da6d62293d9ef7d1a00f8677b777b9b2ceda88941decab5a848b01ded"
+    }
+  ],
+  "approval": {
+    "approved": true,
+    "approved_by": "hatrang20061988",
+    "approved_at": "2026-11-02T14:21:02+07:00",
+    "context_digest": "ec3b0e2e3bfa46fa1fd23d03ccc74ec1d15972f17de8f28bff1c62b8e99e15cd"
+  }
+}

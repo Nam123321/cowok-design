@@ -1,0 +1,8 @@
+{
+  "gate": "H4-Layer-API",
+  "epic_id": "Epic-01",
+  "layer": "api",
+  "document": "layer-epic-api.md",
+  "sha256": "7b5a4ffd66cf39c8e254f83c81c01f6804be96fc47c70fb5e992d52c2d681e00",
+  "status": "PENDING_HUMAN_APPROVAL"
+}

@@ -1,0 +1,98 @@
+{
+  "meta": {
+    "brand": "cowok.ai",
+    "version": "1.0.0",
+    "dependsOn": [
+      "Visual Foundations v1.1",
+      "Iconography v1.2"
+    ]
+  },
+  "components": {
+    "button": [
+      "primary",
+      "secondary",
+      "ghost",
+      "humanAction",
+      "agentAction",
+      "danger"
+    ],
+    "input": [
+      "default",
+      "focus",
+      "error",
+      "disabled"
+    ],
+    "select": [
+      "default",
+      "open",
+      "selected"
+    ],
+    "tabs": [
+      "default",
+      "active"
+    ],
+    "badge": [
+      "neutral",
+      "human",
+      "agent",
+      "success",
+      "warning",
+      "error",
+      "info"
+    ],
+    "card": [
+      "default",
+      "subtle",
+      "raised",
+      "selected"
+    ],
+    "table": [
+      "header",
+      "row",
+      "hover",
+      "selected"
+    ],
+    "modal": [
+      "default"
+    ],
+    "drawer": [
+      "default"
+    ],
+    "toast": [
+      "info",
+      "success",
+      "warning",
+      "error"
+    ],
+    "tooltip": [
+      "default"
+    ],
+    "humanAgentChip": [
+      "human",
+      "agent",
+      "humanAgent"
+    ],
+    "reviewRequired": [
+      "default"
+    ],
+    "agentActivity": [
+      "neutral",
+      "active",
+      "review"
+    ],
+    "automationState": [
+      "idle",
+      "running",
+      "review",
+      "completed",
+      "failed"
+    ]
+  },
+  "rules": {
+    "color": "All components consume semantic theme tokens only.",
+    "icons": "All icons use currentColor and Iconography v1.2.",
+    "lowChroma": "Available only in Night mode and only through theme-token remapping.",
+    "agentOrange": "Agent orange is semantic; never used as generic warning or generic CTA.",
+    "humanBlue": "Human blue is semantic; never used as generic primary action unless Human ownership matters."
+  }
+}

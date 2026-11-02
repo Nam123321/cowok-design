@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="schema-topology">
+  <rect x="2" y="3" width="8" height="8" rx="1.8"/>
+  <rect x="14" y="13" width="8" height="8" rx="1.8"/>
+  <path d="M2 6h8"/>
+  <path d="M14 16h8"/>
+  <path d="M10 7h2.5a2 2 0 0 1 2 2v4"/>
+  <circle cx="10" cy="7" r="1" fill="none"/>
+  <path d="M14.5 13l-1.5 2-1.5-2"/>
+</svg>

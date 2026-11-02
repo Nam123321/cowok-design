@@ -1,0 +1,17 @@
+{
+  "name": "cowok.ai Brand & Product System",
+  "version": "4.3.0",
+  "modules": {
+    "brand": "brand/",
+    "foundations": "foundations/",
+    "logo": "logo/",
+    "iconography": "iconography/",
+    "components": "components/",
+    "applicationPatterns": "application-patterns/",
+    "aiUx": "ai-ux/",
+    "qa": "qa/"
+  },
+  "logoStatus": "APPROVED HIGH-RES RASTER MASTER",
+  "iconographyStatus": "APPROVED",
+  "canonicalIconCount": 143
+}

@@ -1,0 +1,8 @@
+{
+  "gate": "H2-Layer-FE",
+  "epic_id": "Epic-01",
+  "layer": "fe",
+  "document": "layer-epic-fe.md",
+  "sha256": "4eac97f0d4c9d2d4a51fff4ad5fc77615e6fb0a81ae0fb1e9006c17fbb68f8d9",
+  "status": "PENDING_HUMAN_APPROVAL"
+}

@@ -1,0 +1,119 @@
+schema: project-agent-ops-profile/v2.1
+profile_kind: DERIVED_EVIDENCE_PROFILE
+repo_id: cowok-ai
+worktree_id: uxui-os-6d92b60d
+worktree_root: /Users/hatrang20061988/Desktop/AI Project/uxui-os
+git_head: unknown
+policy_version: 2.1.0
+probe_version: 2.1.0
+generated_at: '2026-11-02T07:14:27.190322+00:00'
+sha256_digest: sha256:a48ab879e93fc968ebd784af586966e3873f126363d1548bf79e900df27bb5f9
+overall_status: NOT_READY
+delta_summary:
+  previous_digest: null
+  digest_changed: false
+  changed_probes: []
+source_manifest:
+- path: _iwish-output/2. Product Planning/2.5. architecture.md
+  present: true
+  sha256: sha256:bbb2254466a908070de945737f5a1f779af661d1e5d709fb82c6af8f0ddc0d1c
+- path: _iwish-output/3. Development/development-roadmap.md
+  present: true
+  sha256: sha256:f3c5201bfcd763446711c1c893de96b2e21decdc751173eaba378a4bb0df7d6a
+- path: prisma/schema.prisma
+  present: false
+  sha256: MISSING
+- path: src/lib/api-guard.ts
+  present: false
+  sha256: MISSING
+probes:
+  M1:
+    title: Auth, Tenant RLS & GuardedRoute Enforcement
+    critical: true
+    spec_status: FAIL
+    physical_status: FAIL
+    evidence:
+    - path: src/lib/api-guard.ts
+      sha256: MISSING
+      assertion: guardedRoute & createCrossTenantHandler exported
+    blockers:
+    - Missing guardedRoute or RLS spec
+  M2:
+    title: Single Core Port & Typed Client SDK
+    critical: true
+    spec_status: PASS
+    physical_status: FAIL
+    evidence:
+    - path: src/api/client.ts
+      sha256: MISSING
+      assertion: Typed API client SDK present
+    blockers:
+    - Missing src/api/ domain SDK
+  M3:
+    title: 3-Lane Intent Router & Semantic Discovery
+    critical: false
+    spec_status: PASS
+    physical_status: FAIL
+    evidence:
+    - path: _iwish-output/3. Development/development-roadmap.md
+      sha256: sha256:f3c5201bfcd763446711c1c893de96b2e21decdc751173eaba378a4bb0df7d6a
+      assertion: Intent Router & Discovery service verified
+    blockers:
+    - Missing Intent Router / Discovery service
+  M4:
+    title: Scoped Memory, Vector & FalkorDB Ports
+    critical: true
+    spec_status: FAIL
+    physical_status: FAIL
+    evidence:
+    - path: .agents/AGENTS.md
+      sha256: MISSING
+      assertion: FalkorDB host port binding verified; .env untouched
+    blockers:
+    - FalkorDB host port violation detected in port rules
+    - Missing vector/capability model in Prisma schema or DB spec
+  M5:
+    title: Tool Execution Pipeline & Sandbox
+    critical: true
+    spec_status: PASS
+    physical_status: FAIL
+    evidence:
+    - path: _iwish-output/2. Product Planning/2.5. architecture.md
+      sha256: sha256:bbb2254466a908070de945737f5a1f779af661d1e5d709fb82c6af8f0ddc0d1c
+      assertion: Execution services verified in src/
+    blockers:
+    - Missing plugin/tool execution service in src/
+  M6:
+    title: Immutable Audit Ledger & Prisma Schema Reality
+    critical: true
+    spec_status: PASS
+    physical_status: FAIL
+    evidence:
+    - path: prisma/schema.prisma
+      sha256: MISSING
+      assertion: Physical Prisma models verified
+    blockers:
+    - Missing required domain/registry models in Prisma schema
+  M7:
+    title: HITL Proposal Card & GenUI Surface
+    critical: false
+    spec_status: PASS
+    physical_status: FAIL
+    evidence:
+    - path: _iwish-output/3. Development/development-roadmap.md
+      sha256: sha256:f3c5201bfcd763446711c1c893de96b2e21decdc751173eaba378a4bb0df7d6a
+      assertion: Feature surface verified
+    blockers:
+    - Missing UI/API feature surface
+  M8:
+    title: Control Plane, Canary & Rollback Pointers
+    critical: true
+    spec_status: PASS
+    physical_status: FAIL
+    evidence:
+    - path: prisma/schema.prisma
+      sha256: MISSING
+      assertion: PluginRegistry & CuratedPluginImportJob/CapabilityPackageVersion
+        present
+    blockers:
+    - Missing Control Plane registry models/spec

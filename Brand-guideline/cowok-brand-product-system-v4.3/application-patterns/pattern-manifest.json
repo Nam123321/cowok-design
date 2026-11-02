@@ -1,0 +1,119 @@
+{
+  "meta": {
+    "brand": "cowok.ai",
+    "version": "1.0.0",
+    "dependsOn": [
+      "Visual Foundations v1.1",
+      "Iconography v1.2",
+      "Core Components v1.0"
+    ],
+    "themes": [
+      "Warm Light",
+      "Focus Light",
+      "Night"
+    ],
+    "lowChroma": "Night only"
+  },
+  "patterns": [
+    {
+      "id": "dashboard",
+      "goal": "See operational state, attention items and work progress without visual overload.",
+      "primaryAction": "Open the most relevant work item.",
+      "modules": [
+        "KPI summary",
+        "Needs attention",
+        "Active workflows",
+        "Agent activity",
+        "Recent work"
+      ],
+      "aiRole": "Surface operational signals; avoid making AI the hero."
+    },
+    {
+      "id": "project",
+      "goal": "Coordinate Human + Agent work around one business objective.",
+      "primaryAction": "Continue current work.",
+      "modules": [
+        "Project header",
+        "Outcome",
+        "Members",
+        "Agents",
+        "Milestones",
+        "Workstream",
+        "Activity"
+      ],
+      "aiRole": "Agents appear as collaborators with role, status and output."
+    },
+    {
+      "id": "workflow",
+      "goal": "Understand and manage work from request to completion.",
+      "primaryAction": "Review or advance the next actionable stage.",
+      "modules": [
+        "Workflow map",
+        "Kanban",
+        "Stage status",
+        "Human owner",
+        "Agent execution",
+        "Exceptions"
+      ],
+      "aiRole": "Execution is visible but subordinate to workflow."
+    },
+    {
+      "id": "agent-workspace",
+      "goal": "Inspect what an Agent is doing, why and what needs Human review.",
+      "primaryAction": "Review proposed output/action.",
+      "modules": [
+        "Agent identity",
+        "Role",
+        "Current task",
+        "Working context",
+        "Tool calls",
+        "Draft output",
+        "Review state"
+      ],
+      "aiRole": "Transparent execution, provenance and review."
+    },
+    {
+      "id": "knowledge",
+      "goal": "Find trusted business context and understand source quality.",
+      "primaryAction": "Open or use trusted knowledge.",
+      "modules": [
+        "Search",
+        "Collections",
+        "Recent",
+        "Source metadata",
+        "Trust/recency",
+        "Linked workflows"
+      ],
+      "aiRole": "Retrieve and summarize; provenance stays visible."
+    },
+    {
+      "id": "review",
+      "goal": "Make a Human decision on an Agent-proposed change.",
+      "primaryAction": "Approve / edit / reject.",
+      "modules": [
+        "Proposal summary",
+        "What changes",
+        "Why",
+        "Evidence",
+        "Impact",
+        "Actions"
+      ],
+      "aiRole": "Explain proposal; never silently execute high-impact actions."
+    },
+    {
+      "id": "automation",
+      "goal": "Monitor recurring execution with low attention cost.",
+      "primaryAction": "Inspect exception or edit automation.",
+      "modules": [
+        "Run history",
+        "State",
+        "Trigger",
+        "Owner",
+        "Agent",
+        "Exceptions",
+        "Next run"
+      ],
+      "aiRole": "Run quietly; escalate only meaningful exceptions."
+    }
+  ]
+}

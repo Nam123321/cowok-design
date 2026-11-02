@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DesignIntentV1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "intent",
+    "target",
+    "status",
+    "acceptanceCriteria"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "intent": {
+      "type": "string"
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "screenId"
+      ],
+      "properties": {
+        "screenId": {
+          "type": "string"
+        },
+        "elementId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "acceptanceCriteria": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "enum": [
+        "captured",
+        "needs_clarification",
+        "ready",
+        "approved",
+        "proposed",
+        "implemented",
+        "rejected"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

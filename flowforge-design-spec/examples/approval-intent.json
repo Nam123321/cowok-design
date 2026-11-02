@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "intent": "add_approval_confirmation",
+  "target": {
+    "screenId": "order-detail-pending",
+    "elementId": "approve-button"
+  },
+  "interaction": {
+    "pattern": "confirmation-modal",
+    "confirm": "submit_approval",
+    "cancel": "close_modal"
+  },
+  "constraints": [
+    "preserve_order_validation",
+    "support_keyboard_navigation"
+  ],
+  "acceptanceCriteria": [
+    "approval_requires_confirmation",
+    "cancel_does_not_mutate_order",
+    "loading_disables_repeat_submission"
+  ],
+  "status": "approved"
+}

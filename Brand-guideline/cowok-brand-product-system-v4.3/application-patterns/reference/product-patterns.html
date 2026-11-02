@@ -1,0 +1,163 @@
+<!doctype html>
+<html data-theme="warm" data-focus="normal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cowok.ai Product Patterns v1.0</title>
+<style>
+:root,html[data-theme=warm]{
+--canvas:#F7F5F0;--workspace:#FFFDFC;--surface:#FFFFFF;--subtle:#F2F0EB;--raised:#FFFFFF;--hover:#F5F7FA;--selected:#EDF4FF;
+--text:#081E3A;--text2:#344054;--muted:#667085;--disabled:#98A2B3;--border:#E6E2DB;--border2:#D6D1C8;
+--human:#4B7FFF;--humanSoft:#EDF3FF;--agent:#E89A35;--agentSoft:#FFF3E3;--success:#3E8A5D;--warning:#A87424;--error:#B45555;
+--action:#081E3A;--actionText:#FFFFFF;--shadow:0 10px 28px rgba(8,30,58,.08);
+}
+html[data-theme=dim]{
+--canvas:#ECEAE4;--workspace:#F4F2ED;--surface:#FAF9F6;--subtle:#E5E2DB;--raised:#FAF9F6;--hover:#EEECE7;--selected:#E7EEF9;
+--text:#182230;--text2:#475467;--muted:#667085;--disabled:#98A2B3;--border:#D8D4CC;--border2:#C8C2B8;
+--human:#5579C9;--humanSoft:#E9EEF8;--agent:#B9772B;--agentSoft:#F5EEE5;--success:#4F7D60;--warning:#8D6B36;--error:#9B5E5E;
+--action:#182230;--actionText:#FFFFFF;--shadow:0 10px 28px rgba(24,34,48,.07);
+}
+html[data-theme=night]{
+--canvas:#0B1220;--workspace:#111827;--surface:#172033;--subtle:#1C2940;--raised:#22314B;--hover:#17263D;--selected:#16294A;
+--text:#F1F5F9;--text2:#CBD5E1;--muted:#94A3B8;--disabled:#64748B;--border:#26354D;--border2:#344761;
+--human:#4D86FF;--humanSoft:#152A4C;--agent:#FF9A2F;--agentSoft:#211B16;--success:#69A77F;--warning:#C79B59;--error:#D17878;
+--action:#F1F5F9;--actionText:#081E3A;--shadow:0 12px 34px rgba(0,0,0,.28);
+}
+html[data-theme=night][data-focus=low]{
+--human:#65789E;--agent:#8F765E;--success:#72877A;--warning:#8B7D68;--error:#8B7070;
+--humanSoft:color-mix(in srgb,var(--surface) 88%,#7E90B4 12%);
+--agentSoft:color-mix(in srgb,var(--surface) 92%,#FF8A00 8%);
+}
+*{box-sizing:border-box}body{margin:0;font-family:Geist,Inter,system-ui;background:var(--canvas);color:var(--text)}
+button,input{font:inherit}.app{min-height:100vh;display:grid;grid-template-columns:232px 1fr}
+.sidebar{background:var(--workspace);border-right:1px solid var(--border);padding:18px 12px;position:sticky;top:0;height:100vh}
+.brand{font-weight:750;font-size:20px;letter-spacing:-.03em;padding:4px 8px 18px}.brand small{display:block;color:var(--muted);font-size:10px;font-weight:500;letter-spacing:0;margin-top:3px}
+.nav{display:grid;gap:3px}.nav button{border:0;background:transparent;color:var(--text2);text-align:left;padding:10px;border-radius:9px;cursor:pointer}
+.nav button.active{background:var(--selected);color:var(--text);font-weight:650}.main{min-width:0}
+.top{height:64px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--workspace) 94%,transparent);display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:sticky;top:0;z-index:3;backdrop-filter:blur(10px)}
+.theme{display:flex;gap:5px;align-items:center;flex-wrap:wrap}.theme button{border:1px solid var(--border);background:var(--surface);color:var(--text2);padding:7px 9px;border-radius:8px;cursor:pointer}.focus{display:none}html[data-theme=night] .focus{display:block}
+.content{padding:22px;max-width:1480px;margin:auto}.pattern{display:none}.pattern.active{display:block}.heading{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}
+h1{font-size:27px;letter-spacing:-.025em;margin:0 0 5px}.muted{color:var(--muted)}.small{font-size:11px}.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px}
+.subtle{background:var(--subtle)}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.grid2{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}
+.kpi b{font-size:24px;display:block;margin-top:8px}.kpi span{font-size:11px;color:var(--muted)}
+.attention{border-left:3px solid var(--agent)}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{padding:5px 7px;border-radius:999px;background:var(--subtle);color:var(--muted);font-size:10px}.chip.h{background:var(--humanSoft);color:var(--human)}.chip.a{background:var(--agentSoft);color:var(--agent)}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--text);padding:8px 10px;border-radius:8px;font-weight:600}.btn.primary{border-color:transparent;background:var(--action);color:var(--actionText)}.btn.agent{border-color:transparent;background:var(--agent);color:#081E3A}
+.list{display:grid;gap:8px}.item{padding:11px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}.item:hover{background:var(--hover)}
+.item b{font-size:12px}.item p{font-size:11px;color:var(--muted);margin:4px 0 0;line-height:1.45}
+.kanban{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.column{background:var(--subtle);border:1px solid var(--border);border-radius:12px;padding:10px}.task{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:8px}.task.h{box-shadow:inset 3px 0 0 var(--human)}.task.a{box-shadow:inset 3px 0 0 var(--agent)}
+.agent-head{display:flex;gap:12px;align-items:center}.avatar{width:42px;height:42px;border-radius:12px;background:var(--agentSoft);color:var(--agent);display:grid;place-items:center;font-weight:700}
+.log{font-family:ui-monospace,monospace;background:var(--subtle);border:1px solid var(--border);padding:10px;border-radius:9px;color:var(--text2);font-size:11px;line-height:1.6}
+.review{background:var(--subtle);border:1px solid var(--border);border-left:3px solid var(--agent);border-radius:12px;padding:14px}
+.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px;border-bottom:1px solid var(--border);text-align:left;font-size:11px}.table th{color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:9px}.state.run{color:var(--human)}.state.review{color:var(--agent)}.state.ok{color:var(--success)}.state.fail{color:var(--error)}
+.mobile{width:310px;margin:auto;background:var(--workspace);border:1px solid var(--border);border-radius:28px;padding:14px;box-shadow:var(--shadow)}.mobile-top{height:22px;border-bottom:1px solid var(--border);margin-bottom:10px}.mobile .card{padding:12px}.mobile .btn{width:100%;margin-top:7px}
+.note{margin-top:14px;padding:12px;background:var(--subtle);border:1px solid var(--border);border-radius:10px;color:var(--text2);font-size:11px}
+@media(max-width:1100px){.app{grid-template-columns:72px 1fr}.brand{font-size:0}.brand:before{content:"c.ai";font-size:16px}.brand small{display:none}.nav button{font-size:0;text-align:center}.nav button:before{content:"•";font-size:18px}.grid4{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
+@media(max-width:720px){.app{display:block}.sidebar{display:none}.top{height:auto;min-height:64px;gap:10px;flex-direction:column;align-items:flex-start;justify-content:center;padding:10px 14px}.content{padding:15px}.grid4,.grid3,.kanban{grid-template-columns:1fr}.heading{flex-direction:column}}
+</style>
+</head><body>
+<div class="app">
+<aside class="sidebar">
+<div class="brand">cowok.ai<small>Human + AI. One Workflow.</small></div>
+<nav class="nav">
+<button class="active" data-pattern="dashboard">Dashboard</button>
+<button data-pattern="project">Project</button>
+<button data-pattern="workflow">Workflow</button>
+<button data-pattern="agent">Agent Workspace</button>
+<button data-pattern="knowledge">Knowledge</button>
+<button data-pattern="review">Review & Approval</button>
+<button data-pattern="automation">Automation</button>
+<button data-pattern="mobile">Mobile</button>
+</nav>
+</aside>
+
+<main class="main">
+<header class="top">
+<div><b>Product Patterns v1.0</b> <span class="muted small">· operational application layer</span></div>
+<div class="theme"><button onclick="theme('warm')">Warm Light</button><button onclick="theme('dim')">Focus Light</button><button onclick="theme('night')">Night</button><button class="focus" onclick="focusMode()">Low-chroma</button></div>
+</header>
+<section class="content">
+
+<div class="pattern active" id="dashboard">
+<div class="heading"><div><h1>Operations overview</h1><div class="muted">See what needs attention without turning the workspace into a control room.</div></div><button class="btn primary">Open current work</button></div>
+<div class="grid4">
+<div class="card kpi"><span>Needs attention</span><b>6</b><span>3 Agent reviews · 2 overdue</span></div>
+<div class="card kpi"><span>Active workflows</span><b>12</b><span>9 healthy</span></div>
+<div class="card kpi"><span>Human reviews</span><b>9</b><span>Today</span></div>
+<div class="card kpi"><span>Completed work</span><b>128</b><span>This week</span></div>
+</div>
+<div class="grid2" style="margin-top:14px">
+<div class="card"><h3>Needs attention</h3><div class="list">
+<div class="item attention"><b>Campaign Agent proposes 6 schedule changes</b><p>Review before external execution.</p></div>
+<div class="item"><b>Distributor research has 2 low-confidence sources</b><p>Research Agent recommends Human verification.</p></div>
+<div class="item"><b>Quarterly planning review due today</b><p>Owner: Mai</p></div>
+</div></div>
+<div class="card"><h3>Activity</h3><div class="list"><div class="item"><b>Research Agent</b><p>Completed competitor scan · 2m</p></div><div class="item"><b>Mai</b><p>Reviewed growth assumptions · 8m</p></div></div></div>
+</div>
+<div class="note">Pattern principle: attention first; KPIs are neutral; Agent activity is secondary to operational work.</div>
+</div>
+
+<div class="pattern" id="project">
+<div class="heading"><div><h1>Q4 Growth Campaign</h1><div class="muted">Outcome-driven project shared by Humans and Agents.</div></div><div class="row"><span class="chip h">4 Humans</span><span class="chip a">3 Agents</span><button class="btn primary">Continue work</button></div></div>
+<div class="grid2"><div class="card"><h3>Outcome</h3><p>Increase qualified distributor pipeline while reducing manual research and coordination.</p><div class="row"><span class="chip">Milestone 3/5</span><span class="chip">On track</span></div>
+<h3 style="margin-top:18px">Workstream</h3><div class="list"><div class="item"><b>Market research</b><p>Research Agent + Mai · completed</p></div><div class="item attention"><b>Partner launch sequence</b><p>Campaign Agent · waiting for review</p></div><div class="item"><b>Sales enablement</b><p>Human owned · in progress</p></div></div></div>
+<div class="card"><h3>Participants</h3><div class="list"><div class="item"><b>Mai — Project Lead</b><p>Human · decision owner</p></div><div class="item"><b>Research Agent</b><p>Agent · market intelligence</p></div><div class="item"><b>Campaign Agent</b><p>Agent · launch orchestration</p></div></div></div></div>
+</div>
+
+<div class="pattern" id="workflow">
+<div class="heading"><div><h1>Launch Partner Workflow</h1><div class="muted">Request → Interpret → Draft → Review → Execute → Report</div></div><button class="btn primary">View workflow map</button></div>
+<div class="kanban"><div class="column"><b>Draft</b><div class="task h"><b>Confirm offer structure</b><p class="muted small">Human · Mai</p></div><div class="task"><b>Prepare data set</b><p class="muted small">System</p></div></div>
+<div class="column"><b>Review</b><div class="task a"><b>Partner outreach sequence</b><p class="muted small">Agent output · review required</p></div><div class="task"><b>Validate top 20 targets</b><p class="muted small">Human + Agent</p></div></div>
+<div class="column"><b>Execute</b><div class="task"><b>Send approved outreach</b><p class="muted small">Blocked until review</p></div></div></div>
+</div>
+
+<div class="pattern" id="agent">
+<div class="heading"><div><h1>Research Agent</h1><div class="muted">Operational transparency instead of chat-first AI.</div></div><button class="btn secondary">Agent settings</button></div>
+<div class="grid2"><div class="card"><div class="agent-head"><div class="avatar">A</div><div><b>Research Agent</b><div class="muted small">Role: Market Intelligence · Working</div></div></div>
+<h3>Current task</h3><p>Identify distributor segments most likely to adopt the new partner program.</p>
+<h3>Working context</h3><div class="row"><span class="chip">Project: Q4 Growth</span><span class="chip">Wiki: GT Market</span><span class="chip">18 sources</span></div>
+<h3>Operational log</h3><div class="log">12:04 Search trusted company sources<br>12:05 Compare distributor segments<br>12:07 Draft evidence summary<br>12:08 Waiting for Human review</div></div>
+<div class="card"><h3>Draft output</h3><p>Three segments show the strongest combination of reach, technology readiness and category fit.</p><div class="review"><b>Human review required</b><p class="muted small">Two recommendations depend on assumptions that should be validated before campaign execution.</p><button class="btn agent">Review output</button></div></div></div>
+</div>
+
+<div class="pattern" id="knowledge">
+<div class="heading"><div><h1>Knowledge</h1><div class="muted">Trusted enterprise context with visible source quality.</div></div><button class="btn primary">Add source</button></div>
+<div class="grid2"><div class="card"><input style="width:100%;padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text)" value="Search company knowledge…"><h3>Collections</h3><div class="list"><div class="item"><b>Go-to-market</b><p>28 verified sources · updated today</p></div><div class="item"><b>Product & positioning</b><p>17 sources · updated 2d</p></div><div class="item"><b>Customer research</b><p>42 sources · updated 5h</p></div></div></div>
+<div class="card"><h3>Recent trusted source</h3><b>GT Distributor Market Notes</b><p class="muted small">Owner: Strategy Team · updated 3h · verified</p><p>Research notes and operational assumptions used by the Q4 Growth workflow.</p><div class="row"><span class="chip">Verified</span><span class="chip">Project linked</span><span class="chip">Used by 2 Agents</span></div></div></div>
+</div>
+
+<div class="pattern" id="review">
+<div class="heading"><div><h1>Review proposed changes</h1><div class="muted">Human decision surface for Agent-proposed execution.</div></div></div>
+<div class="grid2"><div class="card"><h3>Proposal</h3><p>Campaign Agent recommends changing 6 scheduled partner actions based on updated distributor priority.</p>
+<h3>Why</h3><p class="muted">3 new data points materially changed the ranking of target partners.</p>
+<h3>Evidence</h3><div class="list"><div class="item"><b>Distributor engagement data</b><p>Verified CRM data · updated 12m</p></div><div class="item"><b>Partner capacity notes</b><p>Knowledge source · updated yesterday</p></div></div></div>
+<div class="card"><h3>Impact</h3><div class="review"><b>External execution</b><p class="muted small">Approving will update 6 scheduled actions. No message is sent until the execution step.</p></div>
+<h3>Decision</h3><div class="row"><button class="btn agent">Approve proposal</button><button class="btn secondary">Edit</button><button class="btn secondary">Reject</button></div></div></div>
+</div>
+
+<div class="pattern" id="automation">
+<div class="heading"><div><h1>Automations</h1><div class="muted">Healthy runs stay quiet. Exceptions receive attention.</div></div><button class="btn primary">New automation</button></div>
+<div class="card"><table class="table"><thead><tr><th>Automation</th><th>Trigger</th><th>Owner</th><th>Status</th><th>Next run</th></tr></thead><tbody>
+<tr><td>Lead enrichment</td><td>New lead</td><td>Growth Agent</td><td><span class="state run">Running</span></td><td>Now</td></tr>
+<tr><td>Partner outreach</td><td>Approved target</td><td>Campaign Agent</td><td><span class="state review">Review required</span></td><td>Paused</td></tr>
+<tr><td>Weekly insight brief</td><td>Monday 08:00</td><td>Research Agent</td><td><span class="state ok">Healthy</span></td><td>Mon</td></tr>
+<tr><td>CRM sync</td><td>Hourly</td><td>System</td><td><span class="state fail">Failed</span></td><td>Retry 10m</td></tr>
+</tbody></table></div>
+</div>
+
+<div class="pattern" id="mobile">
+<div class="heading"><div><h1>Mobile review pattern</h1><div class="muted">Mobile prioritizes review, approval, status and quick input — not full desktop administration.</div></div></div>
+<div class="mobile"><div class="mobile-top"></div><b>Review required</b><p class="muted small">Campaign Agent proposes 6 changes.</p><div class="card subtle"><b>Impact</b><p class="muted small">Changes partner priority and 6 scheduled actions.</p></div><button class="btn agent">Review proposal</button><button class="btn secondary">Later</button></div>
+</div>
+
+</section>
+</main></div>
+<script>
+document.querySelectorAll('[data-pattern]').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('[data-pattern]').forEach(x=>x.classList.toggle('active',x===b));
+ document.querySelectorAll('.pattern').forEach(x=>x.classList.toggle('active',x.id===b.dataset.pattern));
+});
+function theme(t){document.documentElement.dataset.theme=t;document.documentElement.dataset.focus='normal'}
+function focusMode(){if(document.documentElement.dataset.theme!=='night')return;document.documentElement.dataset.focus=document.documentElement.dataset.focus==='low'?'normal':'low'}
+</script>
+</body></html>

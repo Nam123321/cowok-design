@@ -1,0 +1,148 @@
+<!doctype html>
+<html data-theme="warm" data-focus="normal">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cowok.ai AI UX System v1.0</title>
+<style>
+
+:root,html[data-theme=warm]{
+--canvas:#F7F5F0;--workspace:#FFFDFC;--surface:#FFFFFF;--subtle:#F2F0EB;--raised:#FFFFFF;--hover:#F5F7FA;
+--text:#081E3A;--text2:#344054;--muted:#667085;--border:#E6E2DB;--human:#4B7FFF;--humanSoft:#EDF3FF;--agent:#E89A35;--agentSoft:#FFF3E3;
+--success:#3E8A5D;--warning:#A87424;--error:#B45555;--action:#081E3A;--actionText:#FFFFFF;
+}
+html[data-theme=dim]{
+--canvas:#ECEAE4;--workspace:#F4F2ED;--surface:#FAF9F6;--subtle:#E5E2DB;--raised:#FAF9F6;--hover:#EEECE7;
+--text:#182230;--text2:#475467;--muted:#667085;--border:#D8D4CC;--human:#5579C9;--humanSoft:#E9EEF8;--agent:#B9772B;--agentSoft:#F5EEE5;
+--success:#4F7D60;--warning:#8D6B36;--error:#9B5E5E;--action:#182230;--actionText:#FFFFFF;
+}
+html[data-theme=night]{
+--canvas:#0B1220;--workspace:#111827;--surface:#172033;--subtle:#1C2940;--raised:#22314B;--hover:#17263D;
+--text:#F1F5F9;--text2:#CBD5E1;--muted:#94A3B8;--border:#26354D;--human:#4D86FF;--humanSoft:#152A4C;--agent:#FF9A2F;--agentSoft:#211B16;
+--success:#69A77F;--warning:#C79B59;--error:#D17878;--action:#F1F5F9;--actionText:#081E3A;
+}
+html[data-theme=night][data-focus=low]{
+--human:#65789E;--agent:#8F765E;--success:#72877A;--warning:#8B7D68;--error:#8B7070;
+--humanSoft:color-mix(in srgb,var(--surface) 88%,#7E90B4 12%);
+--agentSoft:color-mix(in srgb,var(--surface) 92%,#FF8A00 8%);
+}
+
+*{box-sizing:border-box}body{margin:0;font-family:Geist,Inter,system-ui;background:var(--canvas);color:var(--text)}button{font:inherit}
+main{max-width:1450px;margin:auto;padding:30px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}
+h1{margin:0;letter-spacing:-.035em}.muted{color:var(--muted)}.controls{display:flex;gap:6px;flex-wrap:wrap}
+.controls button{border:1px solid var(--border);background:var(--surface);color:var(--text2);padding:8px 10px;border-radius:9px}.focus{display:none}html[data-theme=night] .focus{display:inline-block}
+.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}.card{background:var(--surface);border:1px solid var(--border);border-radius:15px;padding:17px}
+.flow{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}.step{background:var(--subtle);border:1px solid var(--border);border-radius:10px;padding:11px;text-align:center;font-size:11px}
+.step.active{box-shadow:inset 0 -3px 0 var(--agent);color:var(--text)}.states{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.state{border:1px solid var(--border);border-radius:10px;padding:11px;background:var(--surface)}.state b{font-size:11px;display:block}.state span{font-size:10px;color:var(--muted)}
+.state.review{border-left:3px solid var(--agent)}.state.fail{border-left:3px solid var(--error)}.state.work{border-left:3px solid var(--agent)}.state.human{border-left:3px solid var(--human)}
+.risk{display:grid;gap:7px}.risk-row{display:grid;grid-template-columns:54px 1fr 1fr;gap:10px;align-items:start;padding:10px;border:1px solid var(--border);border-radius:10px}.risk-row strong{font-size:12px}.risk-row p{font-size:10px;color:var(--muted);margin:2px 0 0}
+.review-box{background:var(--subtle);border:1px solid var(--border);border-left:3px solid var(--agent);border-radius:12px;padding:14px}.review-box h3{margin-top:0}
+.row{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--border);background:var(--surface);color:var(--text);padding:8px 10px;border-radius:8px;font-weight:600}
+.btn.primary{background:var(--action);color:var(--actionText);border-color:transparent}.btn.agent{background:var(--agent);color:#081E3A;border-color:transparent}
+.prov{display:grid;gap:7px}.prov div{padding:9px;background:var(--subtle);border-radius:9px;font-size:11px}.prov b{display:block;font-size:10px;color:var(--muted);margin-bottom:2px}
+.supervisor{display:grid;gap:7px}.check{display:flex;justify-content:space-between;gap:10px;padding:9px;border-bottom:1px solid var(--border);font-size:11px}.ok{color:var(--success)}.warn{color:var(--warning)}
+.timeline{display:grid;gap:8px}.event{display:grid;grid-template-columns:28px 1fr auto;gap:9px;padding:9px;border-radius:9px}.event:hover{background:var(--hover)}.dot{width:28px;height:28px;border-radius:9px;background:var(--agentSoft);color:var(--agent);display:grid;place-items:center;font-size:10px;font-weight:700}.event.h .dot{background:var(--humanSoft);color:var(--human)}.event b{font-size:11px}.event p{font-size:10px;color:var(--muted);margin:3px 0 0}.time{font-size:9px;color:var(--muted)}
+.note{margin-top:14px;background:var(--subtle);border:1px solid var(--border);border-radius:10px;padding:11px;font-size:11px;color:var(--text2)}
+@media(max-width:950px){.grid{grid-template-columns:1fr}.flow{grid-template-columns:repeat(3,1fr)}.states{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.top{align-items:flex-start;flex-direction:column}.flow,.states{grid-template-columns:1fr}.risk-row{grid-template-columns:45px 1fr}.risk-row>:last-child{grid-column:2}}
+</style>
+</head><body>
+<main>
+<div class="top">
+<div><h1>AI UX System v1.0</h1><p class="muted">Human authority · Agent execution · explicit review · visible provenance</p></div>
+<div class="controls"><button onclick="theme('warm')">Warm Light</button><button onclick="theme('dim')">Focus Light</button><button onclick="theme('night')">Night</button><button class="focus" onclick="focusMode()">Low-chroma</button></div>
+</div>
+
+<div class="card" style="margin-bottom:14px">
+<h3>Canonical lifecycle</h3>
+<div class="flow">
+<div class="step">Request</div><div class="step">Interpret</div><div class="step active">Draft</div><div class="step">Review</div><div class="step">Execute</div><div class="step">Report</div>
+</div>
+</div>
+
+<div class="grid">
+<div>
+<div class="card">
+<h3>Agent states</h3>
+<div class="states">
+<div class="state"><b>Idle</b><span>Available</span></div>
+<div class="state work"><b>Interpreting</b><span>Resolving context</span></div>
+<div class="state work"><b>Working</b><span>Internal execution</span></div>
+<div class="state"><b>Draft ready</b><span>Output exists</span></div>
+<div class="state review"><b>Review required</b><span>Human decision needed</span></div>
+<div class="state work"><b>Executing</b><span>Approved action running</span></div>
+<div class="state"><b>Completed</b><span>Outcome available</span></div>
+<div class="state fail"><b>Failed</b><span>Execution failed</span></div>
+<div class="state fail"><b>Blocked</b><span>Permission/context missing</span></div>
+</div>
+</div>
+
+<div class="card" style="margin-top:14px">
+<h3>Action risk model</h3>
+<div class="risk">
+<div class="risk-row"><strong>R0</strong><div><b>Informational</b><p>Research, summarize, draft</p></div><div><p>No external side effect · review not required</p></div></div>
+<div class="risk-row"><strong>R1</strong><div><b>Low-impact reversible</b><p>Tag record, reorder task</p></div><div><p>Optional review based on policy</p></div></div>
+<div class="risk-row"><strong>R2</strong><div><b>Operational change</b><p>Update CRM, modify workflow</p></div><div><p>Human approval required</p></div></div>
+<div class="risk-row"><strong>R3</strong><div><b>External / financial / bulk</b><p>Send, pay, bulk-update</p></div><div><p>Explicit confirmation + impact summary</p></div></div>
+</div>
+</div>
+
+<div class="card" style="margin-top:14px">
+<h3>Review pattern</h3>
+<div class="review-box">
+<h3>Campaign Agent proposes 6 changes</h3>
+<p>Based on updated distributor priority, the Agent recommends rescheduling six partner actions.</p>
+<div class="prov">
+<div><b>What changes</b>6 partner actions move to a higher-priority segment.</div>
+<div><b>Why</b>3 verified data points changed the ranking.</div>
+<div><b>Impact</b>External execution will occur only after approval.</div>
+</div>
+<div class="row" style="margin-top:10px"><button class="btn agent">Approve</button><button class="btn">Edit</button><button class="btn">Reject</button><button class="btn">Ask for context</button></div>
+</div>
+</div>
+</div>
+
+<div>
+<div class="card">
+<h3>Provenance</h3>
+<div class="prov">
+<div><b>Sources</b>CRM · GT Distributor Notes · Partner capacity sheet</div>
+<div><b>Freshness</b>CRM 12m · Notes 3h · Capacity 1d</div>
+<div><b>Tool / action</b>Internal analysis + schedule planner</div>
+<div><b>Project</b>Q4 Growth Campaign</div>
+<div><b>Human owner</b>Mai</div>
+<div><b>Execution effect</b>No external action yet</div>
+</div>
+<div class="note">Show operational explanation, not private chain-of-thought.</div>
+</div>
+
+<div class="card" style="margin-top:14px">
+<h3>Supervisor environment</h3>
+<div class="supervisor">
+<div class="check"><span>Risk level</span><span class="warn">R2 · review required</span></div>
+<div class="check"><span>Tool permission</span><span class="ok">Allowed</span></div>
+<div class="check"><span>Source validity</span><span class="ok">Verified</span></div>
+<div class="check"><span>Workflow stage</span><span class="ok">Review</span></div>
+<div class="check"><span>External execution</span><span class="warn">Blocked until approval</span></div>
+</div>
+</div>
+
+<div class="card" style="margin-top:14px">
+<h3>Operational activity</h3>
+<div class="timeline">
+<div class="event"><div class="dot">A</div><div><b>Research Agent interpreted request</b><p>Resolved project context and trusted sources.</p></div><span class="time">12:02</span></div>
+<div class="event"><div class="dot">A</div><div><b>Draft prepared</b><p>Generated proposed partner sequence.</p></div><span class="time">12:08</span></div>
+<div class="event h"><div class="dot">H</div><div><b>Human review required</b><p>6 operational changes await decision.</p></div><span class="time">Now</span></div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="note"><b>System rule:</b> Draft ≠ Approved ≠ Executed. Agent state, Human decision and actual side effect must always be distinguishable.</div>
+</main>
+<script>
+function theme(t){document.documentElement.dataset.theme=t;document.documentElement.dataset.focus='normal'}
+function focusMode(){if(document.documentElement.dataset.theme!=='night')return;document.documentElement.dataset.focus=document.documentElement.dataset.focus==='low'?'normal':'low'}
+</script>
+</body></html>
