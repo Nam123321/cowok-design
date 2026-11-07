@@ -7,3 +7,10 @@ build/
 .env.*
 .tmp/
 target/
+.cowok-design/
+.uxui-os/
+.agent/
+.opencodereview/
+_iwish-output/
+scripts
+
