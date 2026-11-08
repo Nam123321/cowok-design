@@ -1,0 +1,32 @@
+[package]
+name = "harness-daemon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+domain = { path = "../domain" }
+spec-registry = { path = "../spec-registry" }
+constraint-engine = { path = "../constraint-engine" }
+flow-graph = { path = "../flow-graph" }
+html-forge = { path = "../html-forge" }
+presentation-cms = { path = "../presentation-cms" }
+plugin-host = { path = "../plugin-host" }
+rea-bridge = { path = "../rea-bridge" }
+bot-fleet = { path = "../bot-fleet" }
+mcp-gateway = { path = "../mcp-gateway" }
+axum = "0.7"
+tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+sha2.workspace = true
+rusqlite.workspace = true
+libc = "0.2"
+
+[dev-dependencies]
+tempfile.workspace = true
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+
