@@ -416,8 +416,7 @@ impl TokenBudgetGovernor {
             .filter(|s| s.priority == PriorityTier::P1TaskCore)
             .count();
 
-        if p1_count > 0 {
-            let budget_per_p1 = available_for_p1 / p1_count;
+        if let Some(budget_per_p1) = available_for_p1.checked_div(p1_count) {
             for sec in sections.iter_mut() {
                 if sec.priority == PriorityTier::P1TaskCore && sec.tokens() > budget_per_p1 {
                     sec.content = truncate_utf8_to_tokens(

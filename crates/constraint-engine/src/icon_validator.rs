@@ -191,6 +191,7 @@ impl IconValidator {
     }
 
     /// Efficient Wagner-Fischer algorithm for Levenshtein distance with stack arrays for length <= 64.
+    #[allow(clippy::needless_range_loop)]
     pub fn levenshtein_distance(a: &str, b: &str) -> usize {
         let m = a.chars().count();
         let n = b.chars().count();

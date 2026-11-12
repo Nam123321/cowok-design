@@ -11,10 +11,11 @@ targets = [
 
 [advisories]
 version = 2
-vulnerability = "deny"
-unmaintained = "warn"
 yanked = "deny"
-notice = "warn"
+unmaintained = "workspace"
+ignore = [
+    "RUSTSEC-2026-0459", # Bundled SQLite 3.53.2 WAL cache vulnerability in rusqlite 0.32; tracked for rusqlite 0.41 upgrade
+]
 
 [licenses]
 version = 2
@@ -26,11 +27,11 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "CC0-1.0",
+    "Unicode-3.0",
     "Unicode-DFS-2016",
     "OpenSSL",
     "Zlib",
 ]
-copyleft = "deny"
 
 [licenses.private]
 ignore = true

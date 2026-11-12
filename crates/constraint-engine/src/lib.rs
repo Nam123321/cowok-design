@@ -1191,7 +1191,7 @@ mod tests {
         );
         assert_eq!(reconstructed.project_id, domain_profile.project_id);
         assert_eq!(reconstructed.max_complexity_score, 5);
-        assert_eq!(reconstructed.enforce_clean_code, true);
+        assert!(reconstructed.enforce_clean_code);
         assert_eq!(reconstructed.target_framework, "react");
         assert!(reconstructed
             .forbidden_patterns

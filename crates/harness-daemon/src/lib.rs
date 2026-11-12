@@ -1,5 +1,6 @@
 // @story 01.3
 // @implements AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10
+#![allow(clippy::result_large_err)]
 //! Harness Daemon entrypoint, loopback Axum control plane, `.cowok-design/daemon.lock`
 //! dynamic port discovery, and 9-Spec Synthesis Pipeline for `cowok-design`.
 
@@ -422,35 +423,32 @@ pub fn extract_disallowed_profiles(
     for c in constraints {
         let code = c.rule_code.to_uppercase();
         // 1. Direct rule_code matching
-        if code.contains("FORBID_FRONTIER")
+        if (code.contains("FORBID_FRONTIER")
             || code.contains("DISALLOW_FRONTIER")
-            || code.contains("FORBID_PROFILE_A")
+            || code.contains("FORBID_PROFILE_A"))
+            && !disallowed.contains(&domain::ModelProfileTier::ProfileA_Frontier)
         {
-            if !disallowed.contains(&domain::ModelProfileTier::ProfileA_Frontier) {
-                disallowed.push(domain::ModelProfileTier::ProfileA_Frontier);
-            }
+            disallowed.push(domain::ModelProfileTier::ProfileA_Frontier);
         }
-        if code.contains("FORBID_FAST_CODING")
+        if (code.contains("FORBID_FAST_CODING")
             || code.contains("DISALLOW_FAST_CODING")
-            || code.contains("FORBID_PROFILE_B")
+            || code.contains("FORBID_PROFILE_B"))
+            && !disallowed.contains(&domain::ModelProfileTier::ProfileB_FastCoding)
         {
-            if !disallowed.contains(&domain::ModelProfileTier::ProfileB_FastCoding) {
-                disallowed.push(domain::ModelProfileTier::ProfileB_FastCoding);
-            }
+            disallowed.push(domain::ModelProfileTier::ProfileB_FastCoding);
         }
-        if code.contains("FORBID_COMPACT")
+        if (code.contains("FORBID_COMPACT")
             || code.contains("DISALLOW_COMPACT")
-            || code.contains("FORBID_PROFILE_C")
+            || code.contains("FORBID_PROFILE_C"))
+            && !disallowed.contains(&domain::ModelProfileTier::ProfileC_Compact)
         {
-            if !disallowed.contains(&domain::ModelProfileTier::ProfileC_Compact) {
-                disallowed.push(domain::ModelProfileTier::ProfileC_Compact);
-            }
+            disallowed.push(domain::ModelProfileTier::ProfileC_Compact);
         }
 
         // 2. Structured JSON config matching
         if let Ok(json_cfg) = serde_json::from_str::<serde_json::Value>(&c.config_json) {
             // Check explicit forbid flags
-            if json_cfg
+            if (json_cfg
                 .get("forbid_frontier")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false)
@@ -461,13 +459,12 @@ pub fn extract_disallowed_profiles(
                 || json_cfg
                     .get("disallow_frontier")
                     .and_then(|v| v.as_bool())
-                    .unwrap_or(false)
+                    .unwrap_or(false))
+                && !disallowed.contains(&domain::ModelProfileTier::ProfileA_Frontier)
             {
-                if !disallowed.contains(&domain::ModelProfileTier::ProfileA_Frontier) {
-                    disallowed.push(domain::ModelProfileTier::ProfileA_Frontier);
-                }
+                disallowed.push(domain::ModelProfileTier::ProfileA_Frontier);
             }
-            if json_cfg
+            if (json_cfg
                 .get("forbid_fast_coding")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false)
@@ -478,13 +475,12 @@ pub fn extract_disallowed_profiles(
                 || json_cfg
                     .get("disallow_fast_coding")
                     .and_then(|v| v.as_bool())
-                    .unwrap_or(false)
+                    .unwrap_or(false))
+                && !disallowed.contains(&domain::ModelProfileTier::ProfileB_FastCoding)
             {
-                if !disallowed.contains(&domain::ModelProfileTier::ProfileB_FastCoding) {
-                    disallowed.push(domain::ModelProfileTier::ProfileB_FastCoding);
-                }
+                disallowed.push(domain::ModelProfileTier::ProfileB_FastCoding);
             }
-            if json_cfg
+            if (json_cfg
                 .get("forbid_compact")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false)
@@ -495,11 +491,10 @@ pub fn extract_disallowed_profiles(
                 || json_cfg
                     .get("disallow_compact")
                     .and_then(|v| v.as_bool())
-                    .unwrap_or(false)
+                    .unwrap_or(false))
+                && !disallowed.contains(&domain::ModelProfileTier::ProfileC_Compact)
             {
-                if !disallowed.contains(&domain::ModelProfileTier::ProfileC_Compact) {
-                    disallowed.push(domain::ModelProfileTier::ProfileC_Compact);
-                }
+                disallowed.push(domain::ModelProfileTier::ProfileC_Compact);
             }
 
             // Check forbidden/disallowed profile lists
@@ -513,36 +508,30 @@ pub fn extract_disallowed_profiles(
                     for item in arr {
                         if let Some(s) = item.as_str() {
                             let s_lower = s.to_ascii_lowercase();
-                            if s_lower == "frontier_reasoning"
+                            if (s_lower == "frontier_reasoning"
                                 || s_lower == "profilea_frontier"
                                 || s_lower == "profile_a"
-                                || s_lower == "frontier"
-                            {
-                                if !disallowed
+                                || s_lower == "frontier")
+                                && !disallowed
                                     .contains(&domain::ModelProfileTier::ProfileA_Frontier)
-                                {
-                                    disallowed.push(domain::ModelProfileTier::ProfileA_Frontier);
-                                }
-                            }
-                            if s_lower == "fast_coding"
-                                || s_lower == "profileb_fastcoding"
-                                || s_lower == "profile_b"
                             {
-                                if !disallowed
-                                    .contains(&domain::ModelProfileTier::ProfileB_FastCoding)
-                                {
-                                    disallowed.push(domain::ModelProfileTier::ProfileB_FastCoding);
-                                }
+                                disallowed.push(domain::ModelProfileTier::ProfileA_Frontier);
                             }
-                            if s_lower == "compact_motion"
+                            if (s_lower == "fast_coding"
+                                || s_lower == "profileb_fastcoding"
+                                || s_lower == "profile_b")
+                                && !disallowed
+                                    .contains(&domain::ModelProfileTier::ProfileB_FastCoding)
+                            {
+                                disallowed.push(domain::ModelProfileTier::ProfileB_FastCoding);
+                            }
+                            if (s_lower == "compact_motion"
                                 || s_lower == "profilec_compact"
                                 || s_lower == "profile_c"
-                                || s_lower == "compact"
+                                || s_lower == "compact")
+                                && !disallowed.contains(&domain::ModelProfileTier::ProfileC_Compact)
                             {
-                                if !disallowed.contains(&domain::ModelProfileTier::ProfileC_Compact)
-                                {
-                                    disallowed.push(domain::ModelProfileTier::ProfileC_Compact);
-                                }
+                                disallowed.push(domain::ModelProfileTier::ProfileC_Compact);
                             }
                         }
                     }

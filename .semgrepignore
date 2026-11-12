@@ -1,0 +1,31 @@
+# Dependency locks & package manager metadata
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+Cargo.lock
+
+# Test files & test fixtures
+tests/
+__tests__/
+*.test.ts
+*.test.tsx
+*.test.js
+*.spec.ts
+*.spec.tsx
+*.spec.js
+fixtures/
+
+# Build & generated files
+dist/
+target/
+build/
+coverage/
+node_modules/
+.next/
+.turbo/
+
+# Project documentation & internal state
+_iwish-output/
+.agent/
+.agents/
+docs/

@@ -318,13 +318,13 @@ impl VisibilityPolicy {
         portal: Portal,
     ) -> (bool, ReasonCode) {
         // AC-03 Boundary Guard: If request is from public/marketing portal, forbid admin-sensitive specs unconditionally
-        if portal.is_public_facing() {
-            if matches!(
+        if portal.is_public_facing()
+            && matches!(
                 key,
                 CanonicalSpecKey::DatabaseSpec | CanonicalSpecKey::SecurityTenancy
-            ) {
-                return (false, ReasonCode::RedactedSecurityBoundary);
-            }
+            )
+        {
+            return (false, ReasonCode::RedactedSecurityBoundary);
         }
 
         // Department-driven inclusion matrix

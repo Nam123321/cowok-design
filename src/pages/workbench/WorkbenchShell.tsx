@@ -140,8 +140,16 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
       />
       <OnboardingWizardModal
         isOpen={isOnboardingOpen}
-        onClose={() => setIsOnboardingOpen(false)}
+        onClose={() => {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("cowok_first_run_completed", "true");
+          }
+          setIsOnboardingOpen(false);
+        }}
         onComplete={(_cfg) => {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("cowok_first_run_completed", "true");
+          }
           setIsOnboardingOpen(false);
         }}
       />

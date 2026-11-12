@@ -13,6 +13,9 @@ test.describe("Story 04.1: Unified DualMainPanel Workbench, Rust SQLite WAL SSOT
     fs.mkdirSync(evidenceDir, { recursive: true });
 
     await page.setViewportSize({ width: 1440, height: 900 });
+    await page.addInitScript(() => {
+      window.localStorage.setItem("cowok_first_run_completed", "true");
+    });
     const targetPort = process.env.TARGET_PORT || "4173";
     await page.goto(`http://127.0.0.1:${targetPort}/`, { waitUntil: "networkidle" });
 

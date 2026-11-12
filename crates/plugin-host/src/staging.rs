@@ -52,8 +52,7 @@ impl PerRunStager {
             std::fs::create_dir_all(&skill_dir)?;
 
             let manifest_path = skill_dir.join("plugin.json");
-            let json = serde_json::to_string_pretty(skill)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            let json = serde_json::to_string_pretty(skill).map_err(std::io::Error::other)?;
             std::fs::write(manifest_path, json)?;
 
             if let Some(overview) = &skill.prompt_overview {
@@ -74,8 +73,7 @@ impl PerRunStager {
         };
 
         let receipt_path = run_dir.join("run-receipt.json");
-        let receipt_json = serde_json::to_string_pretty(&receipt)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let receipt_json = serde_json::to_string_pretty(&receipt).map_err(std::io::Error::other)?;
         std::fs::write(receipt_path, receipt_json)?;
 
         Ok(receipt)
