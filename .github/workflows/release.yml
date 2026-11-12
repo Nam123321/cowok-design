@@ -54,10 +54,20 @@ jobs:
         run: |
           mkdir -p dist-bin
           if [ "${{ runner.os }}" = "Windows" ]; then
-            cp "target/${{ matrix.target }}/release/harness-daemon.exe" "dist-bin/${{ matrix.artifact_name }}" || cp "target/${{ matrix.target }}/release/*.exe" "dist-bin/${{ matrix.artifact_name }}" || true
+            SRC="target/${{ matrix.target }}/release/harness-daemon.exe"
+            if [ ! -f "$SRC" ]; then
+              echo "::error::Release binary not found at $SRC"
+              exit 1
+            fi
+            cp "$SRC" "dist-bin/${{ matrix.artifact_name }}"
           else
-            cp "target/${{ matrix.target }}/release/harness-daemon" "dist-bin/${{ matrix.artifact_name }}" || cp "target/${{ matrix.target }}/release/cowok*" "dist-bin/${{ matrix.artifact_name }}" || true
-            chmod +x "dist-bin/${{ matrix.artifact_name }}" || true
+            SRC="target/${{ matrix.target }}/release/harness-daemon"
+            if [ ! -f "$SRC" ]; then
+              echo "::error::Release binary not found at $SRC"
+              exit 1
+            fi
+            cp "$SRC" "dist-bin/${{ matrix.artifact_name }}"
+            chmod +x "dist-bin/${{ matrix.artifact_name }}"
           fi
 
       - name: Upload Binary to Release

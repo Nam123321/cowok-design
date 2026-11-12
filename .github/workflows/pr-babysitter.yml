@@ -50,4 +50,6 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           CI: "true"
         run: |
+          # Prevent accidental secret exposure in public runner logs
+          echo "::add-mask::${{ secrets.GEMINI_API_KEY }}"
           node scripts/pr-babysitter-runner.js
