@@ -24,7 +24,7 @@ pub fn estimate_token_count(text: &str) -> usize {
     let word_count = trimmed.split_whitespace().count();
 
     // Conservative ceiling heuristic
-    let char_estimate = (char_count + 3) / 4;
+    let char_estimate = char_count.div_ceil(4);
     let word_estimate = ((word_count as f64) * 1.33).ceil() as usize;
     std::cmp::max(char_estimate, word_estimate)
 }
@@ -35,12 +35,11 @@ pub fn estimate_token_count(text: &str) -> usize {
 /// - Contains `name` and `description`
 pub fn validate_skill_frontmatter(raw_content: &str) -> Result<usize, ValidationError> {
     let trimmed = raw_content.trim();
-    let yaml_body = if trimmed.starts_with("---") {
-        let after_first = &trimmed[3..];
+    let yaml_body = if let Some(after_first) = trimmed.strip_prefix("---") {
         let end_idx = after_first
             .find("---")
             .ok_or(ValidationError::InvalidFrontmatterDelimiters)?;
-        &after_first[..end_idx].trim()
+        after_first[..end_idx].trim()
     } else {
         trimmed
     };
@@ -72,8 +71,8 @@ pub fn validate_skill_frontmatter(raw_content: &str) -> Result<usize, Validation
     // Check risk tier if present
     for line in yaml_body.lines() {
         let t = line.trim();
-        if t.starts_with("risk_tier:") {
-            let val_part = t["risk_tier:".len()..].trim();
+        if let Some(stripped) = t.strip_prefix("risk_tier:") {
+            let val_part = stripped.trim();
             if let Ok(tier) = val_part.parse::<u8>() {
                 if !(1..=3).contains(&tier) {
                     return Err(ValidationError::InvalidRiskTier(tier));

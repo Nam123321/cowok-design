@@ -224,13 +224,13 @@ pub fn atomic_write_spec_file(
     #[cfg(unix)]
     {
         atomic_write_spec_file_unix_nofollow(workspace_root, spec_key, operation_id, content)?;
-        return Ok(target_path);
+        Ok(target_path)
     }
 
     #[cfg(windows)]
     {
         atomic_write_spec_file_windows(workspace_root, spec_key, operation_id, content)?;
-        return Ok(target_path);
+        Ok(target_path)
     }
 
     #[cfg(not(any(unix, windows)))]

@@ -679,6 +679,7 @@ impl SpecRegistry {
 
     /// Reconciles an external filesystem event for `candidate_path` with Hash-Gated Echo Suppression
     /// and a 50ms debounce window for transient 0-byte IDE save truncations.
+    #[allow(clippy::type_complexity)]
     pub fn handle_watcher_path_event(
         &self,
         project_id: Uuid,

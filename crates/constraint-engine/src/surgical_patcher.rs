@@ -166,7 +166,7 @@ impl SurgicalPatcher {
         let total_elements_tagged = insertions.len();
 
         // Sort descending by offset so insertions don't shift prior byte offsets
-        insertions.sort_by(|a, b| b.0.cmp(&a.0));
+        insertions.sort_by_key(|a| std::cmp::Reverse(a.0));
 
         let mut tagged_source = source.to_string();
         for (offset, text) in insertions {
@@ -794,7 +794,7 @@ impl SurgicalPatcher {
                                                 let is_match = if let Some(target) = target_attr {
                                                     key_name == Some(target)
                                                 } else {
-                                                    key_name.map_or(false, |k| k.starts_with("--"))
+                                                    key_name.is_some_and(|k| k.starts_with("--"))
                                                 };
                                                 if is_match {
                                                     let span = p.value.span();

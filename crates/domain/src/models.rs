@@ -35,6 +35,7 @@ where
     Ok(val)
 }
 
+#[allow(clippy::ptr_arg)]
 fn serialize_sha256_hash<S>(val: &String, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -68,6 +69,7 @@ where
     Ok(val)
 }
 
+#[allow(clippy::ptr_arg)]
 fn serialize_non_empty_string<S>(val: &String, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,

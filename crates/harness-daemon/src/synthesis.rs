@@ -362,8 +362,7 @@ pub fn synthesize_nine_specs(
         );
 
         let (markdown, src_proj_id, src_rev_sha, status_override) =
-            if is_brand_inheritable && inherit_from.is_some() {
-                let upstream_id = inherit_from.expect("checked Some");
+            if let (true, Some(upstream_id)) = (is_brand_inheritable, inherit_from) {
                 match load_upstream_spec_content(base_registry, upstream_id, spec_key)? {
                     Some((up_md, up_sha)) => (
                         up_md,

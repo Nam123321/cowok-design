@@ -592,7 +592,7 @@ pub(super) fn verify_anti_idor_and_resolve_registry(
 }
 
 fn check_upstream_drift(registry: &SpecRegistry, rec: &SpecRecord) -> Result<bool, HarnessError> {
-    let (Some(src_proj), Some(ref src_sha)) =
+    let (Some(src_proj), Some(src_sha)) =
         (rec.source_project_id, rec.source_revision_sha256.as_ref())
     else {
         return Ok(false);
@@ -610,7 +610,7 @@ fn check_upstream_drift(registry: &SpecRegistry, rec: &SpecRecord) -> Result<boo
         .map_err(|e| map_sqlite_error(e, "check_upstream_drift"))?;
 
     match upstream_sha_opt {
-        Some(cur_up_sha) => Ok(&cur_up_sha != *src_sha),
+        Some(cur_up_sha) => Ok(&cur_up_sha != src_sha),
         None => Ok(false),
     }
 }

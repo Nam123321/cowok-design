@@ -29,27 +29,24 @@ pub fn check_geometric_and_wcag_rules(content: &str) -> Vec<LintIssue> {
         }
 
         // Rule 02: WCAG 2.2 AA Contrast check for known poor-contrast gray pairs
-        if lower.contains("color: #999")
+        if (lower.contains("color: #999")
             || lower.contains("color: #aaa")
-            || lower.contains("color: #bbb")
-        {
-            if lower.contains("background: #fff")
+            || lower.contains("color: #bbb"))
+            && (lower.contains("background: #fff")
                 || lower.contains("background-color: #fff")
-                || lower.contains("bg-white")
-            {
-                issues.push(LintIssue {
-                    rule_id: "RULE_GEO_02_WCAG_CONTRAST_AA".to_string(),
-                    category: LintIssueCategory::WcagContrast,
-                    severity: LintSeverity::Error,
-                    message:
-                        "Contrast ratio falls below WCAG 2.2 AA (4.5:1). Darken foreground text."
-                            .to_string(),
-                    line: Some(line_num),
-                    column: None,
-                    snippet: Some(line.trim().to_string()),
-                    auto_fixable: true,
-                });
-            }
+                || lower.contains("bg-white"))
+        {
+            issues.push(LintIssue {
+                rule_id: "RULE_GEO_02_WCAG_CONTRAST_AA".to_string(),
+                category: LintIssueCategory::WcagContrast,
+                severity: LintSeverity::Error,
+                message: "Contrast ratio falls below WCAG 2.2 AA (4.5:1). Darken foreground text."
+                    .to_string(),
+                line: Some(line_num),
+                column: None,
+                snippet: Some(line.trim().to_string()),
+                auto_fixable: true,
+            });
         }
 
         // Rule 03: Text overflow detection (fixed width without ellipsis or word-break)
@@ -77,29 +74,29 @@ pub fn check_geometric_and_wcag_rules(content: &str) -> Vec<LintIssue> {
         }
 
         // Rule 04: Touch target size (< 44px on clickable buttons)
-        if lower.contains("<button") || lower.contains("class=\"btn\"") {
-            if lower.contains("height: 24px")
+        if (lower.contains("<button") || lower.contains("class=\"btn\""))
+            && (lower.contains("height: 24px")
                 || lower.contains("height: 28px")
-                || lower.contains("height: 32px")
-            {
-                issues.push(LintIssue {
-                    rule_id: "RULE_GEO_04_TOUCH_TARGET".to_string(),
-                    category: LintIssueCategory::GeometricLayout,
-                    severity: LintSeverity::Warning,
-                    message: "Interactive button height < 44px without touch target expansion."
-                        .to_string(),
-                    line: Some(line_num),
-                    column: None,
-                    snippet: Some(line.trim().to_string()),
-                    auto_fixable: false,
-                });
-            }
+                || lower.contains("height: 32px"))
+        {
+            issues.push(LintIssue {
+                rule_id: "RULE_GEO_04_TOUCH_TARGET".to_string(),
+                category: LintIssueCategory::GeometricLayout,
+                severity: LintSeverity::Warning,
+                message: "Interactive button height < 44px without touch target expansion."
+                    .to_string(),
+                line: Some(line_num),
+                column: None,
+                snippet: Some(line.trim().to_string()),
+                auto_fixable: false,
+            });
         }
 
         // Rule 05: Line-height ratio check
-        if lower.contains("line-height: 1;") || lower.contains("leading-none") {
-            if lower.contains("<p") || lower.contains("body") || lower.contains("prose") {
-                issues.push(LintIssue {
+        if (lower.contains("line-height: 1;") || lower.contains("leading-none"))
+            && (lower.contains("<p") || lower.contains("body") || lower.contains("prose"))
+        {
+            issues.push(LintIssue {
                     rule_id: "RULE_GEO_05_LINE_HEIGHT_RATIO".to_string(),
                     category: LintIssueCategory::GeometricLayout,
                     severity: LintSeverity::Warning,
@@ -109,7 +106,6 @@ pub fn check_geometric_and_wcag_rules(content: &str) -> Vec<LintIssue> {
                     snippet: Some(line.trim().to_string()),
                     auto_fixable: true,
                 });
-            }
         }
 
         // Rule 08: Minimum font size (< 10px)
@@ -131,12 +127,12 @@ pub fn check_geometric_and_wcag_rules(content: &str) -> Vec<LintIssue> {
         }
 
         // Rule 10: Interactive role focus outline missing
-        if lower.contains("outline: none") || lower.contains("outline: 0") {
-            if !lower.contains("focus-visible")
-                && !lower.contains("ring")
-                && !lower.contains("box-shadow")
-            {
-                issues.push(LintIssue {
+        if (lower.contains("outline: none") || lower.contains("outline: 0"))
+            && !lower.contains("focus-visible")
+            && !lower.contains("ring")
+            && !lower.contains("box-shadow")
+        {
+            issues.push(LintIssue {
                     rule_id: "RULE_GEO_10_INTERACTIVE_ROLE_FOCUS".to_string(),
                     category: LintIssueCategory::WcagContrast,
                     severity: LintSeverity::Error,
@@ -146,7 +142,6 @@ pub fn check_geometric_and_wcag_rules(content: &str) -> Vec<LintIssue> {
                     snippet: Some(line.trim().to_string()),
                     auto_fixable: true,
                 });
-            }
         }
 
         // Rule 11: Image missing aspect-ratio or object-fit

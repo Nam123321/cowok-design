@@ -57,6 +57,7 @@ struct MigrateLockGuard {
 }
 
 impl MigrateLockGuard {
+    #[allow(clippy::suspicious_open_options)]
     fn acquire(lock_path: &Path) -> Result<Self, HarnessError> {
         #[cfg(unix)]
         {
@@ -546,6 +547,7 @@ impl SqlitePool {
         self.migration_elapsed_ms
     }
 
+    #[allow(clippy::suspicious_open_options)]
     fn connect_with_pragmas(config: &SqliteWalConfig) -> Result<Connection, HarnessError> {
         #[cfg(unix)]
         let conn = {

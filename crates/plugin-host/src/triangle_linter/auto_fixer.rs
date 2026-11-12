@@ -6,11 +6,7 @@ pub fn auto_fix_issues(content: &str) -> (String, usize) {
     // 1. Fix curly smart quotes
     if fixed.contains('“') || fixed.contains('”') || fixed.contains('‘') || fixed.contains('’')
     {
-        fixed = fixed
-            .replace('“', "\"")
-            .replace('”', "\"")
-            .replace('‘', "'")
-            .replace('’', "'");
+        fixed = fixed.replace(['“', '”'], "\"").replace(['‘', '’'], "'");
         fix_count += 1;
     }
 

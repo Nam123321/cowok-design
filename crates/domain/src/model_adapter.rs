@@ -496,13 +496,12 @@ fn flatten_schema_level(
                     }),
                 );
 
-                if child_is_req {
-                    if !required
+                if child_is_req
+                    && !required
                         .iter()
                         .any(|r: &serde_json::Value| r.as_str() == Some(&full_key))
-                    {
-                        required.push(serde_json::Value::String(full_key));
-                    }
+                {
+                    required.push(serde_json::Value::String(full_key));
                 }
             }
         }
