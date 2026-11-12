@@ -1,0 +1,10 @@
+{
+  "id": "scenario-audit-and-fix",
+  "name": "Triangle Linter Automated Audit & Healing",
+  "description": "Scans workspace components with Triangle Linter, applies single-pass fixes, and generates audit receipts",
+  "pipeline": [
+    { "step": "scan-slop", "skill": "design-taste-and-ux-guard" },
+    { "step": "polish-craft", "skill": "impeccable-design-polish" },
+    { "step": "verify-gate", "skill": "self-healing-eval-gate", "repeat_until": "total_issues == 0", "max_attempts": 2 }
+  ]
+}

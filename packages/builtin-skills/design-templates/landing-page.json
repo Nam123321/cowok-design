@@ -1,0 +1,14 @@
+{
+  "id": "template-landing-page",
+  "name": "High-Conversion SaaS Landing Page",
+  "category": "marketing",
+  "description": "Narrative landing page featuring hero showcase, social proof logos, bento grid features, interactive pricing, and FAQ",
+  "sections": [
+    { "id": "hero", "type": "hero", "title": "Headline, Subtitle, Dual CTAs, and Product Preview Stage" },
+    { "id": "social-proof", "type": "logos", "title": "Customer Logo Bar & Testimonial Avatars" },
+    { "id": "bento-features", "type": "bento", "title": "4-Tile Bento Grid Showcasing Core Capabilities" },
+    { "id": "pricing", "type": "pricing", "title": "Tiered Pricing Cards (Starter, Pro, Enterprise)" },
+    { "id": "faq", "type": "accordion", "title": "Frequently Asked Questions Accordion" },
+    { "id": "footer", "type": "footer", "title": "Minimalist Multi-Column Footer with System Status" }
+  ]
+}

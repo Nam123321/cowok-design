@@ -1,0 +1,11 @@
+{
+  "contract_version": 1,
+  "data": {
+    "kind": "STALE_FILE",
+    "payload": {
+      "path": "crates/domain/src/lib.rs",
+      "expected_hash": "hash-a",
+      "actual_hash": "hash-b"
+    }
+  }
+}

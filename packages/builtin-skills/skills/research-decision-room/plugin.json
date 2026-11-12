@@ -1,0 +1,9 @@
+{
+  "name": "research-decision-room",
+  "version": "1.0.0",
+  "description": "Synthesizes design decisions with empirical citations and zero-fabrication rules",
+  "entry_point": "SKILL.md",
+  "capabilities_required": ["spec-registry", "adr-writer"],
+  "risk_tier": 1,
+  "tags": ["research", "adr", "socratic", "citations"]
+}

@@ -1,0 +1,10 @@
+{
+  "contract_version": 1,
+  "data": {
+    "id": "323e4567-e89b-12d3-a456-426614174000",
+    "spec_id": "223e4567-e89b-12d3-a456-426614174000",
+    "revision_number": 1,
+    "content_hash": "sha256-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "created_at": 1730500000
+  }
+}

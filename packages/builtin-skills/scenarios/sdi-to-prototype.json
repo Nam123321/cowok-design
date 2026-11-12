@@ -1,0 +1,12 @@
+{
+  "id": "scenario-sdi-to-prototype",
+  "name": "SDI Intent to Live Prototype Pipeline",
+  "description": "Orchestrates intent clarification, design taste alignment, and HTML prototype generation with self-healing feedback loop",
+  "pipeline": [
+    { "step": "clarify-intent", "skill": "intent-clarifier-sdi" },
+    { "step": "synthesize-specs", "skill": "project-spec-synthesizer" },
+    { "step": "enforce-ux-guard", "skill": "design-taste-and-ux-guard" },
+    { "step": "complete-states", "skill": "flow-state-completer" },
+    { "step": "audit-and-heal", "skill": "self-healing-eval-gate", "repeat_until": "gate_passed == true", "max_attempts": 3 }
+  ]
+}

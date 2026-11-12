@@ -1,5 +1,5 @@
 // @story 01.3
-// @cover AC-01, AC-02, AC-03, AC-04, AC-05, AC-06
+// @cover AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10
 use std::fs;
 use std::net::TcpListener;
 use std::sync::Arc;
@@ -14,9 +14,9 @@ use domain::{CanonicalSpecKey, ProvenanceStatus};
 use harness_daemon::{
     build_router, map_error_to_response, read_daemon_lock, resolve_project_scoped_registry,
     validate_loopback_host, validate_seed_repo_path, ChatSessionDto, CreateProjectRequest,
-    DaemonAppState, DaemonConfig, DaemonHttpClient, DaemonServer, HealthResponse, HttpErrorBody,
-    ModelAdapterRequestDto, PathTokenResponse, ProjectBoundaryDto, ProjectDto,
-    ProjectSpecsListResponse, PromptCompileRequest, SpecItemWithDriftDto,
+    DaemonAppState, DaemonConfig, DaemonHttpClient, DaemonServer, GitHubPRResponseDto,
+    HealthResponse, HttpErrorBody, ModelAdapterRequestDto, PathTokenResponse, ProjectBoundaryDto,
+    ProjectDto, ProjectSpecsListResponse, PromptCompileRequest, SpecItemWithDriftDto,
     SynthesizeSpecsRequest, SynthesizeSpecsResponse,
 };
 use http_body_util::BodyExt;
@@ -39,8 +39,8 @@ fn setup_daemon_router(tmp: &TempDir) -> (Arc<SpecRegistry>, axum::Router) {
         port: 4170,
     };
     let reg_for_layer = Arc::clone(&registry);
-    let router = build_router(state).layer(middleware::from_fn(
-        move |mut req: Request, next: Next| {
+    let router =
+        build_router(state).layer(middleware::from_fn(move |mut req: Request, next: Next| {
             let ws_default = ws_path.clone();
             let reg = Arc::clone(&reg_for_layer);
             async move {
@@ -72,14 +72,19 @@ fn setup_daemon_router(tmp: &TempDir) -> (Arc<SpecRegistry>, axum::Router) {
                 }
 
                 // If not explicitly testing unauthorized, auto-inject valid Bearer auth for test convenience
-                if is_project_route && !no_auth_requested && !req.headers().contains_key("authorization") {
+                if is_project_route
+                    && !no_auth_requested
+                    && !req.headers().contains_key("authorization")
+                {
                     if let Some(rest) = path.strip_prefix("/api/v1/projects/") {
                         let seg = rest.split('/').next().unwrap_or("");
                         if let Ok(pid) = Uuid::parse_str(seg) {
                             if let Ok((_r, root)) = resolve_project_scoped_registry(&reg, pid) {
                                 let tp = root.join(".cowok-design").join("project.token");
                                 if let Ok(tok) = fs::read_to_string(&tp) {
-                                    if let Ok(val) = HeaderValue::from_str(&format!("Bearer {}", tok.trim())) {
+                                    if let Ok(val) =
+                                        HeaderValue::from_str(&format!("Bearer {}", tok.trim()))
+                                    {
                                         req.headers_mut().insert("authorization", val);
                                     }
                                 }
@@ -90,8 +95,7 @@ fn setup_daemon_router(tmp: &TempDir) -> (Arc<SpecRegistry>, axum::Router) {
 
                 next.run(req).await
             }
-        },
-    ));
+        }));
     (registry, router)
 }
 
@@ -128,7 +132,15 @@ async fn send_json_request(
     let parsed: serde_json::Value = if bytes.is_empty() {
         serde_json::Value::Null
     } else {
-        serde_json::from_slice(&bytes).expect("parse json response")
+        match serde_json::from_slice(&bytes) {
+            Ok(v) => v,
+            Err(e) => {
+                panic!(
+                    "parse json response: {e}; status: {status}; body: '{}'",
+                    String::from_utf8_lossy(&bytes)
+                );
+            }
+        }
     };
     (status, parsed)
 }
@@ -757,10 +769,7 @@ async fn txn_recovery_01_txn_retry_01_trace_01_idor_01_sre_p2002_p2003_conc_01()
     let (status, conc_err_val) = send_json_request(
         &router,
         "PUT",
-        &format!(
-            "/api/v1/projects/{}/specs/01-product-overview.md",
-            proj.id
-        ),
+        &format!("/api/v1/projects/{}/specs/01-product-overview.md", proj.id),
         &[],
         Some(serde_json::json!({
             "markdown_content": "# Concurrent writer with outdated v2 sha\n",
@@ -814,7 +823,10 @@ async fn test_prompt_compile_route_and_token_budget_governor() {
         use std::os::unix::fs::PermissionsExt;
         let meta = fs::metadata(&token_path).expect("metadata");
         let mode = meta.permissions().mode() & 0o777;
-        assert_eq!(mode, 0o600, "project.token must strictly have 0600 permission mode");
+        assert_eq!(
+            mode, 0o600,
+            "project.token must strictly have 0600 permission mode"
+        );
     }
 
     // 2. Unauthenticated request to prompt-compile returns 401 Unauthorized
@@ -908,27 +920,25 @@ async fn test_model_adapter_route_and_capability_tiers() {
     let proj: ProjectDto = serde_json::from_value(proj_val).expect("parse project");
 
     // Sample tool definitions
-    let sample_tools = vec![
-        domain::ModelToolDefinition {
-            name: "mutate_ast".to_string(),
-            description: "Applies surgical AST patch".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "ast_node_id": { "type": "string" },
-                    "details": {
-                        "type": "object",
-                        "properties": {
-                            "backup": { "type": "boolean" },
-                            "force": { "type": "boolean" }
-                        }
+    let sample_tools = vec![domain::ModelToolDefinition {
+        name: "mutate_ast".to_string(),
+        description: "Applies surgical AST patch".to_string(),
+        parameters: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "ast_node_id": { "type": "string" },
+                "details": {
+                    "type": "object",
+                    "properties": {
+                        "backup": { "type": "boolean" },
+                        "force": { "type": "boolean" }
                     }
-                },
-                "required": ["ast_node_id"]
-            }),
-            is_micro_tool: false,
-        },
-    ];
+                }
+            },
+            "required": ["ast_node_id"]
+        }),
+        is_micro_tool: false,
+    }];
 
     // 2. Unauthenticated request to model-adapter returns 401 Unauthorized
     let (status, unauth_val) = send_json_request(
@@ -979,7 +989,10 @@ async fn test_model_adapter_route_and_capability_tiers() {
     assert_eq!(status, StatusCode::OK);
     let resp: domain::AdaptationResponse =
         serde_json::from_value(payload_val).expect("parse adaptation response");
-    assert_eq!(resp.active_profile, domain::ModelProfileTier::ProfileA_Frontier);
+    assert_eq!(
+        resp.active_profile,
+        domain::ModelProfileTier::ProfileA_Frontier
+    );
     assert_eq!(resp.reasoning_effort, domain::ReasoningEffort::High);
     assert!(!resp.degraded);
     assert!(resp.system_prompt.contains("PROFILE A: FRONTIER REASONING"));
@@ -1002,7 +1015,10 @@ async fn test_model_adapter_route_and_capability_tiers() {
     assert_eq!(status, StatusCode::OK);
     let resp: domain::AdaptationResponse =
         serde_json::from_value(payload_val).expect("parse compact response");
-    assert_eq!(resp.active_profile, domain::ModelProfileTier::ProfileC_Compact);
+    assert_eq!(
+        resp.active_profile,
+        domain::ModelProfileTier::ProfileC_Compact
+    );
     assert_eq!(resp.reasoning_effort, domain::ReasoningEffort::Low);
     assert_eq!(resp.token_budget, 1000);
     assert!(resp.system_prompt.contains("PROFILE C: COMPACT"));
@@ -1025,7 +1041,10 @@ async fn test_model_adapter_route_and_capability_tiers() {
     assert_eq!(status, StatusCode::OK);
     let resp: domain::AdaptationResponse =
         serde_json::from_value(payload_val).expect("parse degraded response");
-    assert_eq!(resp.active_profile, domain::ModelProfileTier::ProfileB_FastCoding);
+    assert_eq!(
+        resp.active_profile,
+        domain::ModelProfileTier::ProfileB_FastCoding
+    );
     assert_eq!(resp.reasoning_effort, domain::ReasoningEffort::Medium);
     assert!(resp.degraded);
     assert_eq!(
@@ -1044,8 +1063,13 @@ async fn test_model_adapter_route_and_capability_tiers() {
         syntax_error_reported: false,
         max_budget_override: None,
     };
-    let sdk_res = client.adapt_model_capabilities(proj.id, &sdk_req).expect("sdk adapt");
-    assert_eq!(sdk_res.active_profile, domain::ModelProfileTier::ProfileB_FastCoding);
+    let sdk_res = client
+        .adapt_model_capabilities(proj.id, &sdk_req)
+        .expect("sdk adapt");
+    assert_eq!(
+        sdk_res.active_profile,
+        domain::ModelProfileTier::ProfileB_FastCoding
+    );
     assert_eq!(sdk_res.reasoning_effort, domain::ReasoningEffort::Medium);
     assert!(!sdk_res.degraded);
 
@@ -1085,7 +1109,10 @@ async fn test_model_adapter_route_and_capability_tiers() {
     assert_eq!(status, StatusCode::OK);
     let resp: domain::AdaptationResponse =
         serde_json::from_value(payload_val).expect("parse response");
-    assert_eq!(resp.active_profile, domain::ModelProfileTier::ProfileB_FastCoding);
+    assert_eq!(
+        resp.active_profile,
+        domain::ModelProfileTier::ProfileB_FastCoding
+    );
     assert!(resp.degraded);
     assert_eq!(
         resp.degradation_reason,
@@ -1108,7 +1135,8 @@ async fn test_model_adapter_route_and_capability_tiers() {
     assert_eq!(status2, StatusCode::CREATED);
     let proj2: ProjectDto = serde_json::from_value(proj2_val).expect("parse project 2");
 
-    let (proj2_reg, _) = resolve_project_scoped_registry(&registry, proj2.id).expect("resolve proj2");
+    let (proj2_reg, _) =
+        resolve_project_scoped_registry(&registry, proj2.id).expect("resolve proj2");
     let conn2 = proj2_reg.pool().connection().expect("conn2");
     let profile_id2 = uuid::Uuid::new_v4().to_string();
     let rule_id2 = uuid::Uuid::new_v4().to_string();
@@ -1141,7 +1169,10 @@ async fn test_model_adapter_route_and_capability_tiers() {
     assert_eq!(status, StatusCode::OK);
     let resp2: domain::AdaptationResponse =
         serde_json::from_value(payload_val).expect("parse response 2");
-    assert_eq!(resp2.active_profile, domain::ModelProfileTier::ProfileA_Frontier);
+    assert_eq!(
+        resp2.active_profile,
+        domain::ModelProfileTier::ProfileA_Frontier
+    );
     assert!(!resp2.degraded);
 }
 
@@ -1149,7 +1180,8 @@ async fn test_model_adapter_route_and_capability_tiers() {
 async fn test_lint_source_and_constraint_profile_routes() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let (registry, router) = setup_daemon_router(&tmp);
-    let client = harness_daemon::DaemonHttpClient::new(registry.clone(), "127.0.0.1".to_string(), 0);
+    let client =
+        harness_daemon::DaemonHttpClient::new(registry.clone(), "127.0.0.1".to_string(), 0);
 
     // 1. Create project
     let (status, proj_val) = send_json_request(
@@ -1177,7 +1209,8 @@ async fn test_lint_source_and_constraint_profile_routes() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let profile: domain::ConstraintProfile = serde_json::from_value(profile_val).expect("profile json");
+    let profile: domain::ConstraintProfile =
+        serde_json::from_value(profile_val).expect("profile json");
     assert_eq!(profile.project_id, proj.id);
 
     // 3. Update constraint profile via PUT with forbidden Tailwind & Hex patterns
@@ -1192,7 +1225,8 @@ async fn test_lint_source_and_constraint_profile_routes() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let active_rules: Vec<constraint_engine::ActiveConstraint> = serde_json::from_value(active_val).expect("active json");
+    let active_rules: Vec<constraint_engine::ActiveConstraint> =
+        serde_json::from_value(active_val).expect("active json");
     assert!(!active_rules.is_empty());
 
     // 4. POST /lint with tailwind class and inline hex
@@ -1207,14 +1241,17 @@ async fn test_lint_source_and_constraint_profile_routes() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let lint_resp: harness_daemon::LintSourceResponse = serde_json::from_value(lint_val).expect("lint response");
+    let lint_resp: harness_daemon::LintSourceResponse =
+        serde_json::from_value(lint_val).expect("lint response");
     assert!(!lint_resp.passed);
     assert!(lint_resp.violations.len() >= 2);
 
     // 5. Test DaemonHttpClient direct methods
     let fetched = client.get_constraint_profile(proj.id).expect("client get");
     assert_eq!(fetched.project_id, proj.id);
-    let lint_client_resp = client.lint_source(proj.id, "<div className='clean-token' />").expect("client lint");
+    let lint_client_resp = client
+        .lint_source(proj.id, "<div className='clean-token' />")
+        .expect("client lint");
     assert!(lint_client_resp.passed);
 }
 
@@ -1289,7 +1326,9 @@ async fn test_icon_manifest_and_validation_routes() {
     assert_eq!(typo_report.suggestions[0], "activity");
 
     // 4. Test DaemonHttpClient direct methods
-    let client_manifest = client.get_icon_manifest(proj.id).expect("client get manifest");
+    let client_manifest = client
+        .get_icon_manifest(proj.id)
+        .expect("client get manifest");
     assert_eq!(client_manifest.count, 143);
     let client_report = client
         .validate_icon(proj.id, "ai-agent")
@@ -1356,7 +1395,9 @@ async fn test_inject_ff_id_and_surgical_patch_routes() {
     let patch_resp: constraint_engine::SurgicalPatchResponse =
         serde_json::from_value(patch_val).expect("patch response");
     assert!(patch_resp.success);
-    assert!(patch_resp.patched_source.contains("Surgically Patched Content"));
+    assert!(patch_resp
+        .patched_source
+        .contains("Surgically Patched Content"));
 
     // 3. Test DaemonHttpClient direct methods
     let client_inject = client
@@ -1418,7 +1459,10 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
     // Verify .opendesign/project.json was created on disk in the scratch workspace
     let scratch_ws = std::path::PathBuf::from(&boundary.workspace_path);
     let opendesign_proj = scratch_ws.join(".opendesign").join("project.json");
-    assert!(opendesign_proj.exists(), ".opendesign/project.json must exist in scratch workspace");
+    assert!(
+        opendesign_proj.exists(),
+        ".opendesign/project.json must exist in scratch workspace"
+    );
 
     // Create a dummy spec file in scratch workspace to verify it gets copied on promotion
     let dummy_spec_file = scratch_ws.join("demo.txt");
@@ -1435,7 +1479,8 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let sessions: Vec<ChatSessionDto> = serde_json::from_value(sessions_val).expect("sessions list");
+    let sessions: Vec<ChatSessionDto> =
+        serde_json::from_value(sessions_val).expect("sessions list");
     assert_eq!(sessions.len(), 1, "Must contain default Main Session");
     assert_eq!(sessions[0].title, "Main Session");
 
@@ -1464,7 +1509,8 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let sessions2: Vec<ChatSessionDto> = serde_json::from_value(sessions_val2).expect("sessions list 2");
+    let sessions2: Vec<ChatSessionDto> =
+        serde_json::from_value(sessions_val2).expect("sessions list 2");
     assert_eq!(sessions2.len(), 2);
 
     // Get session by ID
@@ -1477,7 +1523,8 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let fetched_sess: ChatSessionDto = serde_json::from_value(get_sess_val).expect("fetched session");
+    let fetched_sess: ChatSessionDto =
+        serde_json::from_value(get_sess_val).expect("fetched session");
     assert_eq!(fetched_sess.id, new_sess.id);
 
     // Update session title
@@ -1492,7 +1539,8 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let updated_sess: ChatSessionDto = serde_json::from_value(upd_sess_val).expect("updated session");
+    let updated_sess: ChatSessionDto =
+        serde_json::from_value(upd_sess_val).expect("updated session");
     assert_eq!(updated_sess.title, "Updated Session Title");
 
     // Delete session
@@ -1536,9 +1584,13 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    let prom_boundary: ProjectBoundaryDto = serde_json::from_value(prom_val).expect("promoted boundary");
+    let prom_boundary: ProjectBoundaryDto =
+        serde_json::from_value(prom_val).expect("promoted boundary");
     assert_eq!(prom_boundary.boundary_type, "folder_backed");
-    assert!(prom_boundary.is_git_repository, "Should detect user's preexisting git repository");
+    assert!(
+        prom_boundary.is_git_repository,
+        "Should detect user's preexisting git repository"
+    );
     assert!(prom_boundary.promoted_at.is_some());
 
     // Verify user's .git/ was preserved and not mutated
@@ -1549,8 +1601,14 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
     );
 
     // Verify files copied to target
-    assert!(target_dir.join("demo.txt").exists(), "demo.txt must be copied to target");
-    assert!(target_dir.join(".opendesign").join("project.json").exists(), ".opendesign/project.json must be created in target");
+    assert!(
+        target_dir.join("demo.txt").exists(),
+        "demo.txt must be copied to target"
+    );
+    assert!(
+        target_dir.join(".opendesign").join("project.json").exists(),
+        ".opendesign/project.json must be created in target"
+    );
 
     // Subsequent promote should fail with 409 Conflict
     let (status_conflict, _) = send_json_request(
@@ -1580,7 +1638,10 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
     .await;
     assert_eq!(status, StatusCode::OK);
     let tok_resp: PathTokenResponse = serde_json::from_value(tok_val).expect("path token response");
-    assert_eq!(tok_resp.normalized_relative_path, "product/specs/01-product-overview.md");
+    assert_eq!(
+        tok_resp.normalized_relative_path,
+        "product/specs/01-product-overview.md"
+    );
     assert!(!tok_resp.token.is_empty());
 
     // Verify valid token
@@ -1652,4 +1713,113 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
     )
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn test_ac07_ac08_ac09_ac10_hardening() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let (_registry, router) = setup_daemon_router(&tmp);
+
+    // AC-08: Non-RFC4122 UUID strictly returns 422 Unprocessable Entity
+    let (status, err_val) = send_json_request(
+        &router,
+        "GET",
+        "/api/v1/projects/not-a-valid-uuid-string/boundary",
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "Non-UUID project ID must be rejected with 422"
+    );
+    assert!(err_val.to_string().contains("INVALID_PROJECT_UUID"));
+
+    // Create a scratch project
+    let (status, proj_val) = send_json_request(
+        &router,
+        "POST",
+        "/api/v1/projects",
+        &[],
+        Some(serde_json::json!({
+            "slug": "hardening-proj",
+            "name": "Hardening Project",
+            "product_brief": "Testing AC07-AC10",
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let proj: ProjectDto = serde_json::from_value(proj_val).expect("project dto");
+
+    // AC-09: Promote to forbidden system path (e.g. /etc or /bin) must be denied with 403 SYSTEM_PATH_DENIED
+    let (status, _) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/promote", proj.id),
+        &[],
+        Some(serde_json::json!({
+            "target_directory": "/etc/malicious-folder",
+        })),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "Promote to /etc must return 403 SYSTEM_PATH_DENIED"
+    );
+
+    // AC-07: Promote to an external directory (outside daemon root) and verify scope resolution works
+    let ext_tmp = tempfile::tempdir().expect("ext_tmp");
+    let ext_target = ext_tmp.path().join("external-repo");
+    fs::create_dir_all(&ext_target).expect("create ext target");
+
+    let (status, prom_val) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/promote", proj.id),
+        &[],
+        Some(serde_json::json!({
+            "target_directory": ext_target.display().to_string(),
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let prom_boundary: ProjectBoundaryDto = serde_json::from_value(prom_val).expect("boundary");
+    assert_eq!(prom_boundary.boundary_type, "folder_backed");
+
+    // Now test GET /api/v1/projects/:id/specs on the promoted folder-backed project:
+    // It must resolve the external root without PROJECT_SCOPE_VIOLATION error (AC-07)
+    let (status, _specs) = send_json_request(
+        &router,
+        "GET",
+        &format!("/api/v1/projects/{}/specs", proj.id),
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "Folder-backed external project must resolve specs successfully (AC-07)"
+    );
+
+    // AC-10: Test offline mock flag on GitHub PR response
+    let (status, pr_val) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/snapshots/pr", proj.id),
+        &[],
+        Some(serde_json::json!({
+            "branch_name": "feature/mock-pr",
+            "pr_title": "Test PR",
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let pr_dto: GitHubPRResponseDto = serde_json::from_value(pr_val).expect("pr dto");
+    assert!(
+        pr_dto.is_offline_mock,
+        "GitHub PR response must include isOfflineMock: true (AC-10)"
+    );
 }

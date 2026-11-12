@@ -1,0 +1,127 @@
+name: cowok-design CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+# Least-Privilege IAM boundary (OWASP CI/CD Recommendation)
+permissions: read-all
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ==========================================
+  # LANE 1: RUST CORE HARNESS (11 CRATES)
+  # ==========================================
+  rust-core:
+    name: Rust Core Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@7b7640ecc822db5466a65344378074528495bc81 # stable
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@23bce251a8cd2ffc3c107582370d8c3708579fb7 # v2.7.3
+        with:
+          shared-key: "cowok-design-rust"
+
+      - name: Rust Format Check
+        run: cargo fmt --all --check
+
+      - name: Rust Clippy (Zero Warnings Allowed)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Rust Workspace Unit & Integration Tests
+        run: cargo test --workspace --verbose
+
+  # ==========================================
+  # LANE 2: FRONTEND REACT 19 SPA & TYPES
+  # ==========================================
+  frontend-core:
+    name: Frontend Typecheck & Vitest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d792dbb41b735c0c68e # v3.0.0
+        with:
+          version: 9
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@60edb5dd545a775178f525247059d6428237b465 # v4.0.2
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript Contract & App Typecheck
+        run: pnpm run typecheck
+
+      - name: Vitest Unit Tests
+        run: pnpm run test
+
+      - name: Vite Production Build Verification
+        run: pnpm run build
+
+  # ==========================================
+  # LANE 3: ZERO-TRUST I-WISH GOVERNANCE
+  # ==========================================
+  governance-gate:
+    name: Zero-Trust Category A Governance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@82c7e631bb3cdc910f68e0081d67478d79c6982d # v5.1.0
+        with:
+          python-version: "3.11"
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Validate 100% Story Specifications
+        run: python3 .agent/scripts/validate-story.py --all
+
+      - name: Validate Product Roadmap & Lock Integrity
+        run: python3 .agent/scripts/validate-product-roadmap.py --strict
+
+      - name: Zero-Loss Workspace Hygiene Check
+        run: python3 .agent/scripts/workspace-janitor.py --enforce-structure
+
+  # ==========================================
+  # MASTER GATE: BRANCH PROTECTION ANCHOR
+  # ==========================================
+  ci-master-gate:
+    name: ci-master-gate
+    needs: [rust-core, frontend-core, governance-gate]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Evaluate Upstream Lanes
+        run: |
+          if [ "${{ needs.rust-core.result }}" != "success" ] || \
+             [ "${{ needs.frontend-core.result }}" != "success" ] || \
+             [ "${{ needs.governance-gate.result }}" != "success" ]; then
+            echo "❌ Upstream verification failed."
+            echo "rust-core: ${{ needs.rust-core.result }}"
+            echo "frontend-core: ${{ needs.frontend-core.result }}"
+            echo "governance-gate: ${{ needs.governance-gate.result }}"
+            exit 1
+          fi
+          echo "✅ All CI gates verified successfully."

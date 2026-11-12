@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[[bin]]
+name = "harness-daemon"
+path = "src/main.rs"
+
 [dependencies]
 domain = { path = "../domain" }
 spec-registry = { path = "../spec-registry" }
@@ -24,6 +28,7 @@ chrono.workspace = true
 sha2.workspace = true
 rusqlite.workspace = true
 libc = "0.2"
+base64 = "0.22"
 
 [dev-dependencies]
 tempfile.workspace = true

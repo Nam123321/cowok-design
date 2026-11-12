@@ -1,0 +1,9 @@
+{
+  "name": "reference-design-contract",
+  "version": "1.0.0",
+  "description": "Audits reference designs with Keep, Change, and Do-Not-Copy matrices",
+  "entry_point": "SKILL.md",
+  "capabilities_required": ["design-tokens", "audit-matrix"],
+  "risk_tier": 1,
+  "tags": ["reference-design", "ip-safe", "evidence-table"]
+}

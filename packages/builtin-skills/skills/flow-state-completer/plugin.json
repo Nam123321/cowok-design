@@ -1,0 +1,9 @@
+{
+  "name": "flow-state-completer",
+  "version": "1.0.0",
+  "description": "Enforces 4 UI sub-states and generates Playwright E2E coverage suites",
+  "entry_point": "SKILL.md",
+  "capabilities_required": ["flow-graph", "test-generator"],
+  "risk_tier": 2,
+  "tags": ["flow", "states", "xstate", "playwright"]
+}

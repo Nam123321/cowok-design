@@ -1,0 +1,9 @@
+{
+  "name": "self-healing-eval-gate",
+  "version": "1.0.0",
+  "description": "Self-healing evaluation combining Hallmark Floor, Impeccable Audit, and Coverage",
+  "entry_point": "SKILL.md",
+  "capabilities_required": ["triangle-linter", "eval-gate"],
+  "risk_tier": 2,
+  "tags": ["eval-gate", "self-healing", "hallmark", "coverage"]
+}

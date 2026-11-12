@@ -1,0 +1,9 @@
+{
+  "name": "html-presentation-storyteller",
+  "version": "1.0.0",
+  "description": "Creates Stageshow product UI miniature demos and 16:9 narrative slide decks",
+  "entry_point": "SKILL.md",
+  "capabilities_required": ["stageshow", "presentation-cms"],
+  "risk_tier": 1,
+  "tags": ["stageshow", "presentation", "device-frames", "word-budget"]
+}

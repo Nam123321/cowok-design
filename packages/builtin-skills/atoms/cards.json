@@ -1,0 +1,6 @@
+{
+  "id": "atom-cards",
+  "name": "Design System Elevated Card",
+  "category": "layout",
+  "markup_template": "<div class=\"surface-card\" style=\"background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);\"><slot /></div>"
+}

@@ -1,0 +1,185 @@
+// Prisma Schema for Cowok-Design Kernel (Declarative DDR Contract Mirror Only — ADR-091 / PD-01 = A)
+// Runtime SSOT: crates/spec-registry SQLite WAL (.cowok-design/cowok-design.sqlite3)
+
+datasource db {
+  provider = "sqlite"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Project {
+  id        String   @id @default(uuid())
+  tenantId  String   @default("local-default") @map("tenant_id")
+  name      String
+  slug      String   @unique
+  createdAt BigInt   @map("created_at")
+  updatedAt BigInt   @map("updated_at")
+
+  specs     ProjectSpec[]
+
+  @@map("projects")
+}
+
+model ProjectSpec {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  specKey   String   @map("spec_key")
+  status    String   @default("CONFIRMED")
+  updatedAt BigInt   @map("updated_at")
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisions SpecRevision[]
+
+  @@unique([projectId, specKey])
+  @@index([projectId])
+  @@map("project_specs")
+}
+
+model SpecRevision {
+  id             String      @id @default(uuid())
+  specId         String      @map("spec_id")
+  revisionNumber Int         @map("revision_number")
+  contentHash    String      @map("content_hash")
+  createdAt      BigInt      @map("created_at")
+
+  spec           ProjectSpec @relation(fields: [specId], references: [id], onDelete: Cascade)
+
+  @@unique([specId, revisionNumber])
+  @@index([specId])
+  @@map("spec_revisions")
+}
+
+model ConstraintProfile {
+  id                     String   @id @default(uuid())
+  projectId              String   @map("project_id")
+  presetProfile          String   @default("DEFAULT") @map("preset_profile")
+  stylingPolicy          String   @default("CSS_MODULES") @map("styling_policy")
+  forbidTailwind         Int      @default(1) @map("forbid_tailwind")
+  forbidRawHex           Int      @default(1) @map("forbid_raw_hex")
+  tokensCssPath          String   @default("src/styles/tokens.css") @map("tokens_css_path")
+  iconManifestPath       String   @default("icons/icon-manifest.json") @map("icon_manifest_path")
+  allowedIconSetJson     String   @default("[]") @map("allowed_icon_set_json")
+  typographyContractJson String   @default("{}") @map("typography_contract_json")
+  minWcagContrast        Float    @default(4.5) @map("min_wcag_contrast")
+  updatedAt              BigInt   @map("updated_at")
+
+  rules                  ConstraintRule[]
+
+  @@unique([projectId, presetProfile])
+  @@index([projectId])
+  @@map("constraint_profiles")
+}
+
+model ConstraintRule {
+  id         String            @id @default(uuid())
+  profileId  String            @map("profile_id")
+  ruleCode   String            @map("rule_code")
+  severity   String
+  configJson String            @default("{}") @map("config_json")
+  enabled    Int               @default(1)
+  updatedAt  BigInt            @map("updated_at")
+
+  profile    ConstraintProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, ruleCode])
+  @@index([profileId])
+  @@map("constraint_rules")
+}
+
+model FlowGraph {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  projectId     String   @map("project_id")
+  portalKey     String   @default("default") @map("portal_key")
+  title         String   @default("Default Flow")
+  version       Int      @default(1)
+  layoutVersion Int      @default(1) @map("layout_version")
+  updatedAt     BigInt   @map("updated_at")
+
+  @@unique([projectId, portalKey])
+  @@unique([id, tenantId, projectId])
+  @@index([tenantId])
+  @@index([projectId])
+  @@map("flow_graphs")
+}
+
+model FlowDraftDeployment {
+  tenantId              String @map("tenant_id")
+  projectId             String @map("project_id")
+  draftId               String @map("draft_id")
+  requestSha256         String @map("request_sha256")
+  resultingGraphVersion Int    @map("resulting_graph_version")
+  responseJson          String @map("response_json")
+  createdAt             BigInt @map("created_at")
+  expiresAt             BigInt @map("expires_at")
+
+  @@id([tenantId, projectId, draftId])
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([expiresAt])
+  @@map("flow_draft_deployments")
+}
+
+model FlowNode {
+  id                  String   @id @default(uuid())
+  graphId             String   @map("graph_id")
+  tenantId            String   @map("tenant_id")
+  projectId           String   @map("project_id")
+  portalId            String   @default("default") @map("portal_id")
+  screenKey           String   @map("screen_key")
+  title               String
+  nodeType            String   @default("screen") @map("node_type")
+  routePath           String   @default("/") @map("route_path")
+  componentEntryPath  String   @default("") @map("component_entry_path")
+  fixtureRef          String   @default("Default") @map("fixture_ref")
+  fixtureJson         String   @default("{}") @map("fixture_json")
+  note                String   @default("")
+  viewportPreset      String   @default("desktop-1440") @map("viewport_preset")
+  posX                Float    @default(0.0) @map("pos_x")
+  posY                Float    @default(0.0) @map("pos_y")
+  version             Int      @default(1)
+  layoutVersion       Int      @default(1) @map("layout_version")
+  createdAt           BigInt   @map("created_at")
+  updatedAt           BigInt   @map("updated_at")
+
+  outgoingTransitions FlowTransition[] @relation("SourceTransitions")
+  incomingTransitions FlowTransition[] @relation("TargetTransitions")
+
+  @@unique([projectId, screenKey])
+  @@unique([graphId, screenKey])
+  @@unique([id, tenantId, projectId])
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([graphId])
+  @@index([projectId, portalId])
+  @@index([projectId, screenKey])
+  @@map("flow_nodes")
+}
+
+model FlowTransition {
+  id              String   @id @default(uuid())
+  graphId         String   @map("graph_id")
+  tenantId        String   @map("tenant_id")
+  projectId       String   @map("project_id")
+  sourceNodeId    String   @map("source_node_id")
+  targetNodeId    String   @map("target_node_id")
+  flowType        String   @default("main") @map("flow_type")
+  triggerEvent    String   @default("onClick") @map("trigger_event")
+  guardCondition  String?  @map("guard_condition")
+  version         Int      @default(1)
+  createdAt       BigInt   @map("created_at")
+  updatedAt       BigInt   @map("updated_at")
+
+  sourceNode      FlowNode @relation("SourceTransitions", fields: [sourceNodeId, tenantId, projectId], references: [id, tenantId, projectId], onDelete: Cascade)
+  targetNode      FlowNode @relation("TargetTransitions", fields: [targetNodeId, tenantId, projectId], references: [id, tenantId, projectId], onDelete: Cascade)
+
+  @@unique([projectId, sourceNodeId, targetNodeId, triggerEvent])
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([graphId])
+  @@index([sourceNodeId])
+  @@index([targetNodeId])
+  @@map("flow_edges")
+}

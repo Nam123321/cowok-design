@@ -1,0 +1,53 @@
+name: 🤖 PR Babysitter
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: pr-babysitter-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  babysit:
+    name: Auto-Triage & Self-Healing
+    runs-on: ubuntu-latest
+    # CHỐNG LẶP VÔ TẬN: Tuyệt đối không chạy nếu commit cuối cùng do chính Bot tạo ra
+    if: github.actor != 'github-actions[bot]'
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: 🛡️ Privilege & Fork Isolation Gate
+        id: fork-check
+        run: |
+          IS_FORK="${{ github.event.pull_request.head.repo.full_name != github.repository }}"
+          echo "is_fork=$IS_FORK" >> $GITHUB_OUTPUT
+          if [ "$IS_FORK" = "true" ]; then
+            echo "⚠️ PR xuất phát từ Fork bên ngoài. Chuyển sang chế độ READ-ONLY (Chống PwnRequest)."
+          fi
+
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: ⚙️ Setup Node.js & Tooling
+        uses: actions/setup-node@60edb5dd545a775178f525247059d6428237b465 # v4.0.2
+        with:
+          node-version: '20'
+
+      - name: 🤖 Execute PR Babysitter Runner (3-Strike Circuit Breaker)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          IS_FORK: ${{ steps.fork-check.outputs.is_fork }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CI: "true"
+        run: |
+          node scripts/pr-babysitter-runner.js

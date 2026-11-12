@@ -1,0 +1,9 @@
+{
+  "name": "impeccable-design-polish",
+  "version": "1.0.0",
+  "description": "Applies 24 professional design vocabulary verbs to transform and polish UI",
+  "entry_point": "SKILL.md",
+  "capabilities_required": ["design-tokens", "craft-engine"],
+  "risk_tier": 1,
+  "tags": ["impeccable", "design-vocabulary", "craft-verbs", "polish"]
+}

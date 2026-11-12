@@ -1,0 +1,10 @@
+{
+  "id": "scenario-spec-to-e2e",
+  "name": "Specification to E2E Playwright Suite",
+  "description": "Synthesizes data and UI specifications into 4-state flow nodes and generates verifiable Playwright test suites",
+  "pipeline": [
+    { "step": "synthesize-specs", "skill": "project-spec-synthesizer" },
+    { "step": "complete-flow-states", "skill": "flow-state-completer" },
+    { "step": "eval-and-certify", "skill": "self-healing-eval-gate" }
+  ]
+}

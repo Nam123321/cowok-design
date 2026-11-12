@@ -1,0 +1,26 @@
+{
+  "system": "cowok-design-system/v1",
+  "dtcg_to_css": {
+    "color.action.primary": "var(--action-primary)",
+    "color.action.primary-hover": "var(--action-primary-hover)",
+    "color.action.primary-active": "var(--action-primary-active)",
+    "color.surface.base": "var(--bg-base)",
+    "color.surface.elevated": "var(--bg-elevated)",
+    "color.surface.overlay": "var(--bg-surface)",
+    "color.text.primary": "var(--text-primary)",
+    "color.text.secondary": "var(--text-secondary)",
+    "color.text.muted": "var(--text-muted)",
+    "color.border.subtle": "var(--border-subtle)",
+    "color.border.focus": "var(--border-focus)",
+    "color.border.danger": "var(--state-danger)",
+    "dimension.radius.sm": "var(--radius-sm)",
+    "dimension.radius.md": "var(--radius-md)",
+    "dimension.radius.lg": "var(--radius-lg)",
+    "dimension.radius.full": "var(--radius-full)"
+  },
+  "design_md_sections": {
+    "colors": "DESIGN.md#3-color-system",
+    "typography": "DESIGN.md#4-typography-hierarchy",
+    "components": "DESIGN.md#5-ui-component-layouts"
+  }
+}

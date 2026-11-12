@@ -1,0 +1,3661 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="night">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>cowok-design — Minimalist Agent Workbench & Draft-Aware DAG Studio (v5.3)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       1. COWOK.AI v4.3 MINIMALIST TOKENS & GLOBAL FONT SIZE CONFIG
+       ========================================================================== */
+    :root {
+      --app-font-size: 13px;
+      --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+      --radius-xs: 6px;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --radius-xl: 20px;
+      --radius-pill: 9999px;
+      --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    :root,
+    [data-theme="warm"] {
+      --bg-canvas: #F7F5F0;
+      --bg-surface: #FFFFFF;
+      --bg-elevated: #F1EFE9;
+      --bg-subtle: #EAE6DF;
+      --bg-sidebar: #F3F0EA;
+      --text-primary: #111827;
+      --text-secondary: #4B5563;
+      --text-muted: #71717A;
+      --accent-primary: #2563EB;
+      --accent-primary-hover: #1D4ED8;
+      --accent-primary-subtle: rgba(37, 99, 235, 0.09);
+      --accent-ai: #7C3AED;
+      --accent-ai-subtle: rgba(124, 58, 237, 0.09);
+      --semantic-success: #0D9488;
+      --semantic-success-subtle: rgba(13, 148, 136, 0.11);
+      --semantic-warning: #D97706;
+      --semantic-warning-subtle: rgba(217, 119, 6, 0.12);
+      --semantic-danger: #E11D48;
+      --border-default: #E6E3DC;
+      --border-subtle: #EFECE6;
+      --border-strong: #D1CEC5;
+      --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.04);
+      --shadow-md: 0 6px 20px -4px rgba(17, 24, 39, 0.08);
+      --shadow-lg: 0 18px 36px -10px rgba(17, 24, 39, 0.15);
+      --dot-grid-color: rgba(17, 24, 39, 0.08);
+    }
+
+    [data-theme="dim"] {
+      --bg-canvas: #ECEAE4;
+      --bg-surface: #F5F3EE;
+      --bg-elevated: #E3E0D8;
+      --bg-subtle: #DBD7CE;
+      --bg-sidebar: #E6E3DC;
+      --text-primary: #1E293B;
+      --text-secondary: #475569;
+      --text-muted: #64748B;
+      --accent-primary: #2563EB;
+      --accent-primary-hover: #1D4ED8;
+      --accent-primary-subtle: rgba(37, 99, 235, 0.11);
+      --accent-ai: #7C3AED;
+      --accent-ai-subtle: rgba(124, 58, 237, 0.11);
+      --semantic-success: #0D9488;
+      --semantic-success-subtle: rgba(13, 148, 136, 0.12);
+      --semantic-warning: #D97706;
+      --semantic-warning-subtle: rgba(217, 119, 6, 0.14);
+      --semantic-danger: #E11D48;
+      --border-default: #D8D4CB;
+      --border-subtle: #E1DDD4;
+      --border-strong: #C2BDB2;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 6px 20px -4px rgba(15, 23, 42, 0.09);
+      --shadow-lg: 0 18px 36px -10px rgba(15, 23, 42, 0.17);
+      --dot-grid-color: rgba(30, 41, 59, 0.09);
+    }
+
+    [data-theme="night"] {
+      --bg-canvas: #0B101B;
+      --bg-surface: #111726;
+      --bg-elevated: #192234;
+      --bg-subtle: #141C2B;
+      --bg-sidebar: #0D121D;
+      --text-primary: #F1F5F9;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      --accent-primary: #3B82F6;
+      --accent-primary-hover: #60A5FA;
+      --accent-primary-subtle: rgba(59, 130, 246, 0.14);
+      --accent-ai: #8B5CF6;
+      --accent-ai-subtle: rgba(139, 92, 246, 0.14);
+      --semantic-success: #14B8A6;
+      --semantic-success-subtle: rgba(20, 184, 166, 0.14);
+      --semantic-warning: #F59E0B;
+      --semantic-warning-subtle: rgba(245, 158, 11, 0.15);
+      --semantic-danger: #F43F5E;
+      --border-default: #1E293B;
+      --border-subtle: #172030;
+      --border-strong: #2E3D52;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+      --shadow-md: 0 8px 24px -6px rgba(0, 0, 0, 0.5);
+      --shadow-lg: 0 22px 44px -12px rgba(0, 0, 0, 0.72);
+      --dot-grid-color: rgba(148, 163, 184, 0.09);
+    }
+
+    [data-low-focus="true"] {
+      --accent-ai: var(--accent-primary);
+      --accent-ai-subtle: var(--accent-primary-subtle);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: var(--app-font-size);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .mono-num {
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+    }
+
+    button, input, textarea, select {
+      font-family: inherit;
+      color: inherit;
+    }
+
+    /* ==========================================================================
+       2. ICON-ONLY BUTTONS WITH TOOLTIPS & KEY BUTTONS
+       ========================================================================== */
+    .icon-btn {
+      width: 26px;
+      height: 26px;
+      min-width: 26px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-secondary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+
+    .icon-btn:hover {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      border-color: var(--border-default);
+    }
+
+    .icon-btn.active {
+      background: var(--accent-primary-subtle);
+      color: var(--accent-primary);
+      border-color: rgba(59, 130, 246, 0.35);
+    }
+
+    .icon-btn svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    .key-btn {
+      height: 26px;
+      padding: 0 9px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-default);
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      font-size: 11.5px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.12s;
+    }
+
+    .key-btn:hover {
+      border-color: var(--accent-primary);
+      color: var(--accent-primary);
+    }
+
+    .key-btn:active,
+    .icon-btn:active,
+    .btn-new-conv:active,
+    .session-item:active,
+    .dock-btn:active,
+    .viewport-btn:active,
+    .tab:active {
+      transform: translateY(1px);
+      filter: brightness(0.96);
+      transition: transform 60ms ease, filter 60ms ease;
+    }
+
+    .key-btn.primary {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: #fff;
+    }
+
+    .key-btn.primary:hover {
+      background: var(--accent-primary-hover);
+      color: #fff;
+    }
+
+    .key-btn.warning {
+      background: var(--semantic-warning);
+      border-color: var(--semantic-warning);
+      color: #fff;
+    }
+
+    .icon-segment-group {
+      display: inline-flex;
+      align-items: center;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .icon-segment-group .icon-btn {
+      width: 23px;
+      height: 23px;
+      min-width: 23px;
+      border-radius: 4px;
+    }
+
+    [data-tooltip] {
+      position: relative;
+    }
+
+    [data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: -29px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #090D16;
+      color: #F8FAFC;
+      border: 1px solid var(--border-strong);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 7px;
+      border-radius: 4px;
+      white-space: nowrap;
+      box-shadow: var(--shadow-md);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.12s ease;
+      z-index: 600;
+    }
+
+    [data-tooltip]:hover::after {
+      opacity: 1;
+    }
+
+    /* ==========================================================================
+       3. MACRO SHELL: MAIN SIDEBAR + SINGLE DUAL-MAIN-PANEL
+       ========================================================================== */
+    .workbench-root {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .main-sidebar {
+      width: 232px;
+      min-width: 232px;
+      height: 100vh;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border-default);
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      transition: width 0.22s var(--ease-spring), min-width 0.22s var(--ease-spring);
+      z-index: 30;
+    }
+
+    .main-sidebar.collapsed {
+      width: 44px;
+      min-width: 44px;
+      overflow: hidden;
+      align-items: center;
+    }
+
+    .main-sidebar.collapsed .brand-identity,
+    .main-sidebar.collapsed .btn-new-conv span,
+    .main-sidebar.collapsed .sidebar-scroll-area,
+    .main-sidebar.collapsed #topLangSelect {
+      display: none !important;
+    }
+
+    .main-sidebar.collapsed .sidebar-brand-row,
+    .main-sidebar.collapsed .sidebar-top-actions,
+    .main-sidebar.collapsed .sidebar-footer {
+      justify-content: center;
+      padding-left: 0;
+      padding-right: 0;
+      width: 100%;
+    }
+
+    .main-sidebar.collapsed .btn-new-conv {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      justify-content: center;
+    }
+
+    .sidebar-brand-row {
+      height: 40px;
+      padding: 0 10px 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .brand-identity {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .brand-logo-mark {
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      background: var(--accent-primary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 700;
+    }
+
+    .sidebar-top-actions {
+      padding: 8px 10px 4px;
+    }
+
+    .btn-new-conv {
+      width: 100%;
+      height: 30px;
+      padding: 0 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-default);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+    }
+
+    .btn-new-conv:hover {
+      border-color: var(--accent-primary);
+    }
+
+    .sidebar-scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 8px 12px;
+    }
+
+    .sidebar-section-header {
+      padding: 8px 6px 3px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10.5px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .project-group {
+      margin-bottom: 4px;
+    }
+
+    .project-folder-row {
+      width: 100%;
+      padding: 5px 8px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+
+    .project-folder-row:hover {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+    }
+
+    .project-sessions-list {
+      padding-left: 8px;
+      margin-top: 2px;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      border-left: 1px solid var(--border-default);
+      margin-left: 12px;
+    }
+
+    .project-group.collapsed .project-sessions-list {
+      display: none;
+    }
+
+    .session-item {
+      width: 100%;
+      padding: 5px 8px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .session-item:hover {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+    }
+
+    .session-item.active {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .session-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .session-meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .sidebar-footer {
+      padding: 7px 10px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* ==========================================================================
+       4. SINGLE MAIN PANEL: AGENT CHAT (LEFT) <-> COMPANION CANVAS (RIGHT)
+       ========================================================================== */
+    .single-main-panel {
+      flex: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .main-panel-topbar {
+      height: 40px;
+      min-height: 40px;
+      padding: 0 12px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .topbar-left, .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dual-main-body {
+      flex: 1;
+      display: flex;
+      width: 100%;
+      height: calc(100vh - 40px);
+      overflow: hidden;
+    }
+
+    /* --- 4.1 AGENT-CENTRIC MINIMALIST CHAT (REQ 1 & 2: NO AVATAR, BUBBLE ONLY FOR HUMAN, OPEN PROSE FOR AGENT) --- */
+    .chat-subpanel {
+      width: 30%;
+      min-width: 260px;
+      max-width: 60%;
+      height: 100%;
+      background: var(--bg-surface);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: width 0.16s ease, min-width 0.16s ease;
+    }
+
+    .chat-subpanel.shortened {
+      width: 38px !important;
+      min-width: 38px !important;
+      max-width: 38px !important;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border-default);
+    }
+
+    .chat-subpanel.shortened .chat-stream,
+    .chat-subpanel.shortened .chat-composer-shell,
+    .chat-subpanel.shortened .chat-header-title-group {
+      display: none !important;
+    }
+
+    .chat-subpanel.shortened .subpanel-header {
+      justify-content: center;
+      padding: 0;
+    }
+
+    .subpanel-header {
+      height: 35px;
+      min-height: 35px;
+      padding: 0 10px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .chat-header-title-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .chat-stream {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      user-select: text;
+    }
+
+    /* Requirement 2: Human message has a clean compact bubble aligned right */
+    .chat-human-bubble {
+      align-self: flex-end;
+      max-width: 88%;
+      padding: 9px 12px;
+      border-radius: 12px 12px 3px 12px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      color: var(--text-primary);
+      font-size: 1em;
+      line-height: 1.5;
+    }
+
+    /* Requirement 1 & 2: Agent message has NO Avatar and NO enclosing bubble — flows freely full-width like Antigravity 2.0 / Codex */
+    .chat-agent-prose {
+      width: 100%;
+      padding: 2px 0;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 1em;
+      line-height: 1.6;
+    }
+
+    .chat-agent-prose p {
+      margin-bottom: 8px;
+    }
+
+    .chat-agent-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Tournament Selector inside Open Agent Prose */
+    .chat-tournament-box {
+      margin-top: 8px;
+      padding: 10px;
+      border-radius: var(--radius-md);
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-default);
+      outline: none;
+    }
+
+    .chat-variant-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin: 7px 0;
+    }
+
+    .chat-variant-btn {
+      width: 100%;
+      padding: 6px 9px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-default);
+      background: var(--bg-surface);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .chat-variant-btn.active {
+      border-color: var(--accent-primary);
+      background: var(--accent-primary-subtle);
+      font-weight: 500;
+    }
+
+    /* Minimalist Agent Chat Composer (Requirement 2: Stripped human-to-human bloat) */
+    .chat-composer-shell {
+      padding: 8px 10px 10px;
+      background: var(--bg-surface);
+    }
+
+    .composer-capsule {
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      background: var(--bg-canvas);
+      padding: 8px 10px;
+    }
+
+    .composer-capsule:focus-within {
+      border-color: var(--accent-primary);
+    }
+
+    .chat-attachment-tray {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .chat-attachment-tray:empty {
+      display: none;
+    }
+
+    .attachment-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      max-width: 100%;
+      padding: 3px 7px;
+      border-radius: 5px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      color: var(--text-primary);
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .attachment-chip-tag {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--accent-primary);
+      font-size: 10.5px;
+      flex-shrink: 0;
+    }
+
+    .attachment-chip-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-secondary);
+    }
+
+    .composer-textarea {
+      width: 100%;
+      min-height: 36px;
+      max-height: 110px;
+      border: none;
+      background: transparent;
+      resize: none;
+      outline: none;
+      font-size: 1em;
+      color: var(--text-primary);
+      line-height: 1.48;
+    }
+
+    .composer-action-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+      padding-top: 5px;
+    }
+
+    .cowok-model-pill {
+      height: 22px;
+      padding: 0 7px;
+      border-radius: 4px;
+      border: 1px solid var(--border-default);
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      font-size: 10.5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+
+    .morphing-send-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: none;
+      background: var(--accent-primary);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    /* Floating Quote Selection Pill (Requirement 3: Select text in Agent Chat or Doc -> Quote to Chat) */
+    .floating-quote-pill {
+      position: fixed;
+      z-index: 700;
+      background: var(--accent-primary);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: var(--radius-pill);
+      padding: 4px 10px;
+      font-size: 11.5px;
+      font-weight: 600;
+      box-shadow: var(--shadow-lg);
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      gap: 5px;
+      animation: popQuote 0.12s ease;
+    }
+
+    @keyframes popQuote {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .drag-splitter {
+      width: 5px;
+      min-width: 5px;
+      height: 100%;
+      background: var(--border-subtle);
+      cursor: col-resize;
+      z-index: 20;
+    }
+
+    .drag-splitter:hover,
+    .drag-splitter.dragging {
+      background: var(--accent-primary);
+    }
+
+    .drag-splitter.hidden-splitter {
+      display: none !important;
+    }
+
+    /* ==========================================================================
+       5. RIGHT SUB-PANEL: COMPANION CANVAS & INTERACTIVE 2D DAG USERFLOW (REQ 5)
+       ========================================================================== */
+    .companion-canvas-subpanel {
+      flex: 1;
+      min-width: 380px;
+      height: 100%;
+      background: var(--bg-canvas);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .canvas-tabbar {
+      height: 35px;
+      min-height: 35px;
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+    }
+
+    .canvas-tabs-scroll {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      overflow-x: auto;
+      flex: 1;
+      height: 100%;
+    }
+
+    .canvas-tab-item {
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 6px 6px 0 0;
+      border: 1px solid transparent;
+      border-bottom: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      align-self: flex-end;
+    }
+
+    .canvas-tab-item.active {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      border-color: var(--border-default);
+      font-weight: 500;
+    }
+
+    .canvas-add-tab-wrapper {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .new-tab-popover {
+      position: absolute;
+      top: 30px;
+      right: 0;
+      width: 320px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+      padding: 8px;
+      z-index: 200;
+      display: none;
+    }
+
+    .new-tab-popover.open {
+      display: block;
+    }
+
+    .popover-action-item {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-primary);
+    }
+
+    .popover-action-item:hover {
+      background: var(--bg-elevated);
+    }
+
+    .canvas-split-stage {
+      flex: 1;
+      display: flex;
+      width: 100%;
+      height: calc(100% - 35px);
+      overflow: hidden;
+    }
+
+    .canvas-left-pane {
+      width: 46%;
+      min-width: 280px;
+      max-width: 78%;
+      height: 100%;
+      background: var(--bg-canvas);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .canvas-left-pane.hidden-pane {
+      display: none !important;
+    }
+
+    .canvas-left-pane.maximized-pane {
+      width: 100% !important;
+      max-width: 100% !important;
+      flex: 1 !important;
+    }
+
+    .structure-pane-header,
+    .html-pane-toolbar {
+      height: 35px;
+      min-height: 35px;
+      padding: 0 8px;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+    }
+
+    .canvas-right-pane {
+      flex: 1;
+      min-width: 300px;
+      height: 100%;
+      background: var(--bg-surface);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .canvas-right-pane.hidden-pane {
+      display: none !important;
+    }
+
+    .canvas-right-pane.maximized-pane {
+      width: 100% !important;
+      max-width: 100% !important;
+      flex: 1 !important;
+    }
+
+    /* --- 5.1 TRUE 2D DIRECTED ACYCLIC GRAPH (DAG) USERFLOW STUDIO (v5.4) --- */
+    /* Draft Deployment Bar (Only appears when structural changes occur, NOT on layout drag/zoom!) */
+    .dag-draft-bar {
+      padding: 6px 10px;
+      background: var(--bg-workspace);
+      border-bottom: 1px solid var(--border-default);
+      color: var(--text-primary);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11.5px;
+      z-index: 60;
+    }
+
+    .dag-draft-bar.active {
+      display: flex;
+    }
+
+    /* Edge Condition & Wiring Inspector Bar (Req 5.3: Main / IF-ELSE / Fallback + Condition Input + Reverse Arrow) */
+    .dag-edge-inspector {
+      padding: 7px 10px;
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-default);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      z-index: 60;
+    }
+
+    .dag-edge-inspector.open {
+      display: flex;
+    }
+
+    /* 2D Infinite Pan & Zoom Viewport */
+    .dag-flow-viewport {
+      flex: 1;
+      background-color: var(--bg-canvas);
+      background-image: radial-gradient(var(--dot-grid-color) 1.25px, transparent 1.25px);
+      background-size: 20px 20px;
+      overflow: hidden;
+      position: relative;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .dag-flow-viewport.panning {
+      cursor: grabbing;
+    }
+
+    /* 2D Coordinate World Plane (Nodes + Clusters + SVG Directed Bezier Edges) */
+    .dag-zoom-stage {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%; max-width: 1280px;
+      height: 760px;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+
+    /* SVG Directed Edges Layer */
+    .dag-svg-edges {
+      position: absolute;
+      inset: 0;
+      width: 100%; max-width: 1280px;
+      height: 760px;
+      pointer-events: none;
+      z-index: 12;
+      overflow: visible;
+    }
+
+    .dag-svg-edge-hit {
+      fill: none;
+      stroke: transparent;
+      stroke-width: 16px;
+      cursor: pointer;
+      pointer-events: stroke;
+    }
+
+    .dag-svg-edge-path {
+      fill: none;
+      stroke-width: 2.2px;
+      pointer-events: none;
+      transition: stroke 0.15s, stroke-width 0.15s;
+    }
+
+    .dag-svg-edge-group:hover .dag-svg-edge-path,
+    .dag-svg-edge-group.selected .dag-svg-edge-path {
+      stroke-width: 3.2px;
+      filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.45));
+    }
+
+    /* 2D Cluster Bounding Box Frames (Req 5.3: Đóng khung các cụm node theo luồng trên mặt phẳng 2D) */
+    .dag-cluster-frame {
+      position: absolute;
+      border: 1.5px dashed var(--border-strong);
+      border-radius: 12px;
+      background: rgba(59, 130, 246, 0.025);
+      pointer-events: auto;
+      z-index: 2;
+      transition: height 0.18s ease, width 0.18s ease;
+    }
+
+    .dag-cluster-frame.fallback-cluster {
+      border-color: rgba(245, 158, 11, 0.45);
+      background: rgba(245, 158, 11, 0.03);
+    }
+
+    .dag-cluster-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      border-bottom: 1px dashed var(--border-subtle);
+      background: rgba(15, 23, 42, 0.25);
+      border-radius: 11px 11px 0 0;
+      cursor: pointer;
+    }
+
+    .dag-cluster-frame.collapsed {
+      height: 32px !important;
+      overflow: hidden;
+    }
+
+    /* 2D Positioned Graph Node Card (x, y coordinates + Input/Output Ports) */
+    .dag-node-card {
+      position: absolute;
+      width: 192px;
+      background: var(--bg-surface);
+      border: 1.5px solid var(--border-strong);
+      border-radius: 10px;
+      padding: 8px 10px;
+      cursor: grab;
+      z-index: 20;
+      box-shadow: var(--shadow-md);
+      transition: border-color 0.14s, box-shadow 0.14s;
+    }
+
+    .dag-node-card:active {
+      cursor: grabbing;
+    }
+
+    .dag-node-card.active {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px var(--accent-primary-subtle), var(--shadow-md);
+    }
+
+    /* Decision Diamond Indicator on Branching Nodes */
+    .dag-node-card.decision-node {
+      border-color: var(--accent-ai);
+    }
+
+    /* Draft Node Visual State (Req 5.1) */
+    .dag-node-card.draft-node {
+      border: 1.5px dashed var(--semantic-warning);
+      background: var(--semantic-warning-subtle);
+    }
+
+    /* Node Connection Ports (● Input Left, ● Output Right Main/IF, ● Output Bottom Fallback) */
+    .dag-port {
+      position: absolute;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: var(--bg-surface);
+      border: 2px solid var(--accent-primary);
+      z-index: 25;
+      cursor: crosshair;
+      transition: transform 0.12s, background 0.12s;
+    }
+
+    .dag-port:hover {
+      transform: scale(1.45);
+      background: var(--accent-primary);
+    }
+
+    .dag-port.port-in {
+      left: -6px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .dag-port.port-in:hover {
+      transform: translateY(-50%) scale(1.45);
+    }
+
+    .dag-port.port-out-main {
+      right: -6px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .dag-port.port-out-main:hover {
+      transform: translateY(-50%) scale(1.45);
+    }
+
+    .dag-port.port-out-branch {
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-color: var(--semantic-warning);
+    }
+
+    .dag-port.port-out-branch:hover {
+      transform: translateX(-50%) scale(1.45);
+      background: var(--semantic-warning);
+    }
+
+    .dag-node-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 3px;
+    }
+
+    .dag-node-id {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--accent-primary);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .draft-pill {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--semantic-warning);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .dag-node-note {
+      margin-top: 6px;
+      padding: 4px 7px;
+      border-radius: 4px;
+      background: var(--bg-elevated);
+      border-left: 2px solid var(--accent-ai);
+      font-size: 10px;
+      color: var(--text-secondary);
+      line-height: 1.35;
+    }
+
+    /* Interactive Edge Condition Badge Floating at Bezier Midpoint (mx, my) */
+    .dag-edge-badge {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-surface);
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      z-index: 30;
+      white-space: nowrap;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.12s;
+    }
+
+    .dag-edge-badge:hover,
+    .dag-edge-badge.active {
+      border-color: var(--accent-primary);
+      color: var(--text-primary);
+      transform: translate(-50%, -50%) scale(1.05);
+    }
+
+    .dag-edge-badge.badge-main {
+      border-left: 3px solid var(--accent-primary);
+    }
+
+    .dag-edge-badge.badge-ifelse {
+      border-left: 3px solid var(--semantic-success);
+    }
+
+    .dag-edge-badge.badge-fallback {
+      border-left: 3px solid var(--semantic-warning);
+    }
+
+    .dag-edge-badge.draft-edge {
+      border-color: var(--semantic-warning);
+      background: var(--semantic-warning-subtle);
+      color: var(--text-primary);
+    }
+
+    /* --- ITEM 2: RIGHT-EDGE VERTICAL FLOATING TOOLBAR DOCK ON DAG CANVAS --- */
+    .dag-right-vertical-dock {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 5px 4px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      box-shadow: var(--shadow-md);
+      z-index: 50;
+    }
+
+    .dag-dock-divider {
+      width: 18px;
+      height: 1px;
+      background: var(--border-default);
+      margin: 2px 0;
+    }
+
+    .dag-zoom-pct-btn {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      padding: 2px 3px;
+      width: 30px;
+      text-align: center;
+      cursor: pointer;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .dag-zoom-pct-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--accent-primary);
+    }
+
+    /* Tooltips on Right Vertical Dock open to the LEFT so they never clip off the right edge */
+    .dag-right-vertical-dock .icon-btn[data-tooltip]::after {
+      left: auto;
+      right: calc(100% + 8px);
+      bottom: 50%;
+      transform: translateY(50%);
+    }
+
+    /* Bottom-Left Keyboard / Touchpad / Mouse Gesture HUD Hint */
+    .dag-gesture-hud {
+      position: absolute;
+      left: 10px;
+      right: 52px;
+      bottom: 8px;
+      padding: 4px 9px;
+      border-radius: 6px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      z-index: 42;
+      pointer-events: none;
+      opacity: 0.94;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    /* DAG 2D Minimap Radar (Positioned cleanly above the bottom gesture bar) */
+    .dag-minimap {
+      position: absolute;
+      bottom: 36px;
+      right: 52px;
+      width: 128px;
+      height: 78px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 7px;
+      box-shadow: var(--shadow-md);
+      padding: 5px;
+      z-index: 45;
+      overflow: hidden;
+    }
+
+    .dag-minimap.hidden {
+      display: none;
+    }
+
+    .minimap-canvas {
+      position: relative;
+      width: 100%;
+      height: 60px;
+      background: var(--bg-canvas);
+      border-radius: 4px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .minimap-node-rect {
+      position: absolute;
+      height: 10px;
+      border-radius: 2px;
+      background: var(--accent-primary-subtle);
+      border: 1px solid var(--accent-primary);
+    }
+
+    /* Slide Structure Viewport */
+    .slide-structure-viewport {
+      flex: 1;
+      overflow: hidden;
+      background: var(--bg-canvas);
+    }
+
+    .slide-over-track {
+      display: flex;
+      width: 200%;
+      height: 100%;
+      transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .slide-over-track.cms-open {
+      transform: translateX(-50%);
+    }
+
+    .slide-map-panel,
+    .slide-cms-panel {
+      width: 50%;
+      height: 100%;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .slide-phase-card {
+      padding: 10px;
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      cursor: pointer;
+    }
+
+    .cms-field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: var(--bg-surface);
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-default);
+    }
+
+    .cms-input,
+    .cms-textarea {
+      width: 100%;
+      padding: 5px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border-default);
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+      font-size: 12px;
+      outline: none;
+    }
+
+    /* Right HTML Stage */
+    .html-preview-container {
+      flex: 1;
+      overflow: auto;
+      padding: 14px;
+      background: var(--bg-subtle);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      user-select: text;
+    }
+
+    .workbench-root.presentation-mode .main-sidebar,
+    .workbench-root.presentation-mode .main-panel-topbar,
+    .workbench-root.presentation-mode .chat-subpanel,
+    .workbench-root.presentation-mode #resizerMain,
+    .workbench-root.presentation-mode .canvas-tabbar,
+    .workbench-root.presentation-mode .canvas-left-pane,
+    .workbench-root.presentation-mode #resizerCanvas {
+      display: none !important;
+    }
+
+    .live-html-frame {
+      width: 100%;
+      max-width: 840px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      transition: width 0.2s ease;
+    }
+
+    .live-html-frame[data-viewport="tablet"] {
+      width: 600px;
+      max-width: 95%;
+    }
+
+    .live-html-frame[data-viewport="mobile"] {
+      width: 375px;
+      max-width: 95%;
+      border-width: 4px;
+      border-color: var(--border-strong);
+      border-radius: 20px;
+    }
+
+    .live-html-frame[data-frame="16-9"] {
+      aspect-ratio: 16 / 9;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .live-html-frame[data-frame="16-10"] {
+      aspect-ratio: 16 / 10;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .live-html-browser-bar {
+      height: 28px;
+      padding: 0 12px;
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .live-html-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .html-region {
+      padding: 13px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-default);
+      background: var(--bg-canvas);
+      position: relative;
+    }
+
+    .html-region.highlighted-region {
+      border-color: var(--accent-primary) !important;
+      box-shadow: 0 0 0 2px var(--accent-primary-subtle);
+    }
+
+    .advanced-code-editor-shell {
+      width: 100%;
+      max-width: 860px;
+      height: 100%;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .advanced-code-editor-shell.active {
+      display: flex;
+    }
+
+    .code-editor-topbar {
+      height: 32px;
+      padding: 0 12px;
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .code-editor-textarea {
+      flex: 1;
+      width: 100%;
+      padding: 12px;
+      border: none;
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.55;
+      resize: none;
+      outline: none;
+    }
+
+    .marquee-selection-rect {
+      position: fixed;
+      border: 1.5px solid var(--accent-primary);
+      background: rgba(59, 130, 246, 0.14);
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 180;
+      display: none;
+    }
+
+    .marquee-coords-pill {
+      position: absolute;
+      top: -19px;
+      left: 0;
+      background: var(--accent-primary);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .spatial-comment-popover {
+      position: fixed;
+      z-index: 240;
+      width: 290px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+      padding: 10px;
+      display: none;
+    }
+
+    .spatial-comment-popover.open {
+      display: block;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 10, 20, 0.55);
+      backdrop-filter: blur(3px);
+      z-index: 300;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .settings-modal {
+      width: 580px;
+      max-width: 92vw;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+
+    .settings-modal-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .settings-modal-body {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .settings-card {
+      padding: 11px;
+      border-radius: var(--radius-md);
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-default);
+    }
+
+    .html-kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .html-kpi-box {
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+    }
+
+    .html-kpi-val {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .toolbar-select {
+      height: 24px;
+      padding: 0 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border-default);
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      font-size: 11px;
+      cursor: pointer;
+      outline: none;
+    }
+  
+    .brand-svg {
+      display: inline-block;
+      vertical-align: middle;
+      flex-shrink: 0;
+      margin-right: 4px;
+    }
+    </style>
+</head>
+<body>
+  <div class="workbench-root" id="workbenchRoot">
+    <!-- ========================================================================
+         1. MAIN SIDEBAR
+         ======================================================================== -->
+    <aside class="main-sidebar" id="mainSidebar">
+      <div class="sidebar-brand-row">
+        <div class="brand-identity">
+          <span class="brand-logo-mark">cd</span>
+          <span>cowok-design</span>
+        </div>
+        <button class="icon-btn" id="btnToggleMainSidebar" onclick="toggleMainSidebar()" data-tooltip="Thu gọn / Mở rộng Sidebar">
+          <svg id="iconToggleMainSidebar" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m14 9-3 3 3 3"/></svg>
+        </button>
+      </div>
+
+      <div class="sidebar-top-actions">
+        <button class="btn-new-conv" onclick="createNewSessionInActiveProject()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          <span data-i18n="newConv">New Conversation</span>
+        </button>
+      </div>
+
+      <div class="sidebar-scroll-area">
+        <div class="sidebar-section-header">
+          <span data-i18n="pinned">Pinned</span>
+        </div>
+        <button class="session-item" onclick="selectSession('cowok-design', 'sess-checkout', 'FinTech Checkout Flow', 'app-flow')">
+          <span class="session-title">Epic 04 — Unified Canvas</span>
+          <span class="session-meta">::</span>
+        </button>
+
+        <div class="sidebar-section-header">
+          <span data-i18n="projects">Projects</span>
+          <button class="icon-btn" style="width:20px;height:20px;min-width:20px;" onclick="openSettingsModal()" data-tooltip="Liên kết Folder / Dự án mới">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+
+        <div class="project-group" id="proj-cowok-design">
+          <button class="project-folder-row" onclick="toggleProjectFolder('proj-cowok-design')">
+            <span style="display:flex;align-items:center;gap:6px;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span>cowok-design</span>
+            </span>
+            <span class="session-meta">git</span>
+          </button>
+          <div class="project-sessions-list">
+            <button class="session-item active" id="sess-checkout" onclick="selectSession('cowok-design', 'sess-checkout', 'FinTech Checkout Flow', 'app-flow')">
+              <span class="session-title">FinTech Checkout App</span>
+              <span class="session-meta">Now</span>
+            </button>
+            <button class="session-item" id="sess-deck" onclick="selectSession('cowok-design', 'sess-deck', 'Q4 Architecture Deck', 'slide-deck')">
+              <span class="session-title">Q4 Architecture Deck</span>
+              <span class="session-meta">14m</span>
+            </button>
+            <button class="session-item" id="sess-code" onclick="selectSession('cowok-design', 'sess-code', 'CheckoutForm.tsx', 'code-edit')">
+              <span class="session-title">CheckoutForm.tsx</span>
+              <span class="session-meta">35m</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="icon-btn" id="btnOpenSettings" onclick="openSettingsModal()" data-tooltip="Cài đặt Hệ thống, Cỡ chữ & Ngôn ngữ">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+
+        <select class="toolbar-select" id="topLangSelect" onchange="changeLanguage(this.value)" title="9 Ngôn ngữ chuẩn cowok.ai">
+          <option value="vi">Tiếng Việt</option>
+          <option value="en">English</option>
+          <option value="zh">中文</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="fr">Français</option>
+          <option value="es">Español</option>
+          <option value="pt">Português</option>
+          <option value="it">Italiano</option>
+        </select>
+      </div>
+    </aside>
+
+    <!-- ========================================================================
+         2. SINGLE MAIN PANEL
+         ======================================================================== -->
+    <main class="single-main-panel">
+      <header class="main-panel-topbar">
+        <div class="topbar-left">
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);">
+            <span id="activeProjectLabel" style="font-weight:500;color:var(--text-primary);">cowok-design</span>
+            <span>/</span>
+            <span id="activeSessionLabel">FinTech Checkout Flow</span>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <div class="icon-segment-group">
+            <button class="icon-btn" data-theme-btn="warm" onclick="applyTheme('warm', false)" data-tooltip="Warm Paper (#F7F5F0)">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2"/></svg>
+            </button>
+            <button class="icon-btn" data-theme-btn="dim" onclick="applyTheme('dim', false)" data-tooltip="Stone Dim (#ECEAE4)">
+              <svg viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+            </button>
+            <button class="icon-btn active" data-theme-btn="night" onclick="applyTheme('night', false)" data-tooltip="Obsidian Night (#0B101B)">
+              <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+            <button class="icon-btn" data-theme-btn="low-focus" onclick="applyTheme('night', true)" data-tooltip="Low-Focus Monochrome">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div class="dual-main-body" id="dualMainBody">
+        <!-- ====================================================================
+             2.1 LEFT SUB-PANEL: AGENT-CENTRIC CHAT (REQ 1, 2, 3)
+             - No Avatars
+             - Bubble ONLY for Human prompts
+             - Open Full-Width Prose for Agent responses
+             - Highlight text to trigger "❝ Quote vào Chat" (@[Quote])
+             ==================================================================== -->
+        <section class="chat-subpanel" id="chatSubpanel">
+          <div class="subpanel-header">
+            <div class="chat-header-title-group">
+              <span data-i18n="chatHeader">Agent</span>
+              <span class="session-meta" id="chatSessionBadge">• Tô đen chữ bất kỳ để Quote</span>
+            </div>
+            <button
+              class="icon-btn"
+              id="btnShortenChat"
+              onclick="toggleShortenChatPanel()"
+              data-tooltip="Thu gọn / Mở rộng Khung Chat"
+            >
+              <svg id="iconShortenChat" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m14 9-3 3 3 3"/></svg>
+            </button>
+          </div>
+
+          <div class="chat-stream" id="chatStream">
+            <!-- Human Prompt: Compact Right-Aligned Bubble (Req 2) -->
+            <div class="chat-human-bubble">
+              Thiết kế luồng <strong>FinTech Checkout & Biometric Approval</strong> gồm cụm luồng chính và luồng dự phòng <code>IF NOT (Fallback)</code>, chạy Tournament 3 phương án cho <code>SCR-02</code>.
+            </div>
+
+            <!-- Agent Response: Unboxed Full-Width Open Prose (Req 1 & 2) + Selectable for Quote (Req 3) -->
+            <div class="chat-agent-prose" data-quotable="true">
+              <div class="chat-agent-eyebrow">
+                <span>cowok • E1..E4 Verified</span>
+                <span>12.4ms</span>
+              </div>
+              <p>
+                Tôi đã khởi tạo sơ đồ <strong>DAG Userflow</strong> chia làm 2 cụm khung (<em>Cụm 1: Luồng Thanh toán Chính</em> và <em>Cụm 2: Luồng Rẽ nhánh IF/ELSE & Dự phòng</em>). Bạn có thể bôi đen bất kỳ đoạn văn bản nào trong phản hồi này để bấm <strong>❝ Quote</strong> đưa nhanh vào ô nhập liệu.
+              </p>
+              <p>
+                Trên sơ đồ DAG bên phải, khi bạn kéo thả vị trí node hoặc thu phóng thì hệ thống không tạo Draft. Khi bạn thay đổi liên kết dây dẫn, đảo chiều mũi tên, sửa điều kiện <code>if / if not</code> hoặc thêm node mới, hệ thống sẽ bật <strong>chế độ Draft</strong> để bạn bấm <em>Triển khai</em> gửi gói JSON sang cho tôi kiểm tra xung đột và thực thi.
+              </p>
+
+              <!-- Tournament Card inside Open Prose -->
+              <div class="chat-tournament-box" id="chatTournamentCard" tabindex="0" onkeydown="if(event.key==='Enter') confirmTournamentSelection()">
+                <div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-weight:600;">
+                  <span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.45 1-1 1H7v2h10v-2h-2c-.55 0-1-.45-1-1v-2.34"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg> SCR-02 Tournament</span>
+                  <span class="mono-num" id="tournamentStatusBadge" style="color:var(--text-muted);">Preview: Option B</span>
+                </div>
+                <div class="chat-variant-list">
+                  <button class="chat-variant-btn" data-variant="A" onclick="previewTournamentVariant('A')">
+                    <span>Option A — Split Two-Column</span>
+                    <span class="mono-num">8.4</span>
+                  </button>
+                  <button class="chat-variant-btn active" data-variant="B" onclick="previewTournamentVariant('B')">
+                    <span>Option B (Winner) — 1-Click Biometric</span>
+                    <span class="mono-num" style="color:var(--semantic-success);">9.6</span>
+                  </button>
+                  <button class="chat-variant-btn" data-variant="C" onclick="previewTournamentVariant('C')">
+                    <span>Option C — Progressive Drawer</span>
+                    <span class="mono-num">7.9</span>
+                  </button>
+                </div>
+                <button class="key-btn primary" style="width:100%;justify-content:center;" id="btnConfirmTournament" onclick="confirmTournamentSelection()">
+                  <span>✓ Xác nhận <strong id="confirmBtnOptionLabel">Option B</strong> (Enter ↵)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ultra-Clean Agent Chat Composer (Req 2 & 3) -->
+          <div class="chat-composer-shell">
+            <div class="composer-capsule">
+              <!-- Attachment Tray: Holds @[Quote] chips, [Node SCR-XX] chips, and HTML Region chips -->
+              <div class="chat-attachment-tray" id="chatAttachmentTray">
+                <div class="attachment-chip" onclick="selectDagNode('SCR-02', 'sec-biometric')">
+                  <span class="attachment-chip-tag">@[Quote]</span>
+                  <span class="attachment-chip-text">"luồng dự phòng IF NOT (Fallback) khi WebAuthn thất bại"</span>
+                  <button class="icon-btn" style="width:15px;height:15px;min-width:15px;" onclick="event.stopPropagation(); this.parentElement.remove();">✕</button>
+                </div>
+              </div>
+
+              <textarea
+                class="composer-textarea"
+                id="chatInputTextarea"
+                data-i18n-placeholder="composerPlaceholder"
+                placeholder="Nhập chỉ thị cho Agent (hoặc bôi đen nội dung để Quote)..."
+                onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendChatPrompt(); }"
+              ></textarea>
+
+              <div class="composer-action-bar">
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <button class="icon-btn" style="width:22px;height:22px;min-width:22px;" data-tooltip="Mở tệp dự án" onclick="toggleNewTabPopover(event)">
+                    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                  </button>
+                  <button class="cowok-model-pill" data-tooltip="Mô hình điều phối: Cowok Swarm • High">
+                    <span style="color:var(--accent-primary);">✦</span>
+                    <span>Cowok Swarm</span>
+                    <span class="mono-num" style="color:var(--text-muted);">High</span>
+                  </button>
+                </div>
+
+                <button class="morphing-send-btn" onclick="sendChatPrompt()" data-tooltip="Gửi (Enter)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="drag-splitter" id="resizerMain"></div>
+
+        <!-- ====================================================================
+             2.2 RIGHT SUB-PANEL: COMPANION CANVAS
+             ==================================================================== -->
+        <section class="companion-canvas-subpanel" id="canvasSubpanel">
+          <div class="canvas-tabbar">
+            <div class="canvas-tabs-scroll" id="canvasTabsBar">
+              <button class="canvas-tab-item active" data-tab-id="tab-app" onclick="switchCanvasTab('tab-app')">
+                <span>checkout-app.html</span>
+              </button>
+              <button class="canvas-tab-item" data-tab-id="tab-slide" onclick="switchCanvasTab('tab-slide')">
+                <span>q4-deck.html</span>
+              </button>
+              <button class="canvas-tab-item" data-tab-id="tab-code" onclick="switchCanvasTab('tab-code')">
+                <span>&lt;/&gt; CheckoutForm.tsx</span>
+              </button>
+              <button class="canvas-tab-item" data-tab-id="tab-md" onclick="switchCanvasTab('tab-md')">
+                <span>DESIGN.md</span>
+              </button>
+              <button class="canvas-tab-item" data-tab-id="tab-img" onclick="switchCanvasTab('tab-img')">
+                <span>brand-kit.svg</span>
+              </button>
+
+              <div class="canvas-add-tab-wrapper">
+                <button class="icon-btn" id="btnAddCanvasTab" onclick="toggleNewTabPopover(event)" data-tooltip="Mở Tệp / Tạo Thiết Kế Mới">
+                  <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+
+                <div class="new-tab-popover" id="newTabPopover" onclick="event.stopPropagation()">
+                  <button class="popover-action-item" onclick="createNewCanvasTab('app-flow', 'multi-sig-wallet.html')">
+                    <span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> Tạo Apps (DAG Userflow + HTML)</span>
+                    <span class="session-meta">App</span>
+                  </button>
+                  <button class="popover-action-item" onclick="createNewCanvasTab('slide-deck', 'series-a-pitch.html')">
+                    <span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg> Tạo Slide Deck (Slide Map + CMS)</span>
+                    <span class="session-meta">Deck</span>
+                  </button>
+                  <button class="popover-action-item" onclick="switchCanvasTab('tab-code'); closeNewTabPopover();">
+                    <span>&lt;/&gt; Mở CheckoutForm.tsx (Code)</span>
+                    <span class="session-meta">.tsx</span>
+                  </button>
+                  <button class="popover-action-item" onclick="switchCanvasTab('tab-md'); closeNewTabPopover();">
+                    <span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Mở DESIGN.md (Hỗ trợ bôi đen Quote)</span>
+                    <span class="session-meta">.md</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="canvas-split-stage" id="canvasSplitStage">
+            <!-- ==============================================================
+                 LEFT PANE: TRUE 2D DIRECTED ACYCLIC GRAPH (DAG) USERFLOW STUDIO (v5.4)
+                 - Item 1: True 2D Coordinate Graph with SVG Cubic Bezier Directed Edges,
+                   Input/Output Connection Ports (●), 2D Branching Topology, and 2D Cluster Bounding Boxes.
+                 - Item 2: Vertical Floating Toolbar Dock along the right edge of the DAG +
+                   Keyboard (⌘+/-, ⌘0, F, Space+Drag), Touchpad (Pinch-to-Zoom & 2-Finger Pan), and Mouse Wheel UX.
+                 ============================================================== -->
+            <div class="canvas-left-pane" id="canvasLeftPane">
+              <div class="structure-pane-header">
+                <!-- Key Switcher [Userflow | Slide/CMS] -->
+                <div class="icon-segment-group">
+                  <button class="key-btn active" style="height:22px;border:none;" id="lensBtnFlow" onclick="setCanvasLeftLens('flow')">
+                    <span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.8" y="4.5" width="5.8" height="5.6" rx="1.8"/><rect x="14.4" y="4.5" width="5.8" height="5.6" rx="1.8"/><rect x="9.1" y="14" width="5.8" height="5.6" rx="1.8"/><path d="M6.7 10.1v2.1c0 1.2 1 2.1 2.1 2.1h.3M17.3 10.1v2.1c0 1.2-1 2.1-2.1 2.1h-.3"/></svg> Userflow (2D DAG)</span>
+                  </button>
+                  <button class="key-btn" style="height:22px;border:none;background:transparent;" id="lensBtnSlide" onclick="setCanvasLeftLens('slide')">
+                    <span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg> Slide / CMS</span>
+                  </button>
+                </div>
+
+                <!-- Clean Header Right: Save State Indicator + Top-Right Synchronized Shorten/Expand Structure Pane -->
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span class="mono-num" id="dagSaveStateLabel" style="font-size:10px;color:var(--text-muted);" title="Di chuyển Node / Pan / Zoom không tạo Draft">● Saved (2D Graph)</span>
+                  <button class="icon-btn" id="btnToggleLeftPaneFull" onclick="toggleCanvasInternalFull('left')" data-tooltip="Thu gọn / Mở rộng Khung Cấu trúc (DAG / Slide)">
+                    <svg id="iconToggleLeftPaneFull" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 5.1 Structural Draft Bar (Only appears when Node/Edge/Condition is structurally modified!) -->
+              <div class="dag-draft-bar" id="dagDraftBar">
+                <span class="mono-num" id="dagDraftCountText">[DRAFT] 1 thay đổi cấu trúc đồ thị chưa triển khai</span>
+                <div style="display:flex;gap:5px;">
+                  <button class="key-btn" style="height:22px;" onclick="discardDagDraft()">Hủy Draft</button>
+                  <button class="key-btn primary" style="height:22px;" onclick="deployDagDraftToAgent()">
+                    <svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M 12 3 C 13.5 6 14.5 10 14.5 16 H 9.5 C 9.5 10 10.5 6 12 3 Z" /><circle cx="12" cy="9.5" r="1.5" /><path d="M 9.5 12 L 6 15.5 V 18 H 9.5" stroke="currentColor" /><path d="M 14.5 12 L 18 15.5 V 18 H 14.5" stroke="currentColor" /><path d="M 10.5 16 C 10.5 18.5 12 20.5 12 20.5 C 12 20.5 13.5 18.5 13.5 16" stroke="currentColor" /><path d="M 12 16 V 19" stroke="currentColor" /></svg> Triển khai Draft (Gửi JSON → Agent)
+                  </button>
+                </div>
+              </div>
+
+              <!-- 5.3 Edge Wiring, Direction & Condition Inspector -->
+              <div class="dag-edge-inspector" id="dagEdgeInspector">
+                <span class="mono-num" id="editingEdgeLabel" style="font-weight:600;color:var(--accent-primary);">Edge E1</span>
+                <select class="toolbar-select" id="edgeTypeSelect" onchange="updateActiveEdgeDraft()">
+                  <option value="main">Luồng chính (───▶)</option>
+                  <option value="ifelse">Luồng IF / ELSE (- - ▶)</option>
+                  <option value="fallback">Luồng IF NOT / Fallback (···▶)</option>
+                </select>
+                <button class="icon-btn" onclick="reverseActiveEdgeDirection()" data-tooltip="Đảo chiều mũi tên (⇄)">
+                  <svg viewBox="0 0 24 24"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+                </button>
+                <input
+                  type="text"
+                  class="cms-input mono-num"
+                  style="width:170px;height:24px;font-size:10.5px;"
+                  id="edgeConditionInput"
+                  placeholder="Điền condition (if / if not)..."
+                  oninput="updateActiveEdgeDraft()"
+                />
+                <button class="icon-btn" onclick="closeEdgeInspector()" data-tooltip="Đóng">✕</button>
+              </div>
+
+              <!-- 3A. TRUE 2D DIRECTED ACYCLIC GRAPH (DAG) VIEWPORT -->
+              <div
+                class="dag-flow-viewport"
+                id="leftViewDagFlow"
+                tabindex="0"
+                onmousedown="startDagCanvasPan(event)"
+              >
+                <!-- 2D World Stage (Transformed by translate(panX, panY) scale(zoom)) -->
+                <div class="dag-zoom-stage" id="dagZoomStage">
+                  <!-- 1. 2D CLUSTER BOUNDING FRAMES (True Branch & Merge DAG Topology) -->
+                  <div
+                    class="dag-cluster-frame"
+                    id="clusterMain"
+                    style="left: 12px; top: 16px; width: 706px; height: 220px;"
+                  >
+                    <div class="dag-cluster-header" onclick="toggleClusterCollapse('clusterMain')">
+                      <span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> Cụm 1: Luồng Thanh toán Chính (Main & Convergence DAG)</span>
+                      <span class="mono-num" style="font-size:9.5px;color:var(--text-muted);">Thu gọn / Mở rộng (No Draft) ▾</span>
+                    </div>
+                  </div>
+
+                  <div
+                    class="dag-cluster-frame fallback-cluster"
+                    id="clusterFallback"
+                    style="left: 236px; top: 266px; width: 482px; height: 186px;"
+                  >
+                    <div class="dag-cluster-header" onclick="toggleClusterCollapse('clusterFallback')">
+                      <span><svg class="brand-svg cowok-icon-shield" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="shield"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg> Cụm 2: Nhánh Rẽ IF NOT (Fallback & Exception Branch)</span>
+                      <span class="mono-num" style="font-size:9.5px;color:var(--text-muted);">Thu gọn / Mở rộng (No Draft) ▾</span>
+                    </div>
+                  </div>
+
+                  <!-- 2. SVG DIRECTED BEZIER EDGES LAYER (Dynamic 2D Cubic Bezier Curves + Arrowheads) -->
+                  <svg class="dag-svg-edges" id="dagSvgEdges" viewBox="0 0 1280 760">
+                    <defs>
+                      <marker id="arrow-main" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1 L 9 5 L 0 9 z" fill="#3b82f6" />
+                      </marker>
+                      <marker id="arrow-ifelse" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1 L 9 5 L 0 9 z" fill="#10b981" />
+                      </marker>
+                      <marker id="arrow-fallback" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1 L 9 5 L 0 9 z" fill="#f59e0b" />
+                      </marker>
+                      <marker id="arrow-draft" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 1 L 9 5 L 0 9 z" fill="#f59e0b" />
+                      </marker>
+                    </defs>
+                    <g id="dagSvgEdgesGroup"></g>
+                    <!-- Live Wire Preview when dragging from a Node Port (●) -->
+                    <path id="dagLiveWirePath" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-dasharray="5 4" marker-end="url(#arrow-draft)" style="display:none;" />
+                  </svg>
+
+                  <!-- 3. INTERACTIVE MIDPOINT CONDITION BADGES ON EDGES -->
+                  <div id="dagEdgeBadgesLayer"></div>
+
+                  <!-- 4. 2D GRAPH NODES LAYER (Draggable in X,Y + Input/Output Ports ●) -->
+                  <div id="dagNodesLayer">
+                    <!-- Node SCR-01 (Entry Node at x:24, y:64) -->
+                    <div
+                      class="dag-node-card"
+                      id="node-SCR-01"
+                      data-node-id="SCR-01"
+                      data-cluster="clusterMain"
+                      style="left: 24px; top: 64px;"
+                      onmousedown="startDagNodeDrag(event, 'SCR-01')"
+                      onclick="selectDagNode('SCR-01', 'sec-header')"
+                    >
+                      <div class="dag-port port-out-main" title="Kéo chấm ● để nối dây sang Node khác (Tạo Draft)" onmousedown="startPortWireDrag(event, 'SCR-01', 'main')"></div>
+                      <div class="dag-node-top">
+                        <span class="dag-node-id">SCR-01 • ENTRY</span>
+                        <div style="display:flex;gap:2px;" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
+                          <button class="icon-btn" style="width:20px;height:20px;min-width:20px;" onclick="editNodeNote('SCR-01')" data-tooltip="Sửa Note trên Node">
+                            <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                          </button>
+                          <button class="icon-btn" style="width:20px;height:20px;min-width:20px;" onclick="openNodeCommentPopover(event, 'Node SCR-01 (Giỏ hàng)')" data-tooltip="Comment lên Node SCR-01 để đưa vào Chat (5.4)">
+                            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div style="font-weight:600;font-size:11.5px;">Giỏ hàng & Tóm tắt Danh mục</div>
+                      <div class="dag-node-note" id="note-SCR-01">
+                        <span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Note: Kiểm tra số dư trước khi mở khóa ký</span>
+                      </div>
+                    </div>
+
+                    <!-- Node SCR-02 (Decision & Biometric Node at x:256, y:64 — Diverges to SCR-03 [IF] and SCR-02B [IF NOT]) -->
+                    <div
+                      class="dag-node-card decision-node active"
+                      id="node-SCR-02"
+                      data-node-id="SCR-02"
+                      data-cluster="clusterMain"
+                      style="left: 256px; top: 64px;"
+                      onmousedown="startDagNodeDrag(event, 'SCR-02')"
+                      onclick="selectDagNode('SCR-02', 'sec-biometric')"
+                    >
+                      <div class="dag-port port-in" title="Input Port (SCR-02)"></div>
+                      <div class="dag-port port-out-main" title="Output Port: Nhánh IF True (Kéo để nối dây)" onmousedown="startPortWireDrag(event, 'SCR-02', 'ifelse')"></div>
+                      <div class="dag-port port-out-branch" title="Output Port: Nhánh IF NOT / Fallback (Kéo để nối dây)" onmousedown="startPortWireDrag(event, 'SCR-02', 'fallback')"></div>
+                      <div class="dag-node-top">
+                        <span class="dag-node-id">◇ SCR-02 • DECISION</span>
+                        <div style="display:flex;gap:2px;" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
+                          <button class="icon-btn" style="width:20px;height:20px;min-width:20px;" onclick="editNodeNote('SCR-02')" data-tooltip="Sửa Note trên Node">
+                            <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                          </button>
+                          <button class="icon-btn" style="width:20px;height:20px;min-width:20px;" onclick="openNodeCommentPopover(event, 'Node SCR-02 (Xác thực Sinh trắc học)')" data-tooltip="Comment lên Node SCR-02 để đưa vào Chat (5.4)">
+                            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div style="font-weight:600;font-size:11.5px;">Xác thực Sinh trắc học & Hạn mức</div>
+                      <div class="dag-node-note" id="note-SCR-02">
+                        <span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Note: Tournament (A/B/C) • Rẽ nhánh IF / IF NOT</span>
+                      </div>
+                    </div>
+
+                    <!-- Node SCR-03 (Convergence Terminal Node at x:508, y:108 — Both IF and Fallback converge here!) -->
+                    <div
+                      class="dag-node-card"
+                      id="node-SCR-03"
+                      data-node-id="SCR-03"
+                      data-cluster="clusterMain"
+                      style="left: 508px; top: 108px;"
+                      onmousedown="startDagNodeDrag(event, 'SCR-03')"
+                      onclick="selectDagNode('SCR-03', 'sec-receipt')"
+                    >
+                      <div class="dag-port port-in" title="Input Port (SCR-03 — Điểm hội tụ DAG)"></div>
+                      <div class="dag-port port-out-main" title="Kéo chấm ● để nối dây mở rộng" onmousedown="startPortWireDrag(event, 'SCR-03', 'main')"></div>
+                      <div class="dag-node-top">
+                        <span class="dag-node-id" style="color:var(--semantic-success);">SCR-03 • TERMINAL</span>
+                        <div style="display:flex;gap:2px;" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
+                          <button class="icon-btn" style="width:20px;height:20px;min-width:20px;" onclick="openNodeCommentPopover(event, 'Node SCR-03 (Biên nhận)')" data-tooltip="Comment lên Node SCR-03 để đưa vào Chat (5.4)">
+                            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div style="font-weight:600;font-size:11.5px;">Biên nhận Ủy thác & Sổ cái</div>
+                      <div class="dag-node-note" id="note-SCR-03">
+                        <span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Note: Hội tụ nhánh Chính & Dự phòng (3/3)</span>
+                      </div>
+                    </div>
+
+                    <!-- Node SCR-02B (Fallback Branch Node in Cluster 2 at x:256, y:312) -->
+                    <div
+                      class="dag-node-card"
+                      id="node-SCR-02B"
+                      data-node-id="SCR-02B"
+                      data-cluster="clusterFallback"
+                      style="left: 256px; top: 312px;"
+                      onmousedown="startDagNodeDrag(event, 'SCR-02B')"
+                      onclick="selectDagNode('SCR-02', 'sec-biometric')"
+                    >
+                      <div class="dag-port port-in" title="Input Port (SCR-02B Fallback)"></div>
+                      <div class="dag-port port-out-main" title="Kéo chấm ● để nối về SCR-03 hoặc Node mới" onmousedown="startPortWireDrag(event, 'SCR-02B', 'ifelse')"></div>
+                      <div class="dag-node-top">
+                        <span class="dag-node-id" style="color:var(--semantic-warning);">SCR-02B • FALLBACK</span>
+                        <div style="display:flex;gap:2px;" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()">
+                          <button class="icon-btn" style="width:20px;height:20px;min-width:20px;" onclick="openNodeCommentPopover(event, 'Node SCR-02B (Fallback OTP)')" data-tooltip="Comment lên Node SCR-02B để đưa vào Chat (5.4)">
+                            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div style="font-weight:600;font-size:11.5px;">Xác thực Dự phòng OTP + Giám đốc</div>
+                      <div class="dag-node-note" id="note-SCR-02B">
+                        <span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Note: Kích hoạt khi Passkey lỗi / vượt hạn mức</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ITEM 2: RIGHT-EDGE VERTICAL FLOATING TOOLBAR DOCK ON DAG CANVAS -->
+                <aside class="dag-right-vertical-dock" id="dagRightVerticalDock" onmousedown="event.stopPropagation()">
+                  <button class="icon-btn" onclick="addDraftNodeToDag()" data-tooltip="Thêm Node mới vào DAG (+ Node)">
+                    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                  </button>
+                  <button class="icon-btn" onclick="undoDagAction()" data-tooltip="Hoàn tác (Undo • ⌘Z)">
+                    <svg viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                  </button>
+                  <button class="icon-btn" onclick="redoDagAction()" data-tooltip="Làm lại (Redo • ⇧⌘Z)">
+                    <svg viewBox="0 0 24 24"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+                  </button>
+
+                  <div class="dag-dock-divider"></div>
+
+                  <button class="icon-btn" onclick="zoomDag(0.12)" data-tooltip="Phóng to (Zoom In • ⌘+ / Pinch / ⌘+Scroll)">
+                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                  </button>
+                  <button class="dag-zoom-pct-btn" id="dagZoomPctBadge" onclick="resetDagView()" title="Click để Reset 100% (⌘0)">
+                    90%
+                  </button>
+                  <button class="icon-btn" onclick="zoomDag(-0.12)" data-tooltip="Thu nhỏ (Zoom Out • ⌘- / Pinch / ⌘+Scroll)">
+                    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                  </button>
+                  <button class="icon-btn" onclick="fitDagToViewport()" data-tooltip="Căn vừa khung nhìn (Fit View • Phím F)">
+                    <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                  </button>
+
+                  <div class="dag-dock-divider"></div>
+
+                  <button class="icon-btn active" id="btnToggleMinimap" onclick="toggleDagMinimap()" data-tooltip="Ẩn / Hiện Bản đồ thu nhỏ (Minimap • Phím M)">
+                    <svg viewBox="0 0 24 24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                  </button>
+                </aside>
+
+                <!-- Bottom-Left Keyboard + Touchpad + Mouse Gesture HUD -->
+                <div class="dag-gesture-hud" id="dagGestureHud">
+                  <span>Kéo nền / Space+Drag: Pan</span>
+                  <span>•</span>
+                  <span>Pinch / ⌘+Scroll: Zoom</span>
+                  <span>•</span>
+                  <span>Phím tắt: ⌘+ / ⌘- / ⌘0 / F</span>
+                </div>
+
+                <!-- 5.3 Live 2D Minimap Radar Overlay -->
+                <div class="dag-minimap" id="dagMinimap" onmousedown="event.stopPropagation()">
+                  <div style="font-size:8px;font-family:var(--font-mono);color:var(--text-muted);margin-bottom:3px;display:flex;justify-content:space-between;">
+                    <span>2D DAG RADAR</span>
+                    <span id="minimapNodeCount">4 NODES</span>
+                  </div>
+                  <div class="minimap-canvas" id="minimapCanvas"></div>
+                </div>
+              </div>
+
+              <!-- 3B. SLIDE / SECTION STRUCTURE MAP + SLIDE-OVER CMS -->
+              <div class="slide-structure-viewport" id="leftViewSlideMap" style="display:none;">
+                <div class="slide-over-track" id="slideOverTrack">
+                  <div class="slide-map-panel">
+                    <div class="slide-phase-card active" onclick="openSlideCmsEditor(0)">
+                      <div class="dag-node-id">SLIDE 01 • HERO</div>
+                      <div style="font-weight:600;font-size:12px;">Kiến trúc Điều phối cowok-design v5.3</div>
+                    </div>
+                    <div class="slide-phase-card" onclick="openSlideCmsEditor(1)">
+                      <div class="dag-node-id">SLIDE 02 • METRICS</div>
+                      <div style="font-weight:600;font-size:12px;">Hiệu suất Đồng bộ & Độ trễ &lt; 16ms</div>
+                    </div>
+                  </div>
+                  <div class="slide-cms-panel">
+                    <button class="key-btn" onclick="closeSlideCmsEditor()">← Quay lại danh sách Slide</button>
+                    <div class="cms-field-group">
+                      <label class="session-meta">Headline</label>
+                      <input type="text" class="cms-input" id="cmsInputHeadline" oninput="syncCmsToLiveHtml()" value="Kiến trúc Điều phối cowok-design v5.3" />
+                    </div>
+                    <div class="cms-field-group">
+                      <label class="session-meta">Subtitle</label>
+                      <textarea class="cms-textarea" id="cmsInputSubtitle" rows="2" oninput="syncCmsToLiveHtml()">Minimalist Agent Chat & Draft-Aware DAG Studio.</textarea>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="drag-splitter" id="resizerCanvas"></div>
+
+            <!-- ==============================================================
+                 RIGHT PANE: LIVE HTML STAGE & CODE EDITOR
+                 ============================================================== -->
+            <div class="canvas-right-pane" id="canvasRightPane">
+              <div class="html-pane-toolbar">
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <div class="icon-segment-group">
+                    <button class="icon-btn active" id="modeBtnInteract" onclick="setHtmlPointerMode('interact')" data-tooltip="Tương tác trực tiếp với HTML">
+                      <svg viewBox="0 0 24 24"><path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/></svg>
+                    </button>
+                    <button class="icon-btn" id="modeBtnClickDom" onclick="setHtmlPointerMode('click-dom')" data-tooltip="Pattern 1: Click chọn Component để Comment">
+                      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                    <button class="icon-btn" id="modeBtnDragBox" onclick="setHtmlPointerMode('drag-box')" data-tooltip="Pattern 2: Kéo khung chọn vùng (Marquee Box)">
+                      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 2"/><path d="M9 12h6M12 9v6"/></svg>
+                    </button>
+                  </div>
+
+                  <button class="icon-btn" id="btnToggleCodeEditor" onclick="toggleInlineCodeEditor()" data-tooltip="Mở / Đóng Trình sửa Code trực tiếp (Advanced Code Editor)">
+                    <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                  </button>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <div class="icon-segment-group">
+                    <button class="icon-btn active" data-vp-btn="desktop" onclick="setResponsiveViewport('desktop')" data-tooltip="Desktop (100%)">
+                      <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    </button>
+                    <button class="icon-btn" data-vp-btn="tablet" onclick="setResponsiveViewport('tablet')" data-tooltip="Tablet (768px)">
+                      <svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    </button>
+                    <button class="icon-btn" data-vp-btn="mobile" onclick="setResponsiveViewport('mobile')" data-tooltip="Mobile (375px)">
+                      <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    </button>
+                  </div>
+
+                  <select class="toolbar-select" id="presentFrameSelect" onchange="setPresentationFrame(this.value)">
+                    <option value="auto">Auto Fit</option>
+                    <option value="16-9">16:9 Deck</option>
+                    <option value="16-10">16:10 Studio</option>
+                  </select>
+
+                  <button class="key-btn" id="btnPresentMode" onclick="togglePresentationMode()">
+                    <span>▶ Present</span>
+                  </button>
+
+                  <!-- Standardized Top-Right Corner Shorten/Expand Toggle for Live HTML Preview Pane -->
+                  <button class="icon-btn" id="btnToggleRightPaneFull" onclick="toggleCanvasInternalFull('right')" data-tooltip="Thu gọn / Mở rộng Khung Live HTML Preview">
+                    <svg id="iconToggleRightPaneFull" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div
+                class="html-preview-container"
+                id="htmlPreviewContainer"
+                onmousedown="startMarqueeDrag(event)"
+                onmousemove="updateMarqueeDrag(event)"
+                onmouseup="endMarqueeDrag(event)"
+              >
+                <div class="live-html-frame" id="liveHtmlFrame" data-viewport="desktop" data-frame="auto">
+                  <div class="live-html-browser-bar">
+                    <span id="liveHtmlUrlBar">checkout-app.html#SCR-02 (Option B)</span>
+                    <span class="mono-num" id="viewportBadgeLabel">Desktop • Auto</span>
+                  </div>
+
+                  <div class="live-html-body" id="liveHtmlBody">
+                    <div class="html-region" id="sec-header" onclick="handleHtmlRegionClick(event, 'SCR-02 • #sec-header')">
+                      <div class="mono-num" style="font-size:10px;color:var(--accent-primary);margin-bottom:3px;" id="liveScreenEyebrow">
+                        SCR-02 • OPTION B (Winner 9.6/10 — 1-CLICK BIOMETRIC VAULT)
+                      </div>
+                      <h2 style="font-size:18px;font-weight:600;margin-bottom:4px;" id="liveHeadline">
+                        Xác thực Ủy thác Giao dịch Kho bạc Đa Chữ Ký
+                      </h2>
+                      <p style="font-size:12.5px;color:var(--text-secondary);" id="liveSubtitle">
+                        Phương án B tối ưu hóa xác thực khóa cứng WebAuthn Passkey ngay trên một mặt phẳng duy nhất.
+                      </p>
+                    </div>
+
+                    <div class="html-region" id="sec-kpi" onclick="handleHtmlRegionClick(event, 'SCR-02 • #sec-kpi')">
+                      <div class="html-kpi-row">
+                        <div class="html-kpi-box">
+                          <div style="font-size:10px;color:var(--text-muted);">Giải ngân</div>
+                          <div class="html-kpi-val" id="liveKpi1">$1,284,500.00</div>
+                        </div>
+                        <div class="html-kpi-box">
+                          <div style="font-size:10px;color:var(--text-muted);">Trạng thái</div>
+                          <div class="html-kpi-val" style="color:var(--semantic-success);" id="liveKpi2">99.4% SAFE</div>
+                        </div>
+                        <div class="html-kpi-box">
+                          <div style="font-size:10px;color:var(--text-muted);">Độ trễ</div>
+                          <div class="html-kpi-val" id="liveKpi3">12.4 ms</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="html-region highlighted-region" id="sec-biometric" onclick="handleHtmlRegionClick(event, 'SCR-02 • #sec-biometric')">
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                        <div>
+                          <div style="font-size:12.5px;font-weight:600;" id="liveActionTitle">
+                            <svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Xác nhận Chữ ký Sinh trắc học (Hardware Passkey)
+                          </div>
+                          <div style="font-size:11.5px;color:var(--text-secondary);">
+                            Nếu thất bại sẽ tự động rẽ nhánh sang Cụm 2: SCR-02B (Fallback OTP).
+                          </div>
+                        </div>
+                        <button class="key-btn primary" id="liveCtaBtn" onclick="event.stopPropagation(); triggerLiveHtmlDemoAction()">
+                          Ký & Giải ngân Ngay ($1.28M)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Advanced Code Editor -->
+                <div class="advanced-code-editor-shell" id="advancedCodeEditorShell" onmousedown="event.stopPropagation()">
+                  <div class="code-editor-topbar">
+                    <span>&lt;/&gt; src/components/CheckoutForm.tsx</span>
+                    <button class="key-btn primary" style="height:22px;" onclick="applyLiveCodeChanges()">✓ Áp dụng Code (⌘S)</button>
+                  </div>
+                  <textarea class="code-editor-textarea" id="codeEditorTextarea" spellcheck="false">export const CheckoutScreenConfig = {
+  screenId: "SCR-02",
+  headline: "Xác thực Ủy thác Giao dịch Kho bạc Đa Chữ Ký",
+  subtitle: "Phương án B tối ưu hóa xác thực khóa cứng WebAuthn Passkey ngay trên một mặt phẳng duy nhất.",
+  amountLabel: "$1,284,500.00",
+  ctaLabel: "Ký & Giải ngân Ngay ($1.28M)"
+};</textarea>
+                </div>
+
+                <!-- Multi-Format Viewer (.md supports Highlight-to-Quote Req 3!) -->
+                <div class="live-html-frame" id="multiFormatFrame" style="display:none;max-width:840px;" data-quotable="true">
+                  <div class="live-html-browser-bar">
+                    <span id="multiFormatHeaderTitle">DESIGN.md (Bôi đen chữ bất kỳ để bấm ❝ Quote vào Chat)</span>
+                    <span class="mono-num" id="multiFormatKindBadge">Markdown</span>
+                  </div>
+                  <div class="live-html-body" id="multiFormatBody"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- Floating Quote Selection Button (Requirement 3: Appears when selecting text in Agent Chat or Doc) -->
+  <button class="floating-quote-pill" id="floatingQuotePill" onmousedown="event.preventDefault(); attachSelectedQuoteToChat();">
+    <span>❝ Quote vào Chat</span>
+  </button>
+
+  <!-- Marquee Selection Box -->
+  <div class="marquee-selection-rect" id="marqueeSelectionRect">
+    <span class="marquee-coords-pill" id="marqueeCoordsPill">0 × 0 px</span>
+  </div>
+
+  <!-- Comment Popover -->
+  <div class="spatial-comment-popover" id="spatialCommentPopover">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <span class="mono-num" style="font-size:11px;font-weight:600;color:var(--accent-primary);" id="spatialTargetBadge">SCR-02</span>
+      <button class="icon-btn" style="width:18px;height:18px;min-width:18px;" onclick="closeSpatialPopover()">✕</button>
+    </div>
+    <textarea
+      class="cms-textarea"
+      id="spatialCommentInput"
+      rows="2"
+      placeholder="Nhập ghi chú (Enter để đưa vào Chat)..."
+      onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); submitSpatialCommentToChat(); }"
+    ></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:5px;margin-top:6px;">
+      <button class="key-btn" style="height:22px;" onclick="closeSpatialPopover()">Hủy</button>
+      <button class="key-btn primary" style="height:22px;" onclick="submitSpatialCommentToChat()">Đính kèm ↵</button>
+    </div>
+  </div>
+
+  <!-- Settings Modal Popup (Includes Global Font Size Config - Req 2, 9 Locales, 4 Themes) -->
+  <div class="modal-backdrop" id="settingsModalBackdrop" onclick="if(event.target===this) closeSettingsModal()">
+    <div class="settings-modal" role="dialog">
+      <div class="settings-modal-header">
+        <span data-i18n="settingsTitle"><svg class="brand-svg cowok-icon-settings" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="settings"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg> Settings (Ngôn ngữ, Cỡ chữ toàn cục & Giao diện)</span>
+        <button class="icon-btn" onclick="closeSettingsModal()">✕</button>
+      </div>
+      <div class="settings-modal-body">
+        <div class="settings-card">
+          <div style="font-weight:600;margin-bottom:6px;">1. Cỡ chữ Làm việc Toàn cục (Global Workspace Font Size — Mục 2)</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+            <button class="key-btn" onclick="setGlobalFontSize('12px')">12px Compact</button>
+            <button class="key-btn active" onclick="setGlobalFontSize('13px')">13px Default</button>
+            <button class="key-btn" onclick="setGlobalFontSize('14px')">14px Comfort</button>
+            <button class="key-btn" onclick="setGlobalFontSize('15px')">15px Large</button>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <div style="font-weight:600;margin-bottom:6px;">2. Ngôn ngữ Hiển thị (9 Supported Locales — cowok.ai)</div>
+          <select class="toolbar-select" style="width:100%;height:30px;" id="modalLangSelect" onchange="changeLanguage(this.value)">
+            <option value="vi">Tiếng Việt (vi-VN)</option>
+            <option value="en">English (en-US)</option>
+            <option value="zh">中文 (zh-CN)</option>
+            <option value="ja">日本語 (ja-JP)</option>
+            <option value="ko">한국어 (ko-KR)</option>
+            <option value="fr">Français (fr-FR)</option>
+            <option value="es">Español (es-ES)</option>
+            <option value="pt">Português (pt-PT)</option>
+            <option value="it">Italiano (it-IT)</option>
+          </select>
+        </div>
+
+        <div class="settings-card">
+          <div style="font-weight:600;margin-bottom:6px;">3. Chế độ Màu sắc (4-Theme Minimalist Matrix)</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+            <button class="key-btn" onclick="applyTheme('warm', false)"><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> Warm</button>
+            <button class="key-btn" onclick="applyTheme('dim', false)"><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> Dim</button>
+            <button class="key-btn" onclick="applyTheme('night', false)"><svg class="brand-svg cowok-icon-moon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="moon"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></svg> Night</button>
+            <button class="key-btn" onclick="applyTheme('night', true)"><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> Low-Focus</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       6. INTERACTIVE CONTROLLER: QUOTE + DRAFT-AWARE DAG + UNDO/REDO + JSON DIFF
+       ========================================================================== -->
+  <script>
+    let currentTabId = 'tab-app';
+    let pendingVariant = 'B';
+    let confirmedVariant = 'B';
+    let htmlPointerMode = 'interact';
+    let pendingSpatialRegion = '';
+    let selectedQuoteText = '';
+    let currentViewport = 'desktop';
+    let currentFrameRatio = 'auto';
+    let isCodeEditorOpen = false;
+    let isDraggingMarquee = false;
+    let marqueeStartX = 0;
+    let marqueeStartY = 0;
+
+    // --- 2D DIRECTED ACYCLIC GRAPH (DAG) STATE (v5.4: True 2D Coordinates + SVG Bezier Edges) ---
+    let dagZoomLevel = 0.88;
+    let dagPanX = 10;
+    let dagPanY = 10;
+    let isSpaceKeyHeld = false;
+    let isPanningDag = false;
+    let panStartClientX = 0;
+    let panStartClientY = 0;
+    let panOriginX = 0;
+    let panOriginY = 0;
+
+    let draggingNodeId = null;
+    let nodeDragStartClientX = 0;
+    let nodeDragStartClientY = 0;
+    let nodeDragOriginX = 0;
+    let nodeDragOriginY = 0;
+    let nodeDragMoved = false;
+
+    let wiringFromNodeId = null;
+    let wiringPortType = 'main';
+
+    let activeEdgeId = null;
+    let dagDraftChanges = [];
+    let dagUndoStack = [];
+    let dagRedoStack = [];
+
+    // 2D Node Coordinate Map (x, y, width, height — True Branch & Merge DAG Topology)
+    const dagNodesState = {
+      'SCR-01': { id: 'SCR-01', x: 24, y: 64, w: 192, h: 108, cluster: 'clusterMain', draft: false },
+      'SCR-02': { id: 'SCR-02', x: 256, y: 64, w: 192, h: 108, cluster: 'clusterMain', draft: false },
+      'SCR-03': { id: 'SCR-03', x: 508, y: 108, w: 192, h: 108, cluster: 'clusterMain', draft: false },
+      'SCR-02B': { id: 'SCR-02B', x: 256, y: 312, w: 192, h: 108, cluster: 'clusterFallback', draft: false }
+    };
+
+    // Directed Edges Map (SVG Cubic Bezier Connections between 2D Nodes)
+    const dagEdgesState = {
+      E1: { id: 'E1', from: 'SCR-01', to: 'SCR-02', type: 'main', reversed: false, draft: false, condition: 'Click Checkout' },
+      E2: { id: 'E2', from: 'SCR-02', to: 'SCR-03', type: 'ifelse', reversed: false, draft: false, condition: 'passkey_ok && <=500M' },
+      E3: { id: 'E3', from: 'SCR-02', to: 'SCR-02B', type: 'fallback', reversed: false, draft: false, condition: 'biometric_fail' },
+      E4: { id: 'E4', from: 'SCR-02B', to: 'SCR-03', type: 'ifelse', reversed: false, draft: false, condition: 'otp_approved' }
+    };
+
+    const I18N_DICT = {
+      vi: { newConv: 'Cuộc trò chuyện mới', pinned: 'Đã ghim', projects: 'Dự án', chatHeader: 'Agent', composerPlaceholder: 'Nhập chỉ thị cho Agent (hoặc bôi đen nội dung để Quote)...' },
+      en: { newConv: 'New Conversation', pinned: 'Pinned', projects: 'Projects', chatHeader: 'Agent', composerPlaceholder: 'Message Agent (or highlight text to Quote)...' },
+      zh: { newConv: '新建对话', pinned: '已置顶', projects: '项目列表', chatHeader: '智能体', composerPlaceholder: '输入指令或选中文字进行引用 (Quote)...' },
+      ja: { newConv: '新しい会話', pinned: 'ピン留め', projects: 'プロジェクト', chatHeader: 'エージェント', composerPlaceholder: '指示を入力（またはテキストを選択して引用）...' },
+      ko: { newConv: '새 대화 시작', pinned: '고정됨', projects: '프로젝트', chatHeader: '에이전트', composerPlaceholder: '지시사항 입력 (또는 텍스트 선택하여 인용)...' },
+      fr: { newConv: 'Nouvelle conversation', pinned: 'Épinglés', projects: 'Projets', chatHeader: 'Agent', composerPlaceholder: 'Message pour l’Agent (ou surligner pour citer)...' },
+      es: { newConv: 'Nueva conversación', pinned: 'Fijados', projects: 'Proyectos', chatHeader: 'Agente', composerPlaceholder: 'Mensaje para el Agente (o selecciona texto para citar)...' },
+      pt: { newConv: 'Nova conversa', pinned: 'Fixados', projects: 'Projetos', chatHeader: 'Agente', composerPlaceholder: 'Mensagem para o Agente (ou selecione texto para citar)...' },
+      it: { newConv: 'Nuova conversazione', pinned: 'Fissati', projects: 'Progetti', chatHeader: 'Agente', composerPlaceholder: 'Messaggio per l’Agente (o evidenzia testo per citare)...' }
+    };
+
+    function changeLanguage(lang) {
+      const dict = I18N_DICT[lang] || I18N_DICT.vi;
+      document.documentElement.lang = lang;
+      document.getElementById('topLangSelect').value = lang;
+      document.getElementById('modalLangSelect').value = lang;
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) el.textContent = dict[key];
+      });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (dict[key]) el.setAttribute('placeholder', dict[key]);
+      });
+    }
+
+    function setGlobalFontSize(sizeStr) {
+      document.documentElement.style.setProperty('--app-font-size', sizeStr);
+    }
+
+    // --- Requirement 3: Highlight Text in Agent Chat or Markdown Doc -> Show Floating "❝ Quote vào Chat" ---
+    document.addEventListener('mouseup', (e) => {
+      const pill = document.getElementById('floatingQuotePill');
+      const sel = window.getSelection();
+      const text = sel ? sel.toString().trim() : '';
+      if (text.length > 3) {
+        const anchorNode = sel.anchorNode?.parentElement;
+        if (anchorNode && anchorNode.closest('[data-quotable="true"]')) {
+          selectedQuoteText = text.length > 90 ? text.slice(0, 90) + '...' : text;
+          const range = sel.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          pill.style.left = Math.max(16, Math.min(window.innerWidth - 160, rect.left + rect.width / 2 - 60)) + 'px';
+          pill.style.top = Math.max(12, rect.top - 34) + 'px';
+          pill.style.display = 'inline-flex';
+          return;
+        }
+      }
+      pill.style.display = 'none';
+    });
+
+    function attachSelectedQuoteToChat() {
+      if (!selectedQuoteText) return;
+      const tray = document.getElementById('chatAttachmentTray');
+      const chip = document.createElement('div');
+      chip.className = 'attachment-chip';
+      chip.innerHTML = `
+        <span class="attachment-chip-tag">@[Quote]</span>
+        <span class="attachment-chip-text">"${selectedQuoteText}"</span>
+        <button class="icon-btn" style="width:15px;height:15px;min-width:15px;" onclick="event.stopPropagation(); this.parentElement.remove();">✕</button>
+      `;
+      tray.appendChild(chip);
+      document.getElementById('floatingQuotePill').style.display = 'none';
+      window.getSelection()?.removeAllRanges();
+      document.getElementById('chatSubpanel').classList.remove('shortened');
+      document.getElementById('chatInputTextarea').focus();
+    }
+
+    // =========================================================================
+    // ITEM 1 & 2: 2D SVG BEZIER DAG ENGINE + TOUCHPAD/MOUSE/KEYBOARD ZOOM & PAN
+    // =========================================================================
+    function applyDagTransform() {
+      const stage = document.getElementById('dagZoomStage');
+      if (stage) {
+        stage.style.transform = `translate(${Math.round(dagPanX)}px, ${Math.round(dagPanY)}px) scale(${dagZoomLevel})`;
+      }
+      const badge = document.getElementById('dagZoomPctBadge');
+      if (badge) {
+        badge.textContent = `${Math.round(dagZoomLevel * 100)}%`;
+      }
+    }
+
+    function getPortCoords(node, isSource, edgeType) {
+      if (isSource) {
+        if (edgeType === 'fallback' && node.id === 'SCR-02') {
+          return { x: node.x + node.w / 2, y: node.y + node.h, dir: 'down' };
+        }
+        return { x: node.x + node.w, y: node.y + node.h / 2, dir: 'right' };
+      } else {
+        if (edgeType === 'fallback' && node.id === 'SCR-02B') {
+          return { x: node.x + node.w / 2, y: node.y, dir: 'up' };
+        }
+        return { x: node.x, y: node.y + node.h / 2, dir: 'left' };
+      }
+    }
+
+    function computeCubicBezierPath(p1, p2, edgeId) {
+      if (p1.dir === 'down' && p2.dir === 'up') {
+        const dy = Math.max(40, Math.abs(p2.y - p1.y) * 0.5);
+        return {
+          d: `M ${p1.x} ${p1.y} C ${p1.x} ${p1.y + dy}, ${p2.x} ${p2.y - dy}, ${p2.x} ${p2.y}`,
+          mx: (p1.x + p2.x) / 2,
+          my: (p1.y + p2.y) / 2
+        };
+      }
+      const dx = Math.max(55, Math.abs(p2.x - p1.x) * 0.48);
+      const cx1 = p1.x + (p2.x >= p1.x ? dx : -dx);
+      const cx2 = p2.x - (p2.x >= p1.x ? dx : -dx);
+      const isHorizontal = Math.abs(p1.y - p2.y) < 30;
+      const badgeOffsetY = isHorizontal ? -20 : (edgeId === 'E4' ? 32 : 0);
+      return {
+        d: `M ${p1.x} ${p1.y} C ${cx1} ${p1.y}, ${cx2} ${p2.y}, ${p2.x} ${p2.y}`,
+        mx: (p1.x + p2.x) / 2,
+        my: (p1.y + p2.y) / 2 + badgeOffsetY
+      };
+    }
+
+    function renderAllDagEdges() {
+      const svgGroup = document.getElementById('dagSvgEdgesGroup');
+      const badgesLayer = document.getElementById('dagEdgeBadgesLayer');
+      if (!svgGroup || !badgesLayer) return;
+
+      svgGroup.innerHTML = '';
+      badgesLayer.innerHTML = '';
+
+      Object.values(dagEdgesState).forEach(edge => {
+        const nFrom = dagNodesState[edge.from];
+        const nTo = dagNodesState[edge.to];
+        if (!nFrom || !nTo) return;
+
+        // Hide edges if target/source cluster is collapsed
+        const fromClusterEl = document.getElementById(nFrom.cluster);
+        const toClusterEl = document.getElementById(nTo.cluster);
+        if (fromClusterEl?.classList.contains('collapsed') || toClusterEl?.classList.contains('collapsed')) {
+          return;
+        }
+
+        const p1 = getPortCoords(nFrom, true, edge.type);
+        const p2 = getPortCoords(nTo, false, edge.type);
+        const bez = computeCubicBezierPath(p1, p2, edge.id);
+
+        const strokeColor = edge.draft
+          ? '#f59e0b'
+          : (edge.type === 'main' ? '#3b82f6' : (edge.type === 'ifelse' ? '#10b981' : '#f59e0b'));
+        const dashAttr = edge.type === 'ifelse' ? 'stroke-dasharray="6 4"' : (edge.type === 'fallback' ? 'stroke-dasharray="3 4"' : '');
+        const markerId = edge.draft ? 'arrow-draft' : `arrow-${edge.type}`;
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('class', `dag-svg-edge-group ${activeEdgeId === edge.id ? 'selected' : ''}`);
+        g.innerHTML = `
+          <path class="dag-svg-edge-hit" d="${bez.d}" onclick="openEdgeInspector('${edge.id}')" />
+          <path class="dag-svg-edge-path" d="${bez.d}" stroke="${strokeColor}" ${dashAttr} marker-end="url(#${markerId})" />
+        `;
+        svgGroup.appendChild(g);
+
+        // Create Interactive Condition Pill Badge at Bezier Midpoint (mx, my)
+        const badge = document.createElement('button');
+        badge.className = `dag-edge-badge badge-${edge.type} ${edge.draft ? 'draft-edge' : ''} ${activeEdgeId === edge.id ? 'active' : ''}`;
+        badge.id = 'edge-' + edge.id;
+        badge.style.left = `${bez.mx}px`;
+        badge.style.top = `${bez.my}px`;
+        const prefix = edge.type === 'main' ? 'Main' : (edge.type === 'ifelse' ? '◇ IF' : 'IF NOT');
+        badge.innerHTML = `<span id="edgeText-${edge.id}">${edge.draft ? '[DRAFT] ' : ''}${prefix}: ${edge.condition}</span>`;
+        badge.onclick = (ev) => {
+          ev.stopPropagation();
+          openEdgeInspector(edge.id);
+        };
+        badgesLayer.appendChild(badge);
+      });
+
+      renderDagMinimap();
+    }
+
+    function renderDagMinimap() {
+      const mmCanvas = document.getElementById('minimapCanvas');
+      if (!mmCanvas) return;
+      mmCanvas.innerHTML = '';
+      const scaleX = 124 / 960;
+      const scaleY = 58 / 500;
+      const nodes = Object.values(dagNodesState);
+      const countEl = document.getElementById('minimapNodeCount');
+      if (countEl) countEl.textContent = `${nodes.length} NODES`;
+
+      nodes.forEach(n => {
+        const dot = document.createElement('div');
+        dot.className = 'minimap-node-rect';
+        dot.style.left = `${Math.max(2, Math.min(105, Math.round(n.x * scaleX)))}px`;
+        dot.style.top = `${Math.max(2, Math.min(46, Math.round(n.y * scaleY)))}px`;
+        dot.style.width = `${Math.round(n.w * scaleX)}px`;
+        if (n.draft || n.cluster === 'clusterFallback') {
+          dot.style.borderColor = 'var(--semantic-warning)';
+        }
+        mmCanvas.appendChild(dot);
+      });
+    }
+
+    // --- 5.2 Non-Structural 2D Node Dragging (Moves Node in X,Y & Redraws Bezier Curves WITHOUT creating Draft!) ---
+    function startDagNodeDrag(e, nodeId) {
+      if (e.button !== 0) return;
+      if (e.target.closest('.dag-port') || e.target.closest('button')) return;
+      e.stopPropagation();
+      draggingNodeId = nodeId;
+      nodeDragStartClientX = e.clientX;
+      nodeDragStartClientY = e.clientY;
+      const node = dagNodesState[nodeId];
+      if (!node) return;
+      nodeDragOriginX = node.x;
+      nodeDragOriginY = node.y;
+      nodeDragMoved = false;
+    }
+
+    function handleNonStructuralNodeDrag(e, nodeId) {
+      const node = dagNodesState[nodeId];
+      if (node) {
+        document.getElementById('dagSaveStateLabel').textContent =
+          `● Layout Saved (${nodeId} @ ${Math.round(node.x)},${Math.round(node.y)} — No Draft needed)`;
+      } else {
+        document.getElementById('dagSaveStateLabel').textContent =
+          `● Layout Saved (${nodeId} moved — No Draft needed)`;
+      }
+    }
+
+    // --- 5.1 & 5.3 Structural Port-to-Port Wire Dragging (Creates/Updates Edge & Triggers DRAFT Mode!) ---
+    function startPortWireDrag(e, fromNodeId, portType) {
+      e.stopPropagation();
+      e.preventDefault();
+      wiringFromNodeId = fromNodeId;
+      wiringPortType = portType || 'ifelse';
+      const livePath = document.getElementById('dagLiveWirePath');
+      if (livePath) livePath.style.display = 'block';
+    }
+
+    // --- Canvas Panning via Background Drag or Space+Drag ---
+    function startDagCanvasPan(e) {
+      if (e.target.closest('.dag-node-card') || e.target.closest('.dag-edge-badge') || e.target.closest('.dag-right-vertical-dock')) {
+        return;
+      }
+      isPanningDag = true;
+      panStartClientX = e.clientX;
+      panStartClientY = e.clientY;
+      panOriginX = dagPanX;
+      panOriginY = dagPanY;
+      document.getElementById('leftViewDagFlow')?.classList.add('panning');
+    }
+
+    window.addEventListener('mousemove', (e) => {
+      if (draggingNodeId) {
+        const node = dagNodesState[draggingNodeId];
+        const dx = (e.clientX - nodeDragStartClientX) / dagZoomLevel;
+        const dy = (e.clientY - nodeDragStartClientY) / dagZoomLevel;
+        if (Math.abs(dx) > 2 || Math.abs(dy) > 2) nodeDragMoved = true;
+        node.x = Math.max(16, Math.min(980, Math.round(nodeDragOriginX + dx)));
+        node.y = Math.max(24, Math.min(620, Math.round(nodeDragOriginY + dy)));
+        const el = document.getElementById('node-' + draggingNodeId);
+        if (el) {
+          el.style.left = `${node.x}px`;
+          el.style.top = `${node.y}px`;
+        }
+        renderAllDagEdges();
+        return;
+      }
+
+      if (wiringFromNodeId) {
+        const nFrom = dagNodesState[wiringFromNodeId];
+        const stage = document.getElementById('dagZoomStage');
+        if (!nFrom || !stage) return;
+        const rect = stage.getBoundingClientRect();
+        const curX = (e.clientX - rect.left) / dagZoomLevel;
+        const curY = (e.clientY - rect.top) / dagZoomLevel;
+        const p1 = getPortCoords(nFrom, true, wiringPortType);
+        const bez = computeCubicBezierPath(p1, { x: curX, y: curY, dir: 'left' });
+        const livePath = document.getElementById('dagLiveWirePath');
+        if (livePath) livePath.setAttribute('d', bez.d);
+        return;
+      }
+
+      if (isPanningDag) {
+        dagPanX = panOriginX + (e.clientX - panStartClientX);
+        dagPanY = panOriginY + (e.clientY - panStartClientY);
+        applyDagTransform();
+      }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (draggingNodeId) {
+        if (nodeDragMoved) {
+          handleNonStructuralNodeDrag(e, draggingNodeId);
+        }
+        draggingNodeId = null;
+      }
+
+      if (wiringFromNodeId) {
+        const livePath = document.getElementById('dagLiveWirePath');
+        if (livePath) livePath.style.display = 'none';
+        const targetCard = e.target.closest?.('.dag-node-card');
+        const targetNodeId = targetCard?.getAttribute('data-node-id');
+        if (targetNodeId && targetNodeId !== wiringFromNodeId) {
+          const newEdgeId = 'E' + (Object.keys(dagEdgesState).length + 1);
+          dagEdgesState[newEdgeId] = {
+            id: newEdgeId,
+            from: wiringFromNodeId,
+            to: targetNodeId,
+            type: wiringPortType,
+            reversed: false,
+            draft: true,
+            condition: wiringPortType === 'fallback' ? 'if_not_fallback' : 'custom_branch_ok'
+          };
+          renderAllDagEdges();
+          recordStructuralDraftChange({
+            action: 'CONNECT_EDGE',
+            edgeId: newEdgeId,
+            from: wiringFromNodeId,
+            to: targetNodeId,
+            edgeType: wiringPortType,
+            condition: dagEdgesState[newEdgeId].condition
+          });
+        }
+        wiringFromNodeId = null;
+      }
+
+      if (isPanningDag) {
+        isPanningDag = false;
+        document.getElementById('leftViewDagFlow')?.classList.remove('panning');
+        document.getElementById('dagSaveStateLabel').textContent = '● Pan Saved (No Draft)';
+      }
+    });
+
+    function toggleClusterCollapse(clusterId) {
+      const clusterEl = document.getElementById(clusterId);
+      if (!clusterEl) return;
+      const isCollapsed = clusterEl.classList.toggle('collapsed');
+      document.querySelectorAll(`.dag-node-card[data-cluster="${clusterId}"]`).forEach(card => {
+        card.style.display = isCollapsed ? 'none' : 'block';
+      });
+      renderAllDagEdges();
+      document.getElementById('dagSaveStateLabel').textContent = '● View Collapsed/Expanded (No Draft needed)';
+    }
+
+    // --- ITEM 2: ZOOM IN / OUT / FIT VIEW + TOUCHPAD PINCH + CTRL/CMD SCROLL + KEYBOARD SHORTCUTS ---
+    function zoomDag(delta, pivotClientX, pivotClientY) {
+      const prevZoom = dagZoomLevel;
+      dagZoomLevel = Math.max(0.45, Math.min(1.65, +(dagZoomLevel + delta).toFixed(2)));
+      if (pivotClientX !== undefined && pivotClientY !== undefined) {
+        const vp = document.getElementById('leftViewDagFlow');
+        if (vp) {
+          const rect = vp.getBoundingClientRect();
+          const vx = pivotClientX - rect.left;
+          const vy = pivotClientY - rect.top;
+          dagPanX = vx - ((vx - dagPanX) / prevZoom) * dagZoomLevel;
+          dagPanY = vy - ((vy - dagPanY) / prevZoom) * dagZoomLevel;
+        }
+      }
+      applyDagTransform();
+      document.getElementById('dagSaveStateLabel').textContent = `● Zoom ${Math.round(dagZoomLevel * 100)}% (No Draft)`;
+    }
+
+    function resetDagView() {
+      dagZoomLevel = 1.0;
+      dagPanX = 12;
+      dagPanY = 12;
+      applyDagTransform();
+      document.getElementById('dagSaveStateLabel').textContent = '● Reset 100% (No Draft)';
+    }
+
+    function fitDagToViewport() {
+      const vp = document.getElementById('leftViewDagFlow');
+      if (!vp) return;
+      const w = vp.clientWidth || 520;
+      dagZoomLevel = Math.max(0.46, Math.min(1.0, +((w - 56) / 730).toFixed(2)));
+      dagPanX = 8;
+      dagPanY = 14;
+      applyDagTransform();
+      document.getElementById('dagSaveStateLabel').textContent = `● Fit View ${Math.round(dagZoomLevel * 100)}% (No Draft)`;
+    }
+
+    function toggleDagMinimap() {
+      const mm = document.getElementById('dagMinimap');
+      const hidden = mm.classList.toggle('hidden');
+      document.getElementById('btnToggleMinimap').classList.toggle('active', !hidden);
+    }
+
+    // Touchpad Pinch-to-Zoom (ctrlKey/metaKey wheel) & 2-Finger Touchpad Pan on DAG Viewport
+    setTimeout(() => {
+      const dagVp = document.getElementById('leftViewDagFlow');
+      if (dagVp) {
+        dagVp.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          if (e.ctrlKey || e.metaKey) {
+            // Touchpad Pinch-to-Zoom or Ctrl/Cmd + Mouse Wheel
+            const zoomStep = e.deltaY < 0 ? 0.08 : -0.08;
+            zoomDag(zoomStep, e.clientX, e.clientY);
+          } else {
+            // 2-Finger Touchpad Scroll or Mouse Wheel Pan
+            dagPanX -= e.deltaX;
+            dagPanY -= e.deltaY;
+            applyDagTransform();
+          }
+        }, { passive: false });
+      }
+      fitDagToViewport();
+      renderAllDagEdges();
+    }, 30);
+
+    // Keyboard Shortcuts for DAG Zoom / Fit / Undo / Redo (⌘+, ⌘-, ⌘0, F, M, ⌘Z, ⇧⌘Z)
+    window.addEventListener('keydown', (e) => {
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      if (e.code === 'Space') {
+        isSpaceKeyHeld = true;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        zoomDag(0.12);
+      } else if ((e.metaKey || e.ctrlKey) && e.key === '-') {
+        e.preventDefault();
+        zoomDag(-0.12);
+      } else if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+        e.preventDefault();
+        resetDagView();
+      } else if (!e.metaKey && !e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        fitDagToViewport();
+      } else if (!e.metaKey && !e.ctrlKey && (e.key === 'm' || e.key === 'M')) {
+        e.preventDefault();
+        toggleDagMinimap();
+      } else if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        redoDagAction();
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        undoDagAction();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') isSpaceKeyHeld = false;
+    });
+
+    // --- Requirement 5.1 & 5.3: Structural Changes on DAG Trigger DRAFT Mode + Undo/Redo + Deploy JSON to Agent ---
+    function recordStructuralDraftChange(changeObj) {
+      dagUndoStack.push(JSON.parse(JSON.stringify(dagDraftChanges)));
+      dagRedoStack = [];
+      dagDraftChanges.push(changeObj);
+      refreshDagDraftBarUI();
+    }
+
+    function refreshDagDraftBarUI() {
+      const bar = document.getElementById('dagDraftBar');
+      const saveLabel = document.getElementById('dagSaveStateLabel');
+      if (dagDraftChanges.length > 0) {
+        bar.classList.add('active');
+        document.getElementById('dagDraftCountText').textContent =
+          `[DRAFT] ${dagDraftChanges.length} thay đổi cấu trúc đồ thị (Node / Edge / Condition)`;
+        saveLabel.textContent = '● Unsaved Graph Draft';
+        saveLabel.style.color = 'var(--semantic-warning)';
+      } else {
+        bar.classList.remove('active');
+        saveLabel.textContent = '● Saved (2D Graph)';
+        saveLabel.style.color = 'var(--text-muted)';
+      }
+    }
+
+    function addDraftNodeToDag() {
+      const addedCount = dagDraftChanges.filter(c => c.action === 'ADD_NODE').length;
+      const newId = 'SCR-0' + (4 + addedCount);
+      const newX = 626;
+      const newY = 290 + addedCount * 130;
+
+      dagNodesState[newId] = {
+        id: newId,
+        x: newX,
+        y: newY,
+        w: 230,
+        h: 112,
+        cluster: 'clusterFallback',
+        draft: true
+      };
+
+      const nodesLayer = document.getElementById('dagNodesLayer');
+      const nodeDiv = document.createElement('div');
+      nodeDiv.className = 'dag-node-card draft-node';
+      nodeDiv.id = 'node-' + newId;
+      nodeDiv.setAttribute('data-node-id', newId);
+      nodeDiv.setAttribute('data-cluster', 'clusterFallback');
+      nodeDiv.setAttribute('data-draft-el', 'true');
+      nodeDiv.style.left = `${newX}px`;
+      nodeDiv.style.top = `${newY}px`;
+      nodeDiv.onmousedown = (ev) => startDagNodeDrag(ev, newId);
+      nodeDiv.innerHTML = `
+        <div class="dag-port port-in" title="Input Port (${newId})"></div>
+        <div class="dag-port port-out-main" title="Output Port (${newId})" onmousedown="startPortWireDrag(event, '${newId}', 'main')"></div>
+        <div class="dag-node-top">
+          <span class="dag-node-id">${newId} <span class="draft-pill">DRAFT</span></span>
+          <button class="icon-btn" style="width:20px;height:20px;min-width:20px;" onmousedown="event.stopPropagation()" onclick="openNodeCommentPopover(event, 'Node ${newId} (Draft)')">
+            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </button>
+        </div>
+        <div style="font-weight:600;font-size:11.5px;">Màn hình Mới (${newId} — Audit Log)</div>
+        <div class="dag-node-note" id="note-${newId}">
+          <span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Note: Chờ Agent sinh giao diện HTML</span>
+        </div>
+      `;
+      nodesLayer.appendChild(nodeDiv);
+
+      const newEdgeId = 'E' + (Object.keys(dagEdgesState).length + 1);
+      dagEdgesState[newEdgeId] = {
+        id: newEdgeId,
+        from: 'SCR-02B',
+        to: newId,
+        type: 'ifelse',
+        reversed: false,
+        draft: true,
+        condition: 'user_requests_audit'
+      };
+
+      renderAllDagEdges();
+
+      recordStructuralDraftChange({
+        action: 'ADD_NODE',
+        nodeId: newId,
+        edgeId: newEdgeId,
+        fromNode: 'SCR-02B',
+        edgeType: 'ifelse',
+        condition: 'user_requests_audit'
+      });
+    }
+
+    function openEdgeInspector(edgeId) {
+      activeEdgeId = edgeId;
+      const e = dagEdgesState[edgeId];
+      if (!e) return;
+      document.getElementById('editingEdgeLabel').textContent = `${e.id}: ${e.from}→${e.to}`;
+      document.getElementById('edgeTypeSelect').value = e.type;
+      document.getElementById('edgeConditionInput').value = e.condition;
+      document.getElementById('dagEdgeInspector').classList.add('open');
+      renderAllDagEdges();
+    }
+
+    function closeEdgeInspector() {
+      document.getElementById('dagEdgeInspector').classList.remove('open');
+      activeEdgeId = null;
+      renderAllDagEdges();
+    }
+
+    function reverseActiveEdgeDirection() {
+      if (!activeEdgeId) return;
+      const e = dagEdgesState[activeEdgeId];
+      const tmp = e.from;
+      e.from = e.to;
+      e.to = tmp;
+      e.reversed = !e.reversed;
+      e.draft = true;
+      document.getElementById('editingEdgeLabel').textContent = `${e.id}: ${e.from}→${e.to}`;
+      renderAllDagEdges();
+      recordStructuralDraftChange({
+        action: 'REVERSE_EDGE_DIRECTION',
+        edgeId: e.id,
+        newFrom: e.from,
+        newTo: e.to,
+        potentialConflict: e.to === 'SCR-01' ? 'Cycle detected back to Entry node SCR-01 without reset guard' : null
+      });
+    }
+
+    function updateActiveEdgeDraft() {
+      if (!activeEdgeId) return;
+      const e = dagEdgesState[activeEdgeId];
+      e.type = document.getElementById('edgeTypeSelect').value;
+      e.condition = document.getElementById('edgeConditionInput').value;
+      e.draft = true;
+      renderAllDagEdges();
+      recordStructuralDraftChange({
+        action: 'UPDATE_EDGE_CONDITION',
+        edgeId: e.id,
+        edgeType: e.type,
+        condition: e.condition
+      });
+    }
+
+    function editNodeNote(nodeId) {
+      const noteEl = document.getElementById('note-' + nodeId);
+      const nextNote = 'Cập nhật quy tắc kiểm tra hạn mức > 500M';
+      if (noteEl) noteEl.innerHTML = `<span><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Note (DRAFT): ${nextNote}</span>`;
+      recordStructuralDraftChange({
+        action: 'UPDATE_NODE_NOTE',
+        nodeId,
+        note: nextNote
+      });
+    }
+
+    function undoDagAction() {
+      if (dagDraftChanges.length === 0) return;
+      const popped = dagDraftChanges.pop();
+      dagRedoStack.push(popped);
+      if (popped.action === 'ADD_NODE') {
+        document.getElementById('node-' + popped.nodeId)?.remove();
+        delete dagNodesState[popped.nodeId];
+        if (popped.edgeId) delete dagEdgesState[popped.edgeId];
+      }
+      renderAllDagEdges();
+      refreshDagDraftBarUI();
+    }
+
+    function redoDagAction() {
+      if (dagRedoStack.length === 0) return;
+      const item = dagRedoStack.pop();
+      dagDraftChanges.push(item);
+      refreshDagDraftBarUI();
+    }
+
+    function discardDagDraft() {
+      dagDraftChanges.forEach(ch => {
+        if (ch.action === 'ADD_NODE') {
+          document.getElementById('node-' + ch.nodeId)?.remove();
+          delete dagNodesState[ch.nodeId];
+          if (ch.edgeId) delete dagEdgesState[ch.edgeId];
+        }
+      });
+      dagDraftChanges = [];
+      Object.values(dagEdgesState).forEach(e => { e.draft = false; });
+      closeEdgeInspector();
+      renderAllDagEdges();
+      refreshDagDraftBarUI();
+    }
+
+    // --- Requirement 5.1: Deploy Draft -> Generate JSON Diff -> Send to Agent -> Conflict Detection & Confirmation ---
+    function deployDagDraftToAgent() {
+      if (dagDraftChanges.length === 0) return;
+      const payload = {
+        schema: 'cowok-design.flow-diff.v1',
+        projectId: 'cowok-design',
+        timestamp: new Date().toISOString(),
+        changesCount: dagDraftChanges.length,
+        structuralDeltas: dagDraftChanges
+      };
+      const jsonStr = JSON.stringify(payload, null, 2);
+
+      const stream = document.getElementById('chatStream');
+      // 1. User Bubble dispatching the generated JSON diff
+      const humanDiv = document.createElement('div');
+      humanDiv.className = 'chat-human-bubble';
+      humanDiv.innerHTML = `
+        <div style="font-weight:600;margin-bottom:4px;"><svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4.5c1.62-1.63 5-1.5 5-1.5"/><path d="M12 15v5s3.03-.55 4.5-2c1.63-1.62 1.5-5 1.5-5"/></svg> Triển khai Draft 2D DAG Userflow (<code>flow-changes-draft.json</code>)</div>
+        <pre class="mono-num" style="font-size:10.5px;background:var(--bg-canvas);padding:8px;border-radius:6px;overflow-x:auto;">${jsonStr}</pre>
+      `;
+      stream.appendChild(humanDiv);
+
+      // 2. Agent Open-Prose Response analyzing JSON & checking for conflicts
+      const agentDiv = document.createElement('div');
+      agentDiv.className = 'chat-agent-prose';
+      agentDiv.setAttribute('data-quotable', 'true');
+      agentDiv.innerHTML = `
+        <div class="chat-agent-eyebrow"><span>cowok • 2D DAG AST Analyzer</span><span>Just now</span></div>
+        <p>Đã nhận gói <code>flow-changes-draft.json</code> gồm <strong>${dagDraftChanges.length} thay đổi cấu trúc đồ thị DAG</strong>. Qua phân tích đồ thị có hướng:</p>
+        <p style="color:var(--semantic-warning);">
+          <svg class="brand-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> <strong>Phát hiện điểm cần xác nhận (Conflict / Ambiguity Check):</strong> Thay đổi điều kiện rẽ nhánh hoặc Node mới cần xác định rõ nếu điều kiện <code>IF</code> không thỏa mãn thì có tự động chuyển hướng về <code>SCR-02B (Fallback OTP)</code> hay giữ nguyên tại màn hình hiện tại?
+        </p>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button class="key-btn primary" onclick="confirmDagConflictResolution(this)">✓ Xác nhận: Tự động rẽ về SCR-02B & Thực thi HTML</button>
+        </div>
+      `;
+      stream.appendChild(agentDiv);
+      stream.scrollTop = stream.scrollHeight;
+
+      // Clear draft bar into committed state
+      dagDraftChanges = [];
+      Object.values(dagNodesState).forEach(n => { n.draft = false; });
+      Object.values(dagEdgesState).forEach(e => { e.draft = false; });
+      document.querySelectorAll('.draft-pill').forEach(el => el.remove());
+      document.querySelectorAll('.draft-node').forEach(el => el.classList.remove('draft-node'));
+      closeEdgeInspector();
+      renderAllDagEdges();
+      refreshDagDraftBarUI();
+    }
+
+    function confirmDagConflictResolution(btnEl) {
+      btnEl.textContent = 'Đã xác nhận & Đồng bộ xuống mã nguồn HTML!';
+      btnEl.disabled = true;
+    }
+
+    // --- Standard Workbench Helpers ---
+    const variantData = {
+      A: { eyebrow: 'SCR-02 • OPTION A (8.4 — SPLIT TWO-COLUMN)', headline: 'Bố cục Chia Cột: Chi tiết Lệnh & Khung Ký', subtitle: 'Phương án A hiển thị song song bảng kê phí lưu ký và form xác thực.', kpi1: '$1,284,500.00', kpi2: '88.2% SCORE', kpi3: '24.0 ms', actionTitle: 'Xác thực 2 bước: OTP + Chữ ký Thiết bị', cta: 'Tiếp tục Bước Xác thực (Option A)' },
+      B: { eyebrow: 'SCR-02 • OPTION B (Winner 9.6 — 1-CLICK BIOMETRIC VAULT)', headline: 'Xác thực Ủy thác Giao dịch Kho bạc Đa Chữ Ký', subtitle: 'Phương án B tối ưu hóa xác thực khóa cứng WebAuthn Passkey ngay trên một mặt phẳng duy nhất.', kpi1: '$1,284,500.00', kpi2: '99.4% SAFE', kpi3: '12.4 ms', actionTitle: '<svg class="brand-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Xác nhận Chữ ký Sinh trắc học (Hardware Passkey)', cta: 'Ký & Giải ngân Ngay ($1.28M)' },
+      C: { eyebrow: 'SCR-02 • OPTION C (7.9 — PROGRESSIVE DRAWER)', headline: 'Trình thuật sĩ 3 Bước theo Ngăn kéo Trượt', subtitle: 'Phương án C chia nhỏ quy trình phê duyệt thành 3 bước tuần tự.', kpi1: '$1,284,500.00', kpi2: '79.0% SCORE', kpi3: '31.5 ms', actionTitle: 'Bước 2/3: Kiểm tra Hạn mức & Ký nháy', cta: 'Sang Bước 3: Hoàn tất Giao dịch' }
+    };
+
+    const screenNodeData = {
+      'SCR-01': { eyebrow: 'SCR-01 • ENTRY SCREEN', headline: 'Giỏ hàng Ủy thác & Phân bổ Thanh khoản', subtitle: 'Kiểm tra danh mục tài sản số trước khi chuyển sang bước ký sinh trắc học.', kpi1: '$4,850,000.00', kpi2: '3 Lệnh Chờ', kpi3: '0.02% Fee', actionTitle: 'Danh sách 3 Lệnh Giải ngân', cta: 'Chuyển sang SCR-02 →' },
+      'SCR-03': { eyebrow: 'SCR-03 • TERMINAL SCREEN', headline: 'Biên nhận Giao dịch Đã Niêm phong Sổ cái', subtitle: 'Giao dịch đã được xác thực bởi 3/3 chữ ký phần cứng.', kpi1: 'TX #9482-OK', kpi2: '100% SEALED', kpi3: 'Block #19402', actionTitle: 'Biên bản Nghiệm thu hoàn tất', cta: 'Tải Biên nhận PDF / JSON' }
+    };
+
+    function toggleMainSidebar() {
+      const sb = document.getElementById('mainSidebar');
+      const isCollapsed = sb.classList.toggle('collapsed');
+      const iconEl = document.getElementById('iconToggleMainSidebar');
+      if (iconEl) {
+        iconEl.innerHTML = isCollapsed
+          ? '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m11 9 3 3-3 3"/>'
+          : '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m14 9-3 3 3 3"/>';
+      }
+    }
+    function toggleProjectFolder(id) { document.getElementById(id)?.classList.toggle('collapsed'); }
+    function openSettingsModal() { document.getElementById('settingsModalBackdrop').classList.add('open'); }
+    function closeSettingsModal() { document.getElementById('settingsModalBackdrop').classList.remove('open'); }
+
+    function applyTheme(theme, lowFocus) {
+      document.documentElement.setAttribute('data-theme', theme);
+      if (lowFocus) document.documentElement.setAttribute('data-low-focus', 'true');
+      else document.documentElement.removeAttribute('data-low-focus');
+      document.querySelectorAll('[data-theme-btn]').forEach(btn => {
+        const key = btn.getAttribute('data-theme-btn');
+        btn.classList.toggle('active', (lowFocus && key === 'low-focus') || (!lowFocus && key === theme));
+      });
+    }
+
+    function toggleShortenChatPanel() {
+      const chat = document.getElementById('chatSubpanel');
+      const isShort = chat.classList.toggle('shortened');
+      document.getElementById('resizerMain').classList.toggle('hidden-splitter', isShort);
+      const iconEl = document.getElementById('iconShortenChat');
+      if (iconEl) {
+        iconEl.innerHTML = isShort
+          ? '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m11 9 3 3-3 3"/>'
+          : '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m14 9-3 3 3 3"/>';
+      }
+    }
+
+    function previewTournamentVariant(opt) {
+      pendingVariant = opt;
+      const d = variantData[opt];
+      if (!d) return;
+      document.querySelectorAll('.chat-variant-btn').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-variant') === opt));
+      document.getElementById('tournamentStatusBadge').textContent = `Preview: Option ${opt}`;
+      document.getElementById('btnConfirmTournament').innerHTML = `<span>✓ Xác nhận <strong id="confirmBtnOptionLabel">Option ${opt}</strong> (Enter ↵)</span>`;
+      document.getElementById('liveScreenEyebrow').textContent = d.eyebrow;
+      document.getElementById('liveHeadline').textContent = d.headline;
+      document.getElementById('liveSubtitle').textContent = d.subtitle;
+      document.getElementById('liveKpi1').textContent = d.kpi1;
+      document.getElementById('liveKpi2').textContent = d.kpi2;
+      document.getElementById('liveKpi3').textContent = d.kpi3;
+      document.getElementById('liveActionTitle').textContent = d.actionTitle;
+      document.getElementById('liveCtaBtn').textContent = d.cta;
+    }
+
+    function confirmTournamentSelection() {
+      confirmedVariant = pendingVariant;
+      document.getElementById('tournamentStatusBadge').textContent = `Confirmed: Option ${confirmedVariant}`;
+      const stream = document.getElementById('chatStream');
+      const div = document.createElement('div');
+      div.className = 'chat-agent-prose';
+      div.setAttribute('data-quotable', 'true');
+      div.innerHTML = `<div class="chat-agent-eyebrow"><span>cowok • AST Updated</span><span>Now</span></div><p>Đã xác nhận và thực thi <strong>Option ${confirmedVariant}</strong> cho <code>SCR-02</code>.</p>`;
+      stream.appendChild(div);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    function toggleNewTabPopover(e) {
+      e.stopPropagation();
+      document.getElementById('newTabPopover').classList.toggle('open');
+    }
+    function closeNewTabPopover() { document.getElementById('newTabPopover').classList.remove('open'); }
+    document.addEventListener('click', () => closeNewTabPopover());
+
+    function switchCanvasTab(tabId) {
+      currentTabId = tabId;
+      document.querySelectorAll('.canvas-tab-item').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-tab-id') === tabId));
+      const liveFrame = document.getElementById('liveHtmlFrame');
+      const codeShell = document.getElementById('advancedCodeEditorShell');
+      const multiFrame = document.getElementById('multiFormatFrame');
+      const leftPane = document.getElementById('canvasLeftPane');
+      const resizerCanvas = document.getElementById('resizerCanvas');
+      const codeBtn = document.getElementById('btnToggleCodeEditor');
+
+      if (tabId === 'tab-code') {
+        isCodeEditorOpen = true;
+        codeBtn.classList.add('active');
+        liveFrame.style.display = 'none';
+        multiFrame.style.display = 'none';
+        codeShell.classList.add('active');
+        return;
+      }
+      isCodeEditorOpen = false;
+      codeBtn.classList.remove('active');
+      codeShell.classList.remove('active');
+
+      if (tabId === 'tab-md' || tabId === 'tab-img') {
+        liveFrame.style.display = 'none';
+        multiFrame.style.display = 'block';
+        leftPane.classList.add('hidden-pane');
+        resizerCanvas.classList.add('hidden-splitter');
+        const body = document.getElementById('multiFormatBody');
+        if (tabId === 'tab-md') {
+          body.innerHTML = `<div class="html-region"><h3 style="margin-bottom:6px;"># DESIGN.md — Tài liệu Hệ thống Thiết kế cowok-design</h3><p>Hãy thử bôi đen bất kỳ cụm từ nào trong tài liệu Markdown này — nút <strong>❝ Quote vào Chat</strong> sẽ xuất hiện ngay lập tức để bạn trích dẫn trực tiếp vào khung Chat giống Antigravity 2.0!</p></div>`;
+        } else {
+          body.innerHTML = `<div class="html-region" style="text-align:center;padding:24px;"><span class="brand-logo-mark" style="width:40px;height:40px;font-size:18px;">cd</span><div style="margin-top:8px;font-weight:600;">cowok-brand-kit.svg</div></div>`;
+        }
+        return;
+      }
+
+      liveFrame.style.display = 'block';
+      multiFrame.style.display = 'none';
+      leftPane.classList.remove('hidden-pane');
+      resizerCanvas.classList.remove('hidden-splitter');
+      setCanvasLeftLens(tabId === 'tab-slide' ? 'slide' : 'flow');
+    }
+
+    function toggleInlineCodeEditor() {
+      const liveFrame = document.getElementById('liveHtmlFrame');
+      const codeShell = document.getElementById('advancedCodeEditorShell');
+      const codeBtn = document.getElementById('btnToggleCodeEditor');
+      isCodeEditorOpen = !isCodeEditorOpen;
+      codeBtn.classList.toggle('active', isCodeEditorOpen);
+      codeShell.classList.toggle('active', isCodeEditorOpen);
+      liveFrame.style.display = isCodeEditorOpen ? 'none' : 'block';
+    }
+
+    function applyLiveCodeChanges() {
+      const raw = document.getElementById('codeEditorTextarea').value;
+      const headMatch = raw.match(/headline:\s*"([^"]+)"/);
+      if (headMatch) document.getElementById('liveHeadline').textContent = headMatch[1];
+      toggleInlineCodeEditor();
+    }
+
+    function createNewCanvasTab(kind, fileName) {
+      closeNewTabPopover();
+      switchCanvasTab(kind === 'slide-deck' ? 'tab-slide' : 'tab-app');
+    }
+
+    function setCanvasLeftLens(lens) {
+      document.getElementById('leftViewDagFlow').style.display = lens === 'flow' ? 'block' : 'none';
+      document.getElementById('leftViewSlideMap').style.display = lens === 'slide' ? 'block' : 'none';
+      document.getElementById('lensBtnFlow').classList.toggle('active', lens === 'flow');
+      document.getElementById('lensBtnSlide').classList.toggle('active', lens === 'slide');
+      document.getElementById('lensBtnFlow').style.background = lens === 'flow' ? 'var(--bg-surface)' : 'transparent';
+      document.getElementById('lensBtnSlide').style.background = lens === 'slide' ? 'var(--bg-surface)' : 'transparent';
+    }
+
+    function selectDagNode(nodeId, sectionId) {
+      document.querySelectorAll('.dag-node-card').forEach(card => card.classList.toggle('active', card.getAttribute('data-node-id') === nodeId));
+      if (nodeId === 'SCR-02') previewTournamentVariant(pendingVariant);
+      else if (screenNodeData[nodeId]) {
+        const d = screenNodeData[nodeId];
+        document.getElementById('liveScreenEyebrow').textContent = d.eyebrow;
+        document.getElementById('liveHeadline').textContent = d.headline;
+        document.getElementById('liveSubtitle').textContent = d.subtitle;
+      }
+      if (sectionId) highlightHtmlSection(sectionId);
+    }
+
+    function highlightHtmlSection(sectionId) {
+      document.querySelectorAll('.html-region').forEach(el => el.classList.remove('highlighted-region'));
+      document.getElementById(sectionId)?.classList.add('highlighted-region');
+    }
+
+    function openNodeCommentPopover(e, nodeLabel) {
+      e.stopPropagation();
+      openSpatialCommentPopover(nodeLabel, e.clientX, e.clientY);
+    }
+
+    function openSlideCmsEditor(idx) {
+      document.getElementById('slideOverTrack').classList.add('cms-open');
+    }
+    function closeSlideCmsEditor() {
+      document.getElementById('slideOverTrack').classList.remove('cms-open');
+    }
+    function syncCmsToLiveHtml() {
+      document.getElementById('liveHeadline').textContent = document.getElementById('cmsInputHeadline').value;
+      document.getElementById('liveSubtitle').textContent = document.getElementById('cmsInputSubtitle').value;
+    }
+
+    function setHtmlPointerMode(mode) {
+      htmlPointerMode = mode;
+      document.getElementById('modeBtnInteract').classList.toggle('active', mode === 'interact');
+      document.getElementById('modeBtnClickDom').classList.toggle('active', mode === 'click-dom');
+      document.getElementById('modeBtnDragBox').classList.toggle('active', mode === 'drag-box');
+      const container = document.getElementById('htmlPreviewContainer');
+      container.classList.toggle('inspect-click-mode', mode === 'click-dom');
+      container.classList.toggle('inspect-marquee-mode', mode === 'drag-box');
+    }
+
+    function handleHtmlRegionClick(e, regionLabel) {
+      highlightHtmlSection(e.currentTarget.id);
+      if (htmlPointerMode !== 'click-dom') return;
+      e.stopPropagation();
+      openSpatialCommentPopover(regionLabel, e.clientX, e.clientY);
+    }
+
+    function startMarqueeDrag(e) {
+      if (htmlPointerMode !== 'drag-box') return;
+      if (e.target.closest('#spatialCommentPopover')) return;
+      isDraggingMarquee = true;
+      marqueeStartX = e.clientX;
+      marqueeStartY = e.clientY;
+      const rectEl = document.getElementById('marqueeSelectionRect');
+      rectEl.style.left = marqueeStartX + 'px';
+      rectEl.style.top = marqueeStartY + 'px';
+      rectEl.style.width = '0px';
+      rectEl.style.height = '0px';
+      rectEl.style.display = 'block';
+      e.preventDefault();
+    }
+
+    function updateMarqueeDrag(e) {
+      if (!isDraggingMarquee) return;
+      const rectEl = document.getElementById('marqueeSelectionRect');
+      const width = Math.abs(e.clientX - marqueeStartX);
+      const height = Math.abs(e.clientY - marqueeStartY);
+      rectEl.style.left = Math.min(marqueeStartX, e.clientX) + 'px';
+      rectEl.style.top = Math.min(marqueeStartY, e.clientY) + 'px';
+      rectEl.style.width = width + 'px';
+      rectEl.style.height = height + 'px';
+      document.getElementById('marqueeCoordsPill').textContent = `${Math.round(width)} × ${Math.round(height)} px`;
+    }
+
+    function endMarqueeDrag(e) {
+      if (!isDraggingMarquee) return;
+      isDraggingMarquee = false;
+      const width = Math.abs(e.clientX - marqueeStartX);
+      const height = Math.abs(e.clientY - marqueeStartY);
+      if (width < 16 || height < 16) {
+        document.getElementById('marqueeSelectionRect').style.display = 'none';
+        return;
+      }
+      openSpatialCommentPopover(`⬚ Vùng kéo [${Math.round(width)}×${Math.round(height)}px]`, e.clientX, e.clientY);
+    }
+
+    function openSpatialCommentPopover(regionLabel, clientX, clientY) {
+      pendingSpatialRegion = regionLabel;
+      const pop = document.getElementById('spatialCommentPopover');
+      document.getElementById('spatialTargetBadge').textContent = regionLabel;
+      document.getElementById('spatialCommentInput').value = '';
+      pop.style.left = Math.min(window.innerWidth - 310, Math.max(16, clientX - 80)) + 'px';
+      pop.style.top = Math.min(window.innerHeight - 170, Math.max(16, clientY + 8)) + 'px';
+      pop.classList.add('open');
+      setTimeout(() => document.getElementById('spatialCommentInput').focus(), 40);
+    }
+
+    function closeSpatialPopover() {
+      document.getElementById('spatialCommentPopover').classList.remove('open');
+      document.getElementById('marqueeSelectionRect').style.display = 'none';
+    }
+
+    function submitSpatialCommentToChat() {
+      const commentText = document.getElementById('spatialCommentInput').value.trim() || 'Cập nhật tại đây';
+      const tray = document.getElementById('chatAttachmentTray');
+      const chip = document.createElement('div');
+      chip.className = 'attachment-chip';
+      chip.innerHTML = `
+        <span class="attachment-chip-tag">[${pendingSpatialRegion}]</span>
+        <span class="attachment-chip-text">"${commentText}"</span>
+        <button class="icon-btn" style="width:15px;height:15px;min-width:15px;" onclick="event.stopPropagation(); this.parentElement.remove();">✕</button>
+      `;
+      tray.appendChild(chip);
+      closeSpatialPopover();
+      document.getElementById('chatSubpanel').classList.remove('shortened');
+      document.getElementById('chatInputTextarea').focus();
+    }
+
+    function setResponsiveViewport(vp) {
+      currentViewport = vp;
+      document.getElementById('liveHtmlFrame').setAttribute('data-viewport', vp);
+      document.querySelectorAll('[data-vp-btn]').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-vp-btn') === vp));
+    }
+
+    function setPresentationFrame(ratio) {
+      currentFrameRatio = ratio;
+      document.getElementById('liveHtmlFrame').setAttribute('data-frame', ratio);
+    }
+
+    function togglePresentationMode() {
+      const root = document.getElementById('workbenchRoot');
+      const isPresenting = root.classList.toggle('presentation-mode');
+      document.getElementById('btnPresentMode').innerHTML = isPresenting ? '<span>✕ Exit</span>' : '<span>▶ Present</span>';
+    }
+
+    function toggleCanvasInternalFull(side) {
+      const left = document.getElementById('canvasLeftPane');
+      const right = document.getElementById('canvasRightPane');
+      const resizer = document.getElementById('resizerCanvas');
+      const leftIcon = document.getElementById('iconToggleLeftPaneFull');
+      const rightIcon = document.getElementById('iconToggleRightPaneFull');
+      const maxPath = '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>';
+      const minPath = '<path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>';
+      if (side === 'left') {
+        const rightHidden = right.classList.toggle('hidden-pane');
+        left.classList.remove('hidden-pane');
+        left.classList.toggle('maximized-pane', rightHidden);
+        resizer.classList.toggle('hidden-splitter', rightHidden);
+        if (leftIcon) leftIcon.innerHTML = rightHidden ? minPath : maxPath;
+        if (rightIcon) rightIcon.innerHTML = maxPath;
+      } else {
+        const leftHidden = left.classList.toggle('hidden-pane');
+        right.classList.remove('hidden-pane');
+        right.classList.toggle('maximized-pane', leftHidden);
+        resizer.classList.toggle('hidden-splitter', leftHidden);
+        if (rightIcon) rightIcon.innerHTML = leftHidden ? minPath : maxPath;
+        if (leftIcon) leftIcon.innerHTML = maxPath;
+      }
+    }
+
+    function selectSession(projectName, sessionId, sessionTitle, mode) {
+      document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
+      document.getElementById(sessionId)?.classList.add('active');
+      document.getElementById('activeProjectLabel').textContent = projectName;
+      document.getElementById('activeSessionLabel').textContent = sessionTitle;
+      if (mode === 'app-flow') switchCanvasTab('tab-app');
+      else if (mode === 'slide-deck') switchCanvasTab('tab-slide');
+      else if (mode === 'code-edit') switchCanvasTab('tab-code');
+    }
+
+    function createNewSessionInActiveProject() {
+      const id = 'sess-' + Math.floor(100 + Math.random() * 899);
+      const list = document.querySelector('#proj-cowok-design .project-sessions-list');
+      const btn = document.createElement('button');
+      btn.className = 'session-item';
+      btn.id = id;
+      btn.innerHTML = `<span class="session-title">Session ${id}</span><span class="session-meta">Now</span>`;
+      btn.onclick = () => selectSession('cowok-design', id, `Session ${id}`, 'app-flow');
+      list.prepend(btn);
+      selectSession('cowok-design', id, `Session ${id}`, 'app-flow');
+    }
+
+    function sendChatPrompt() {
+      const input = document.getElementById('chatInputTextarea');
+      const tray = document.getElementById('chatAttachmentTray');
+      const chips = Array.from(tray.querySelectorAll('.attachment-chip')).map(c => c.innerText.replace('✕', '').trim());
+      const text = input.value.trim();
+      if (!text && chips.length === 0) return;
+
+      const stream = document.getElementById('chatStream');
+      const div = document.createElement('div');
+      div.className = 'chat-human-bubble';
+      div.innerHTML = `
+        ${chips.length ? `<div style="margin-bottom:4px;font-family:var(--font-mono);font-size:10.5px;color:var(--accent-primary);">${chips.join('<br/>')}</div>` : ''}
+        <div>${text || 'Thực thi các điều chỉnh đã trích dẫn.'}</div>
+      `;
+      stream.appendChild(div);
+      stream.scrollTop = stream.scrollHeight;
+      input.value = '';
+      tray.innerHTML = '';
+    }
+
+    function triggerLiveHtmlDemoAction() {
+      selectDagNode('SCR-03', 'sec-receipt');
+    }
+
+    function initSplitter(splitterId, leftElId, containerId) {
+      const splitter = document.getElementById(splitterId);
+      const leftEl = document.getElementById(leftElId);
+      const container = document.getElementById(containerId);
+      let isDragging = false;
+      splitter.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        splitter.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        e.preventDefault();
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        leftEl.classList.remove('shortened');
+        const rect = container.getBoundingClientRect();
+        const pct = ((e.clientX - rect.left) / rect.width) * 100;
+        leftEl.style.width = Math.max(18, Math.min(75, pct)).toFixed(1) + '%';
+      });
+      window.addEventListener('mouseup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        splitter.classList.remove('dragging');
+        document.body.style.cursor = '';
+      });
+    }
+
+    initSplitter('resizerMain', 'chatSubpanel', 'dualMainBody');
+    initSplitter('resizerCanvas', 'canvasLeftPane', 'canvasSplitStage');
+  </script>
+</body>
+</html>

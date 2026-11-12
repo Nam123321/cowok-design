@@ -1,0 +1,9 @@
+{
+  "name": "intent-clarifier-sdi",
+  "version": "1.0.0",
+  "description": "Clarifies design intent with 67 styles, 25 chart types, and 84 brand DNA presets",
+  "entry_point": "SKILL.md",
+  "capabilities_required": ["sdi", "spec-registry"],
+  "risk_tier": 1,
+  "tags": ["sdi", "intent", "styles", "brand-dna"]
+}

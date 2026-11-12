@@ -1,0 +1,20 @@
+{
+  "name": "@cowok-design/shared-types",
+  "version": "0.1.0",
+  "description": "Deterministic TypeScript definitions and Zod schemas synchronized with crates/domain",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

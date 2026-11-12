@@ -1,8 +1,10 @@
 // @story 01.3
-// @implements AC-01, AC-02, AC-03, AC-04, AC-05, AC-06
+// @implements AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10
 //! Harness Daemon entrypoint, loopback Axum control plane, `.cowok-design/daemon.lock`
 //! dynamic port discovery, and 9-Spec Synthesis Pipeline for `cowok-design`.
 
+pub mod daemon_auth;
+pub mod flow_routes;
 pub mod lockfile;
 pub mod routes;
 pub mod synthesis;
@@ -22,10 +24,11 @@ pub use crate::lockfile::{
 pub use crate::routes::{
     build_router, create_project_isolated, ensure_ac06_tables, map_error_to_response,
     ChatSessionDto, CreateChatSessionRequest, CreateProjectRequest, DaemonAppState,
-    HealthResponse, HttpErrorBody, IssuePathTokenRequest, LintSourceRequest, LintSourceResponse,
-    ModelAdapterRequestDto, PathTokenPayload, PathTokenResponse, ProjectBoundaryDto, ProjectDto,
-    ProjectSpecsListResponse, PromoteScratchRequest, PromptCompileRequest, PutSpecRequest,
-    SpecItemWithDriftDto, UpdateChatSessionRequest, VerifyPathTokenRequest,
+    GitHubPRRequest, GitHubPRResponseDto, HealthResponse, HttpErrorBody, IssuePathTokenRequest,
+    LintSourceRequest, LintSourceResponse, ModelAdapterRequestDto, PathTokenPayload,
+    PathTokenResponse, ProjectBoundaryDto, ProjectDto, ProjectSpecsListResponse,
+    PromoteScratchRequest, PromptCompileRequest, PutSpecRequest, SpecItemWithDriftDto,
+    UpdateChatSessionRequest, VerifyPathTokenRequest,
 };
 pub use crate::synthesis::{
     count_provenance_markers, ensure_project_token, resolve_project_scoped_registry,
@@ -118,6 +121,9 @@ impl DaemonHttpClient {
             service: "cowok-design-harness-daemon".to_string(),
             host: self.state.host.clone(),
             port: self.state.port,
+            pid: std::process::id(),
+            daemon_nonce: String::new(),
+            schema_version: crate::lockfile::CURRENT_SCHEMA_VERSION,
         }
     }
 
@@ -213,7 +219,8 @@ impl DaemonHttpClient {
             resolve_project_scoped_registry(&self.state.registry, project_id)?;
         let slicer = spec_registry::ContextSlicer::new(&project_registry);
         let active_constraints = slicer.load_active_constraints(project_id)?;
-        let disallowed_profiles = extract_disallowed_profiles(&req.disallowed_profiles, &active_constraints);
+        let disallowed_profiles =
+            extract_disallowed_profiles(&req.disallowed_profiles, &active_constraints);
 
         let adapt_req = domain::AdaptationRequest {
             project_id,
@@ -282,14 +289,31 @@ impl DaemonHttpClient {
     ) -> Result<Vec<constraint_engine::ActiveConstraint>, HarnessError> {
         let (project_registry, _) =
             resolve_project_scoped_registry(&self.state.registry, project_id)?;
-        let active = constraint_engine::ConstraintEvaluator::active_constraints_from_domain(profile);
+        let active =
+            constraint_engine::ConstraintEvaluator::active_constraints_from_domain(profile);
         let mut conn = project_registry.pool().connection()?;
         let now_ms = chrono::Utc::now().timestamp_millis();
         let prof_id_str = profile.id.to_string();
         let proj_id_str = project_id.to_string();
 
-        let forbid_tailwind = if profile.forbidden_patterns.iter().any(|p| p.to_uppercase().contains("TAILWIND")) { 1 } else { 0 };
-        let forbid_raw_hex = if profile.forbidden_patterns.iter().any(|p| p.to_uppercase().contains("HEX")) { 1 } else { 0 };
+        let forbid_tailwind = if profile
+            .forbidden_patterns
+            .iter()
+            .any(|p| p.to_uppercase().contains("TAILWIND"))
+        {
+            1
+        } else {
+            0
+        };
+        let forbid_raw_hex = if profile
+            .forbidden_patterns
+            .iter()
+            .any(|p| p.to_uppercase().contains("HEX"))
+        {
+            1
+        } else {
+            0
+        };
 
         retry_on_busy("set_constraint_profile_tx", || {
             let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
@@ -364,7 +388,9 @@ impl DaemonHttpClient {
         icon_name: &str,
     ) -> Result<constraint_engine::IconValidationReport, HarnessError> {
         let manifest = self.get_icon_manifest(project_id)?;
-        Ok(constraint_engine::IconValidator::validate_icon(&manifest, icon_name))
+        Ok(constraint_engine::IconValidator::validate_icon(
+            &manifest, icon_name,
+        ))
     }
 
     /// Injects deterministic `data-ff-id` attributes into JSX elements.
@@ -396,17 +422,26 @@ pub fn extract_disallowed_profiles(
     for c in constraints {
         let code = c.rule_code.to_uppercase();
         // 1. Direct rule_code matching
-        if code.contains("FORBID_FRONTIER") || code.contains("DISALLOW_FRONTIER") || code.contains("FORBID_PROFILE_A") {
+        if code.contains("FORBID_FRONTIER")
+            || code.contains("DISALLOW_FRONTIER")
+            || code.contains("FORBID_PROFILE_A")
+        {
             if !disallowed.contains(&domain::ModelProfileTier::ProfileA_Frontier) {
                 disallowed.push(domain::ModelProfileTier::ProfileA_Frontier);
             }
         }
-        if code.contains("FORBID_FAST_CODING") || code.contains("DISALLOW_FAST_CODING") || code.contains("FORBID_PROFILE_B") {
+        if code.contains("FORBID_FAST_CODING")
+            || code.contains("DISALLOW_FAST_CODING")
+            || code.contains("FORBID_PROFILE_B")
+        {
             if !disallowed.contains(&domain::ModelProfileTier::ProfileB_FastCoding) {
                 disallowed.push(domain::ModelProfileTier::ProfileB_FastCoding);
             }
         }
-        if code.contains("FORBID_COMPACT") || code.contains("DISALLOW_COMPACT") || code.contains("FORBID_PROFILE_C") {
+        if code.contains("FORBID_COMPACT")
+            || code.contains("DISALLOW_COMPACT")
+            || code.contains("FORBID_PROFILE_C")
+        {
             if !disallowed.contains(&domain::ModelProfileTier::ProfileC_Compact) {
                 disallowed.push(domain::ModelProfileTier::ProfileC_Compact);
             }
@@ -415,25 +450,52 @@ pub fn extract_disallowed_profiles(
         // 2. Structured JSON config matching
         if let Ok(json_cfg) = serde_json::from_str::<serde_json::Value>(&c.config_json) {
             // Check explicit forbid flags
-            if json_cfg.get("forbid_frontier").and_then(|v| v.as_bool()).unwrap_or(false)
-                || json_cfg.get("forbid_profile_a").and_then(|v| v.as_bool()).unwrap_or(false)
-                || json_cfg.get("disallow_frontier").and_then(|v| v.as_bool()).unwrap_or(false)
+            if json_cfg
+                .get("forbid_frontier")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+                || json_cfg
+                    .get("forbid_profile_a")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                || json_cfg
+                    .get("disallow_frontier")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
             {
                 if !disallowed.contains(&domain::ModelProfileTier::ProfileA_Frontier) {
                     disallowed.push(domain::ModelProfileTier::ProfileA_Frontier);
                 }
             }
-            if json_cfg.get("forbid_fast_coding").and_then(|v| v.as_bool()).unwrap_or(false)
-                || json_cfg.get("forbid_profile_b").and_then(|v| v.as_bool()).unwrap_or(false)
-                || json_cfg.get("disallow_fast_coding").and_then(|v| v.as_bool()).unwrap_or(false)
+            if json_cfg
+                .get("forbid_fast_coding")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+                || json_cfg
+                    .get("forbid_profile_b")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                || json_cfg
+                    .get("disallow_fast_coding")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
             {
                 if !disallowed.contains(&domain::ModelProfileTier::ProfileB_FastCoding) {
                     disallowed.push(domain::ModelProfileTier::ProfileB_FastCoding);
                 }
             }
-            if json_cfg.get("forbid_compact").and_then(|v| v.as_bool()).unwrap_or(false)
-                || json_cfg.get("forbid_profile_c").and_then(|v| v.as_bool()).unwrap_or(false)
-                || json_cfg.get("disallow_compact").and_then(|v| v.as_bool()).unwrap_or(false)
+            if json_cfg
+                .get("forbid_compact")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+                || json_cfg
+                    .get("forbid_profile_c")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                || json_cfg
+                    .get("disallow_compact")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
             {
                 if !disallowed.contains(&domain::ModelProfileTier::ProfileC_Compact) {
                     disallowed.push(domain::ModelProfileTier::ProfileC_Compact);
@@ -441,23 +503,44 @@ pub fn extract_disallowed_profiles(
             }
 
             // Check forbidden/disallowed profile lists
-            for list_key in &["disallowed_profiles", "forbidden_profiles", "disallowed", "forbidden"] {
+            for list_key in &[
+                "disallowed_profiles",
+                "forbidden_profiles",
+                "disallowed",
+                "forbidden",
+            ] {
                 if let Some(arr) = json_cfg.get(list_key).and_then(|v| v.as_array()) {
                     for item in arr {
                         if let Some(s) = item.as_str() {
                             let s_lower = s.to_ascii_lowercase();
-                            if s_lower == "frontier_reasoning" || s_lower == "profilea_frontier" || s_lower == "profile_a" || s_lower == "frontier" {
-                                if !disallowed.contains(&domain::ModelProfileTier::ProfileA_Frontier) {
+                            if s_lower == "frontier_reasoning"
+                                || s_lower == "profilea_frontier"
+                                || s_lower == "profile_a"
+                                || s_lower == "frontier"
+                            {
+                                if !disallowed
+                                    .contains(&domain::ModelProfileTier::ProfileA_Frontier)
+                                {
                                     disallowed.push(domain::ModelProfileTier::ProfileA_Frontier);
                                 }
                             }
-                            if s_lower == "fast_coding" || s_lower == "profileb_fastcoding" || s_lower == "profile_b" {
-                                if !disallowed.contains(&domain::ModelProfileTier::ProfileB_FastCoding) {
+                            if s_lower == "fast_coding"
+                                || s_lower == "profileb_fastcoding"
+                                || s_lower == "profile_b"
+                            {
+                                if !disallowed
+                                    .contains(&domain::ModelProfileTier::ProfileB_FastCoding)
+                                {
                                     disallowed.push(domain::ModelProfileTier::ProfileB_FastCoding);
                                 }
                             }
-                            if s_lower == "compact_motion" || s_lower == "profilec_compact" || s_lower == "profile_c" || s_lower == "compact" {
-                                if !disallowed.contains(&domain::ModelProfileTier::ProfileC_Compact) {
+                            if s_lower == "compact_motion"
+                                || s_lower == "profilec_compact"
+                                || s_lower == "profile_c"
+                                || s_lower == "compact"
+                            {
+                                if !disallowed.contains(&domain::ModelProfileTier::ProfileC_Compact)
+                                {
                                     disallowed.push(domain::ModelProfileTier::ProfileC_Compact);
                                 }
                             }
@@ -481,10 +564,13 @@ pub async fn serve_daemon_with_config(config: DaemonConfig) -> Result<(), Harnes
     server.serve().await
 }
 
-/// Starts and serves the `cowok-design` loopback Axum harness daemon on the current workspace.
+/// Starts and serves the `cowok-design` loopback Axum harness daemon on the target workspace.
 pub fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
-    let cwd = std::env::current_dir()?;
-    let config = DaemonConfig::loopback_default(cwd);
+    let workspace_root = match std::env::var("UXUI_OS_WORKSPACE_ROOT") {
+        Ok(val) if !val.trim().is_empty() => PathBuf::from(val.trim()),
+        _ => std::env::current_dir()?,
+    };
+    let config = DaemonConfig::loopback_default(workspace_root);
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;

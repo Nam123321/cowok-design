@@ -1,10 +1,37 @@
 {
-  "name": "uxui-os",
+  "name": "cowok-design",
   "version": "0.1.0",
+  "type": "module",
   "private": true,
-  "description": "UI/UX OS (FlowForge Harness OS) \u2014 Day-1 Rust Core + React 19 Hybrid Monorepo",
+  "description": "cowok-design (UI/UX OS — FlowForge Harness OS) — Day-1 Rust Core + React 19 Hybrid Monorepo",
   "workspaces": [
-    "apps/*",
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "dev": "vite",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p packages/shared-types/tsconfig.json && tsc --noEmit -p tsconfig.flow.json",
+    "cargo:test": "cargo test --workspace",
+    "build": "pnpm --filter @cowok-design/shared-types build && vite build"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "jsdom": "^29.1.1",
+    "ts-morph": "^28.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.6.3",
+    "vite": "^8.0.12",
+    "vitest": "^2.1.4"
+  }
 }

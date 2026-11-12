@@ -1,0 +1,9 @@
+{
+  "contract_version": 1,
+  "data": {
+    "kind": "INVALID_SPEC_KEY",
+    "payload": {
+      "key": "../escape-attempt.md"
+    }
+  }
+}

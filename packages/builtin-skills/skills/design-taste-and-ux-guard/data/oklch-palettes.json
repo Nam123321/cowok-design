@@ -1,0 +1,13 @@
+{
+  "total": 50,
+  "palettes": [
+    { "id": "dusk", "name": "Dusk", "l": 0.22, "c": 0.04, "h": 265, "surface": "oklch(0.18 0.02 265)", "accent": "oklch(0.65 0.18 260)" },
+    { "id": "cobalt", "name": "Cobalt", "l": 0.28, "c": 0.08, "h": 240, "surface": "oklch(0.20 0.04 240)", "accent": "oklch(0.70 0.22 245)" },
+    { "id": "studio", "name": "Studio Neutral", "l": 0.96, "c": 0.01, "h": 90, "surface": "oklch(0.98 0.005 90)", "accent": "oklch(0.35 0.05 260)" },
+    { "id": "atelier", "name": "Atelier Warm", "l": 0.94, "c": 0.02, "h": 75, "surface": "oklch(0.97 0.01 75)", "accent": "oklch(0.45 0.12 45)" },
+    { "id": "ribbon", "name": "Ribbon Crimson", "l": 0.25, "c": 0.06, "h": 15, "surface": "oklch(0.19 0.03 15)", "accent": "oklch(0.68 0.24 25)" },
+    { "id": "furrow", "name": "Furrow Earth", "l": 0.30, "c": 0.05, "h": 50, "surface": "oklch(0.22 0.03 50)", "accent": "oklch(0.72 0.15 65)" },
+    { "id": "nordic", "name": "Nordic Frost", "l": 0.95, "c": 0.02, "h": 210, "surface": "oklch(0.98 0.01 210)", "accent": "oklch(0.55 0.16 215)" },
+    { "id": "emerald-slate", "name": "Emerald Slate", "l": 0.24, "c": 0.05, "h": 160, "surface": "oklch(0.17 0.02 160)", "accent": "oklch(0.75 0.19 155)" }
+  ]
+}

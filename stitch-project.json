@@ -1,15 +1,62 @@
 {
   "projectId": "9168334019814804214",
   "projectName": "projects/9168334019814804214",
-  "title": "UI/UX OS (FlowForge Harness OS) — Master Design System",
+  "title": "cowok-design — Master Design System",
   "designSystem": "assets/8dea0cc19e8c48d193f6550232507a0f",
   "screens": {
-    "Epic-01": {
-      "screenId": "223e92c3f6c64c72bfd928cc660710ae",
-      "screenName": "projects/9168334019814804214/screens/223e92c3f6c64c72bfd928cc660710ae",
-      "title": "FlowForge Harness OS — Epic 01 Control Plane",
-      "screenshot": "projects/9168334019814804214/files/a1347dc970c9453fb84a861e2807a87a",
-      "htmlCode": "projects/9168334019814804214/files/668e1f43455e4fb6b7f4e000628e2052"
+    "LAY-01-Flow-First-Studio": {
+      "screenId": "e78e81beda7e41149d6935e1ca08d49f",
+      "screenName": "projects/9168334019814804214/screens/e78e81beda7e41149d6935e1ca08d49f",
+      "title": "LAY-01 Master Three-Zone Flow-First Studio",
+      "screenshot": "projects/9168334019814804214/files/95e563d0a96841daa912478782911212",
+      "htmlCode": "projects/9168334019814804214/files/f487aaf28e4f4230a2c275aed216c558",
+      "localScreenshot": "_iwish-output/mockups/mockup-lay-01-three-zone-flow-studio.png",
+      "localHtml": "_iwish-output/adhoc-workspace/scratch/stitch-mockup-lay-01.html"
+    },
+    "LAY-02-Dual-Canvas-Split-Stage": {
+      "screenId": "692b3ef5c8ce45f0a8493bac64df1589",
+      "screenName": "projects/9168334019814804214/screens/692b3ef5c8ce45f0a8493bac64df1589",
+      "title": "LAY-02 Synchronized Dual-Canvas Split-Stage (DAG <-> State-Hydrated Live Preview)",
+      "screenshot": "projects/9168334019814804214/files/dc17f7680b35407c98c4f69a4250bfe5",
+      "htmlCode": "projects/9168334019814804214/files/0d97e75440304af0af9c3c933303576d",
+      "localScreenshot": "_iwish-output/mockups/mockup-lay-02-split-stage.png",
+      "localHtml": "_iwish-output/adhoc-workspace/scratch/stitch-mockup-lay-02.html"
+    },
+    "LAY-04-Design-Tournament-Arena": {
+      "screenId": "44b5cef2af51471fa754b592f3e3c433",
+      "screenName": "projects/9168334019814804214/screens/44b5cef2af51471fa754b592f3e3c433",
+      "title": "LAY-04 Visual Clarification & 3-Up Design Tournament Arena",
+      "screenshot": "projects/9168334019814804214/files/6ea266740e7647f087a9a67475d4a279",
+      "htmlCode": "projects/9168334019814804214/files/f0bf042b994947219a9a636fb497db06",
+      "localScreenshot": "_iwish-output/mockups/mockup-lay-04-tournament-arena.png",
+      "localHtml": "_iwish-output/adhoc-workspace/scratch/stitch-mockup-lay-04.html"
+    },
+    "LAY-05-16x9-Presentation-CMS": {
+      "screenId": "2522f884e830459593f49d94fcfb0609",
+      "screenName": "projects/9168334019814804214/screens/2522f884e830459593f49d94fcfb0609",
+      "title": "LAY-05 Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Studio (Mode 2)",
+      "screenshot": "projects/9168334019814804214/files/866667695bd841adb5db8cdde613a7da",
+      "htmlCode": "projects/9168334019814804214/files/326c325f5beb4a2db2c2565d0d6ff5a1",
+      "localScreenshot": "_iwish-output/mockups/mockup-lay-05-16x9-presentation-cms.png",
+      "localHtml": "_iwish-output/adhoc-workspace/scratch/stitch-mockup-lay-05.html"
+    },
+    "LAY-06-ChangeProposal-Diff-Studio": {
+      "screenId": "177aff0794aa49d9bb0894c1b12b9fb0",
+      "screenName": "projects/9168334019814804214/screens/177aff0794aa49d9bb0894c1b12b9fb0",
+      "title": "LAY-06 ChangeProposal Review Inbox & E1..E4 Governance Diff Studio",
+      "screenshot": "projects/9168334019814804214/files/554ee80cfd9343fd9ba2d983cc435526",
+      "htmlCode": "projects/9168334019814804214/files/6ffb60f87af94f2a86a118c7d32d8572",
+      "localScreenshot": "_iwish-output/mockups/mockup-lay-06-changeproposal-diff-studio.png",
+      "localHtml": "_iwish-output/adhoc-workspace/scratch/stitch-mockup-lay-06.html"
+    },
+    "LAY-07-OPC-Fleet-PTY-Hub": {
+      "screenId": "31e2ddf361174c42b9d03107b8ebc64f",
+      "screenName": "projects/9168334019814804214/screens/31e2ddf361174c42b9d03107b8ebc64f",
+      "title": "LAY-07 cowok & advisor Autonomous OPC Fleet Hub + Embedded $UIUX_LIVE_SPEC PTY (Mode 3)",
+      "screenshot": "projects/9168334019814804214/files/b9d542bc8748445d91988b65050dca88",
+      "htmlCode": "projects/9168334019814804214/files/f870f206c2984d5ab7efad11d6e58356",
+      "localScreenshot": "_iwish-output/mockups/mockup-lay-07-opc-fleet-pty-hub.png",
+      "localHtml": "_iwish-output/adhoc-workspace/scratch/stitch-mockup-lay-07.html"
     }
   }
 }

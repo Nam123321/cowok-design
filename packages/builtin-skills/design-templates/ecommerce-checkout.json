@@ -1,0 +1,12 @@
+{
+  "id": "template-ecommerce-checkout",
+  "name": "E-Commerce Streamlined Checkout",
+  "category": "checkout",
+  "description": "Two-column frictionless checkout flow with order summary, shipping address, payment methods, and trust markers",
+  "sections": [
+    { "id": "header", "type": "branding", "title": "Minimalist Header with Back Link and Security Badge" },
+    { "id": "shipping-form", "type": "form", "title": "Shipping & Contact Information" },
+    { "id": "payment-methods", "type": "payment", "title": "Card, Apple Pay, and Bank Transfer Selectors" },
+    { "id": "order-summary", "type": "summary", "title": "Sticky Order Summary with Promo Code and Taxes" }
+  ]
+}

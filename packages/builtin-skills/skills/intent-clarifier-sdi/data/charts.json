@@ -1,0 +1,30 @@
+{
+  "total": 25,
+  "chart_types": [
+    { "id": "line-single", "name": "Single Trend Line", "best_for": "Metric over time" },
+    { "id": "line-multi", "name": "Multi-Series Trend", "best_for": "Comparing 2-4 variables over time" },
+    { "id": "bar-vertical", "name": "Column Bar Chart", "best_for": "Discrete category comparisons" },
+    { "id": "bar-horizontal", "name": "Horizontal Bar Chart", "best_for": "Ranking items with long labels" },
+    { "id": "bar-stacked", "name": "Stacked Bar Chart", "best_for": "Part-to-whole categorical breakdown" },
+    { "id": "area-gradient", "name": "Area Chart with Gradient", "best_for": "Volume and velocity over time" },
+    { "id": "area-stacked", "name": "Stacked Area Chart", "best_for": "Cumulative composition trends" },
+    { "id": "donut", "name": "Donut Chart", "best_for": "3-5 segment percentage distribution" },
+    { "id": "scatter-plot", "name": "Scatter Plot", "best_for": "Correlation between two numeric variables" },
+    { "id": "bubble-chart", "name": "Bubble Chart", "best_for": "3D numeric comparison (X, Y, Radius)" },
+    { "id": "radar-spider", "name": "Radar Spider Chart", "best_for": "Multi-attribute capability assessment" },
+    { "id": "funnel-conversion", "name": "Conversion Funnel", "best_for": "User onboarding or checkout drops" },
+    { "id": "treemap-density", "name": "Treemap Hierarchical", "best_for": "Nested proportional disk/memory usage" },
+    { "id": "heatmap-matrix", "name": "Heatmap Activity Matrix", "best_for": "Contribution calendars, hourly activity" },
+    { "id": "waterfall-bridge", "name": "Waterfall P&L Bridge", "best_for": "Cumulative gains and losses in finance" },
+    { "id": "sankey-flow", "name": "Sankey Flow Diagram", "best_for": "Resource distribution and user path hops" },
+    { "id": "candlestick", "name": "Candlestick Financial", "best_for": "OHLC market trading movements" },
+    { "id": "gauge-radial", "name": "Radial Gauge / Meter", "best_for": "Single percentage quota or budget ceiling" },
+    { "id": "sparkline-mini", "name": "Inline Sparkline", "best_for": "Compact table cell trend indicator" },
+    { "id": "choropleth-map", "name": "Choropleth Regional Map", "best_for": "Geographic density by country/state" },
+    { "id": "box-whisker", "name": "Box & Whisker Plot", "best_for": "Statistical dispersion and quartile bounds" },
+    { "id": "polar-area", "name": "Polar Area Chart", "best_for": "Cyclical or angular magnitude comparisons" },
+    { "id": "chord-diagram", "name": "Chord Relationship Diagram", "best_for": "Bidirectional inter-cluster matrix flows" },
+    { "id": "gantt-timeline", "name": "Gantt Timeline Chart", "best_for": "Milestone schedules and parallel tasks" },
+    { "id": "bullet-graph", "name": "Bullet Benchmark Graph", "best_for": "Performance vs target threshold bands" }
+  ]
+}

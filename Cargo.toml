@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/domain",
+    "crates/spec-registry",
+    "crates/constraint-engine",
+    "crates/flow-graph",
+    "crates/html-forge",
+    "crates/presentation-cms",
+    "crates/plugin-host",
+    "crates/rea-bridge",
+    "crates/bot-fleet",
+    "crates/mcp-gateway",
+    "crates/harness-daemon",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["cowok-design Team"]
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+uuid = { version = "1.10", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+ts-rs = { version = "10.1", features = ["uuid-impl"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+notify = "6.1"
+sha2 = "0.10"
+tempfile = "3.13"

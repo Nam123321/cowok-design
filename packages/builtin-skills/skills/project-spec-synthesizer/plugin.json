@@ -1,0 +1,9 @@
+{
+  "name": "project-spec-synthesizer",
+  "version": "1.0.0",
+  "description": "Synthesizes PRD, Data Specs, UI Specs, and Host Integration Contracts",
+  "entry_point": "SKILL.md",
+  "capabilities_required": ["spec-registry", "schema-builder"],
+  "risk_tier": 2,
+  "tags": ["specs", "architecture", "contracts"]
+}

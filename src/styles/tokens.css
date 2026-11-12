@@ -1,0 +1,686 @@
+/* ==========================================================================
+   cowok-design — Canonical Semantic Tokens & Component System (DESIGN.md v4.3-OS)
+   Single Source of Truth: Brand-guideline/cowok-brand-product-system-v4.3/
+   Mantra: "Warm in light. Calm in dark. Quiet by default. Color only when meaningful."
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+/* --------------------------------------------------------------------------
+   1. Universal Geometric & Typography Tokens
+   -------------------------------------------------------------------------- */
+:root {
+  --font-sans: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Geist Mono', 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+
+  /* Global App Font Size (12px / 13px / 14px / 15px configurable in Settings) */
+  --app-font-size: 13px;
+
+  /* Spacing Scale (4px Base Grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Corner Radii (Ergonomic Softness & Tactile Comfort — DESIGN.md v4.3-OS) */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 9999px;
+
+  /* Transitions & Motion (Ergonomic Spring Easing) */
+  --duration-fast: 140ms;
+  --duration-normal: 200ms;
+  --duration-slow: 280ms;
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Tactile Press & Hover Ergonomics for Interactive Elements (Impeccable & Hallmark Standard) */
+button,
+.btn,
+.icon-btn,
+.key-btn,
+.session-item,
+[role="button"] {
+  transition: transform var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-normal) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    filter var(--duration-fast) var(--ease-standard);
+}
+
+button:active,
+.btn:active,
+.icon-btn:active,
+.key-btn:active,
+.session-item:active,
+[role="button"]:active {
+  transform: translateY(1px) scale(0.985);
+  filter: brightness(0.96);
+}
+
+/* --------------------------------------------------------------------------
+   2. Theme: Warm Light (Default Flagship)
+   Warm Paper Canvas, Deep Navy Ink Text, High-Contrast Action
+   -------------------------------------------------------------------------- */
+:root,
+html[data-theme="warm"],
+.workbench-shell[data-theme="warm"],
+.workbench-shell.theme-warm {
+  --bg-canvas: #F7F5F0;
+  --bg-workspace: #FFFDFC;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F2F0EB;
+  --bg-raised: #FFFFFF;
+  --bg-elevated: #FCFBF8;
+  --bg-hover: #F5F7FA;
+  --bg-selected: #EDF4FF;
+
+  --text-primary: #081E3A;
+  --text-secondary: #344054;
+  --text-muted: #667085;
+  --text-disabled: #98A2B3;
+  --text-on-action: #FFFFFF;
+  --text-on-strong: #FFFFFF;
+
+  --border-default: #E6E2DB;
+  --border-strong: #D6D1C8;
+  --border-focus: #90AEFF;
+  --border-subtle: #E6E2DB;
+  --border: var(--border-default);
+
+  --human-accent: #0057FF;
+  --human-soft: #EDF3FF;
+  --human-border: #B8CEFF;
+  --agent-accent: #0057FF;
+  --agent-soft: #EDF3FF;
+  --agent-border: #B8CEFF;
+
+  --action-primary: #0057FF;
+  --action-primary-fg: #FFFFFF;
+  --action-primary-hover: #1A6CFF;
+  --action-link: #0057FF;
+  --action: #0057FF;
+  --action-hover: #1A6CFF;
+  --link: #0057FF;
+  --primary: var(--action-primary);
+  --primary-foreground: var(--action-primary-fg);
+  --tab-indicator-active: var(--action-primary);
+
+  --state-success: #169B62;
+  --state-success-soft: #E9F9F1;
+  --state-warning: #D9822B;
+  --state-warning-soft: #FFF5E8;
+  --state-danger: #D9485F;
+  --state-danger-soft: #FDECEF;
+  --state-info: #2E7CF6;
+  --state-info-soft: #EBF3FF;
+  --window-dot-close: #FF5F56;
+  --window-dot-minimize: #FFBD2E;
+  --window-dot-maximize: #27C93F;
+
+  --success: #3E8A5D;
+  --warning: #A87424;
+  --error: #B45555;
+  --info: #4B7FFF;
+  --destructive: var(--state-danger);
+
+  --shadow-sm: 0 1px 2px rgba(8, 30, 58, 0.04);
+  --shadow-md: 0 4px 12px rgba(8, 30, 58, 0.06);
+  --shadow-lg: 0 8px 24px rgba(8, 30, 58, 0.08);
+  --shadow: 0 8px 24px rgba(8, 30, 58, 0.08);
+
+  /* Semantic UI Bindings */
+  --background: var(--bg-canvas);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --secondary: var(--bg-subtle);
+  --secondary-foreground: var(--text-secondary);
+  --muted: var(--bg-subtle);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--human-soft);
+  --accent-foreground: var(--human-accent);
+
+  /* Legacy & Canonical Aliases */
+  --cw-bg-canvas: var(--bg-canvas);
+  --cw-bg-workspace: var(--bg-workspace);
+  --cw-bg-surface: var(--bg-surface);
+  --cw-bg-subtle: var(--bg-subtle);
+  --cw-bg-hover: var(--bg-hover);
+  --cw-bg-selected: var(--bg-selected);
+  --cw-border-subtle: var(--border-subtle);
+  --cw-text-primary: var(--text-primary);
+  --cw-text-secondary: var(--text-secondary);
+  --cw-text-muted: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   3. Theme: Focus Light (Dim)
+   Reduced Glare for Extended Deep-Work Sessions
+   -------------------------------------------------------------------------- */
+html[data-theme="dim"],
+.workbench-shell[data-theme="dim"],
+.workbench-shell.theme-dim {
+  --bg-canvas: #ECEAE4;
+  --bg-workspace: #F4F2ED;
+  --bg-surface: #FAF9F6;
+  --bg-subtle: #E5E2DB;
+  --bg-raised: #FAF9F6;
+  --bg-elevated: #FAF8F4;
+  --bg-hover: #EEECE7;
+  --bg-selected: #E7EEF9;
+
+  --text-primary: #182230;
+  --text-secondary: #475467;
+  --text-muted: #667085;
+  --text-disabled: #98A2B3;
+  --text-on-action: #FFFFFF;
+  --text-on-strong: #FFFFFF;
+
+  --border-default: #D8D4CC;
+  --border-strong: #C8C2B8;
+  --border-focus: #8099D8;
+  --border-subtle: #D8D4CC;
+  --border: var(--border-default);
+
+  --human-accent: #315FB6;
+  --human-soft: #E9EEF8;
+  --human-border: #ADC0E8;
+  --agent-accent: #315FB6;
+  --agent-soft: #E9EEF8;
+  --agent-border: #ADC0E8;
+
+  --action-primary: #315FB6;
+  --action-primary-fg: #FFFFFF;
+  --action-primary-hover: #4071D0;
+  --action-link: #315FB6;
+  --action: #315FB6;
+  --action-hover: #4071D0;
+  --link: #315FB6;
+  --primary: var(--action-primary);
+  --primary-foreground: var(--action-primary-fg);
+  --tab-indicator-active: var(--action-primary);
+
+  --state-success: #169B62;
+  --state-success-soft: #EAF7F0;
+  --state-warning: #C97724;
+  --state-warning-soft: #FDF4E7;
+  --state-danger: #CB445A;
+  --state-danger-soft: #FCECEF;
+  --state-info: #3572D8;
+  --state-info-soft: #ECF3FC;
+
+  --success: #4F7D60;
+  --warning: #8D6B36;
+  --error: #9B5E5E;
+  --info: #5579C9;
+  --destructive: var(--state-danger);
+
+  --shadow-sm: 0 1px 2px rgba(24, 34, 48, 0.04);
+  --shadow-md: 0 4px 12px rgba(24, 34, 48, 0.06);
+  --shadow-lg: 0 8px 24px rgba(24, 34, 48, 0.07);
+  --shadow: 0 8px 24px rgba(24, 34, 48, 0.07);
+
+  --background: var(--bg-canvas);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --secondary: var(--bg-subtle);
+  --secondary-foreground: var(--text-secondary);
+  --muted: var(--bg-subtle);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--human-soft);
+  --accent-foreground: var(--human-accent);
+
+  --cw-bg-canvas: var(--bg-canvas);
+  --cw-bg-workspace: var(--bg-workspace);
+  --cw-bg-surface: var(--bg-surface);
+  --cw-bg-subtle: var(--bg-subtle);
+  --cw-bg-hover: var(--bg-hover);
+  --cw-bg-selected: var(--bg-selected);
+  --cw-border-subtle: var(--border-subtle);
+  --cw-text-primary: var(--text-primary);
+  --cw-text-secondary: var(--text-secondary);
+  --cw-text-muted: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   4. Theme: Night Workspace
+   Deep Obsidian Blue, Crisp Text, Controlled Luminance
+   -------------------------------------------------------------------------- */
+html[data-theme="night"],
+.workbench-shell[data-theme="night"],
+.workbench-shell.theme-night {
+  --bg-canvas: #0B1220;
+  --bg-workspace: #111827;
+  --bg-surface: #172033;
+  --bg-subtle: #1C2940;
+  --bg-raised: #22314B;
+  --bg-elevated: #1A253C;
+  --bg-hover: #1E293B;
+  --bg-selected: #22314B;
+
+  --text-primary: #F1F5F9;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-disabled: #64748B;
+  --text-on-action: #081E3A;
+  --text-on-strong: #081E3A;
+
+  --border-default: #26354D;
+  --border-strong: #344761;
+  --border-focus: #FF9A2F;
+  --border-subtle: #1F2D42;
+  --border: var(--border-default);
+
+  --human-accent: #FF9A2F;
+  --human-soft: #22314B;
+  --human-border: #344761;
+  --agent-accent: #FF9A2F;
+  --agent-soft: #22314B;
+  --agent-border: #7B4B18;
+
+  --action-primary: #FF9A2F;
+  --action-primary-fg: #081E3A;
+  --action-primary-hover: #FFAF54;
+  --action-link: #FF9A2F;
+  --action: #FF9A2F;
+  --action-hover: #FFAF54;
+  --link: #FF9A2F;
+  --primary: var(--action-primary);
+  --primary-foreground: var(--action-primary-fg);
+  --tab-indicator-active: var(--action-primary);
+
+  --state-success: #2AD189;
+  --state-success-soft: rgba(42, 209, 137, 0.14);
+  --state-warning: #F3A447;
+  --state-warning-soft: rgba(243, 164, 71, 0.15);
+  --state-danger: #F06A7E;
+  --state-danger-soft: rgba(240, 106, 126, 0.16);
+  --state-info: #5CA0FF;
+  --state-info-soft: rgba(92, 160, 255, 0.15);
+
+  --success: #69A77F;
+  --warning: #C79B59;
+  --error: #D17878;
+  --info: #6F9BFF;
+  --destructive: var(--state-danger);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.35);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+
+  --background: var(--bg-canvas);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --secondary: var(--bg-subtle);
+  --secondary-foreground: var(--text-secondary);
+  --muted: var(--bg-subtle);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--human-soft);
+  --accent-foreground: var(--human-accent);
+
+  --cw-bg-canvas: var(--bg-canvas);
+  --cw-bg-workspace: var(--bg-workspace);
+  --cw-bg-surface: var(--bg-surface);
+  --cw-bg-subtle: var(--bg-subtle);
+  --cw-bg-hover: var(--bg-hover);
+  --cw-bg-selected: var(--bg-selected);
+  --cw-border-subtle: var(--border-subtle);
+  --cw-text-primary: var(--text-primary);
+  --cw-text-secondary: var(--text-secondary);
+  --cw-text-muted: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   5. Theme: Night Low-Chroma Focus & Monochrome
+   -------------------------------------------------------------------------- */
+html[data-theme="monochrome"],
+html[data-theme="night"][data-focus="low"],
+.workbench-shell[data-theme="monochrome"],
+.workbench-shell[data-theme="night"][data-focus="low"],
+.workbench-shell.theme-night-low,
+.workbench-shell.theme-monochrome {
+  --bg-canvas: #0B1220;
+  --bg-workspace: #111827;
+  --bg-surface: #172033;
+  --bg-subtle: #1C2940;
+  --bg-raised: #22314B;
+  --bg-elevated: #1A253C;
+  --bg-hover: #1E293B;
+  --bg-selected: #22314B;
+
+  --text-primary: #F1F5F9;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-disabled: #64748B;
+  --text-on-action: #081E3A;
+  --action-primary-fg: #081E3A;
+
+  --border-default: #26354D;
+  --border-strong: #344761;
+  --border-focus: #6C8FD9;
+  --border-subtle: #26354D;
+  --border: var(--border-default);
+
+  --human-accent: #65789E;
+  --agent-accent: #8F765E;
+  --human-soft: rgba(101, 120, 158, 0.18);
+  --agent-soft: rgba(143, 118, 94, 0.18);
+
+  --success: #72877A;
+  --warning: #8B7D68;
+  --error: #8B7070;
+  --destructive: var(--state-danger);
+
+  --action-primary: #F1F5F9;
+  --action-primary-hover: #FFFFFF;
+  --action-link: #8FAECF;
+  --action: #F1F5F9;
+  --action-hover: #FFFFFF;
+  --link: #8FAECF;
+  --primary: var(--action-primary);
+  --primary-foreground: var(--text-on-action);
+  --tab-indicator-active: var(--text-primary);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.35);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+
+  --background: var(--bg-canvas);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --secondary: var(--bg-subtle);
+  --secondary-foreground: var(--text-secondary);
+  --muted: var(--bg-subtle);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--human-soft);
+  --accent-foreground: var(--human-accent);
+
+  --cw-bg-canvas: var(--bg-canvas);
+  --cw-bg-workspace: var(--bg-workspace);
+  --cw-bg-surface: var(--bg-surface);
+  --cw-bg-subtle: var(--bg-subtle);
+  --cw-bg-hover: var(--bg-hover);
+  --cw-bg-selected: var(--bg-selected);
+  --cw-border-subtle: var(--border-subtle);
+  --cw-text-primary: var(--text-primary);
+  --cw-text-secondary: var(--text-secondary);
+  --cw-text-muted: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   6. Global Base & Ergonomics
+   -------------------------------------------------------------------------- */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular Numerics for Telemetry & IDs */
+.tabular-nums,
+[data-tabular-nums="true"] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Clean Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* Compatibility classes for uncompiled tailwind utility references */
+.bg-card { background-color: var(--bg-surface) !important; }
+.bg-muted { background-color: var(--bg-subtle) !important; }
+.bg-muted\/20 { background-color: var(--bg-subtle) !important; }
+.bg-muted\/30 { background-color: var(--bg-subtle) !important; }
+.bg-muted\/40 { background-color: var(--bg-subtle) !important; }
+.bg-muted\/60 { background-color: var(--bg-subtle) !important; }
+.bg-background { background-color: var(--bg-canvas) !important; }
+.text-foreground { color: var(--text-primary) !important; }
+.text-foreground\/90 { color: var(--text-primary) !important; }
+.text-muted-foreground { color: var(--text-muted) !important; }
+.border-border { border-color: var(--border-default) !important; }
+.border-border\/80 { border-color: var(--border-default) !important; }
+.bg-primary { background-color: var(--action-primary) !important; }
+.text-primary-foreground { color: var(--text-on-action) !important; }
+.border-primary { border-color: var(--action-primary) !important; }
+.bg-secondary { background-color: var(--bg-subtle) !important; }
+.text-secondary-foreground { color: var(--text-secondary) !important; }
+
+/* --------------------------------------------------------------------------
+   7. Reusable Canonical Component Classes (.cowok-* & .ff-*)
+   -------------------------------------------------------------------------- */
+.cowok-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-standard);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.cowok-btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
+.cowok-btn-primary {
+  background-color: var(--action-primary);
+  color: var(--text-on-action);
+  border-color: transparent;
+}
+.cowok-btn-primary:hover {
+  background-color: var(--action-primary-hover);
+}
+
+.cowok-btn-secondary {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+.cowok-btn-secondary:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--border-focus);
+}
+
+.cowok-btn-ghost {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border-color: transparent;
+}
+.cowok-btn-ghost:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.cowok-btn-agent {
+  background-color: var(--agent-accent);
+  color: #081E3A;
+  font-weight: 600;
+  border-color: transparent;
+}
+.cowok-btn-agent:hover {
+  filter: brightness(1.05);
+}
+
+.cowok-btn-human {
+  background-color: var(--human-accent);
+  color: #FFFFFF;
+  font-weight: 600;
+  border-color: transparent;
+}
+.cowok-btn-human:hover {
+  filter: brightness(1.08);
+}
+
+/* Badge & Tag Primitives */
+.cowok-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  line-height: 1.2;
+}
+
+.cowok-badge-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.cowok-badge-human {
+  background-color: var(--human-soft);
+  color: var(--human-accent);
+  border: 1px solid var(--human-border);
+}
+
+.cowok-badge-agent {
+  background-color: var(--agent-soft);
+  color: var(--agent-accent);
+  border: 1px solid var(--agent-border);
+}
+
+.cowok-badge-draft {
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1.5px dashed var(--action-primary);
+}
+
+#dagDraftBar {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--action-primary);
+  color: var(--text-primary);
+}
+
+.cowok-badge-success {
+  background-color: var(--state-success-soft);
+  color: var(--state-success);
+  border: 1px solid var(--state-success);
+}
+
+/* Card Primitives */
+.cowok-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--duration-normal) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+
+.cowok-card-subtle {
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+/* Input Fields */
+.cowok-input {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
+  box-sizing: border-box;
+}
+
+.cowok-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px var(--human-soft);
+}
+
+.cowok-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   8. User Project HTML Design Isolation (Zero Workspace Theme Leaking)
+   The embedded HTML canvas reflects the user's project design specification,
+   independent of the host workspace theme mode (warm, dim, or night).
+   -------------------------------------------------------------------------- */
+.live-html-frame,
+[data-project-preview="true"] {
+  --bg-canvas: #F8FAFC;
+  --bg-workspace: #FFFFFF;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #F1F5F9;
+  --bg-hover: #F8FAFC;
+  --bg-selected: #EDF4FF;
+
+  --text-primary: #0F172A;
+  --text-secondary: #475467;
+  --text-muted: #64748B;
+  --text-disabled: #94A3B8;
+  --text-on-action: #FFFFFF;
+
+  --border-default: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --border-subtle: #F1F5F9;
+  --border-focus: #90AEFF;
+
+  --action-primary: #0F172A;
+  --action-primary-hover: #1E293B;
+  --human-accent: #2563EB;
+  --state-success: #16A34A;
+  --state-warning: #D9822B;
+  --state-danger: #DC2626;
+  --state-info: #2563EB;
+
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+}

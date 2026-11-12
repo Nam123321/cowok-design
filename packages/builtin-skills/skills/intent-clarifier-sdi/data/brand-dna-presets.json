@@ -1,0 +1,85 @@
+{
+  "total": 84,
+  "presets": [
+    {
+      "id": "brand-linear",
+      "name": "Linear",
+      "font_family": "Inter, system-ui",
+      "primary_color": "#5e6ad2",
+      "bg_color": "#0d0e11",
+      "surface_color": "#16171d",
+      "border_radius": "6px",
+      "border_color": "rgba(255, 255, 255, 0.08)"
+    },
+    {
+      "id": "brand-stripe",
+      "name": "Stripe",
+      "font_family": "Söhne, -apple-system, sans-serif",
+      "primary_color": "#635bff",
+      "bg_color": "#f8fbfd",
+      "surface_color": "#ffffff",
+      "border_radius": "8px",
+      "border_color": "#e3e8ee"
+    },
+    {
+      "id": "brand-apple",
+      "name": "Apple",
+      "font_family": "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif",
+      "primary_color": "#0071e3",
+      "bg_color": "#ffffff",
+      "surface_color": "#f5f5f7",
+      "border_radius": "12px",
+      "border_color": "rgba(0, 0, 0, 0.08)"
+    },
+    {
+      "id": "brand-notion",
+      "name": "Notion",
+      "font_family": "Lyon-Text, Georgia, serif",
+      "primary_color": "#2383e2",
+      "bg_color": "#ffffff",
+      "surface_color": "#f7f6f3",
+      "border_radius": "4px",
+      "border_color": "rgba(55, 53, 47, 0.16)"
+    },
+    {
+      "id": "brand-raycast",
+      "name": "Raycast",
+      "font_family": "Inter, sans-serif",
+      "primary_color": "#ff6363",
+      "bg_color": "#0f0f11",
+      "surface_color": "#1b1b1e",
+      "border_radius": "10px",
+      "border_color": "rgba(255, 255, 255, 0.12)"
+    },
+    {
+      "id": "brand-vercel",
+      "name": "Vercel",
+      "font_family": "'Geist Sans', -apple-system, sans-serif",
+      "primary_color": "#000000",
+      "bg_color": "#000000",
+      "surface_color": "#111111",
+      "border_radius": "6px",
+      "border_color": "#333333"
+    },
+    {
+      "id": "brand-supabase",
+      "name": "Supabase",
+      "font_family": "Circular, -apple-system, sans-serif",
+      "primary_color": "#3ecf8e",
+      "bg_color": "#1c1c1c",
+      "surface_color": "#242424",
+      "border_radius": "6px",
+      "border_color": "#2e2e2e"
+    },
+    {
+      "id": "brand-github",
+      "name": "GitHub",
+      "font_family": "-apple-system, BlinkMacSystemFont, sans-serif",
+      "primary_color": "#238636",
+      "bg_color": "#0d1117",
+      "surface_color": "#161b22",
+      "border_radius": "6px",
+      "border_color": "#30363d"
+    }
+  ]
+}

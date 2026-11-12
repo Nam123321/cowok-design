@@ -1,0 +1,9 @@
+{
+  "name": "design-taste-and-ux-guard",
+  "version": "1.0.0",
+  "description": "Enforces 50 OKLCH palettes, Hallmark 3-Tier gates, and 62 anti-slop rules",
+  "entry_point": "SKILL.md",
+  "capabilities_required": ["triangle-linter", "design-tokens"],
+  "risk_tier": 1,
+  "tags": ["hallmark", "anti-slop", "oklch", "taste"]
+}

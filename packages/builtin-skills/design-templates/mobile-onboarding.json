@@ -1,0 +1,11 @@
+{
+  "id": "template-mobile-onboarding",
+  "name": "Mobile App Onboarding Flow",
+  "category": "mobile",
+  "description": "3-screen mobile onboarding flow with benefit carousel, permission prompt, and account creation",
+  "sections": [
+    { "id": "carousel", "type": "carousel", "title": "Interactive Swiper Carousel with Dots" },
+    { "id": "permissions", "type": "prompt", "title": "Notification & Location Permission Cards" },
+    { "id": "auth-prompt", "type": "auth", "title": "Social Auth Buttons & Email Registration" }
+  ]
+}

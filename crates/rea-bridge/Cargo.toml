@@ -1,0 +1,8 @@
+[package]
+name = "rea-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+domain = { path = "../domain" }

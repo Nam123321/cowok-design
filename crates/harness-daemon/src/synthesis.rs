@@ -1,3 +1,5 @@
+// @story 01.3
+// @implements AC-02, AC-03, AC-05, AC-07
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -90,7 +92,22 @@ pub fn resolve_project_scoped_registry(
     }
 
     let proj_canon_root = validate_and_canonicalize_workspace_root(&raw_proj_path)?;
-    if !proj_canon_root.starts_with(&daemon_canon_root) {
+
+    // AC-07 / F-01: Check boundary_type in project_boundaries.
+    // If project is folder_backed (promoted from scratch or linked to an external folder repo),
+    // allow external workspace root outside daemon_canon_root.
+    let boundary_type: Option<String> = conn
+        .query_row(
+            "SELECT boundary_type FROM project_boundaries WHERE project_id = ?1",
+            params![project_id.to_string()],
+            |r| r.get(0),
+        )
+        .optional()
+        .map_err(|e| map_sqlite_error(e, "resolve_project_scoped_registry_boundary_check"))?;
+
+    let is_folder_backed = boundary_type.as_deref() == Some("folder_backed");
+
+    if !is_folder_backed && !proj_canon_root.starts_with(&daemon_canon_root) {
         return Err(HarnessError::ValidationFailed {
             reason: format!(
                 "PROJECT_SCOPE_VIOLATION: project workspace '{}' escapes daemon root '{}'",
@@ -114,7 +131,10 @@ pub fn ensure_project_token(proj_canon_root: &Path) -> Result<String, HarnessErr
     let token_dir = proj_canon_root.join(".cowok-design");
     if !token_dir.exists() {
         fs::create_dir_all(&token_dir).map_err(|e| HarnessError::ValidationFailed {
-            reason: format!("Failed to create token directory '{}': {e}", token_dir.display()),
+            reason: format!(
+                "Failed to create token directory '{}': {e}",
+                token_dir.display()
+            ),
         })?;
     }
     #[cfg(unix)]
@@ -133,9 +153,13 @@ pub fn ensure_project_token(proj_canon_root: &Path) -> Result<String, HarnessErr
             let mut opts = fs::OpenOptions::new();
             opts.write(true).create_new(true).mode(0o600);
             if let Ok(mut f) = opts.open(&token_file) {
-                f.write_all(secret.as_bytes()).map_err(|e| HarnessError::ValidationFailed {
-                    reason: format!("Failed to write token file '{}': {e}", token_file.display()),
-                })?;
+                f.write_all(secret.as_bytes())
+                    .map_err(|e| HarnessError::ValidationFailed {
+                        reason: format!(
+                            "Failed to write token file '{}': {e}",
+                            token_file.display()
+                        ),
+                    })?;
             } else {
                 fs::write(&token_file, &secret).map_err(|e| HarnessError::ValidationFailed {
                     reason: format!("Failed to write token file '{}': {e}", token_file.display()),
@@ -194,11 +218,12 @@ pub fn validate_seed_repo_path(
         workspace_root.join(candidate)
     };
     reject_if_symlink(&resolved)?;
-    let canon_root = workspace_root
-        .canonicalize()
-        .map_err(|_| HarnessError::PathTraversalDenied {
-            path: workspace_root.display().to_string(),
-        })?;
+    let canon_root =
+        workspace_root
+            .canonicalize()
+            .map_err(|_| HarnessError::PathTraversalDenied {
+                path: workspace_root.display().to_string(),
+            })?;
     let canon_seed = resolved
         .canonicalize()
         .map_err(|_| HarnessError::ValidationFailed {
@@ -277,7 +302,8 @@ pub fn synthesize_nine_specs(
         None
     };
 
-    let (db_brief, db_inherit_proj) = load_project_brief_and_lineage(&project_registry, project_id)?;
+    let (db_brief, db_inherit_proj) =
+        load_project_brief_and_lineage(&project_registry, project_id)?;
     let explicit_brief = req
         .product_brief
         .as_deref()
@@ -389,8 +415,7 @@ pub fn synthesize_nine_specs(
 
         // Check existing spec for idempotency (`SYN-04`): if SHA-256 is identical, skip write
         let new_sha = compute_sha256_hex(markdown.as_bytes());
-        let existing_spec: Option<SpecRecord> =
-            project_registry.get_spec(project_id, spec_key)?;
+        let existing_spec: Option<SpecRecord> = project_registry.get_spec(project_id, spec_key)?;
 
         let record = match existing_spec {
             Some(ref cur)

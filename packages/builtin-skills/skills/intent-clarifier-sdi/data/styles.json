@@ -1,0 +1,25 @@
+{
+  "total": 67,
+  "styles": [
+    { "id": "bento-grid", "name": "Bento Grid", "category": "modern", "characteristics": "Grid layout, rounded cards, subtle borders, high information density" },
+    { "id": "brutalism", "name": "Brutalism", "category": "expressive", "characteristics": "High contrast black borders, bold typography, raw layout, vibrant punch colors" },
+    { "id": "minimalist-clean", "name": "Minimalist Clean", "category": "clean", "characteristics": "Generous whitespace, refined typography, subtle gray dividers, no shadows" },
+    { "id": "skeuomorphic-modern", "name": "Modern Skeuomorphism", "category": "tactile", "characteristics": "Soft directional shadows, tactile buttons, debossed insets, realistic lighting" },
+    { "id": "neumorphism", "name": "Neumorphism", "category": "tactile", "characteristics": "Dual soft inner and outer shadows, extruded plastic look, low contrast surfaces" },
+    { "id": "apple-hig", "name": "Apple Human Interface", "category": "platform", "characteristics": "SF Pro typography, translucent blur sheets, fluid corners, dynamic island" },
+    { "id": "glassmorphism", "name": "Glassmorphism", "category": "modern", "characteristics": "Backdrop blur, semi-transparent frosted glass, colorful background reflections" },
+    { "id": "industrial-dark", "name": "Industrial Dark", "category": "developer", "characteristics": "Deep carbon surfaces, monospaced accents, copper or safety orange alerts" },
+    { "id": "cyberpunk-hud", "name": "Cyberpunk HUD", "category": "sci-fi", "characteristics": "Neon cyan/magenta accents, angular corner clips, wireframe gridlines" },
+    { "id": "scandinavian-warm", "name": "Scandinavian Warm", "category": "warm", "characteristics": "Warm beige canvas, earthy terracotta accents, serif editorial headings" },
+    { "id": "linear-app", "name": "Linear Precision", "category": "developer", "characteristics": "Dark graphite palette, 1px border hairline, keyboard shortcuts, fast micro-interactions" },
+    { "id": "stripe-press", "name": "Stripe Press", "category": "fintech", "characteristics": "Crisp slate typography, vibrant purple/blue accents, pill badges, clean data tables" },
+    { "id": "notion-editorial", "name": "Notion Editorial", "category": "productivity", "characteristics": "Monochrome canvas, serif reading typography, emoji icon markers, clean dividers" },
+    { "id": "raycast-command", "name": "Raycast Command", "category": "developer", "characteristics": "Deep black overlay, glowing pill borders, keyboard badge indicators, high velocity" },
+    { "id": "vercel-geek", "name": "Vercel Geek", "category": "developer", "characteristics": "Pure black and white, Geist typography, geometric triangle mark, high contrast code" },
+    { "id": "retro-terminal", "name": "Retro Terminal", "category": "developer", "characteristics": "Amber or green CRT glow, scanlines, monospaced font, prompt cursor blinking" },
+    { "id": "editorial-magazine", "name": "Editorial Magazine", "category": "editorial", "characteristics": "Display serif titles, multi-column reading flow, pull quotes, rich photography" },
+    { "id": "swiss-international", "name": "Swiss International", "category": "classic", "characteristics": "Strict mathematical grid, Helvetica/Inter, asymmetric layouts, flush-left alignment" },
+    { "id": "claymorphism", "name": "Claymorphism", "category": "playful", "characteristics": "Soft rounded 3D clay shapes, pastel colors, thick pill borders, inner shadow" },
+    { "id": "aurora-glow", "name": "Aurora Glow", "category": "modern", "characteristics": "Multicolor organic blur gradients behind dark cards, subtle luminous borders" }
+  ]
+}

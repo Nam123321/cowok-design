@@ -1,0 +1,10 @@
+{
+  "name": "@cowok-design/ui-shell",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UI Shell package for cowok-design",
+  "main": "./src/index.ts",
+  "dependencies": {
+    "@cowok-design/shared-types": "workspace:*"
+  }
+}

@@ -1,0 +1,87 @@
+name: cowok-design Security & SCA Ratchet
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  schedule:
+    - cron: '0 3 * * 1' # Run weekly on Mondays at 03:00 UTC
+
+permissions: read-all
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ==========================================
+  # LANE 1: SECRET SCANNING (GITLEAKS)
+  # ==========================================
+  secret-scan:
+    name: Gitleaks Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@5a9f626c04f981e428cf0b4bf18f0f3531649987 # v2.3.4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ==========================================
+  # LANE 2: RUST CARGO DENY (LICENSES & ADVISORIES)
+  # ==========================================
+  cargo-deny:
+    name: Cargo Deny (License & Advisories)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Run Cargo Deny Check
+        uses: EmbarkStudios/cargo-deny-action@3f4a782664881cfac704956d02674a64117fe348 # v2.0.8
+        with:
+          command: check
+
+  # ==========================================
+  # LANE 3: DEPENDENCY VULNERABILITY RATCHET (SCA)
+  # ==========================================
+  pnpm-audit-ratchet:
+    name: Pnpm Dependency Ratchet (SCA)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d792dbb41b735c0c68e # v3.0.0
+        with:
+          version: 9
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@60edb5dd545a775178f525247059d6428237b465 # v4.0.2
+        with:
+          node-version: 20
+          cache: "pnpm"
+
+      - name: Evaluate Security Ratchet
+        run: node scripts/ci-audit-ratchet.js
+
+  # ==========================================
+  # LANE 4: STATIC APPLICATION SECURITY TESTING (SAST)
+  # ==========================================
+  semgrep-sast:
+    name: Semgrep SAST Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+
+      - name: Run Semgrep SAST
+        run: |
+          python3 -m pip install semgrep
+          semgrep ci --config auto --error

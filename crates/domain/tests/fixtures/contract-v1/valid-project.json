@@ -1,0 +1,10 @@
+{
+  "contract_version": 1,
+  "data": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "name": "Cowok-Design Platform",
+    "slug": "cowok-design",
+    "created_at": 1730500000,
+    "updated_at": 1730500000
+  }
+}

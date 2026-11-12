@@ -1,0 +1,12 @@
+{
+  "id": "template-saas-dashboard",
+  "name": "B2B SaaS Dashboard",
+  "category": "dashboard",
+  "description": "Standard high-density B2B dashboard with KPI metric line, data table with filters, and activity stream",
+  "sections": [
+    { "id": "topbar", "type": "navigation", "title": "Top Navigation Bar with Search and Profile" },
+    { "id": "metric-line", "type": "metrics", "title": "4 KPI Cards with Sparklines and Deltas" },
+    { "id": "analytics-chart", "type": "chart", "title": "Revenue & Active Users Trend Chart" },
+    { "id": "data-table", "type": "table", "title": "Recent Transactions Data Table with Multi-Filter" }
+  ]
+}

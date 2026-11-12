@@ -1,0 +1,12 @@
+{
+  "id": "template-settings-portal",
+  "name": "Multi-Tenant Settings & Admin Portal",
+  "category": "admin",
+  "description": "Enterprise settings portal with vertical sidebar tabs, organization profile, team members table, and API keys",
+  "sections": [
+    { "id": "sidebar-nav", "type": "navigation", "title": "Vertical Tab Navigation (General, Team, Billing, Security, API)" },
+    { "id": "profile-form", "type": "form", "title": "Organization Profile Form with Avatar Upload" },
+    { "id": "api-keys", "type": "table", "title": "API Token Vault with Revocation & Last Used Timestamps" },
+    { "id": "danger-zone", "type": "danger", "title": "Red-Bordered Danger Zone for Project Deletion" }
+  ]
+}

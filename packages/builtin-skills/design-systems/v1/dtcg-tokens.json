@@ -1,0 +1,41 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "color": {
+    "action": {
+      "primary": { "$value": "#2563eb", "$type": "color" },
+      "primary-hover": { "$value": "#1d4ed8", "$type": "color" },
+      "primary-active": { "$value": "#1e40af", "$type": "color" }
+    },
+    "surface": {
+      "base": { "$value": "#0d0e12", "$type": "color" },
+      "elevated": { "$value": "#15171e", "$type": "color" },
+      "overlay": { "$value": "#1e212b", "$type": "color" }
+    },
+    "text": {
+      "primary": { "$value": "#f3f4f6", "$type": "color" },
+      "secondary": { "$value": "#9ca3af", "$type": "color" },
+      "muted": { "$value": "#6b7280", "$type": "color" }
+    },
+    "border": {
+      "subtle": { "$value": "rgba(255, 255, 255, 0.08)", "$type": "color" },
+      "focus": { "$value": "#3b82f6", "$type": "color" },
+      "danger": { "$value": "#ef4444", "$type": "color" }
+    }
+  },
+  "dimension": {
+    "radius": {
+      "sm": { "$value": "4px", "$type": "dimension" },
+      "md": { "$value": "8px", "$type": "dimension" },
+      "lg": { "$value": "12px", "$type": "dimension" },
+      "full": { "$value": "9999px", "$type": "dimension" }
+    },
+    "spacing": {
+      "1": { "$value": "4px", "$type": "dimension" },
+      "2": { "$value": "8px", "$type": "dimension" },
+      "3": { "$value": "12px", "$type": "dimension" },
+      "4": { "$value": "16px", "$type": "dimension" },
+      "6": { "$value": "24px", "$type": "dimension" },
+      "8": { "$value": "32px", "$type": "dimension" }
+    }
+  }
+}

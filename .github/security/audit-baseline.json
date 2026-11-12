@@ -1,0 +1,6 @@
+{
+  "max_critical": 3,
+  "max_high": 2,
+  "last_reviewed": "2026-11-12",
+  "comment": "Security Ratchet Baseline for cowok-design. Any new CVE on PR delta will fail-fast."
+}
