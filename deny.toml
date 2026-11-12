@@ -12,7 +12,7 @@ targets = [
 [advisories]
 version = 2
 yanked = "deny"
-unmaintained = "warn"
+unmaintained = "workspace"
 
 [licenses]
 version = 2
