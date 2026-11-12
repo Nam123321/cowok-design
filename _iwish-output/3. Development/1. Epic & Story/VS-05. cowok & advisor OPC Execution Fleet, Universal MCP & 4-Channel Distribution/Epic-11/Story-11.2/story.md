@@ -4,7 +4,7 @@ id: "11.2"
 title: "Story 11.2: Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging)"
 description: "Cho phép mô hình Tier-1 hoặc advisor tạo script phụ trợ dùng một lần trong thư mục .uiux-os/ephemeral-tools/, quét AST/capabilities trước khi chạy với giới hạn thời gian <= 5s và đề xuất thăng cấp thành SKILL.md nếu tái sử dụng >= 3 lần."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-11/Story-11.2/story.md"
-status: planned
+status: refactored
 risk_tier: 3
 delivery: core
 timestamp: "2026-11-02T13:30:00+07:00"
@@ -27,7 +27,7 @@ consumes_apis: []
 
 - **FR Covered:** [FR-27: Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 11: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Universal Open MCP Server](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-11/epic.md)
-- **Status:** `planned`
+- **Status:** `refactored`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context
@@ -40,11 +40,13 @@ Cho phép mô hình Tier-1 hoặc advisor tạo script phụ trợ dùng một l
 - **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging)" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
 - **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Chặn mọi lệnh truy cập mạng ngoài, đọc biến môi trường nhạy cảm hoặc ghi file ngoài thư mục dự án đối với script tự rèn.
+- **AC-04 (Run-Scoped Outbound MCP Tool Bundles & Deterministic Layout Solvers):** Đóng gói bộ công cụ MCP theo đúng phạm vi từng lượt chạy (`Run-Scoped Tool Bundles`) kèm các bộ giải bố cục xác định (như `Banner Solver G1–G15` và `Grounded Diagram elk.js + repo_extract`).
 
 ## 4. Tasks
 - [ ] **Task 11.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging)" (thỏa mãn `AC-01`).
 - [ ] **Task 11.2.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
 - [ ] **Task 11.2.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
+- [ ] **Task 11.2.4**: Cài đặt cơ chế đóng gói MCP Tools theo Run-Scoped Tool Bundles tích hợp Banner Solver G1–G15 và Grounded Diagram layout engine (thỏa mãn `AC-04`).
 
 ## 5. AC-to-Task Traceability Matrix
 
@@ -53,6 +55,7 @@ Cho phép mô hình Tier-1 hoặc advisor tạo script phụ trợ dùng một l
 | **AC-01** | `Task 11.2.1` | Unit & Integration Test (`cargo test` / `vitest`) |
 | **AC-02** | `Task 11.2.2` | Contract & Schema Verification |
 | **AC-03 (`[EDGE-CASE]`)** | `Task 11.2.3` | Boundary Regression Test |
+| **AC-04** | `Task 11.2.4` | Tool Bundler & Layout Solver Integration Test |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** ["11.1", "10.3"]
@@ -87,3 +90,4 @@ Cho phép mô hình Tier-1 hoặc advisor tạo script phụ trợ dùng một l
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 11.2 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
+| 2026-11-12 | 2.0.0 | [refactor-story] Bổ sung AC-04 Run-Scoped Outbound MCP Tool Bundles & Deterministic Layout Solvers theo Master Plan | /refactor-story |

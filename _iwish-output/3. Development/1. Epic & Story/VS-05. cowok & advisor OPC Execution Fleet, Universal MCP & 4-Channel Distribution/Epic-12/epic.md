@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-12"
 title: "Epic 12: 4-Channel Packaging & Distribution Architecture"
-status: planned
+status: in-progress
 track: "Stream-5"
 wave: 4
 provides: ["Single-Binary CLI (uiux-os)", "Tauri v2 Desktop App", "Cowok.ai Native Host Plugin Pack", "Docker/OCI Container Image"]
@@ -26,9 +26,9 @@ links_to:
 
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
-| **Story 12.1** | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | `planned` | `2` | `['07.3', '11.3']` |
-| **Story 12.2** | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | `planned` | `2` | `['12.1']` |
-| **Story 12.3** | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | `planned` | `2` | `['12.1']` |
+| **Story 12.1** | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | `refactored` | `2` | `['07.3', '11.3']` |
+| **Story 12.2** | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | `refactored` | `2` | `['12.1']` |
+| **Story 12.3** | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | `refactored` | `2` | `['12.1']` |
 
 ## 3. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 
@@ -47,3 +47,74 @@ links_to:
 - [x] **Tracer Bullet?** Yes
 - [x] **Deletion Testable?** Yes
 - [x] **Interface vs Implementation?** Yes
+
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.3, 11.3 | planned |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1 | planned |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 12.1 | planned |

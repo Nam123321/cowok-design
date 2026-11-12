@@ -4,10 +4,10 @@ id: "07.1"
 title: "Story 07.1: Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9"
 description: "Kiểm tra tự động 17 quy tắc hình học & bố cục (child-overflow, sibling-overlap, clipped-text, small-touch-target, low-contrast-text, hardcoded-color...) trên cả 3 khung nhìn ứng dụng và khung 16:9 của slide."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-07/Story-07.1/story.md"
-status: planned
+status: refactored
 risk_tier: 2
 delivery: core
-timestamp: "2026-11-02T13:30:00+07:00"
+timestamp: "2026-11-12T16:20:00+07:00"
 tags:
   - "story-07.1"
   - "epic-07"
@@ -40,11 +40,13 @@ Kiểm tra tự động 17 quy tắc hình học & bố cục (child-overflow, s
 - **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
 - **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Phát hiện chính xác hiện tượng tràn khung dọc/ngang (scrollHeight > clientHeight) khi người dùng nhập đoạn văn bản quá dài trên slide 16:9.
+- **AC-04 (E2E Flow Completeness Auditor — Dead-End CTA, Orphan Screen & Missing 4-SubStates Detector — GAP-13):** Bên cạnh bộ kiểm định bố cục/WCAG (mở rộng lên 25+ luật hình học + R-tree overlap + Concentric Radii + `Footer-Rail CONTENT_MAX_Y`), bổ sung máy quét toàn đồ thị phát hiện: (1) Nút CTA trên HTML chưa được nối đi đâu (`Unwired Dead-End CTAs`), (2) Màn hình mồ côi không có đường dẫn tới từ Entry (`Orphan Screens`), và (3) Màn hình dữ liệu thiếu các trạng thái `Loading / Empty / Error`.
 
 ## 4. Tasks
 - [ ] **Task 07.1.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9" (thỏa mãn `AC-01`).
 - [ ] **Task 07.1.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
 - [ ] **Task 07.1.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
+- [ ] **Task 07.1.4**: Cài đặt E2E Flow Completeness Auditor quét Dead-End CTAs, Orphan Screens và thiếu 4-SubStates (thỏa mãn `AC-04`).
 
 ## 5. AC-to-Task Traceability Matrix
 
@@ -53,6 +55,7 @@ Kiểm tra tự động 17 quy tắc hình học & bố cục (child-overflow, s
 | **AC-01** | `Task 07.1.1` | Unit & Integration Test (`cargo test` / `vitest`) |
 | **AC-02** | `Task 07.1.2` | Contract & Schema Verification |
 | **AC-03 (`[EDGE-CASE]`)** | `Task 07.1.3` | Boundary Regression Test |
+| **AC-04** | `Task 07.1.4` | Flow Completeness AST Graph Scan Test |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** ["05.2", "06.2"]
@@ -87,3 +90,4 @@ Kiểm tra tự động 17 quy tắc hình học & bố cục (child-overflow, s
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 07.1 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
+| 2026-11-12 | 2.0.0 | [refactor-story] Bổ sung AC-04 E2E Flow Completeness Auditor (Dead-End CTA, Orphan Screen, Missing 4-SubStates — GAP-13) theo Master Plan | /refactor-story |

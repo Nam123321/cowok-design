@@ -4,10 +4,10 @@ id: "10.2"
 title: "Story 10.2: Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)"
 description: "Điều phối đa Execution Agents (Claude, Codex, AGY, Grok, Muse, Duet, Dot) qua hộp thư file-backed với hợp đồng ONE_JOB + NEVER và tách biệt hoàn toàn Builder Agent khỏi Verifier Agent theo thang bằng chứng E1..E4."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-10/Story-10.2/story.md"
-status: planned
+status: refactored
 risk_tier: 3
 delivery: core
-timestamp: "2026-11-02T13:30:00+07:00"
+timestamp: "2026-11-12T16:55:00+07:00"
 tags:
   - "story-10.2"
   - "epic-10"
@@ -40,11 +40,13 @@ consumes_apis: []
 - **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
 - **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Chặn tuyệt đối mọi nỗ lực của Builder Agent tự ghi kết quả PASS vào file kiểm định của Verifier Agent.
+- **AC-04 (Single-Session Design Jury / Critique Theater on Frozen Bundle):** Trước khi bàn giao một thiết kế lớn, kích hoạt hội đồng chấm điểm đa vai nội tuyến (`Visual`, `UX Flow`, `Copy`, `Brand Identity`) làm việc trên gói chụp đóng băng (`review_freeze` có `generation fencing`); chỉ khi đạt ngưỡng điểm chất lượng mới trình người dùng duyệt.
 
 ## 4. Tasks
 - [ ] **Task 10.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)" (thỏa mãn `AC-01`).
 - [ ] **Task 10.2.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
 - [ ] **Task 10.2.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
+- [ ] **Task 10.2.4**: Cài đặt hội đồng chấm điểm Single-Session Design Jury / Critique Theater trên gói chụp đóng băng (thỏa mãn `AC-04`).
 
 ## 5. AC-to-Task Traceability Matrix
 
@@ -53,6 +55,7 @@ consumes_apis: []
 | **AC-01** | `Task 10.2.1` | Unit & Integration Test (`cargo test` / `vitest`) |
 | **AC-02** | `Task 10.2.2` | Contract & Schema Verification |
 | **AC-03 (`[EDGE-CASE]`)** | `Task 10.2.3` | Boundary Regression Test |
+| **AC-04** | `Task 10.2.4` | Design Jury Review Gate Test |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** ["10.1", "09.3"]
@@ -87,3 +90,4 @@ consumes_apis: []
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 10.2 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
+| 2026-11-12 | 2.0.0 | [refactor-story] Bổ sung AC-04 Single-Session Design Jury / Critique Theater on Frozen Bundle theo Master Plan | /refactor-story |

@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-10"
 title: "Epic 10: cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design Tournament"
-status: planned
+status: in-progress
 track: "Stream-5"
 wave: 3
 provides: ["crates/agent-fleet", "cowok Orchestrator", "advisor Meta-Agent", "$UIUX_LIVE_SPEC <50ms PTY Hub", "E1..E4 Verify Ladder & Tournament Mode"]
@@ -28,7 +28,7 @@ links_to:
 | :--- | :--- | :---: | :---: | :--- |
 | **Story 10.1** | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | `planned` | `3` | `['05.2', '08.2', '09.2']` |
 | **Story 10.2** | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | `planned` | `3` | `['10.1', '09.3']` |
-| **Story 10.3** | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | `planned` | `3` | `['10.2']` |
+| **Story 10.3** | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | `refactored` | `3` | `['10.2']` |
 
 ## 3. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 
@@ -47,3 +47,74 @@ links_to:
 - [x] **Tracer Bullet?** Yes
 - [x] **Deletion Testable?** Yes
 - [x] **Interface vs Implementation?** Yes
+
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 05.2, 08.2, 09.2 | planned |
+| [Story-10.2](./Story-10.2/story.md) | Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer) | 10.1, 09.3 | planned |
+| [Story-10.3](./Story-10.3/story.md) | Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode) | 10.2 | refactored |

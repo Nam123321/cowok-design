@@ -4,10 +4,10 @@ id: "09.2"
 title: "Story 09.2: Tích hợp Jev Choice (<2ms Routing), Jev Noul (<1ms Pre-Filter) & Speculative Multi-Head (crates/jev-engine)"
 description: "Cài đặt bộ định tuyến chọn Portal/Component/Skill trong <2ms (Jev Choice), bộ lọc vi phạm ràng buộc dự án trong <1ms (Jev Noul), và bộ chấm điểm độ mơ hồ SDI song song (Speculative Multi-Head)."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe/Epic-09/Story-09.2/story.md"
-status: planned
+status: refactored
 risk_tier: 3
 delivery: core
-timestamp: "2026-11-02T13:30:00+07:00"
+timestamp: "2026-11-12T16:40:00+07:00"
 tags:
   - "story-09.2"
   - "epic-09"
