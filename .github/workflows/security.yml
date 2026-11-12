@@ -6,7 +6,8 @@ on:
   pull_request:
     branches: [master, main]
   schedule:
-    - cron: '0 3 * * 1' # Run weekly on Mondays at 03:00 UTC
+    # Weekly Sunday midnight scan for newly discovered CVEs
+    - cron: '0 0 * * 0'
 
 permissions: read-all
 
@@ -16,72 +17,70 @@ concurrency:
 
 jobs:
   # ==========================================
-  # LANE 1: SECRET SCANNING (GITLEAKS)
+  # LANE 1: PNPM AUDIT RATCHET (ZERO NEW CVES)
   # ==========================================
-  secret-scan:
-    name: Gitleaks Secret Detection
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-        with:
-          fetch-depth: 0
-
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@5a9f626c04f981e428cf0b4bf18f0f3531649987 # v2.3.4
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ==========================================
-  # LANE 2: RUST CARGO DENY (LICENSES & ADVISORIES)
-  # ==========================================
-  cargo-deny:
-    name: Cargo Deny (License & Advisories)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
-
-      - name: Run Cargo Deny Check
-        uses: EmbarkStudios/cargo-deny-action@3f4a782664881cfac704956d02674a64117fe348 # v2.0.8
-        with:
-          command: check
-
-  # ==========================================
-  # LANE 3: DEPENDENCY VULNERABILITY RATCHET (SCA)
-  # ==========================================
-  pnpm-audit-ratchet:
+  audit-ratchet:
     name: Pnpm Dependency Ratchet (SCA)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d792dbb41b735c0c68e # v3.0.0
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
         with:
           version: 9
 
       - name: Setup Node.js 20
-        uses: actions/setup-node@60edb5dd545a775178f525247059d6428237b465 # v4.0.2
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
         with:
           node-version: 20
-          cache: "pnpm"
 
-      - name: Evaluate Security Ratchet
+      - name: Run CI Audit Ratchet
         run: node scripts/ci-audit-ratchet.js
 
   # ==========================================
-  # LANE 4: STATIC APPLICATION SECURITY TESTING (SAST)
+  # LANE 2: SEMGREP SAST SCAN
   # ==========================================
   semgrep-sast:
     name: Semgrep SAST Scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Run Semgrep SAST
         run: |
           python3 -m pip install semgrep
-          semgrep ci --config auto --error
+          semgrep scan --config auto --error
+
+  # ==========================================
+  # LANE 3: GITLEAKS SECRET DETECTION
+  # ==========================================
+  gitleaks:
+    name: Gitleaks Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@f586c14365d4643c6aa59d472ae6e984bf47bb34 # v2.3.8
+
+  # ==========================================
+  # LANE 4: CARGO DENY (RUST SUPPLY CHAIN)
+  # ==========================================
+  cargo-deny:
+    name: Cargo Deny (License & Advisories)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Run Cargo Deny Check
+        uses: embarkstudios/cargo-deny-action@34899fc7ba81ca6268d5947a7a16b4649013fea1 # v2.0.11
+        with:
+          command: check
+          arguments: --workspace
