@@ -36,6 +36,9 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Build Production Frontend
+        run: pnpm run build
+
       - name: Run Playwright E2E Tests (Focus-Free Headless)
         run: pnpm exec playwright test --config=playwright.ui.config.ts
         env:

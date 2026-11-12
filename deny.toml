@@ -11,10 +11,8 @@ targets = [
 
 [advisories]
 version = 2
-vulnerability = "deny"
-unmaintained = "workspace"
 yanked = "deny"
-notice = "warn"
+unmaintained = "warn"
 
 [licenses]
 version = 2
@@ -30,7 +28,6 @@ allow = [
     "OpenSSL",
     "Zlib",
 ]
-copyleft = "deny"
 
 [licenses.private]
 ignore = true

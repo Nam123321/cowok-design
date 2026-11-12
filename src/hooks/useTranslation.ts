@@ -39,7 +39,10 @@ function resolveKey(dict: Record<string, any>, key: string): string | undefined 
   const parts = key.split(".");
   let cur: any = dict;
   for (const p of parts) {
-    if (cur && typeof cur === "object" && p in cur) {
+    if (p === "__proto__" || p === "prototype" || p === "constructor") {
+      return undefined;
+    }
+    if (cur && typeof cur === "object" && Object.prototype.hasOwnProperty.call(cur, p)) {
       cur = cur[p];
     } else {
       return undefined;

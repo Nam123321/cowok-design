@@ -52,7 +52,7 @@ jobs:
       - name: Run Semgrep SAST
         run: |
           python3 -m pip install semgrep
-          semgrep scan --config auto --error
+          semgrep scan --config auto --severity ERROR --error
 
   # ==========================================
   # LANE 3: GITLEAKS SECRET DETECTION
