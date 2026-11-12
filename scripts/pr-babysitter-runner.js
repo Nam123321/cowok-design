@@ -20,6 +20,14 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const STATE_FILE = path.join(REPO_ROOT, '_iwish-output', 'pr-babysitter-state.md');
 const MAX_ATTEMPTS = 3;
 
+function sanitizeMessage(msg) {
+  if (!msg) return '';
+  return String(msg)
+    .replace(/AIza[0-9A-Za-z-_]{35}/g, '[REDACTED_GEMINI_KEY]')
+    .replace(/ghp_[0-9A-Za-z]{36}/g, '[REDACTED_GH_TOKEN]')
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+/-]+=*/gi, '$1[REDACTED_BEARER]');
+}
+
 /**
  * Ensures state file exists and has headers.
  */
@@ -159,9 +167,10 @@ export async function runPrBabysitter() {
       return { status: 'pristine' };
     }
   } catch (err) {
-    console.error('❌ [PR-BABYSITTER] Error during babysitter execution:', err.message);
-    recordPrState(prNumber, branch, err.message.slice(0, 50), currentAttempts + 1, 'TRIAGE_FAILED', 'ERROR');
-    return { status: 'error', error: err.message };
+    const cleanError = sanitizeMessage(err?.message || 'Unknown error');
+    console.error('❌ [PR-BABYSITTER] Error during babysitter execution:', cleanError);
+    recordPrState(prNumber, branch, cleanError.slice(0, 50), currentAttempts + 1, 'TRIAGE_FAILED', 'ERROR');
+    return { status: 'error', error: cleanError };
   }
 }
 
@@ -170,7 +179,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     console.log('🏁 [PR-BABYSITTER] Exit Status:', res.status);
     process.exit(0);
   }).catch(err => {
-    console.error('💥 [PR-BABYSITTER] Fatal error:', err);
+    console.error('💥 [PR-BABYSITTER] Fatal error:', sanitizeMessage(err?.message || err));
     process.exit(1);
   });
 }
