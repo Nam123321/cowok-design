@@ -2300,7 +2300,7 @@ async fn test_epic01_security_hardening_delete_spec_and_sqlite_proposals_zip_exp
 
     let dl_req = Request::builder()
         .method("GET")
-        .uri(&format!(
+        .uri(format!(
             "/api/v1/projects/{}/snapshots/export/download",
             proj.id
         ))

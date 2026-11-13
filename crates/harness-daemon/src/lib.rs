@@ -651,13 +651,13 @@ pub fn reconcile_project_watchers(
     for id_str in rows.flatten() {
         if let Ok(pid) = uuid::Uuid::parse_str(&id_str) {
             active_ids.insert(pid);
-            if !watchers.contains_key(&pid) {
+            if let std::collections::hash_map::Entry::Vacant(e) = watchers.entry(pid) {
                 if let Ok((proj_reg, proj_root)) =
                     crate::synthesis::resolve_project_scoped_registry(registry, pid)
                 {
                     if proj_root.join("product").join("specs").is_dir() {
                         if let Ok(w) = spec_registry::SpecWatcher::start(proj_reg, pid) {
-                            watchers.insert(pid, w);
+                            e.insert(w);
                         }
                     }
                 }

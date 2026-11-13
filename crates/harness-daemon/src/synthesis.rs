@@ -235,7 +235,7 @@ pub fn ensure_project_token(proj_canon_root: &Path) -> Result<String, HarnessErr
                 .map_err(|e| HarnessError::ValidationFailed {
                     reason: format!("Failed to read project.token: {e}"),
                 })?;
-            return Ok(s.trim().to_string());
+            Ok(s.trim().to_string())
         }
         #[cfg(not(unix))]
         {

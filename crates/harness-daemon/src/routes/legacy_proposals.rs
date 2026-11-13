@@ -1485,11 +1485,7 @@ pub(super) async fn handle_export_snapshots(
         let ready_to_run = files_included.iter().any(|p| p == "package.json");
         let zip_bytes = build_pkzip_archive(&entries);
         let sha256 = format!("{:x}", Sha256::digest(&zip_bytes));
-        let format_ext = if req.format == "tar.gz" {
-            "zip"
-        } else {
-            "zip"
-        };
+        let format_ext = "zip";
         let date_str = chrono::Utc::now().format("%Y%m%d").to_string();
         let file_name = format!("{project_id}-{tenant_for_name}-bundle-{date_str}.{format_ext}");
 

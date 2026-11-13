@@ -179,7 +179,7 @@ mod tests {
             prompt_overview: None,
         };
         assert!(stager
-            .stage_run("../bad-run", &[bad_skill.clone()])
+            .stage_run("../bad-run", std::slice::from_ref(&bad_skill))
             .is_err());
         assert!(stager.stage_run("ok-run", &[bad_skill]).is_err());
     }
