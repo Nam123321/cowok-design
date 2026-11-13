@@ -4,7 +4,7 @@ id: "11.1"
 title: "Story 11.1: POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway"
 description: "Tự động dò tìm và điều phối codex, claude, agy, ollama qua file descriptor 0600 (không lộ prompt trên ps aux), quản lý nhóm tiến trình bằng setpgid/killpg và tích hợp cổng BYOK."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-11/Story-11.1/story.md"
-status: planned
+status: refactored
 risk_tier: 3
 delivery: core
 timestamp: "2026-11-02T13:30:00+07:00"
@@ -27,7 +27,7 @@ consumes_apis: []
 
 - **FR Covered:** [FR-28: POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 11: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Universal Open MCP Server](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-11/epic.md)
-- **Status:** `planned`
+- **Status:** `refactored`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context
@@ -40,11 +40,13 @@ Tự động dò tìm và điều phối codex, claude, agy, ollama qua file des
 - **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
 - **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Dọn sạch 100% tiến trình con và xóa ngay lập tức file tạm 0600 khi tiến trình hoàn tất hoặc bị hủy giữa chừng.
+- **AC-04 (Zero-Global-Pollution $COWOK_SESSION_DIR with O_NOFOLLOW & 26+ Data-Driven Agent Adapters):** Khi chạy các child CLI (`claude`, `codex`, `agy`, `gemini`, `cursor`, `opencode`, `omp`...), tạo thư mục phiên cô lập `$COWOK_SESSION_DIR` với cờ `O_NOFOLLOW` để tiêm cấu hình MCP/Skills/Hooks tạm thời mà tuyệt đối không ghi bẩn 1 file nào vào `~/.claude`, `~/.cursor`, `~/.gemini` hay `~/.codex` của máy người dùng.
 
 ## 4. Tasks
 - [ ] **Task 11.1.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway" (thỏa mãn `AC-01`).
 - [ ] **Task 11.1.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
 - [ ] **Task 11.1.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
+- [ ] **Task 11.1.4**: Cài đặt cơ chế cách ly thư mục phiên `$COWOK_SESSION_DIR` với cờ `O_NOFOLLOW` và tích hợp 26+ data-driven agent adapters chống ghi bẩn môi trường máy chủ (thỏa mãn `AC-04`).
 
 ## 5. AC-to-Task Traceability Matrix
 
@@ -53,6 +55,7 @@ Tự động dò tìm và điều phối codex, claude, agy, ollama qua file des
 | **AC-01** | `Task 11.1.1` | Unit & Integration Test (`cargo test` / `vitest`) |
 | **AC-02** | `Task 11.1.2` | Contract & Schema Verification |
 | **AC-03 (`[EDGE-CASE]`)** | `Task 11.1.3` | Boundary Regression Test |
+| **AC-04** | `Task 11.1.4` | Sandbox & File Isolation Regression Test |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** ["02.3", "09.3"]
@@ -87,3 +90,4 @@ Tự động dò tìm và điều phối codex, claude, agy, ollama qua file des
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 11.1 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
+| 2026-11-12 | 2.0.0 | [refactor-story] Bổ sung AC-04 Zero-Global-Pollution $COWOK_SESSION_DIR (O_NOFOLLOW) & 26+ Agent Adapters theo Master Plan | /refactor-story |

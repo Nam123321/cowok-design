@@ -4,10 +4,10 @@ id: "06.3"
 title: "Story 06.3: Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen Mode"
 description: "Cho phép chọn từng khối data-ff-id để yêu cầu Agent đổi wording hoặc cập nhật số liệu biểu đồ động; hỗ trợ chế độ Presenter View (màn hình phụ hiển thị Speaker Notes và đồng hồ bấm giờ)."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/Story-06.3/story.md"
-status: planned
+status: refactored
 risk_tier: 2
 delivery: core
-timestamp: "2026-11-02T13:30:00+07:00"
+timestamp: "2026-11-12T16:15:00+07:00"
 tags:
   - "story-06.3"
   - "epic-06"
@@ -40,11 +40,13 @@ Cho phép chọn từng khối data-ff-id để yêu cầu Agent đổi wording 
 - **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen Mode" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
 - **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Khi cập nhật số liệu biểu đồ qua Copilot, tự động kiểm tra tổng phần trăm và tính hợp lệ của chuỗi dữ liệu JSON.
+- **AC-04 (Unified Contextual Slide Copilot & Parallel Slide Execution):** Tái sử dụng trực tiếp hạ tầng Contextual Node Chat, Movable Floating Window và Keyed Parallel Execution của `Story 04.3` cho từng `Slide Node` (`SLIDE-01..N`), cho phép thực thi Agent song song giữa các Slide khác nhau (ví dụ: vừa sửa chữ ở Slide 2 vừa nhờ Agent vẽ lại biểu đồ ở Slide 5) và xếp hàng đợi FIFO trên cùng một Slide.
 
 ## 4. Tasks
 - [ ] **Task 06.3.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen Mode" (thỏa mãn `AC-01`).
 - [ ] **Task 06.3.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
 - [ ] **Task 06.3.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
+- [ ] **Task 06.3.4**: Tích hợp Contextual Node Chat, Movable Floating Window và Keyed Parallel Execution cho từng Slide Node `SLIDE-01..N` (thỏa mãn `AC-04`).
 
 ## 5. AC-to-Task Traceability Matrix
 
@@ -53,6 +55,7 @@ Cho phép chọn từng khối data-ff-id để yêu cầu Agent đổi wording 
 | **AC-01** | `Task 06.3.1` | Unit & Integration Test (`cargo test` / `vitest`) |
 | **AC-02** | `Task 06.3.2` | Contract & Schema Verification |
 | **AC-03 (`[EDGE-CASE]`)** | `Task 06.3.3` | Boundary Regression Test |
+| **AC-04** | `Task 06.3.4` | Parallel Slide Execution & Floating Chat Test |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** ["06.2"]
@@ -87,3 +90,4 @@ Cho phép chọn từng khối data-ff-id để yêu cầu Agent đổi wording 
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 06.3 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
+| 2026-11-12 | 2.0.0 | [refactor-story] Bổ sung AC-04 Unified Contextual Slide Copilot & Parallel Slide Execution theo Master Plan | /refactor-story |

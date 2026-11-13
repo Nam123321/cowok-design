@@ -4,10 +4,10 @@ id: "07.3"
 title: "Story 07.3: Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)"
 description: "Đóng gói toàn bộ bài thuyết trình/báo cáo thành 1 file .html độc lập duy nhất (nhúng sẵn CSS tokens, SVG icons, dữ liệu biểu đồ) hoặc kết xuất ra file .pdf vector chuẩn tỷ lệ 16:9."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-07/Story-07.3/story.md"
-status: planned
+status: refactored
 risk_tier: 2
 delivery: core
-timestamp: "2026-11-02T13:30:00+07:00"
+timestamp: "2026-11-12T16:30:00+07:00"
 tags:
   - "story-07.3"
   - "epic-07"
@@ -40,11 +40,15 @@ consumes_apis: []
 - **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
 - **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Đảm bảo các biểu đồ động và SVG icons hiển thị sắc nét 100% khi mở file .html ở chế độ hoàn toàn không có mạng Internet.
+- **AC-04 (Dual Editable .pptx Exporter with Footer-Rail Guarantee & Motion Video — GAP-17):** Bổ sung xuất file PowerPoint `.pptx` chỉnh sửa được (kết hợp `domToPptx` với thuật toán kiểm định đường biên dọc `Footer-Rail` đảm bảo 0% tràn chữ xuống chân slide) và xuất video trình diễn `.mp4`.
+- **AC-05 (Shareable Interactive Stakeholder Review Bundle — GAP-15):** Cho phép xuất 1 gói Prototype HTML Tương tác Độc lập (gồm bản đồ hành trình + màn hình bấm chuyển trang thật + chuyển đổi Desktop/Mobile + chế độ ghi chú nhận xét cho khách hàng/sếp mà không cần cài đặt công cụ lập trình).
 
 ## 4. Tasks
 - [ ] **Task 07.3.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)" (thỏa mãn `AC-01`).
 - [ ] **Task 07.3.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
 - [ ] **Task 07.3.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
+- [ ] **Task 07.3.4**: Cài đặt bộ xuất file PowerPoint `.pptx` chỉnh sửa được có bảo đảm Footer-Rail và xuất video `.mp4` (thỏa mãn `AC-04`).
+- [ ] **Task 07.3.5**: Xây dựng gói xuất Prototype HTML Tương tác Độc lập kèm chế độ Review cho Stakeholder (thỏa mãn `AC-05`).
 
 ## 5. AC-to-Task Traceability Matrix
 
@@ -53,6 +57,8 @@ consumes_apis: []
 | **AC-01** | `Task 07.3.1` | Unit & Integration Test (`cargo test` / `vitest`) |
 | **AC-02** | `Task 07.3.2` | Contract & Schema Verification |
 | **AC-03 (`[EDGE-CASE]`)** | `Task 07.3.3` | Boundary Regression Test |
+| **AC-04** | `Task 07.3.4` | Editable PPTX & Video Export Test |
+| **AC-05** | `Task 07.3.5` | Standalone Prototype Bundle Review Test |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** ["07.1", "06.3"]
@@ -87,3 +93,4 @@ consumes_apis: []
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 07.3 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
+| 2026-11-12 | 2.0.0 | [refactor-story] Bổ sung AC-04 Editable PPTX (GAP-17) & AC-05 Interactive Prototype Review Bundle (GAP-15) theo Master Plan | /refactor-story |

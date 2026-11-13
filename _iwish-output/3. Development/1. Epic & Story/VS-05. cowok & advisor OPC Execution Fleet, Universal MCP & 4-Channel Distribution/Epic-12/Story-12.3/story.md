@@ -4,7 +4,7 @@ id: "12.3"
 title: "Story 12.3: Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD"
 description: "Đóng gói image ghcr.io/cowok-ai/uiux-os tích hợp sẵn Rust Daemon, MCP SSE Server và Headless Chromium phục vụ kiểm định tự động E1..E4 trên CI/CD."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-12/Story-12.3/story.md"
-status: planned
+status: refactored
 risk_tier: 2
 delivery: core
 timestamp: "2026-11-02T13:30:00+07:00"
@@ -27,7 +27,7 @@ consumes_apis: []
 
 - **FR Covered:** [FR-30: Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 12: 4-Channel Packaging & Distribution Architecture](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-12/epic.md)
-- **Status:** `planned`
+- **Status:** `refactored`
 - **Risk Tier:** `2`
 
 ## 1. Story Description & Context
@@ -87,3 +87,4 @@ consumes_apis: []
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 12.3 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
+| 2026-11-12 | 2.0.0 | [refactor-story] Cập nhật trạng thái refactored và đồng bộ quy hoạch đóng gói CI/CD Container Image theo Master Plan | /refactor-story |

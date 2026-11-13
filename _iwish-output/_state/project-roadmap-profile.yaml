@@ -1,9 +1,10 @@
-project_name: Uxui Os
-project_slug: uxui-os
+project_name: cowok-design (Open-Source Agent-Native Design & Presentation Harness
+  OS)
+project_slug: cowok-design
 archetypes:
 - universal-hybrid-saas
 layout_mode: hierarchical
-discovery_tier_used: 'Tier 1: Canonical Horizon-Stream Document'
+discovery_tier_used: 'Tier 2: Physical Bounded Context Clustering'
 max_parallel_tracks: 5
 target_roadmap_path: /Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3.
   Development/development-roadmap.md
@@ -11,35 +12,29 @@ lock_file_path: /Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/
 domain_invariants: []
 track_definitions:
 - track_id: Stream-1
-  track_name: Core Harness & Constraint Engine (`core_specs.prisma`)
+  track_name: VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine
   focus_areas:
-  - '`core_specs.prisma` (`crates'
-  - domain`
-  - '`spec-registry`'
-  - '`prompt-assembler`'
-  - '`ast-guardian`)'
-  worktree_budget: 1
-- track_id: Stream-4
-  track_name: '`agentskills.io` & Plugin Lifecycle (`skills_rea.prisma`)'
-  focus_areas:
-  - '`skills_rea.prisma` (`crates'
-  - skill-repackager`)
+  - VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine
   worktree_budget: 1
 - track_id: Stream-2
-  track_name: Flow-First Design Workbench (`flow_preview.prisma`)
+  track_name: VS-02. Flow-First Executable Design Workbench & SDI Engine
   focus_areas:
-  - '`flow_preview.prisma` (`apps'
-  - web` Flow Canvas)
+  - VS-02. Flow-First Executable Design Workbench & SDI Engine
   worktree_budget: 1
 - track_id: Stream-3
-  track_name: 16:9 Presentation & CMS Studio (`presentation_cms.prisma`)
+  track_name: VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio
   focus_areas:
-  - '`presentation_cms.prisma` (`apps'
-  - web` Dual-Pane CMS)
+  - VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio
+  worktree_budget: 1
+- track_id: Stream-4
+  track_name: VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV
+    — TypeSafe
+  focus_areas:
+  - VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe
   worktree_budget: 1
 - track_id: Stream-5
-  track_name: '`cowok` & `advisor` OPC Fleet (`opc_fleet.prisma`)'
+  track_name: VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel
+    Distribution
   focus_areas:
-  - '`opc_fleet.prisma` (`crates'
-  - agent-fleet`)
+  - VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution
   worktree_budget: 1

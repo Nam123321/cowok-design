@@ -4,10 +4,10 @@ id: "07.2"
 title: "Story 07.2: Lớp phủ Visual QC Overlay & Vòng lặp Auto-Fix 1-Click trên Workbench"
 description: "Đánh dấu trực tiếp các vùng vi phạm bố cục/tương phản ngay trên màn hình preview hoặc slide kèm nút Auto-Fix để AST Patcher hoặc Agent tự động xử lý."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-07/Story-07.2/story.md"
-status: planned
+status: refactored
 risk_tier: 2
 delivery: core
-timestamp: "2026-11-02T13:30:00+07:00"
+timestamp: "2026-11-12T16:25:00+07:00"
 tags:
   - "story-07.2"
   - "epic-07"
@@ -40,11 +40,13 @@ consumes_apis: []
 - **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Lớp phủ Visual QC Overlay & Vòng lặp Auto-Fix 1-Click trên Workbench" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
 - **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Giới hạn vòng lặp Auto-Fix tối đa 3 lần và hiển thị so sánh trước/sau để tránh làm hỏng ý đồ thiết kế của người dùng.
+- **AC-04 (Project Readiness Dashboard & 1-Click Deterministic lint_fix — GAP-14):** Hiển thị bảng tổng hợp sức khỏe dự án trước khi nghiệm thu; các lỗi hình học/token có thể sửa xác định sẽ được nắn ngay bằng `lint_fix` trong `<10ms` (`0` token), chỉ những lỗi cần viết lại cấu trúc mới gọi vòng tự sửa của Agent.
 
 ## 4. Tasks
 - [ ] **Task 07.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Lớp phủ Visual QC Overlay & Vòng lặp Auto-Fix 1-Click trên Workbench" (thỏa mãn `AC-01`).
 - [ ] **Task 07.2.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
 - [ ] **Task 07.2.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
+- [ ] **Task 07.2.4**: Xây dựng Project Readiness Dashboard và cơ chế 1-Click Deterministic `lint_fix` `<10ms` (thỏa mãn `AC-04`).
 
 ## 5. AC-to-Task Traceability Matrix
 
@@ -53,6 +55,7 @@ consumes_apis: []
 | **AC-01** | `Task 07.2.1` | Unit & Integration Test (`cargo test` / `vitest`) |
 | **AC-02** | `Task 07.2.2` | Contract & Schema Verification |
 | **AC-03 (`[EDGE-CASE]`)** | `Task 07.2.3` | Boundary Regression Test |
+| **AC-04** | `Task 07.2.4` | Deterministic lint_fix Execution Test |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** ["07.1"]
@@ -87,3 +90,4 @@ consumes_apis: []
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 07.2 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
+| 2026-11-12 | 2.0.0 | [refactor-story] Bổ sung AC-04 Project Readiness Dashboard & 1-Click Deterministic lint_fix (GAP-14) theo Master Plan | /refactor-story |

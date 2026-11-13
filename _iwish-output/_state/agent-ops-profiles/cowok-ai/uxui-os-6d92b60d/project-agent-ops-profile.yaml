@@ -3,38 +3,38 @@ profile_kind: DERIVED_EVIDENCE_PROFILE
 repo_id: cowok-ai
 worktree_id: uxui-os-6d92b60d
 worktree_root: /Users/hatrang20061988/Desktop/AI Project/uxui-os
-git_head: unknown
+git_head: f8af51941f4b54151fae280dc0413f8bdff3926f
 policy_version: 2.1.0
 probe_version: 2.1.0
-generated_at: '2026-11-02T07:14:27.190322+00:00'
-sha256_digest: sha256:a48ab879e93fc968ebd784af586966e3873f126363d1548bf79e900df27bb5f9
+generated_at: '2026-11-09T05:35:09.743079+00:00'
+sha256_digest: sha256:431b25e7abc33e654920d0b0901d98a8dba9dc5be365be3baf014a56ddf3fd5e
 overall_status: NOT_READY
 delta_summary:
-  previous_digest: null
+  previous_digest: sha256:431b25e7abc33e654920d0b0901d98a8dba9dc5be365be3baf014a56ddf3fd5e
   digest_changed: false
   changed_probes: []
 source_manifest:
 - path: _iwish-output/2. Product Planning/2.5. architecture.md
   present: true
-  sha256: sha256:bbb2254466a908070de945737f5a1f779af661d1e5d709fb82c6af8f0ddc0d1c
+  sha256: sha256:637dc3d039138753fbaac49d11878b76ae8be49ed2abb2925c7fb350c3621a1b
 - path: _iwish-output/3. Development/development-roadmap.md
   present: true
-  sha256: sha256:f3c5201bfcd763446711c1c893de96b2e21decdc751173eaba378a4bb0df7d6a
+  sha256: sha256:1db0f4d4dc55aff8723b07ac59d561b65ca23c2732fdbb826f724dfbf0749749
 - path: prisma/schema.prisma
-  present: false
-  sha256: MISSING
+  present: true
+  sha256: sha256:79bf3ff0a6bd8c73cbb334ab8f97b6d9b743f4505390fc4063d618c515c19328
 - path: src/lib/api-guard.ts
-  present: false
-  sha256: MISSING
+  present: true
+  sha256: sha256:64210dfa421076b61171e7772ebcedef28f0563126ed5a3b0f3cdcd2d46289be
 probes:
   M1:
     title: Auth, Tenant RLS & GuardedRoute Enforcement
     critical: true
     spec_status: FAIL
-    physical_status: FAIL
+    physical_status: PASS
     evidence:
     - path: src/lib/api-guard.ts
-      sha256: MISSING
+      sha256: sha256:64210dfa421076b61171e7772ebcedef28f0563126ed5a3b0f3cdcd2d46289be
       assertion: guardedRoute & createCrossTenantHandler exported
     blockers:
     - Missing guardedRoute or RLS spec
@@ -56,7 +56,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: _iwish-output/3. Development/development-roadmap.md
-      sha256: sha256:f3c5201bfcd763446711c1c893de96b2e21decdc751173eaba378a4bb0df7d6a
+      sha256: sha256:1db0f4d4dc55aff8723b07ac59d561b65ca23c2732fdbb826f724dfbf0749749
       assertion: Intent Router & Discovery service verified
     blockers:
     - Missing Intent Router / Discovery service
@@ -79,7 +79,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: _iwish-output/2. Product Planning/2.5. architecture.md
-      sha256: sha256:bbb2254466a908070de945737f5a1f779af661d1e5d709fb82c6af8f0ddc0d1c
+      sha256: sha256:637dc3d039138753fbaac49d11878b76ae8be49ed2abb2925c7fb350c3621a1b
       assertion: Execution services verified in src/
     blockers:
     - Missing plugin/tool execution service in src/
@@ -90,7 +90,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: prisma/schema.prisma
-      sha256: MISSING
+      sha256: sha256:79bf3ff0a6bd8c73cbb334ab8f97b6d9b743f4505390fc4063d618c515c19328
       assertion: Physical Prisma models verified
     blockers:
     - Missing required domain/registry models in Prisma schema
@@ -98,13 +98,12 @@ probes:
     title: HITL Proposal Card & GenUI Surface
     critical: false
     spec_status: PASS
-    physical_status: FAIL
+    physical_status: PASS
     evidence:
     - path: _iwish-output/3. Development/development-roadmap.md
-      sha256: sha256:f3c5201bfcd763446711c1c893de96b2e21decdc751173eaba378a4bb0df7d6a
+      sha256: sha256:1db0f4d4dc55aff8723b07ac59d561b65ca23c2732fdbb826f724dfbf0749749
       assertion: Feature surface verified
-    blockers:
-    - Missing UI/API feature surface
+    blockers: []
   M8:
     title: Control Plane, Canary & Rollback Pointers
     critical: true
@@ -112,7 +111,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: prisma/schema.prisma
-      sha256: MISSING
+      sha256: sha256:79bf3ff0a6bd8c73cbb334ab8f97b6d9b743f4505390fc4063d618c515c19328
       assertion: PluginRegistry & CuratedPluginImportJob/CapabilityPackageVersion
         present
     blockers:

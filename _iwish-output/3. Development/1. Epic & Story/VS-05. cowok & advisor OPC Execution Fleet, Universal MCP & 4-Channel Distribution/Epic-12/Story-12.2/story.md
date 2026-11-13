@@ -4,7 +4,7 @@ id: "12.2"
 title: "Story 12.2: Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai"
 description: "Đóng gói ứng dụng Desktop gốc nhẹ (~25MB) cho người dùng non-tech và xuất bản gói cài đặt 1-click Native Plugin & Skill Pack cho Cowok.ai."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-12/Story-12.2/story.md"
-status: planned
+status: refactored
 risk_tier: 2
 delivery: core
 timestamp: "2026-11-02T13:30:00+07:00"
@@ -27,7 +27,7 @@ consumes_apis: []
 
 - **FR Covered:** [FR-30: Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 12: 4-Channel Packaging & Distribution Architecture](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-12/epic.md)
-- **Status:** `planned`
+- **Status:** `refactored`
 - **Risk Tier:** `2`
 
 ## 1. Story Description & Context
@@ -40,11 +40,13 @@ consumes_apis: []
 - **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
 - **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Tự động đồng bộ cấu hình kết nối MCP và cặp đôi cowok/advisor khi cài đặt vào không gian làm việc Cowok.ai.
+- **AC-04 (Tauri v2 HMAC Preload Trust Boundary & Packaged Native Module / Updater Harness):** Khoanh vùng bảo mật chọn thư mục bằng HMAC token ở tiến trình chính (không lộ đường dẫn thô xuống WebView) và tự động kiểm tra tính toàn vẹn của mọi native module + auto-updater trước khi đóng gói `.dmg/.msi/.AppImage` và gói Native Plugin cho `Cowok.ai`.
 
 ## 4. Tasks
 - [ ] **Task 12.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai" (thỏa mãn `AC-01`).
 - [ ] **Task 12.2.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
 - [ ] **Task 12.2.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
+- [ ] **Task 12.2.4**: Cài đặt cơ chế bảo mật HMAC Token Preload Trust Boundary và harness kiểm tra tính toàn vẹn Native Module + Auto-updater cho Tauri v2 (thỏa mãn `AC-04`).
 
 ## 5. AC-to-Task Traceability Matrix
 
@@ -53,6 +55,7 @@ consumes_apis: []
 | **AC-01** | `Task 12.2.1` | Unit & Integration Test (`cargo test` / `vitest`) |
 | **AC-02** | `Task 12.2.2` | Contract & Schema Verification |
 | **AC-03 (`[EDGE-CASE]`)** | `Task 12.2.3` | Boundary Regression Test |
+| **AC-04** | `Task 12.2.4` | HMAC Preload Security & Updater Integrity Test |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** ["12.1"]
@@ -87,3 +90,4 @@ consumes_apis: []
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 12.2 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
+| 2026-11-12 | 2.0.0 | [refactor-story] Bổ sung AC-04 Tauri v2 HMAC Preload Trust Boundary & Packaged Native Module / Updater Harness theo Master Plan | /refactor-story |

@@ -1,8 +1,8 @@
 ---
 type: I-Wish Epic
 id: "Epic-11"
-title: "Epic 11: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Universal Open MCP Server"
-status: planned
+title: "Epic 11: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Compiler-Grade Open MCP Ecosystem"
+status: in-progress
 track: "Stream-5"
 wave: 4
 provides: ["crates/byos-sandbox (0600 FD + setpgid)", "Ephemeral Tool Forging Sandbox", "crates/mcp-server (4 Permission Tiers)"]
@@ -13,7 +13,7 @@ links_to:
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.2.%20database-spec.md"
 ---
 
-# Epic 11: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Universal Open MCP Server
+# Epic 11: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Compiler-Grade Open MCP Ecosystem
 
 ## 1. Epic Overview & Value Stream Alignment
 - **Value Stream:** `VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution`
@@ -26,8 +26,9 @@ links_to:
 
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
-| **Story 11.1** | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | `planned` | `3` | `['02.3', '09.3']` |
-| **Story 11.2** | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | `planned` | `3` | `['11.1', '10.3']` |
+| **Story 11.1** | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | `refactored` | `3` | `['02.3', '09.3']` |
+| **Story 11.2** | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | `refactored` | `3` | `['11.1', '10.3']` |
+| **Story 11.3** | Compiler-Grade Bidirectional Open MCP Server & 1-Click Host Installer UI | `refactored` | `3` | `['11.1', '10.2']` |
 | **Story 11.3** | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | `planned` | `3` | `['11.1', '10.2']` |
 
 ## 3. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
@@ -47,3 +48,74 @@ links_to:
 - [x] **Tracer Bullet?** Yes
 - [x] **Deletion Testable?** Yes
 - [x] **Interface vs Implementation?** Yes
+
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 02.3, 09.3 | planned |
+| [Story-11.2](./Story-11.2/story.md) | Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging) | 11.1, 10.3 | planned |
+| [Story-11.3](./Story-11.3/story.md) | Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền | 11.1, 10.2 | planned |

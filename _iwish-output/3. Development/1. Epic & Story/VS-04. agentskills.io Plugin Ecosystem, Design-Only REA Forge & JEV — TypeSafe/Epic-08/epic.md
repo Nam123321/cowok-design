@@ -47,3 +47,74 @@ links_to:
 - [x] **Tracer Bullet?** Yes
 - [x] **Deletion Testable?** Yes
 - [x] **Interface vs Implementation?** Yes
+
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-08.1](./Story-08.1/story.md) | Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills) | 01.2, 02.1 | ready-for-dev |
+| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager) | 08.1 | planned |
+| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler) | 08.2 | planned |

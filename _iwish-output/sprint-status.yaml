@@ -20,7 +20,7 @@ epics:
     wave: 1
   Epic-03:
     title: Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher
-    status: planned
+    status: completed
     track: Stream-1
     wave: 1
   Epic-04:
@@ -129,7 +129,7 @@ stories:
       (Flagship Preset 145 Icons)
     epic: '03'
     risk_tier: 2
-    status: planned
+    status: completed
     dependencies:
     - '03.1'
   '03.3':

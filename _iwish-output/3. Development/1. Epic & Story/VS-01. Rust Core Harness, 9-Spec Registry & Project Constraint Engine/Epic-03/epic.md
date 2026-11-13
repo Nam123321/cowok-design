@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-03"
 title: "Epic 03: Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher"
-status: planned
+status: completed
 track: "Stream-1"
 wave: 1
 provides: ["crates/ast-guardian", "PROJECT_CONSTRAINTS Enforcer", "data-ff-id <1ms Surgical Patcher"]
@@ -27,7 +27,7 @@ links_to:
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
 | **Story 03.1** | Động cơ Ràng buộc Cấu hình theo Dự án (PROJECT_CONSTRAINTS) & oxc AST Linter | `ready-for-dev` | `2` | `['01.2']` |
-| **Story 03.2** | Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons) | `planned` | `2` | `['03.1']` |
+| **Story 03.2** | Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons) | `completed` | `2` | `['03.1']` |
 | **Story 03.3** | Deterministic data-ff-id AST Injector & <1ms Surgical Patcher | `planned` | `3` | `['03.1']` |
 
 ## 3. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)

@@ -1061,11 +1061,7 @@ impl AstLinter {
             }
         }
 
-        if base.contains("-[") && base.ends_with(']') {
-            return true;
-        }
-
-        false
+        base.contains("-[") && base.ends_with(']')
     }
 }
 
