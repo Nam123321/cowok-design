@@ -1,0 +1,879 @@
+{
+  "name": "cowok.ai Iconography v2",
+  "status": "APPROVED",
+  "count": 143,
+  "architecture": {
+    "coreBrandSemantic": 28,
+    "systemDomain": 115
+  },
+  "exactSourceExceptions": [
+    "approval",
+    "connector",
+    "shared-cowok"
+  ],
+  "construction": {
+    "grid": "24x24",
+    "defaultStroke": 1.8,
+    "color": "currentColor"
+  },
+  "icons": [
+    {
+      "name": "activity",
+      "tier": "core-brand-semantic",
+      "file": "svg/activity.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "ai-agent",
+      "tier": "core-brand-semantic",
+      "file": "svg/ai-agent.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "ai-evolution",
+      "tier": "core-brand-semantic",
+      "file": "svg/ai-evolution.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "approval",
+      "tier": "core-brand-semantic",
+      "file": "svg/approval.svg",
+      "source": "exact uploaded source"
+    },
+    {
+      "name": "automation",
+      "tier": "core-brand-semantic",
+      "file": "svg/automation.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "connector",
+      "tier": "core-brand-semantic",
+      "file": "svg/connector.svg",
+      "source": "exact uploaded source"
+    },
+    {
+      "name": "department",
+      "tier": "core-brand-semantic",
+      "file": "svg/department.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "execution-pipeline",
+      "tier": "core-brand-semantic",
+      "file": "svg/execution-pipeline.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "handoff",
+      "tier": "core-brand-semantic",
+      "file": "svg/handoff.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "human-staff",
+      "tier": "core-brand-semantic",
+      "file": "svg/human-staff.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "integration",
+      "tier": "core-brand-semantic",
+      "file": "svg/integration.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "knowledge-base",
+      "tier": "core-brand-semantic",
+      "file": "svg/knowledge-base.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "progress",
+      "tier": "core-brand-semantic",
+      "file": "svg/progress.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "project",
+      "tier": "core-brand-semantic",
+      "file": "svg/project.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "proposal",
+      "tier": "core-brand-semantic",
+      "file": "svg/proposal.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "review-required",
+      "tier": "core-brand-semantic",
+      "file": "svg/review-required.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "role",
+      "tier": "core-brand-semantic",
+      "file": "svg/role.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "security",
+      "tier": "core-brand-semantic",
+      "file": "svg/security.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "shared-cowok",
+      "tier": "core-brand-semantic",
+      "file": "svg/shared-cowok.svg",
+      "source": "exact uploaded source"
+    },
+    {
+      "name": "skill",
+      "tier": "core-brand-semantic",
+      "file": "svg/skill.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "status",
+      "tier": "core-brand-semantic",
+      "file": "svg/status.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "supervisor",
+      "tier": "core-brand-semantic",
+      "file": "svg/supervisor.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "task",
+      "tier": "core-brand-semantic",
+      "file": "svg/task.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "team",
+      "tier": "core-brand-semantic",
+      "file": "svg/team.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "tool",
+      "tier": "core-brand-semantic",
+      "file": "svg/tool.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "wiki",
+      "tier": "core-brand-semantic",
+      "file": "svg/wiki.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "workflow",
+      "tier": "core-brand-semantic",
+      "file": "svg/workflow.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "workspace",
+      "tier": "core-brand-semantic",
+      "file": "svg/workspace.svg",
+      "source": "cowok v2 custom"
+    },
+    {
+      "name": "add-member",
+      "tier": "system-domain",
+      "file": "svg/add-member.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-accountant",
+      "tier": "system-domain",
+      "file": "svg/agent-accountant.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-devops",
+      "tier": "system-domain",
+      "file": "svg/agent-devops.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-legal",
+      "tier": "system-domain",
+      "file": "svg/agent-legal.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-mkt-brand",
+      "tier": "system-domain",
+      "file": "svg/agent-mkt-brand.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-mkt-content",
+      "tier": "system-domain",
+      "file": "svg/agent-mkt-content.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-mkt-copywriter",
+      "tier": "system-domain",
+      "file": "svg/agent-mkt-copywriter.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-mkt-designer",
+      "tier": "system-domain",
+      "file": "svg/agent-mkt-designer.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-mkt-ecom",
+      "tier": "system-domain",
+      "file": "svg/agent-mkt-ecom.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-mkt-kol",
+      "tier": "system-domain",
+      "file": "svg/agent-mkt-kol.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-mkt-ops",
+      "tier": "system-domain",
+      "file": "svg/agent-mkt-ops.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-mkt-trade",
+      "tier": "system-domain",
+      "file": "svg/agent-mkt-trade.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-qa",
+      "tier": "system-domain",
+      "file": "svg/agent-qa.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-recruiter",
+      "tier": "system-domain",
+      "file": "svg/agent-recruiter.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-sales-admin",
+      "tier": "system-domain",
+      "file": "svg/agent-sales-admin.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-sales-ops",
+      "tier": "system-domain",
+      "file": "svg/agent-sales-ops.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-sales-reporter",
+      "tier": "system-domain",
+      "file": "svg/agent-sales-reporter.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "agent-sales",
+      "tier": "system-domain",
+      "file": "svg/agent-sales.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "ai-card",
+      "tier": "system-domain",
+      "file": "svg/ai-card.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "analytics",
+      "tier": "system-domain",
+      "file": "svg/analytics.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "assets",
+      "tier": "system-domain",
+      "file": "svg/assets.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "auto-fix",
+      "tier": "system-domain",
+      "file": "svg/auto-fix.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "bell",
+      "tier": "system-domain",
+      "file": "svg/bell.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "box",
+      "tier": "system-domain",
+      "file": "svg/box.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "bulk-select",
+      "tier": "system-domain",
+      "file": "svg/bulk-select.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "calendar",
+      "tier": "system-domain",
+      "file": "svg/calendar.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "chat",
+      "tier": "system-domain",
+      "file": "svg/chat.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "check-circle",
+      "tier": "system-domain",
+      "file": "svg/check-circle.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "chevron-down",
+      "tier": "system-domain",
+      "file": "svg/chevron-down.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "chevron-right",
+      "tier": "system-domain",
+      "file": "svg/chevron-right.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "commissions",
+      "tier": "system-domain",
+      "file": "svg/commissions.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "copy-text",
+      "tier": "system-domain",
+      "file": "svg/copy-text.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "corner-up-left",
+      "tier": "system-domain",
+      "file": "svg/corner-up-left.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "dashboard",
+      "tier": "system-domain",
+      "file": "svg/dashboard.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "data-desk",
+      "tier": "system-domain",
+      "file": "svg/data-desk.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "data-grid",
+      "tier": "system-domain",
+      "file": "svg/data-grid.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "database",
+      "tier": "system-domain",
+      "file": "svg/database.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "deploy",
+      "tier": "system-domain",
+      "file": "svg/deploy.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "download",
+      "tier": "system-domain",
+      "file": "svg/download.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "draft",
+      "tier": "system-domain",
+      "file": "svg/draft.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "edit",
+      "tier": "system-domain",
+      "file": "svg/edit.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "eye-off",
+      "tier": "system-domain",
+      "file": "svg/eye-off.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "eye",
+      "tier": "system-domain",
+      "file": "svg/eye.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "file-text",
+      "tier": "system-domain",
+      "file": "svg/file-text.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "file",
+      "tier": "system-domain",
+      "file": "svg/file.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "folder",
+      "tier": "system-domain",
+      "file": "svg/folder.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "forward",
+      "tier": "system-domain",
+      "file": "svg/forward.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "github",
+      "tier": "system-domain",
+      "file": "svg/github.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "globe",
+      "tier": "system-domain",
+      "file": "svg/globe.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "hard-drive",
+      "tier": "system-domain",
+      "file": "svg/hard-drive.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "hash",
+      "tier": "system-domain",
+      "file": "svg/hash.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "help-circle",
+      "tier": "system-domain",
+      "file": "svg/help-circle.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "image-icon",
+      "tier": "system-domain",
+      "file": "svg/image-icon.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "jump-message",
+      "tier": "system-domain",
+      "file": "svg/jump-message.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "kanban",
+      "tier": "system-domain",
+      "file": "svg/kanban.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "key",
+      "tier": "system-domain",
+      "file": "svg/key.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "lark",
+      "tier": "system-domain",
+      "file": "svg/lark.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "layers",
+      "tier": "system-domain",
+      "file": "svg/layers.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "lightbulb",
+      "tier": "system-domain",
+      "file": "svg/lightbulb.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "link",
+      "tier": "system-domain",
+      "file": "svg/link.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "llm-config",
+      "tier": "system-domain",
+      "file": "svg/llm-config.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "lock",
+      "tier": "system-domain",
+      "file": "svg/lock.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "log-out",
+      "tier": "system-domain",
+      "file": "svg/log-out.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "map",
+      "tier": "system-domain",
+      "file": "svg/map.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "member",
+      "tier": "system-domain",
+      "file": "svg/member.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "message-square",
+      "tier": "system-domain",
+      "file": "svg/message-square.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "monitor",
+      "tier": "system-domain",
+      "file": "svg/monitor.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "moon",
+      "tier": "system-domain",
+      "file": "svg/moon.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "more-horizontal",
+      "tier": "system-domain",
+      "file": "svg/more-horizontal.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "notification",
+      "tier": "system-domain",
+      "file": "svg/notification.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "onboarding",
+      "tier": "system-domain",
+      "file": "svg/onboarding.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "panel-left-close",
+      "tier": "system-domain",
+      "file": "svg/panel-left-close.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "panel-right",
+      "tier": "system-domain",
+      "file": "svg/panel-right.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "pin-off",
+      "tier": "system-domain",
+      "file": "svg/pin-off.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "pin",
+      "tier": "system-domain",
+      "file": "svg/pin.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "play",
+      "tier": "system-domain",
+      "file": "svg/play.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "plugin",
+      "tier": "system-domain",
+      "file": "svg/plugin.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "plus",
+      "tier": "system-domain",
+      "file": "svg/plus.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "reconciliation",
+      "tier": "system-domain",
+      "file": "svg/reconciliation.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "refresh",
+      "tier": "system-domain",
+      "file": "svg/refresh.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "reply",
+      "tier": "system-domain",
+      "file": "svg/reply.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "report",
+      "tier": "system-domain",
+      "file": "svg/report.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "sales-deck",
+      "tier": "system-domain",
+      "file": "svg/sales-deck.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "schema-topology",
+      "tier": "system-domain",
+      "file": "svg/schema-topology.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "search",
+      "tier": "system-domain",
+      "file": "svg/search.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "send",
+      "tier": "system-domain",
+      "file": "svg/send.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "server",
+      "tier": "system-domain",
+      "file": "svg/server.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "settings",
+      "tier": "system-domain",
+      "file": "svg/settings.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "shield-alert",
+      "tier": "system-domain",
+      "file": "svg/shield-alert.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "shield-check",
+      "tier": "system-domain",
+      "file": "svg/shield-check.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "shield",
+      "tier": "system-domain",
+      "file": "svg/shield.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "slack",
+      "tier": "system-domain",
+      "file": "svg/slack.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "smile",
+      "tier": "system-domain",
+      "file": "svg/smile.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "sql-explain",
+      "tier": "system-domain",
+      "file": "svg/sql-explain.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "subscriptions",
+      "tier": "system-domain",
+      "file": "svg/subscriptions.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "sun",
+      "tier": "system-domain",
+      "file": "svg/sun.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "switch-workspace",
+      "tier": "system-domain",
+      "file": "svg/switch-workspace.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "switch",
+      "tier": "system-domain",
+      "file": "svg/switch.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "table-pro",
+      "tier": "system-domain",
+      "file": "svg/table-pro.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "talent-pool",
+      "tier": "system-domain",
+      "file": "svg/talent-pool.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "telegram",
+      "tier": "system-domain",
+      "file": "svg/telegram.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "terminal",
+      "tier": "system-domain",
+      "file": "svg/terminal.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "ticket-discrepancy",
+      "tier": "system-domain",
+      "file": "svg/ticket-discrepancy.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "token-chip",
+      "tier": "system-domain",
+      "file": "svg/token-chip.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "topic",
+      "tier": "system-domain",
+      "file": "svg/topic.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "trash2",
+      "tier": "system-domain",
+      "file": "svg/trash2.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "trending-up",
+      "tier": "system-domain",
+      "file": "svg/trending-up.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "upload",
+      "tier": "system-domain",
+      "file": "svg/upload.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "user",
+      "tier": "system-domain",
+      "file": "svg/user.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "users",
+      "tier": "system-domain",
+      "file": "svg/users.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "vouchers",
+      "tier": "system-domain",
+      "file": "svg/vouchers.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "whatsapp",
+      "tier": "system-domain",
+      "file": "svg/whatsapp.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "wiki-save",
+      "tier": "system-domain",
+      "file": "svg/wiki-save.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "x",
+      "tier": "system-domain",
+      "file": "svg/x.svg",
+      "source": "uploaded system/domain normalized"
+    },
+    {
+      "name": "zip",
+      "tier": "system-domain",
+      "file": "svg/zip.svg",
+      "source": "uploaded system/domain normalized"
+    }
+  ]
+}

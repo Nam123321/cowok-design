@@ -29,7 +29,8 @@ pub use crate::routes::{
     LintSourceRequest, LintSourceResponse, ModelAdapterRequestDto, PathTokenPayload,
     PathTokenResponse, ProjectBoundaryDto, ProjectDto, ProjectSpecsListResponse,
     PromoteScratchRequest, PromptCompileRequest, PutSpecRequest, SpecItemWithDriftDto,
-    UpdateChatSessionRequest, VerifyPathTokenRequest,
+    UpdateChatSessionRequest, ValidateComponentRequest, ValidateIconRequest,
+    ValidateTypographyRequest, VerifyPathTokenRequest,
 };
 pub use crate::synthesis::{
     count_provenance_markers, ensure_project_token, resolve_project_scoped_registry,
@@ -236,20 +237,33 @@ impl DaemonHttpClient {
         adapter.adapt(&adapt_req)
     }
 
-    /// Runs AST and lexical linting on JSX/HTML source under the project's active constraints.
+    /// Runs AST and lexical linting on JSX/HTML source under the project's active constraints
+    /// and persisted icon/typography/component design contracts.
     pub fn lint_source(
         &self,
         project_id: Uuid,
         source: &str,
     ) -> Result<LintSourceResponse, HarnessError> {
-        let (project_registry, _) =
+        let (project_registry, canon_project_root) =
             resolve_project_scoped_registry(&self.state.registry, project_id)?;
         let conn = project_registry.pool().connection()?;
         let constraints = constraint_engine::ConstraintEvaluator::load_constraints_for_project(
             &conn,
             &project_id.to_string(),
         )?;
-        let violations = constraint_engine::AstLinter::lint_source(source, &constraints)?;
+        let (icon_manifest, typography_contract, component_registry) =
+            constraint_engine::IconValidator::load_project_design_context(
+                &conn,
+                &canon_project_root,
+                &project_id.to_string(),
+            )?;
+        let violations = constraint_engine::AstLinter::lint_source_with_context(
+            source,
+            &constraints,
+            Some(&icon_manifest),
+            Some(&typography_contract),
+            Some(&component_registry),
+        )?;
         let passed = violations.is_empty();
         Ok(LintSourceResponse { violations, passed })
     }
@@ -320,9 +334,16 @@ impl DaemonHttpClient {
             let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
             tx.execute(
                 "INSERT INTO constraint_profiles (id, project_id, preset_profile, styling_policy, forbid_tailwind, forbid_raw_hex, tokens_css_path, icon_manifest_path, allowed_icon_set_json, typography_contract_json, updated_at)
-                 VALUES (?1, ?2, 'custom', 'tokens_strict', ?3, ?4, 'tokens.css', 'icons.json', '[]', '{}', ?5)
-                 ON CONFLICT(project_id, preset_profile) DO UPDATE SET forbid_tailwind = ?3, forbid_raw_hex = ?4, updated_at = ?5",
-                rusqlite::params![prof_id_str, proj_id_str, forbid_tailwind, forbid_raw_hex, now_ms],
+                 VALUES (?1, ?2, 'custom', 'tokens_strict', ?3, ?4, 'tokens.css', ?5, '[]', '{}', ?6)
+                 ON CONFLICT(project_id, preset_profile) DO UPDATE SET forbid_tailwind = ?3, forbid_raw_hex = ?4, updated_at = ?6",
+                rusqlite::params![
+                    prof_id_str,
+                    proj_id_str,
+                    forbid_tailwind,
+                    forbid_raw_hex,
+                    constraint_engine::FLAGSHIP_MANIFEST_SENTINEL,
+                    now_ms
+                ],
             )?;
 
             let effective_prof_id: String = tx.query_row(
@@ -355,7 +376,7 @@ impl DaemonHttpClient {
         Ok(active)
     }
 
-    /// Retrieves the IconManifest for a project or the flagship default if not configured.
+    /// Retrieves the fail-closed IconManifest for a project (or flagship when set to builtin://flagship).
     pub fn get_icon_manifest(
         &self,
         project_id: Uuid,
@@ -363,23 +384,12 @@ impl DaemonHttpClient {
         let (project_registry, project_root) =
             resolve_project_scoped_registry(&self.state.registry, project_id)?;
         let conn = project_registry.pool().connection()?;
-        let manifest_path_rel: Option<String> = conn.query_row(
-            "SELECT icon_manifest_path FROM constraint_profiles WHERE project_id = ?1 ORDER BY updated_at DESC LIMIT 1",
-            rusqlite::params![project_id.to_string()],
-            |r| r.get(0),
-        ).ok();
-
-        if let Some(rel) = manifest_path_rel {
-            let full_path = project_root.join(&rel);
-            if full_path.is_file() {
-                if let Ok(content) = std::fs::read_to_string(&full_path) {
-                    if let Ok(m) = constraint_engine::IconValidator::parse_manifest(&content) {
-                        return Ok(m);
-                    }
-                }
-            }
-        }
-        Ok(constraint_engine::IconValidator::get_flagship_manifest())
+        let (manifest, _, _) = constraint_engine::IconValidator::load_project_design_context(
+            &conn,
+            &project_root,
+            &project_id.to_string(),
+        )?;
+        Ok(manifest)
     }
 
     /// Validates an icon name against project's icon manifest or flagship default.
@@ -392,6 +402,91 @@ impl DaemonHttpClient {
         Ok(constraint_engine::IconValidator::validate_icon(
             &manifest, icon_name,
         ))
+    }
+
+    /// Validates typography properties against the project's persisted TypographyContract.
+    pub fn validate_typography(
+        &self,
+        project_id: Uuid,
+        req: &ValidateTypographyRequest,
+    ) -> Result<constraint_engine::TypographyValidationReport, HarnessError> {
+        let (project_registry, project_root) =
+            resolve_project_scoped_registry(&self.state.registry, project_id)?;
+        let conn = project_registry.pool().connection()?;
+        let (_, typography_contract, _) =
+            constraint_engine::IconValidator::load_project_design_context(
+                &conn,
+                &project_root,
+                &project_id.to_string(),
+            )?;
+        Ok(
+            constraint_engine::IconValidator::validate_typography_report(
+                &typography_contract,
+                &req.font_family,
+                req.font_weight,
+                req.font_size.as_deref(),
+                req.contrast_ratio,
+            ),
+        )
+    }
+
+    /// Validates a JSX component identifier against the project's `07_COMPONENT_REGISTRY`.
+    pub fn validate_component(
+        &self,
+        project_id: Uuid,
+        component_name: &str,
+    ) -> Result<constraint_engine::ComponentValidationReport, HarnessError> {
+        let (project_registry, project_root) =
+            resolve_project_scoped_registry(&self.state.registry, project_id)?;
+        let conn = project_registry.pool().connection()?;
+        let (_, _, component_registry) =
+            constraint_engine::IconValidator::load_project_design_context(
+                &conn,
+                &project_root,
+                &project_id.to_string(),
+            )?;
+        Ok(constraint_engine::IconValidator::validate_component(
+            &component_registry,
+            component_name,
+        ))
+    }
+
+    /// Retrieves persisted design contracts for a project.
+    pub fn get_design_contracts(
+        &self,
+        project_id: Uuid,
+    ) -> Result<domain::ProjectDesignContracts, HarnessError> {
+        let (project_registry, project_root) =
+            resolve_project_scoped_registry(&self.state.registry, project_id)?;
+        let conn = project_registry.pool().connection()?;
+        constraint_engine::IconValidator::load_project_design_contracts(
+            &conn,
+            &project_root,
+            &project_id.to_string(),
+        )
+    }
+
+    /// Validates and persists updated design contracts for a project.
+    pub fn set_design_contracts(
+        &self,
+        project_id: Uuid,
+        contracts: &domain::ProjectDesignContracts,
+    ) -> Result<domain::ProjectDesignContracts, HarnessError> {
+        let (project_registry, project_root) =
+            resolve_project_scoped_registry(&self.state.registry, project_id)?;
+        let mut conn = project_registry.pool().connection()?;
+        let proj_id_str = project_id.to_string();
+        constraint_engine::IconValidator::save_project_design_contracts(
+            &mut conn,
+            &project_root,
+            &proj_id_str,
+            contracts,
+        )?;
+        constraint_engine::IconValidator::load_project_design_contracts(
+            &conn,
+            &project_root,
+            &proj_id_str,
+        )
     }
 
     /// Injects deterministic `data-ff-id` attributes into JSX elements.

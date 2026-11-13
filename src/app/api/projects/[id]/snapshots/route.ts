@@ -8,6 +8,7 @@ import {
   SnapshotFileItem,
   VersionSnapshotResponse,
 } from "../../../../../lib/validations/version-snapshot";
+import { DEFAULT_SEEDED_ICON_MANIFEST } from "../../../../../lib/validations/constraints";
 import {
   createSnapshotFromInput,
   collectWorkspaceFiles,
@@ -89,7 +90,10 @@ export function collectProjectFiles(projectId: string, tenantId?: string): Snaps
           },
           { path: "src/App.tsx", content: "export default function App() { return <div>App</div>; }\n" },
           { path: "src/theme/tokens.css", content: ":root { --color-primary: #000; }\n" },
-          { path: "src/assets/icon-manifest.json", content: '{"icons":[]}\n' },
+          {
+            path: "src/assets/icon-manifest.json",
+            content: `${JSON.stringify(DEFAULT_SEEDED_ICON_MANIFEST)}\n`,
+          },
           { path: "src/fixtures/screen-fixture.json", content: '{"fixtures":[]}\n' },
         ];
 

@@ -1823,3 +1823,227 @@ async fn test_ac07_ac08_ac09_ac10_hardening() {
         "GitHub PR response must include isOfflineMock: true (AC-10)"
     );
 }
+
+#[tokio::test]
+async fn test_design_contracts_fail_closed_and_runtime_ast_enforcement() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let (registry, router) = setup_daemon_router(&tmp);
+    let client = DaemonHttpClient::new(registry.clone(), "127.0.0.1".to_string(), 0);
+
+    let (status, proj_val) = send_json_request(
+        &router,
+        "POST",
+        "/api/v1/projects",
+        &[],
+        Some(serde_json::json!({
+            "name": "Design Contract Enforcement",
+            "slug": "design-contract-enf",
+            "product_brief": "Testing fail-closed icon manifest, typography, and component registry enforcement"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let proj: ProjectDto = serde_json::from_value(proj_val).expect("parse project");
+
+    // 1. Default GET /design-contracts returns builtin://flagship sentinel and default TypographyContract
+    let (status, dc_val) = send_json_request(
+        &router,
+        "GET",
+        &format!("/api/v1/projects/{}/design-contracts", proj.id),
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let initial_dc: domain::ProjectDesignContracts =
+        serde_json::from_value(dc_val).expect("parse design contracts");
+    assert_eq!(
+        initial_dc.icon_manifest_path,
+        constraint_engine::FLAGSHIP_MANIFEST_SENTINEL
+    );
+
+    // 2. Attempting to PUT a jailed-escaping icon_manifest_path MUST fail closed (non-2xx)
+    let mut bad_dc = initial_dc.clone();
+    bad_dc.icon_manifest_path = "../../etc/passwd".to_string();
+    let (status, _) = send_json_request(
+        &router,
+        "PUT",
+        &format!("/api/v1/projects/{}/design-contracts", proj.id),
+        &[],
+        Some(serde_json::to_value(&bad_dc).expect("serialize bad dc")),
+    )
+    .await;
+    assert!(
+        status.is_client_error(),
+        "Traversal icon_manifest_path must be rejected with 4xx, got {status}"
+    );
+
+    // 3. Attempting to PUT a missing relative icon_manifest_path MUST fail closed
+    bad_dc.icon_manifest_path = "missing-custom-icons.json".to_string();
+    let (status, _) = send_json_request(
+        &router,
+        "PUT",
+        &format!("/api/v1/projects/{}/design-contracts", proj.id),
+        &[],
+        Some(serde_json::to_value(&bad_dc).expect("serialize missing dc")),
+    )
+    .await;
+    assert!(
+        status.is_client_error(),
+        "Missing custom manifest path must be rejected with 4xx, got {status}"
+    );
+
+    // 4. Write valid custom manifest inside project workspace jail & configure contracts
+    let (_proj_reg, proj_root) =
+        resolve_project_scoped_registry(&registry, proj.id).expect("resolve proj");
+    std::fs::create_dir_all(proj_root.join("assets")).expect("mkdir assets");
+    std::fs::write(
+        proj_root.join("assets/custom-icons.json"),
+        serde_json::json!({
+            "name": "Custom Subset",
+            "status": "custom",
+            "count": 2,
+            "icons": [
+                { "name": "spark", "pascalName": "SparkIcon", "category": "custom", "file": "spark.svg" },
+                { "name": "shield", "pascalName": "ShieldIcon", "category": "custom", "file": "shield.svg" }
+            ]
+        })
+        .to_string(),
+    )
+    .expect("write custom manifest");
+
+    let updated_dc = domain::ProjectDesignContracts {
+        icon_manifest_path: "assets/custom-icons.json".to_string(),
+        allowed_icon_set: vec!["spark".to_string()],
+        typography_contract: constraint_engine::TypographyContract {
+            allowed_font_families: vec!["Geist".to_string()],
+            allowed_font_weights: vec![400, 600],
+            allowed_font_sizes: vec!["14px".to_string(), "16px".to_string()],
+            min_wcag_contrast: 4.5,
+        },
+        component_registry: constraint_engine::ComponentRegistryContract {
+            components: vec![constraint_engine::ComponentRegistryEntry {
+                name: "PrimaryButton".to_string(),
+                source_spec: Some("07_COMPONENT_REGISTRY".to_string()),
+                allowed_props: vec![],
+            }],
+            forbid_unregistered: true,
+        },
+    };
+
+    let (status, put_dc_val) = send_json_request(
+        &router,
+        "PUT",
+        &format!("/api/v1/projects/{}/design-contracts", proj.id),
+        &[],
+        Some(serde_json::to_value(&updated_dc).expect("serialize updated dc")),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let saved_dc: domain::ProjectDesignContracts =
+        serde_json::from_value(put_dc_val).expect("saved dc");
+    assert_eq!(saved_dc.allowed_icon_set, vec!["spark".to_string()]);
+
+    // 5. GET /icon-manifest must honor both custom file and allowed_icon_set filter
+    let custom_manifest = client.get_icon_manifest(proj.id).expect("custom manifest");
+    assert_eq!(custom_manifest.count, 1);
+    assert_eq!(custom_manifest.icons[0].name, "spark");
+    assert!(!client.validate_icon(proj.id, "shield").unwrap().is_valid);
+    assert!(client.validate_icon(proj.id, "spark").unwrap().is_valid);
+
+    // 6. POST /validate-typography enforces custom TypographyContract + rem<->px normalization
+    let (status, typo_ok) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/validate-typography", proj.id),
+        &[],
+        Some(serde_json::json!({
+            "font_family": "Geist",
+            "font_weight": 600,
+            "font_size": "1rem",
+            "contrast_ratio": 4.8
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let typo_ok_report: constraint_engine::TypographyValidationReport =
+        serde_json::from_value(typo_ok).expect("typo ok report");
+    assert!(typo_ok_report.is_valid);
+
+    let bad_typo = client
+        .validate_typography(
+            proj.id,
+            &harness_daemon::ValidateTypographyRequest {
+                font_family: "Comic Sans MS".to_string(),
+                font_weight: 300,
+                font_size: Some("28px".to_string()),
+                contrast_ratio: 2.1,
+            },
+        )
+        .expect("bad typo");
+    assert!(!bad_typo.is_valid);
+    assert_eq!(bad_typo.errors.len(), 4);
+
+    // 7. POST /validate-component enforces 07_COMPONENT_REGISTRY
+    let (status, comp_ok) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/validate-component", proj.id),
+        &[],
+        Some(serde_json::json!({ "component": "PrimaryButton" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let comp_ok_report: constraint_engine::ComponentValidationReport =
+        serde_json::from_value(comp_ok).expect("comp ok");
+    assert!(comp_ok_report.is_valid);
+
+    let bad_comp = client
+        .validate_component(proj.id, "PrimaryBtn")
+        .expect("bad comp");
+    assert!(!bad_comp.is_valid);
+    assert_eq!(bad_comp.suggestions[0], "PrimaryButton");
+
+    // 8. POST /lint enforces icons, typography inline style, and unregistered components together
+    let (status, lint_bad_val) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/lint", proj.id),
+        &[],
+        Some(serde_json::json!({
+            "source": "export function View() { return <UnknownCard><BrandIcon name=\"shield\" /><span style={{ fontFamily: 'Papyrus', fontSize: '42px', fontWeight: 900 }}>x</span></UnknownCard>; }"
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let lint_bad: harness_daemon::LintSourceResponse =
+        serde_json::from_value(lint_bad_val).expect("lint bad");
+    assert!(!lint_bad.passed);
+    assert!(lint_bad
+        .violations
+        .iter()
+        .any(|v| v.rule_code == "ENFORCE_ICON_MANIFEST"));
+    assert!(lint_bad
+        .violations
+        .iter()
+        .any(|v| v.rule_code == "ENFORCE_TYPOGRAPHY"));
+    assert!(lint_bad
+        .violations
+        .iter()
+        .any(|v| v.rule_code == "ENFORCE_COMPONENT_REGISTRY"));
+
+    // 9. Deleting the custom manifest on disk must FAIL CLOSED (never silently fall back to flagship!)
+    std::fs::remove_file(proj_root.join("assets/custom-icons.json")).expect("delete custom file");
+    let (status, _) = send_json_request(
+        &router,
+        "GET",
+        &format!("/api/v1/projects/{}/icon-manifest", proj.id),
+        &[],
+        None,
+    )
+    .await;
+    assert!(
+        status.is_client_error() || status.is_server_error(),
+        "Deleted configured custom manifest must fail closed, got {status}"
+    );
+}
