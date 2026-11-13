@@ -4,7 +4,7 @@ id: "03.2"
 title: "Story 03.2: Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons)"
 description: "Kiểm tra mọi biểu tượng và component được gọi trong mã nguồn phải nằm trong icon-manifest.json và 07_COMPONENT_REGISTRY của dự án; đóng gói sẵn cowok-brand-product-system-v4.3 (145 SVG Icons) làm Flagship Preset."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-03/Story-03.2/story.md"
-status: planned
+status: completed
 risk_tier: 2
 delivery: core
 timestamp: "2026-11-02T13:30:00+07:00"
@@ -27,7 +27,7 @@ consumes_apis: []
 
 - **FR Covered:** [FR-13: Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 03: Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-03/epic.md)
-- **Status:** `planned`
+- **Status:** `completed`
 - **Risk Tier:** `2`
 
 ## 1. Story Description & Context
@@ -42,9 +42,9 @@ Kiểm tra mọi biểu tượng và component được gọi trong mã nguồn 
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Khi Agent gọi tên icon không tồn tại trong icon-manifest.json của dự án, tự động gợi ý 3 icon hợp lệ gần nhất theo ngữ nghĩa.
 
 ## 4. Tasks
-- [ ] **Task 03.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons)" (thỏa mãn `AC-01`).
-- [ ] **Task 03.2.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
-- [ ] **Task 03.2.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
+- [x] **Task 03.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons)" (thỏa mãn `AC-01`).
+- [x] **Task 03.2.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
+- [x] **Task 03.2.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
 
 ## 5. AC-to-Task Traceability Matrix
 
