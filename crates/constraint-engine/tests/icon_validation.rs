@@ -347,18 +347,19 @@ export function ConditionalView({ ok }: { ok: boolean }) {
   return null;
 }
 "##;
-    let v = AstLinter::lint_source_with_context(
-        tsx,
-        &rules,
-        Some(&flagship),
-        Some(&typo),
-        Some(&comp),
-    )
-    .expect("lint tsx");
+    let v =
+        AstLinter::lint_source_with_context(tsx, &rules, Some(&flagship), Some(&typo), Some(&comp))
+            .expect("lint tsx");
 
-    assert!(v.iter().any(|x| x.rule_code == "ENFORCE_ICON_MANIFEST" && x.message.contains("missing-icon-branch")));
-    assert!(v.iter().any(|x| x.rule_code == "ENFORCE_TYPOGRAPHY" && x.message.contains("WCAG")));
-    assert!(v.iter().any(|x| x.rule_code == "ENFORCE_COMPONENT_REGISTRY" && x.message.contains("rogueProp")));
+    assert!(v.iter().any(
+        |x| x.rule_code == "ENFORCE_ICON_MANIFEST" && x.message.contains("missing-icon-branch")
+    ));
+    assert!(v
+        .iter()
+        .any(|x| x.rule_code == "ENFORCE_TYPOGRAPHY" && x.message.contains("WCAG")));
+    assert!(v
+        .iter()
+        .any(|x| x.rule_code == "ENFORCE_COMPONENT_REGISTRY" && x.message.contains("rogueProp")));
 }
 
 #[test]
@@ -373,7 +374,11 @@ fn test_component_registry_extract_stops_at_next_heading() {
 - `OutsideHeadingComponent` - Must NOT be imported
 "#;
     let contract = IconValidator::extract_component_registry_from_markdown(md, true);
-    let names: Vec<&str> = contract.components.iter().map(|c| c.name.as_str()).collect();
+    let names: Vec<&str> = contract
+        .components
+        .iter()
+        .map(|c| c.name.as_str())
+        .collect();
     assert!(names.contains(&"PrimaryButton"));
     assert!(names.contains(&"SubPanel"));
     assert!(!names.contains(&"OutsideHeadingComponent"));

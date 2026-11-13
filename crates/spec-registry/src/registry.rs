@@ -133,13 +133,11 @@ impl SpecRegistry {
             });
         }
 
-        let canonical_root = self
-            .pool
-            .workspace_root()
-            .canonicalize()
-            .map_err(|_| HarnessError::PathTraversalDenied {
+        let canonical_root = self.pool.workspace_root().canonicalize().map_err(|_| {
+            HarnessError::PathTraversalDenied {
                 path: self.pool.workspace_root().display().to_string(),
-            })?;
+            }
+        })?;
         let workspace_root_str = canonical_root.display().to_string();
 
         let mut conn = self.pool.connection()?;
@@ -255,9 +253,7 @@ impl SpecRegistry {
         let db_root_path = PathBuf::from(&db_root_str);
         if let Ok(meta) = std::fs::symlink_metadata(&db_root_path) {
             if meta.file_type().is_symlink() {
-                return Err(HarnessError::PathTraversalDenied {
-                    path: db_root_str,
-                });
+                return Err(HarnessError::PathTraversalDenied { path: db_root_str });
             }
         }
         let canon_db_root = db_root_path.canonicalize().map_err(|_| HarnessError::ValidationFailed {
@@ -875,16 +871,14 @@ impl SpecRegistry {
             src_proj_uuid,
             src_rev_opt.as_deref(),
         );
-        let new_ver = db_ver
-            .max(
-                conn.query_row(
-                    "SELECT COALESCE(MAX(revision_number), 0) FROM spec_revisions WHERE spec_id = ?1",
-                    params![spec_id_str],
-                    |r| r.get::<_, i64>(0),
-                )
-                .unwrap_or(db_ver),
+        let new_ver = db_ver.max(
+            conn.query_row(
+                "SELECT COALESCE(MAX(revision_number), 0) FROM spec_revisions WHERE spec_id = ?1",
+                params![spec_id_str],
+                |r| r.get::<_, i64>(0),
             )
-            + 1;
+            .unwrap_or(db_ver),
+        ) + 1;
         let now_ms = Utc::now().timestamp_millis();
         let rev_id = Uuid::new_v4().to_string();
 

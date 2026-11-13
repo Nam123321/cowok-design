@@ -110,7 +110,10 @@ pub fn build_flow_subrouter(state: DaemonAppState) -> Router<DaemonAppState> {
             "/api/v1/mcp-servers/:server_id",
             delete(handle_delete_mcp_server),
         )
-        .route("/api/v1/doctor/verify-key", post(handle_verify_provider_key))
+        .route(
+            "/api/v1/doctor/verify-key",
+            post(handle_verify_provider_key),
+        )
         .layer(DefaultBodyLimit::max(1_048_576))
         .route_layer(middleware::from_fn_with_state(
             state,

@@ -1660,7 +1660,10 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
         "demo.txt must be copied to target"
     );
     assert!(
-        target_dir.join(".cowok-design").join("project.json").exists(),
+        target_dir
+            .join(".cowok-design")
+            .join("project.json")
+            .exists(),
         ".cowok-design/project.json must be created in target"
     );
 
@@ -2252,7 +2255,10 @@ async fn test_epic01_security_hardening_delete_spec_and_sqlite_proposals_zip_exp
     let (status, applied_prop) = send_json_request(
         &router,
         "POST",
-        &format!("/api/v1/projects/{}/proposals/{good_prop_id}/apply", proj.id),
+        &format!(
+            "/api/v1/projects/{}/proposals/{good_prop_id}/apply",
+            proj.id
+        ),
         &[],
         Some(serde_json::json!({})),
     )
@@ -2286,18 +2292,29 @@ async fn test_epic01_security_hardening_delete_spec_and_sqlite_proposals_zip_exp
     assert_eq!(status, StatusCode::OK);
     let expected_len = export_meta["byteLength"].as_u64().expect("byteLength") as usize;
     let expected_sha = export_meta["sha256"].as_str().expect("sha256");
-    assert!(expected_len > 22, "Real PKZIP archive must not be 22-byte empty stub");
+    assert!(
+        expected_len > 22,
+        "Real PKZIP archive must not be 22-byte empty stub"
+    );
     assert_ne!(expected_sha, "export_bundle_sha256_verified");
 
     let dl_req = Request::builder()
         .method("GET")
-        .uri(&format!("/api/v1/projects/{}/snapshots/export/download", proj.id))
+        .uri(&format!(
+            "/api/v1/projects/{}/snapshots/export/download",
+            proj.id
+        ))
         .body(Body::empty())
         .expect("build download req");
     let dl_resp = router.clone().oneshot(dl_req).await.expect("oneshot dl");
     assert_eq!(dl_resp.status(), StatusCode::OK);
     assert!(dl_resp.headers().get("x-cowok-offline-mock").is_none());
-    let dl_bytes = dl_resp.into_body().collect().await.expect("dl bytes").to_bytes();
+    let dl_bytes = dl_resp
+        .into_body()
+        .collect()
+        .await
+        .expect("dl bytes")
+        .to_bytes();
     assert_eq!(dl_bytes.len(), expected_len);
     assert_eq!(&dl_bytes[..4], b"PK\x03\x04");
     assert_eq!(format!("{:x}", Sha256::digest(&dl_bytes)), expected_sha);

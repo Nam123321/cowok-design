@@ -43,8 +43,7 @@ pub fn v5_migration_checksum() -> String {
     format!("{:x}", hasher.finalize())
 }
 
-pub const V6_MIGRATION_SQL: &str =
-    include_str!("../migrations/V6__epic04_complete_contracts.sql");
+pub const V6_MIGRATION_SQL: &str = include_str!("../migrations/V6__epic04_complete_contracts.sql");
 pub const V6_MIGRATION_NAME: &str = "V6__epic04_complete_contracts.sql";
 
 pub fn v6_migration_checksum() -> String {
@@ -104,7 +103,10 @@ impl MigrateLockGuard {
                         };
                     }
                     HarnessError::ValidationFailed {
-                        reason: format!("DB_MIGRATE_LOCK_OPEN_FAILED [{}]: {e}", lock_path.display()),
+                        reason: format!(
+                            "DB_MIGRATE_LOCK_OPEN_FAILED [{}]: {e}",
+                            lock_path.display()
+                        ),
                     }
                 })?;
             enforce_unix_mode(lock_path, 0o600)?;
@@ -191,11 +193,10 @@ impl SqlitePool {
         fs::create_dir_all(&parent_dir).map_err(|e| HarnessError::ValidationFailed {
             reason: format!("Failed to create SQLite parent directory: {e}"),
         })?;
-        let parent_meta = fs::symlink_metadata(&parent_dir).map_err(|e| {
-            HarnessError::ValidationFailed {
+        let parent_meta =
+            fs::symlink_metadata(&parent_dir).map_err(|e| HarnessError::ValidationFailed {
                 reason: format!("Failed to stat SQLite parent directory: {e}"),
-            }
-        })?;
+            })?;
         if parent_meta.file_type().is_symlink() || !parent_meta.file_type().is_dir() {
             return Err(HarnessError::PathTraversalDenied {
                 path: parent_dir.display().to_string(),
@@ -584,10 +585,7 @@ impl SqlitePool {
                 ("title", "TEXT NOT NULL DEFAULT ''"),
                 ("description", "TEXT NOT NULL DEFAULT ''"),
                 ("files_json", "TEXT NOT NULL DEFAULT '[]'"),
-                (
-                    "validation_status",
-                    "TEXT NOT NULL DEFAULT 'unverified'",
-                ),
+                ("validation_status", "TEXT NOT NULL DEFAULT 'unverified'"),
                 ("validation_checks_json", "TEXT NOT NULL DEFAULT '[]'"),
             ],
         )?;

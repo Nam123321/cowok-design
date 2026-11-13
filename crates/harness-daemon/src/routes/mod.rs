@@ -49,12 +49,12 @@ use legacy_sessions::{
     handle_promote_scratch, handle_update_chat_session, handle_verify_path_token,
     parse_project_uuid,
 };
+pub(crate) use legacy_specs::constant_time_eq;
 use legacy_specs::{
     handle_context_slice, handle_create_project, handle_delete_project, handle_delete_spec,
     handle_list_projects, handle_list_specs, handle_put_spec, handle_synthesize_specs,
     handle_update_project,
 };
-pub(crate) use legacy_specs::constant_time_eq;
 
 impl DaemonAppState {
     pub fn new(registry: Arc<SpecRegistry>, host: String, port: u16) -> Self {

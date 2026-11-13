@@ -55,12 +55,8 @@ impl DaemonServer {
     ) -> Result<Self, HarnessError> {
         let (listener, lock_info, lock_path) = bind_loopback_with_lockfile(config)?;
         let auth = crate::daemon_auth::DaemonAuthState::from_lock_info(&lock_info)?;
-        let state = DaemonAppState::with_auth(
-            registry,
-            lock_info.host.clone(),
-            lock_info.port,
-            auth,
-        );
+        let state =
+            DaemonAppState::with_auth(registry, lock_info.host.clone(), lock_info.port, auth);
         let router = build_router(state);
         Ok(Self {
             listener,
@@ -644,8 +640,7 @@ pub fn reconcile_project_watchers(
     let Ok(conn) = registry.pool().connection() else {
         return;
     };
-    let Ok(mut stmt) =
-        conn.prepare("SELECT id FROM projects WHERE trash_deleted_at IS NULL")
+    let Ok(mut stmt) = conn.prepare("SELECT id FROM projects WHERE trash_deleted_at IS NULL")
     else {
         return;
     };

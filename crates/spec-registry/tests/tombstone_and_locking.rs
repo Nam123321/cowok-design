@@ -268,8 +268,10 @@ fn test_spec_watcher_external_write_and_echo_suppression() {
         })
         .expect("upsert v1");
 
-    let watcher = spec_registry::SpecWatcher::start(registry.clone(), project_id).expect("start watcher");
-    let spec_path = spec_registry::resolve_jailed_spec_path(dir.path(), spec_key).expect("spec_path");
+    let watcher =
+        spec_registry::SpecWatcher::start(registry.clone(), project_id).expect("start watcher");
+    let spec_path =
+        spec_registry::resolve_jailed_spec_path(dir.path(), spec_key).expect("spec_path");
 
     // Identical content echo must be suppressed
     let echo = watcher.process_path(&spec_path).expect("echo");
@@ -277,10 +279,18 @@ fn test_spec_watcher_external_write_and_echo_suppression() {
 
     // External disk modification must reconcile to version 2
     std::fs::write(&spec_path, "# Updated External Arch").expect("write external edit");
-    let synced = watcher.process_path(&spec_path).expect("sync external edit");
-    assert!(matches!(synced, SyncOutcome::SyncedToDiskAndDb { version: 2, .. }));
+    let synced = watcher
+        .process_path(&spec_path)
+        .expect("sync external edit");
+    assert!(matches!(
+        synced,
+        SyncOutcome::SyncedToDiskAndDb { version: 2, .. }
+    ));
 
-    let latest = registry.get_spec(project_id, spec_key).expect("get_spec").expect("exists");
+    let latest = registry
+        .get_spec(project_id, spec_key)
+        .expect("get_spec")
+        .expect("exists");
     assert_eq!(latest.version, 2);
     assert_ne!(latest.content_sha256, v1.content_sha256);
 }

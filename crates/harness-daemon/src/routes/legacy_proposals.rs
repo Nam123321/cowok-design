@@ -324,7 +324,10 @@ fn run_proposal_validation_checks(
             || lower_patch.contains("dangerouslysetinnerhtml")
             || lower_patch.contains("__html")
         {
-            ast_failures.push(format!("{}: forbidden dynamic execution/HTML pattern", f.path));
+            ast_failures.push(format!(
+                "{}: forbidden dynamic execution/HTML pattern",
+                f.path
+            ));
         }
         let lower_path = f.path.to_ascii_lowercase();
         let is_js_ts = lower_path.ends_with(".tsx")
@@ -348,14 +351,19 @@ fn run_proposal_validation_checks(
                     ast_failures.push(format!("{}: [{}] {}", f.path, v.rule_code, v.message));
                 }
             }
-        } else if lower_path.ends_with(".json") && serde_json::from_str::<serde_json::Value>(&f.patch).is_err() {
+        } else if lower_path.ends_with(".json")
+            && serde_json::from_str::<serde_json::Value>(&f.patch).is_err()
+        {
             ast_failures.push(format!("{}: invalid JSON payload", f.path));
         }
     }
 
     let ast_passed = ast_failures.is_empty();
     let ast_msg = if ast_passed {
-        format!("AST and design contracts verified across {} file(s)", files.len())
+        format!(
+            "AST and design contracts verified across {} file(s)",
+            files.len()
+        )
     } else {
         ast_failures.join("; ")
     };
@@ -471,13 +479,9 @@ pub(super) async fn handle_list_proposals(
     headers: HeaderMap,
 ) -> Result<Json<Vec<ChangeProposalDto>>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
 
     let list = tokio::task::spawn_blocking(move || {
@@ -519,13 +523,9 @@ pub(super) async fn handle_get_proposal(
 ) -> Result<Json<ChangeProposalDto>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let proposal_id = parse_project_uuid(&proposal_id_raw).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
 
     let found = tokio::task::spawn_blocking(move || {
@@ -554,13 +554,9 @@ pub(super) async fn handle_create_proposal(
     Json(req): Json<CreateProposalRequest>,
 ) -> Result<(StatusCode, Json<ChangeProposalDto>), Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let (project_registry, canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
     let base_registry = state.registry.clone();
     let now = chrono::Utc::now().to_rfc3339();
@@ -580,16 +576,14 @@ pub(super) async fn handle_create_proposal(
             "draft".to_string()
         };
 
-        let files_json = serde_json::to_string(&req.files).map_err(|e| {
-            HarnessError::ValidationFailed {
+        let files_json =
+            serde_json::to_string(&req.files).map_err(|e| HarnessError::ValidationFailed {
                 reason: format!("PROPOSAL_SERIALIZE_ERROR: {e}"),
-            }
-        })?;
-        let checks_json = serde_json::to_string(&checks).map_err(|e| {
-            HarnessError::ValidationFailed {
+            })?;
+        let checks_json =
+            serde_json::to_string(&checks).map_err(|e| HarnessError::ValidationFailed {
                 reason: format!("PROPOSAL_CHECKS_SERIALIZE_ERROR: {e}"),
-            }
-        })?;
+            })?;
 
         let mut conn = project_registry.pool().connection()?;
         let title_trimmed = req.title.trim().to_string();
@@ -661,13 +655,9 @@ pub(super) async fn handle_validate_proposal(
 ) -> Result<Json<ChangeProposalDto>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let proposal_id = parse_project_uuid(&proposal_id_raw).map_err(map_error_to_response)?;
-    let (project_registry, canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
     let base_registry = state.registry.clone();
     let now = chrono::Utc::now().to_rfc3339();
@@ -754,13 +744,9 @@ pub(super) async fn handle_apply_proposal(
 ) -> Result<Json<ChangeProposalDto>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let proposal_id = parse_project_uuid(&proposal_id_raw).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
     let now = chrono::Utc::now().to_rfc3339();
 
@@ -876,20 +862,15 @@ pub(super) async fn handle_reject_proposal(
 ) -> Result<Json<ChangeProposalDto>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let proposal_id = parse_project_uuid(&proposal_id_raw).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
     let now = chrono::Utc::now().to_rfc3339();
 
     let result = tokio::task::spawn_blocking(move || {
         let mut conn = project_registry.pool().connection()?;
-        let Some(mut proposal) =
-            load_proposal_by_id(&conn, project_id, proposal_id, &tenant_id)?
+        let Some(mut proposal) = load_proposal_by_id(&conn, project_id, proposal_id, &tenant_id)?
         else {
             return Ok::<_, HarnessError>(Err(proposal_not_found(proposal_id)));
         };
@@ -910,7 +891,12 @@ pub(super) async fn handle_reject_proposal(
             tx.execute(
                 "UPDATE change_proposals SET status = 'rejected', updated_at = ?1
                  WHERE id = ?2 AND project_id = ?3 AND tenant_id = ?4",
-                params![now, proposal_id.to_string(), project_id.to_string(), tenant_id],
+                params![
+                    now,
+                    proposal_id.to_string(),
+                    project_id.to_string(),
+                    tenant_id
+                ],
             )?;
             tx.commit()
         })?;
@@ -977,13 +963,9 @@ pub(super) async fn handle_get_snapshot(
 ) -> Result<Json<VersionSnapshotDto>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let snapshot_id = parse_project_uuid(&snapshot_id_raw).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
 
     let found = tokio::task::spawn_blocking(move || {
@@ -1020,13 +1002,9 @@ pub(super) async fn handle_list_snapshots(
     headers: HeaderMap,
 ) -> Result<Json<Vec<VersionSnapshotDto>>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
 
     let list = tokio::task::spawn_blocking(move || {
@@ -1068,13 +1046,9 @@ pub(super) async fn handle_create_snapshot(
     Json(req): Json<CreateSnapshotRequest>,
 ) -> Result<(StatusCode, Json<VersionSnapshotDto>), Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
     let now = chrono::Utc::now().to_rfc3339();
     let snapshot_id = req.id.unwrap_or_else(Uuid::new_v4);
@@ -1227,13 +1201,9 @@ pub(super) async fn handle_revert_snapshot(
 ) -> Result<Json<RevertResultDto>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let snapshot_id = parse_project_uuid(&snapshot_id_raw).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
     let now = chrono::Utc::now().to_rfc3339();
     let safety_id = Uuid::new_v4();
@@ -1473,13 +1443,9 @@ pub(super) async fn handle_export_snapshots(
     Json(req): Json<ExportZipRequest>,
 ) -> Result<Json<ExportZipResponseDto>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let (project_registry, canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
 
     if !req.include_tokens || !req.include_icons {
         return Err((
@@ -1553,13 +1519,9 @@ pub(super) async fn handle_download_export(
     headers: HeaderMap,
 ) -> Result<Response, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let (project_registry, canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
     let tenant_for_collect = tenant_id.clone();
 
@@ -1622,13 +1584,8 @@ pub(super) async fn handle_create_pr(
     Json(_req): Json<GitHubPRRequest>,
 ) -> Result<Json<GitHubPRResponseDto>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let _ = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let _ = verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+        .map_err(map_error_to_response)?;
 
     Err((
         StatusCode::NOT_IMPLEMENTED,

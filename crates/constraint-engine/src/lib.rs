@@ -1369,7 +1369,12 @@ impl AstLinter {
                 for (comp_name, span) in &nodes.components {
                     if matches!(
                         comp_name.as_str(),
-                        "BrandIcon" | "CowokIcon" | "Icon" | "AgentMktBrandIcon" | "Fragment" | "React.Fragment"
+                        "BrandIcon"
+                            | "CowokIcon"
+                            | "Icon"
+                            | "AgentMktBrandIcon"
+                            | "Fragment"
+                            | "React.Fragment"
                     ) {
                         continue;
                     }

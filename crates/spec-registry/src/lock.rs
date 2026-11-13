@@ -37,11 +37,10 @@ impl SpecLockGuard {
         fs::create_dir_all(&locks_dir).map_err(|e| HarnessError::ValidationFailed {
             reason: format!("LOCK_UNAVAILABLE: failed to create lock directory: {e}"),
         })?;
-        let dir_meta = fs::symlink_metadata(&locks_dir).map_err(|e| {
-            HarnessError::ValidationFailed {
+        let dir_meta =
+            fs::symlink_metadata(&locks_dir).map_err(|e| HarnessError::ValidationFailed {
                 reason: format!("LOCK_UNAVAILABLE: failed to stat lock directory: {e}"),
-            }
-        })?;
+            })?;
         if dir_meta.file_type().is_symlink() || !dir_meta.file_type().is_dir() {
             return Err(HarnessError::PathTraversalDenied {
                 path: locks_dir.display().to_string(),

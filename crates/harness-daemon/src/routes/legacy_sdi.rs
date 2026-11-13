@@ -918,7 +918,8 @@ pub(super) async fn handle_sdi_intent(
 
     let resp_to_store = resp.clone();
     tokio::task::spawn_blocking(move || {
-        let scope_json = serde_json::to_string(&resp_to_store.target_scope).unwrap_or_else(|_| "{}".to_string());
+        let scope_json =
+            serde_json::to_string(&resp_to_store.target_scope).unwrap_or_else(|_| "{}".to_string());
         let variants_json = resp_to_store
             .clarification_variants
             .as_ref()
@@ -992,7 +993,10 @@ pub(super) async fn handle_list_sdi_intents(
             )
             .map_err(|e| map_sqlite_error(e, "prepare_list_sdi_intents"))?;
         let rows = stmt
-            .query_map(params![project_id.to_string(), tenant_id], map_sdi_intent_row)
+            .query_map(
+                params![project_id.to_string(), tenant_id],
+                map_sdi_intent_row,
+            )
             .map_err(|e| map_sqlite_error(e, "query_list_sdi_intents"))?;
         let mut out = Vec::new();
         for r in rows {

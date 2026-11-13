@@ -169,24 +169,20 @@ pub fn ensure_project_token(proj_canon_root: &Path) -> Result<String, HarnessErr
                 .create_new(true)
                 .custom_flags(libc::O_NOFOLLOW)
                 .mode(0o600);
-            let mut f = opts.open(&token_file).map_err(|e| HarnessError::ValidationFailed {
-                reason: format!(
-                    "Failed to create token file '{}': {e}",
-                    token_file.display()
-                ),
-            })?;
-            f.write_all(secret.as_bytes())
+            let mut f = opts
+                .open(&token_file)
                 .map_err(|e| HarnessError::ValidationFailed {
                     reason: format!(
-                        "Failed to write token file '{}': {e}",
+                        "Failed to create token file '{}': {e}",
                         token_file.display()
                     ),
                 })?;
+            f.write_all(secret.as_bytes())
+                .map_err(|e| HarnessError::ValidationFailed {
+                    reason: format!("Failed to write token file '{}': {e}", token_file.display()),
+                })?;
             f.sync_all().map_err(|e| HarnessError::ValidationFailed {
-                reason: format!(
-                    "Failed to sync token file '{}': {e}",
-                    token_file.display()
-                ),
+                reason: format!("Failed to sync token file '{}': {e}", token_file.display()),
             })?;
         }
         #[cfg(not(unix))]
@@ -194,18 +190,17 @@ pub fn ensure_project_token(proj_canon_root: &Path) -> Result<String, HarnessErr
             let mut opts = fs::OpenOptions::new();
             opts.write(true).create_new(true);
             use std::io::Write;
-            let mut f = opts.open(&token_file).map_err(|e| HarnessError::ValidationFailed {
-                reason: format!(
-                    "Failed to create token file '{}': {e}",
-                    token_file.display()
-                ),
-            })?;
-            f.write_all(secret.as_bytes())
+            let mut f = opts
+                .open(&token_file)
                 .map_err(|e| HarnessError::ValidationFailed {
                     reason: format!(
-                        "Failed to write token file '{}': {e}",
+                        "Failed to create token file '{}': {e}",
                         token_file.display()
                     ),
+                })?;
+            f.write_all(secret.as_bytes())
+                .map_err(|e| HarnessError::ValidationFailed {
+                    reason: format!("Failed to write token file '{}': {e}", token_file.display()),
                 })?;
         }
         #[cfg(unix)]
@@ -236,9 +231,10 @@ pub fn ensure_project_token(proj_canon_root: &Path) -> Result<String, HarnessErr
                     path: format!("{} ({e})", token_file.display()),
                 })?;
             let mut s = String::new();
-            f.read_to_string(&mut s).map_err(|e| HarnessError::ValidationFailed {
-                reason: format!("Failed to read project.token: {e}"),
-            })?;
+            f.read_to_string(&mut s)
+                .map_err(|e| HarnessError::ValidationFailed {
+                    reason: format!("Failed to read project.token: {e}"),
+                })?;
             return Ok(s.trim().to_string());
         }
         #[cfg(not(unix))]

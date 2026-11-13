@@ -207,13 +207,13 @@ pub(super) async fn handle_create_project(
     let created = tokio::task::spawn_blocking(move || {
         create_project_isolated_with_tenant(&registry, &req, &tenant_id)
     })
-        .await
-        .map_err(|e| {
-            map_error_to_response(HarnessError::ValidationFailed {
-                reason: format!("BLOCKING_TASK_FAILED: {e}"),
-            })
-        })?
-        .map_err(map_error_to_response)?;
+    .await
+    .map_err(|e| {
+        map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("BLOCKING_TASK_FAILED: {e}"),
+        })
+    })?
+    .map_err(map_error_to_response)?;
 
     Ok((StatusCode::CREATED, Json(created)))
 }
@@ -474,13 +474,9 @@ pub(super) async fn handle_list_specs(
     AxumPath(project_id_raw): AxumPath<String>,
 ) -> Result<Json<ProjectSpecsListResponse>, Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
-    let (project_registry, project_workspace_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, project_workspace_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
 
     let base_registry = state.registry.clone();
     let res = tokio::task::spawn_blocking(move || {
@@ -542,13 +538,9 @@ pub(super) async fn handle_put_spec(
 ) -> Result<Json<SpecItemWithDriftDto>, Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
     let spec_key = CanonicalSpecKey::parse(&spec_key_raw).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
 
     if req.markdown_content.trim().is_empty() {
         return Err(map_error_to_response(HarnessError::ValidationFailed {
@@ -624,13 +616,9 @@ pub(super) async fn handle_delete_spec(
 ) -> Result<Json<DeleteSpecResponse>, Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
     let spec_key = CanonicalSpecKey::parse(&spec_key_raw).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
 
     let actor_id = extract_actor_id(&headers);
     let expected_sha = query.expected_sha256.or_else(|| {
@@ -671,13 +659,8 @@ pub(super) async fn handle_synthesize_specs(
     Json(mut req): Json<SynthesizeSpecsRequest>,
 ) -> Result<Json<SynthesizeSpecsResponse>, Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
-    let _ = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let _ = verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+        .map_err(map_error_to_response)?;
 
     if req.actor_id.is_none() {
         if let Some(hdr_actor) = headers
@@ -783,10 +766,12 @@ pub(crate) fn verify_anti_idor_with_caller(
                 });
             }
         }
-        let canon_hdr = hdr_path.canonicalize().map_err(|_| HarnessError::ValidationFailed {
-            reason: "PROJECT_SCOPE_VIOLATION: invalid or non-canonical X-Cowok-Workspace-Root"
-                .to_string(),
-        })?;
+        let canon_hdr = hdr_path
+            .canonicalize()
+            .map_err(|_| HarnessError::ValidationFailed {
+                reason: "PROJECT_SCOPE_VIOLATION: invalid or non-canonical X-Cowok-Workspace-Root"
+                    .to_string(),
+            })?;
         if canon_hdr != canon_project_root {
             return Err(HarnessError::ValidationFailed {
                 reason: "PROJECT_SCOPE_VIOLATION: Invalid X-Cowok-Workspace-Root provided"
@@ -905,13 +890,9 @@ pub(super) async fn handle_context_slice(
 ) -> Result<Json<AuthorizedContextSlice>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
 
-    let (project_registry, _canon_project_root, has_bearer) = verify_anti_idor_with_caller(
-        &state.registry,
-        project_id,
-        &headers,
-        caller.as_deref(),
-    )
-    .map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, has_bearer) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
 
     let header_portal: Option<Portal> = headers
         .get("x-cowok-portal")

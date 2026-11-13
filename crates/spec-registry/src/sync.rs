@@ -736,9 +736,10 @@ pub fn delete_jailed_spec_file(
         if !target_path.exists() {
             return Ok(false);
         }
-        let meta = fs::symlink_metadata(&target_path).map_err(|e| HarnessError::ValidationFailed {
-            reason: format!("JAILED_DELETE_STAT_FAILED [{}]: {e}", spec_key.as_str()),
-        })?;
+        let meta =
+            fs::symlink_metadata(&target_path).map_err(|e| HarnessError::ValidationFailed {
+                reason: format!("JAILED_DELETE_STAT_FAILED [{}]: {e}", spec_key.as_str()),
+            })?;
         if meta.file_type().is_symlink() || !meta.file_type().is_file() {
             return Err(HarnessError::PathTraversalDenied {
                 path: target_path.display().to_string(),

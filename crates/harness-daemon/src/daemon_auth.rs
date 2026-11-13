@@ -97,11 +97,10 @@ pub struct DaemonAuthState {
 
 impl DaemonAuthState {
     pub fn from_lock_info(lock: &DaemonLockInfo) -> Result<Arc<Self>, HarnessError> {
-        let key_bytes = decode_hex(lock.hmac_key_hex.trim()).ok_or_else(|| {
-            HarnessError::ValidationFailed {
+        let key_bytes =
+            decode_hex(lock.hmac_key_hex.trim()).ok_or_else(|| HarnessError::ValidationFailed {
                 reason: "DAEMON_LOCK_INVALID_KEY: invalid hmac_key_hex".to_string(),
-            }
-        })?;
+            })?;
         if key_bytes.len() < 16 || lock.daemon_nonce.trim().is_empty() {
             return Err(HarnessError::ValidationFailed {
                 reason: "DAEMON_LOCK_INVALID_SECRET: missing daemon_nonce or short hmac_key"
@@ -269,7 +268,9 @@ pub async fn handle_issue_local_session(
         .get("x-cowok-daemon-nonce")
         .and_then(|v| v.to_str().ok())
         .map(str::trim)
-        .is_some_and(|n| !n.is_empty() && constant_time_eq(n.as_bytes(), auth.daemon_nonce.as_bytes()));
+        .is_some_and(|n| {
+            !n.is_empty() && constant_time_eq(n.as_bytes(), auth.daemon_nonce.as_bytes())
+        });
     let is_superadmin = is_valid_superadmin_bearer(&headers);
 
     if role == "admin" && !is_superadmin {
@@ -279,7 +280,10 @@ pub async fn handle_issue_local_session(
             "Issuing an admin local session requires valid superadmin authorization",
         ));
     }
-    if (role == "editor" || requested_tenant != default_tenant_id()) && !is_superadmin && !has_daemon_nonce {
+    if (role == "editor" || requested_tenant != default_tenant_id())
+        && !is_superadmin
+        && !has_daemon_nonce
+    {
         return Err(auth_err_resp(
             StatusCode::FORBIDDEN,
             "INSUFFICIENT_ROLE",
@@ -590,7 +594,8 @@ pub async fn legacy_project_auth_middleware(
         }
     };
     let auth = state_auth(&state);
-    let verified: Option<VerifiedLegacyIngress> = if parts.headers.contains_key("x-cowok-hmac-sig") {
+    let verified: Option<VerifiedLegacyIngress> = if parts.headers.contains_key("x-cowok-hmac-sig")
+    {
         match verify_hmac_v2(&auth, &parts.method, &parts.uri, &parts.headers, &raw_bytes) {
             Ok(principal) => Some(VerifiedLegacyIngress {
                 principal,
@@ -671,7 +676,8 @@ pub async fn legacy_project_auth_middleware(
 
     if parts.uri.path() == "/api/v1/projects" {
         if let Some(ref caller) = verified {
-            if caller.kind == LegacyAuthKind::Bearer && !is_valid_superadmin_bearer(&parts.headers) {
+            if caller.kind == LegacyAuthKind::Bearer && !is_valid_superadmin_bearer(&parts.headers)
+            {
                 return auth_err_resp(
                     StatusCode::FORBIDDEN,
                     "TENANT_ISOLATION_BREACH",

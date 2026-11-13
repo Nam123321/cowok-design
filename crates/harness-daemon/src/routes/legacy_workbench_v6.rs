@@ -44,7 +44,13 @@ fn json_err(status: StatusCode, code: &str, message: impl Into<String>) -> Respo
 fn check_project_uuid(raw: &str) -> Result<String, Response> {
     Uuid::parse_str(raw.trim())
         .map(|u| u.to_string())
-        .map_err(|_| json_err(StatusCode::BAD_REQUEST, "VALIDATION_ERROR", "Invalid project UUID"))
+        .map_err(|_| {
+            json_err(
+                StatusCode::BAD_REQUEST,
+                "VALIDATION_ERROR",
+                "Invalid project UUID",
+            )
+        })
 }
 
 fn check_non_empty_id(raw: &str, label: &str) -> Result<String, Response> {
@@ -73,7 +79,11 @@ fn verify_project_ownership(
         .optional()
         .map_err(|e| {
             let err = map_sqlite_error(e, "verify_project_ownership");
-            json_err(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", err.to_string())
+            json_err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "DB_ERROR",
+                err.to_string(),
+            )
         })?;
 
     match row {
@@ -96,15 +106,13 @@ where
     T: Send + 'static,
     F: FnOnce() -> Result<T, Response> + Send + 'static,
 {
-    tokio::task::spawn_blocking(op)
-        .await
-        .map_err(|e| {
-            json_err(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "INTERNAL_ERROR",
-                format!("Task join error: {e}"),
-            )
-        })?
+    tokio::task::spawn_blocking(op).await.map_err(|e| {
+        json_err(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "INTERNAL_ERROR",
+            format!("Task join error: {e}"),
+        )
+    })?
 }
 
 fn map_harness_resp(err: HarnessError, op: &str) -> Response {
@@ -192,10 +200,14 @@ pub async fn handle_list_comments(
             .map_err(|e| map_harness_resp(map_sqlite_error(e, "prep_comments"), "list_comments"))?;
         let rows = stmt
             .query_map(params![principal.tenant_id, pid, nid], map_comment_row)
-            .map_err(|e| map_harness_resp(map_sqlite_error(e, "query_comments"), "list_comments"))?;
+            .map_err(|e| {
+                map_harness_resp(map_sqlite_error(e, "query_comments"), "list_comments")
+            })?;
         let mut out = Vec::new();
         for r in rows {
-            out.push(r.map_err(|e| map_harness_resp(map_sqlite_error(e, "row_comments"), "list_comments"))?);
+            out.push(r.map_err(|e| {
+                map_harness_resp(map_sqlite_error(e, "row_comments"), "list_comments")
+            })?);
         }
         Ok(out)
     })
@@ -462,10 +474,14 @@ pub async fn handle_list_fixtures(
             .map_err(|e| map_harness_resp(map_sqlite_error(e, "prep_fixtures"), "list_fixtures"))?;
         let rows = stmt
             .query_map(params![principal.tenant_id, pid, nid], map_fixture_row)
-            .map_err(|e| map_harness_resp(map_sqlite_error(e, "query_fixtures"), "list_fixtures"))?;
+            .map_err(|e| {
+                map_harness_resp(map_sqlite_error(e, "query_fixtures"), "list_fixtures")
+            })?;
         let mut out = Vec::new();
         for r in rows {
-            out.push(r.map_err(|e| map_harness_resp(map_sqlite_error(e, "row_fixtures"), "list_fixtures"))?);
+            out.push(r.map_err(|e| {
+                map_harness_resp(map_sqlite_error(e, "row_fixtures"), "list_fixtures")
+            })?);
         }
         Ok(out)
     })
@@ -482,7 +498,10 @@ pub async fn handle_create_fixture(
 ) -> Result<(StatusCode, Json<ScreenFixtureDto>), Response> {
     let pid = check_project_uuid(&id)?;
     let nid = check_non_empty_id(&node_id, "node_id")?;
-    if !matches!(req.variant.as_str(), "DEFAULT" | "EMPTY" | "LOADING" | "ERROR") {
+    if !matches!(
+        req.variant.as_str(),
+        "DEFAULT" | "EMPTY" | "LOADING" | "ERROR"
+    ) {
         return Err(json_err(
             StatusCode::BAD_REQUEST,
             "VALIDATION_ERROR",
@@ -1376,7 +1395,10 @@ fn fetch_pending_events(
             map_row,
         )
     } else {
-        stmt.query_map(params![state.tenant_id, state.project_id, state.last_seq], map_row)
+        stmt.query_map(
+            params![state.tenant_id, state.project_id, state.last_seq],
+            map_row,
+        )
     }
     .map_err(|e| map_sqlite_error(e, "query_sse_events"))?;
 
@@ -1459,7 +1481,8 @@ pub async fn handle_stream_job_events(
                         if is_terminal {
                             st.closed = true;
                         }
-                        let payload = serde_json::to_string(&events).unwrap_or_else(|_| "[]".into());
+                        let payload =
+                            serde_json::to_string(&events).unwrap_or_else(|_| "[]".into());
                         let ev = Event::default().event("execution_events").data(payload);
                         return Some((Ok(ev), st));
                     }
@@ -1518,37 +1541,77 @@ pub async fn handle_verify_provider_key(
     let (valid, status, message) = match provider.as_str() {
         "anthropic" | "claude" => {
             if key.starts_with("sk-ant-") && key.len() >= 24 {
-                (true, "verified", "Anthropic credential format verified locally")
+                (
+                    true,
+                    "verified",
+                    "Anthropic credential format verified locally",
+                )
             } else {
-                (false, "invalid_key", "Expected Anthropic key starting with 'sk-ant-' (min 24 chars)")
+                (
+                    false,
+                    "invalid_key",
+                    "Expected Anthropic key starting with 'sk-ant-' (min 24 chars)",
+                )
             }
         }
         "openai" => {
             if key.starts_with("sk-") && key.len() >= 20 {
-                (true, "verified", "OpenAI credential format verified locally")
+                (
+                    true,
+                    "verified",
+                    "OpenAI credential format verified locally",
+                )
             } else {
-                (false, "invalid_key", "Expected OpenAI key starting with 'sk-' (min 20 chars)")
+                (
+                    false,
+                    "invalid_key",
+                    "Expected OpenAI key starting with 'sk-' (min 20 chars)",
+                )
             }
         }
         "gemini" | "google" => {
             if key.starts_with("AIza") && key.len() >= 24 {
-                (true, "verified", "Gemini credential format verified locally")
+                (
+                    true,
+                    "verified",
+                    "Gemini credential format verified locally",
+                )
             } else {
-                (false, "invalid_key", "Expected Gemini key starting with 'AIza' (min 24 chars)")
+                (
+                    false,
+                    "invalid_key",
+                    "Expected Gemini key starting with 'AIza' (min 24 chars)",
+                )
             }
         }
         "deepseek" => {
             if key.starts_with("sk-") && key.len() >= 18 {
-                (true, "verified", "DeepSeek credential format verified locally")
+                (
+                    true,
+                    "verified",
+                    "DeepSeek credential format verified locally",
+                )
             } else {
-                (false, "invalid_key", "Expected DeepSeek key starting with 'sk-'")
+                (
+                    false,
+                    "invalid_key",
+                    "Expected DeepSeek key starting with 'sk-'",
+                )
             }
         }
         "openrouter" => {
             if key.starts_with("sk-or-") && key.len() >= 20 {
-                (true, "verified", "OpenRouter credential format verified locally")
+                (
+                    true,
+                    "verified",
+                    "OpenRouter credential format verified locally",
+                )
             } else {
-                (false, "invalid_key", "Expected OpenRouter key starting with 'sk-or-'")
+                (
+                    false,
+                    "invalid_key",
+                    "Expected OpenRouter key starting with 'sk-or-'",
+                )
             }
         }
         "ollama" | "byos" => {
@@ -1558,14 +1621,22 @@ pub async fn handle_verify_provider_key(
             if valid_ep {
                 (true, "verified", "Local/BYOS endpoint URL validated")
             } else {
-                (false, "invalid_endpoint", "Expected valid http://127.0.0.1:<port> or https:// endpointUrl")
+                (
+                    false,
+                    "invalid_endpoint",
+                    "Expected valid http://127.0.0.1:<port> or https:// endpointUrl",
+                )
             }
         }
         _ => {
             if key.len() >= 16 {
                 (true, "verified", "Custom provider key shape validated")
             } else {
-                (false, "invalid_key", "API key must be at least 16 characters")
+                (
+                    false,
+                    "invalid_key",
+                    "API key must be at least 16 characters",
+                )
             }
         }
     };
