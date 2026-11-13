@@ -6,7 +6,10 @@ function redactValue(key: string, val: unknown): unknown {
   if (SENSITIVE_KEY_PATTERN.test(key)) {
     return "[REDACTED]";
   }
-  if (val && typeof val === "object" && !Array.isArray(val)) {
+  if (Array.isArray(val)) {
+    return val.map((item) => redactValue("", item));
+  }
+  if (val && typeof val === "object") {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
       out[k] = redactValue(k, v);
@@ -24,8 +27,13 @@ function emit(level: "info" | "warn" | "error", msg: string, meta?: Record<strin
     msg,
     ...safeMeta,
   });
-  if (typeof process !== "undefined" && process.stderr?.write && level === "error") {
+  if (typeof process === "undefined") {
+    return;
+  }
+  if ((level === "error" || level === "warn") && process.stderr?.write) {
     process.stderr.write(`${payload}\n`);
+  } else if (level === "info" && process.stdout?.write) {
+    process.stdout.write(`${payload}\n`);
   }
 }
 

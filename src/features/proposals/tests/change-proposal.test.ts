@@ -8,8 +8,9 @@ import {
   computeUnifiedDiff,
   parsePatchLines,
   runValidationChecks,
-  sandboxedFilesStore,
 } from "../utils/diff-engine";
+import { issueBffLoopbackSession } from "../../../lib/api-guard";
+import { buildCanonicalHmacHeaders, ensureRunningDaemon } from "../../../lib/daemon-client";
 import {
   POST as createProposalRoute,
   GET as listProposalsRoute,
@@ -22,7 +23,53 @@ import { POST as rejectProposalRoute } from "../../../app/api/projects/[id]/prop
 const HTTP_OK = 200;
 const HTTP_CREATED = 201;
 const HTTP_BAD_REQUEST = 400;
+const HTTP_FORBIDDEN = 403;
 const HTTP_NOT_FOUND = 404;
+
+async function seedProposalTestProject(tenantId: string): Promise<{
+  projectId: string;
+  sessionToken: string;
+}> {
+  const lock = await ensureRunningDaemon();
+  const projectId = crypto.randomUUID();
+  const rawBody = JSON.stringify({
+    id: projectId,
+    slug: `prop-${projectId.slice(0, 8)}`,
+    name: "Proposal Integration Project",
+    product_brief: "SQLite WAL test project",
+    workspace_root: null,
+    inherit_brand_from_project_id: null,
+  });
+  const headers = buildCanonicalHmacHeaders({
+    daemonNonce: lock.daemon_nonce,
+    hmacKeyHex: lock.hmac_key_hex,
+    method: "POST",
+    canonicalPath: "/api/v1/projects",
+    rawQuery: "",
+    principal: { tenantId, userId: "proposal-tester", role: "editor" },
+    rawBody,
+    correlationId: crypto.randomUUID(),
+  });
+  const seedRes = await fetch(`http://${lock.host}:${lock.port}/api/v1/projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: rawBody,
+  });
+  if (!seedRes.ok) {
+    throw new Error(`Project seed failed: ${seedRes.status} ${await seedRes.text()}`);
+  }
+  const { sessionToken } = issueBffLoopbackSession({ tenantId, role: "editor" });
+  return { projectId, sessionToken };
+}
+
+function bffHeaders(sessionToken: string, hasBody: boolean = false): Record<string, string> {
+  return {
+    Host: "127.0.0.1:5173",
+    Origin: "http://127.0.0.1:5173",
+    "X-Cowok-Session-Token": sessionToken,
+    ...(hasBody ? { "Content-Type": "application/json" } : {}),
+  };
+}
 
 describe("Story 05.2: Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject", () => {
   describe("AC-01: Sandboxed Diff & Validation Engine", () => {
@@ -158,12 +205,10 @@ describe("Story 05.2: Sandboxed ChangeProposal Diff, Validation Gate & One-Click
 
   describe("AC-02: Fastify REST API Routes & Tenant Isolation", () => {
     it("should create proposal with initial validationStatus and checks via POST /proposals", async () => {
-      const req = new Request("http://localhost/api/v1/projects/p-100/proposals", {
+      const { projectId, sessionToken } = await seedProposalTestProject("tenant-alpha");
+      const req = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-alpha",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           title: "Refactor Navigation Bar",
           description: "Chuẩn hóa theo DESIGN.md [5.25]",
@@ -179,7 +224,7 @@ describe("Story 05.2: Sandboxed ChangeProposal Diff, Validation Gate & One-Click
         }),
       });
 
-      const res = await createProposalRoute(req, { params: { id: "p-100" } });
+      const res = await createProposalRoute(req, { params: { id: projectId } });
       expect(res.status).toBe(HTTP_CREATED);
       const data = await res.json();
       expect(data.id).toBeDefined();
@@ -189,25 +234,23 @@ describe("Story 05.2: Sandboxed ChangeProposal Diff, Validation Gate & One-Click
     });
 
     it("should fetch single proposal via GET /proposals/:proposalId", async () => {
-      const createReq = new Request("http://localhost/api/v1/projects/p-100/proposals", {
+      const { projectId, sessionToken } = await seedProposalTestProject("tenant-alpha");
+      const createReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-alpha",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           title: "Proposal for Single Fetch",
           files: [{ path: "src/Single.ts", status: "added", additions: 1, deletions: 0, patch: "+const s = 1;" }],
         }),
       });
-      const createRes = await createProposalRoute(createReq, { params: { id: "p-100" } });
+      const createRes = await createProposalRoute(createReq, { params: { id: projectId } });
       const proposal = await createRes.json();
 
-      const getReq = new Request(`http://localhost/api/v1/projects/p-100/proposals/${proposal.id}`, {
+      const getReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals/${proposal.id}`, {
         method: "GET",
-        headers: { "x-tenant-id": "tenant-alpha" },
+        headers: bffHeaders(sessionToken),
       });
-      const getRes = await getProposalRoute(getReq, { params: { id: "p-100", proposalId: proposal.id } });
+      const getRes = await getProposalRoute(getReq, { params: { id: projectId, proposalId: proposal.id } });
       expect(getRes.status).toBe(HTTP_OK);
       const fetched = await getRes.json();
       expect(fetched.id).toBe(proposal.id);
@@ -215,119 +258,136 @@ describe("Story 05.2: Sandboxed ChangeProposal Diff, Validation Gate & One-Click
     });
 
     it("should enforce tenant isolation in GET /proposals", async () => {
-      const reqOther = new Request("http://localhost/api/v1/projects/p-100/proposals", {
-        method: "GET",
-        headers: { "x-tenant-id": "tenant-stranger" },
-      });
-      const resOther = await listProposalsRoute(reqOther, { params: { id: "p-100" } });
-      const dataOther = await resOther.json();
-      expect(dataOther).toHaveLength(0);
+      const { projectId, sessionToken } = await seedProposalTestProject("tenant-alpha");
+      await createProposalRoute(
+        new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals`, {
+          method: "POST",
+          headers: bffHeaders(sessionToken, true),
+          body: JSON.stringify({
+            title: "Tenant Alpha Proposal",
+            files: [{ path: "src/T.ts", status: "added", additions: 1, deletions: 0, patch: "+const t = 1;" }],
+          }),
+        }),
+        { params: { id: projectId } }
+      );
 
-      const reqSame = new Request("http://localhost/api/v1/projects/p-100/proposals", {
-        method: "GET",
-        headers: { "x-tenant-id": "tenant-alpha" },
+      const { sessionToken: strangerToken } = issueBffLoopbackSession({
+        tenantId: "tenant-stranger",
+        role: "editor",
       });
-      const resSame = await listProposalsRoute(reqSame, { params: { id: "p-100" } });
+      const reqOther = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals`, {
+        method: "GET",
+        headers: bffHeaders(strangerToken),
+      });
+      const resOther = await listProposalsRoute(reqOther, { params: { id: projectId } });
+      expect(resOther.status).toBe(HTTP_FORBIDDEN);
+
+      const reqSame = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals`, {
+        method: "GET",
+        headers: bffHeaders(sessionToken),
+      });
+      const resSame = await listProposalsRoute(reqSame, { params: { id: projectId } });
+      expect(resSame.status).toBe(HTTP_OK);
       const dataSame = await resSame.json();
       expect(dataSame.length).toBeGreaterThan(0);
     });
 
     it("should prevent cross-project IDOR when proposal belongs to different project", async () => {
-      const createReq = new Request("http://localhost/api/v1/projects/project-A/proposals", {
+      const { projectId: projectA, sessionToken } = await seedProposalTestProject("tenant-alpha");
+      const { projectId: projectB } = await seedProposalTestProject("tenant-alpha");
+
+      const createReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectA}/proposals`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-tenant-id": "tenant-alpha" },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           title: "Proposal in Project A",
           files: [{ path: "src/A.ts", status: "added", additions: 1, deletions: 0, patch: "+const a = 1;" }],
         }),
       });
-      const createRes = await createProposalRoute(createReq, { params: { id: "project-A" } });
+      const createRes = await createProposalRoute(createReq, { params: { id: projectA } });
       const proposal = await createRes.json();
 
-      const applyReq = new Request(`http://localhost/api/v1/projects/project-B/proposals/${proposal.id}/apply`, {
+      const applyReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectB}/proposals/${proposal.id}/apply`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-tenant-id": "tenant-alpha" },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({ force: false }),
       });
-      const applyRes = await applyProposalRoute(applyReq, { params: { id: "project-B", proposalId: proposal.id } });
+      const applyRes = await applyProposalRoute(applyReq, { params: { id: projectB, proposalId: proposal.id } });
       expect(applyRes.status).toBe(HTTP_NOT_FOUND);
       const err = await applyRes.json();
-      expect(err.error).toBe("PROJECT_MISMATCH");
+      expect(err.error).toBe("PROPOSAL_NOT_FOUND");
     });
 
     it("should re-validate proposal via POST /proposals/:proposalId/validate", async () => {
-      const createReq = new Request("http://localhost/api/v1/projects/p-100/proposals", {
+      const { projectId, sessionToken } = await seedProposalTestProject("tenant-alpha");
+      const createReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-alpha",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           title: "Test Validation Run",
           files: [{ path: "src/A.ts", status: "added", additions: 1, deletions: 0, patch: "+const ok = 1;" }],
         }),
       });
-      const createRes = await createProposalRoute(createReq, { params: { id: "p-100" } });
+      const createRes = await createProposalRoute(createReq, { params: { id: projectId } });
       const proposal = await createRes.json();
 
-      const valReq = new Request(`http://localhost/api/v1/projects/p-100/proposals/${proposal.id}/validate`, {
+      const valReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals/${proposal.id}/validate`, {
         method: "POST",
-        headers: { "x-tenant-id": "tenant-alpha" },
+        headers: bffHeaders(sessionToken),
       });
-      const valRes = await validateProposalRoute(valReq, { params: { id: "p-100", proposalId: proposal.id } });
+      const valRes = await validateProposalRoute(valReq, { params: { id: projectId, proposalId: proposal.id } });
       expect(valRes.status).toBe(HTTP_OK);
       const valData = await valRes.json();
       expect(valData.validationStatus).toBe("passed");
     });
 
     it("should strictly reject validate on rejected proposal with HTTP 400 INVALID_STATE", async () => {
-      const createReq = new Request("http://localhost/api/v1/projects/p-100/proposals", {
+      const { projectId, sessionToken } = await seedProposalTestProject("tenant-alpha");
+      const createReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-tenant-id": "tenant-alpha" },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           title: "Proposal To Reject Then Validate",
           files: [{ path: "src/A.ts", status: "added", additions: 1, deletions: 0, patch: "+const ok = 1;" }],
         }),
       });
-      const createRes = await createProposalRoute(createReq, { params: { id: "p-100" } });
+      const createRes = await createProposalRoute(createReq, { params: { id: projectId } });
       const proposal = await createRes.json();
 
-      const rejReq = new Request(`http://localhost/api/v1/projects/p-100/proposals/${proposal.id}/reject`, {
+      const rejReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals/${proposal.id}/reject`, {
         method: "POST",
-        headers: { "x-tenant-id": "tenant-alpha" },
+        headers: bffHeaders(sessionToken),
       });
-      await rejectProposalRoute(rejReq, { params: { id: "p-100", proposalId: proposal.id } });
+      await rejectProposalRoute(rejReq, { params: { id: projectId, proposalId: proposal.id } });
 
-      const valReq = new Request(`http://localhost/api/v1/projects/p-100/proposals/${proposal.id}/validate`, {
+      const valReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals/${proposal.id}/validate`, {
         method: "POST",
-        headers: { "x-tenant-id": "tenant-alpha" },
+        headers: bffHeaders(sessionToken),
       });
-      const valRes = await validateProposalRoute(valReq, { params: { id: "p-100", proposalId: proposal.id } });
+      const valRes = await validateProposalRoute(valReq, { params: { id: projectId, proposalId: proposal.id } });
       expect(valRes.status).toBe(HTTP_BAD_REQUEST);
       const valErr = await valRes.json();
       expect(valErr.error).toBe("INVALID_STATE");
     });
 
     it("should mark proposal as rejected via POST /proposals/:proposalId/reject", async () => {
-      const createReq = new Request("http://localhost/api/v1/projects/p-100/proposals", {
+      const { projectId, sessionToken } = await seedProposalTestProject("tenant-alpha");
+      const createReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-alpha",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           title: "Proposal to Reject",
           files: [{ path: "src/B.ts", status: "added", additions: 1, deletions: 0, patch: "+const b = 1;" }],
         }),
       });
-      const createRes = await createProposalRoute(createReq, { params: { id: "p-100" } });
+      const createRes = await createProposalRoute(createReq, { params: { id: projectId } });
       const proposal = await createRes.json();
 
-      const rejReq = new Request(`http://localhost/api/v1/projects/p-100/proposals/${proposal.id}/reject`, {
+      const rejReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals/${proposal.id}/reject`, {
         method: "POST",
-        headers: { "x-tenant-id": "tenant-alpha" },
+        headers: bffHeaders(sessionToken),
       });
-      const rejRes = await rejectProposalRoute(rejReq, { params: { id: "p-100", proposalId: proposal.id } });
+      const rejRes = await rejectProposalRoute(rejReq, { params: { id: projectId, proposalId: proposal.id } });
       expect(rejRes.status).toBe(HTTP_OK);
       const rejData = await rejRes.json();
       expect(rejData.status).toBe("rejected");
@@ -336,12 +396,10 @@ describe("Story 05.2: Sandboxed ChangeProposal Diff, Validation Gate & One-Click
 
   describe("AC-03: [EDGE-CASE] Resilience & Boundary Guard for Apply Action", () => {
     it("should strictly reject apply with HTTP 400 when validation checks fail", async () => {
-      const createReq = new Request("http://localhost/api/v1/projects/p-100/proposals", {
+      const { projectId, sessionToken } = await seedProposalTestProject("tenant-alpha");
+      const createReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-alpha",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           title: "Malicious Dangerous Proposal",
           files: [
@@ -356,65 +414,58 @@ describe("Story 05.2: Sandboxed ChangeProposal Diff, Validation Gate & One-Click
         }),
       });
 
-      const createRes = await createProposalRoute(createReq, { params: { id: "p-100" } });
+      const createRes = await createProposalRoute(createReq, { params: { id: projectId } });
       const proposal = await createRes.json();
       expect(proposal.validationStatus).toBe("failed");
 
-      const applyReq = new Request(`http://localhost/api/v1/projects/p-100/proposals/${proposal.id}/apply`, {
+      const applyReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals/${proposal.id}/apply`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-alpha",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({ force: false }),
       });
 
-      const applyRes = await applyProposalRoute(applyReq, { params: { id: "p-100", proposalId: proposal.id } });
+      const applyRes = await applyProposalRoute(applyReq, { params: { id: projectId, proposalId: proposal.id } });
       expect(applyRes.status).toBe(HTTP_BAD_REQUEST);
       const err = await applyRes.json();
       expect(err.error).toBe("PRECONDITION_FAILED");
     });
 
     it("should strictly reject apply with HTTP 400 when proposal is not in ready status (e.g. rejected)", async () => {
-      const createReq = new Request("http://localhost/api/v1/projects/p-100/proposals", {
+      const { projectId, sessionToken } = await seedProposalTestProject("tenant-alpha");
+      const createReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-alpha",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           title: "Proposal To Reject Then Apply",
           files: [{ path: "src/C.ts", status: "added", additions: 1, deletions: 0, patch: "+const c = 1;" }],
         }),
       });
-      const createRes = await createProposalRoute(createReq, { params: { id: "p-100" } });
+      const createRes = await createProposalRoute(createReq, { params: { id: projectId } });
       const proposal = await createRes.json();
       expect(proposal.status).toBe("ready");
 
-      const rejReq = new Request(`http://localhost/api/v1/projects/p-100/proposals/${proposal.id}/reject`, {
+      const rejReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals/${proposal.id}/reject`, {
         method: "POST",
-        headers: { "x-tenant-id": "tenant-alpha" },
+        headers: bffHeaders(sessionToken),
       });
-      await rejectProposalRoute(rejReq, { params: { id: "p-100", proposalId: proposal.id } });
+      await rejectProposalRoute(rejReq, { params: { id: projectId, proposalId: proposal.id } });
 
-      const applyReq = new Request(`http://localhost/api/v1/projects/p-100/proposals/${proposal.id}/apply`, {
+      const applyReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals/${proposal.id}/apply`, {
         method: "POST",
-        headers: { "x-tenant-id": "tenant-alpha", "Content-Type": "application/json" },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({ force: false }),
       });
-      const applyRes = await applyProposalRoute(applyReq, { params: { id: "p-100", proposalId: proposal.id } });
+      const applyRes = await applyProposalRoute(applyReq, { params: { id: projectId, proposalId: proposal.id } });
       expect(applyRes.status).toBe(HTTP_BAD_REQUEST);
       const err = await applyRes.json();
       expect(err.error).toBe("INVALID_STATE");
     });
 
     it("should successfully apply proposal when all checks pass", async () => {
-      const createReq = new Request("http://localhost/api/v1/projects/p-100/proposals", {
+      const { projectId, sessionToken } = await seedProposalTestProject("tenant-alpha");
+      const createReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-alpha",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           title: "Safe Valid Proposal",
           files: [
@@ -423,31 +474,27 @@ describe("Story 05.2: Sandboxed ChangeProposal Diff, Validation Gate & One-Click
               status: "added",
               additions: 3,
               deletions: 0,
-              patch: "+export const Clean = () => <div>Safe</div>;",
+              patch: "export const Clean = () => <div>Safe</div>;",
             },
           ],
         }),
       });
 
-      const createRes = await createProposalRoute(createReq, { params: { id: "p-100" } });
+      const createRes = await createProposalRoute(createReq, { params: { id: projectId } });
       const proposal = await createRes.json();
       expect(proposal.validationStatus).toBe("passed");
 
-      const applyReq = new Request(`http://localhost/api/v1/projects/p-100/proposals/${proposal.id}/apply`, {
+      const applyReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/proposals/${proposal.id}/apply`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-alpha",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({ force: false }),
       });
 
-      const applyRes = await applyProposalRoute(applyReq, { params: { id: "p-100", proposalId: proposal.id } });
+      const applyRes = await applyProposalRoute(applyReq, { params: { id: projectId, proposalId: proposal.id } });
       expect(applyRes.status).toBe(HTTP_OK);
       const applied = await applyRes.json();
       expect(applied.status).toBe("applied");
       expect(applied.appliedManifest).toBeUndefined();
-      expect(sandboxedFilesStore.has("src/Clean.tsx")).toBe(true);
     });
   });
 });

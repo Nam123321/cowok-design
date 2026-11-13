@@ -1,13 +1,7 @@
 import { z } from "zod";
+import { SafeJsIntegerSchema } from "./primitives.js";
 
-export const ConstraintSeveritySchema = z.enum([
-  "Info",
-  "Warn",
-  "Blocker",
-  "INFO",
-  "WARN",
-  "BLOCKER",
-]);
+export const ConstraintSeveritySchema = z.enum(["INFO", "WARN", "BLOCKER"]);
 
 export const ActiveConstraintSchema = z
   .object({
@@ -41,7 +35,7 @@ export const IconManifestSchema = z
   .object({
     name: z.string().min(1),
     status: z.string().nullable().optional(),
-    count: z.number().int().nonnegative(),
+    count: SafeJsIntegerSchema.min(0),
     icons: z.array(IconManifestEntrySchema).default([]),
   })
   .strict();
@@ -57,9 +51,48 @@ export const IconValidationReportSchema = z
 export const TypographyContractSchema = z
   .object({
     allowed_font_families: z.array(z.string()),
-    allowed_font_weights: z.array(z.number().int().positive()),
+    allowed_font_weights: z.array(SafeJsIntegerSchema.min(1)),
     allowed_font_sizes: z.array(z.string()),
     min_wcag_contrast: z.number().positive(),
+  })
+  .strict();
+
+export const ComponentRegistryEntrySchema = z
+  .object({
+    name: z.string().min(1),
+    source_spec: z.string().nullable(),
+    allowed_props: z.array(z.string()),
+  })
+  .strict();
+
+export const ComponentRegistryContractSchema = z
+  .object({
+    components: z.array(ComponentRegistryEntrySchema),
+    forbid_unregistered: z.boolean(),
+  })
+  .strict();
+
+export const ComponentValidationReportSchema = z
+  .object({
+    requested_component: z.string(),
+    is_valid: z.boolean(),
+    suggestions: z.array(z.string()),
+  })
+  .strict();
+
+export const TypographyValidationReportSchema = z
+  .object({
+    is_valid: z.boolean(),
+    errors: z.array(z.string()),
+  })
+  .strict();
+
+export const ProjectDesignContractsSchema = z
+  .object({
+    icon_manifest_path: z.string(),
+    allowed_icon_set: z.array(z.string()),
+    typography_contract: TypographyContractSchema,
+    component_registry: ComponentRegistryContractSchema,
   })
   .strict();
 
@@ -86,7 +119,7 @@ export const SurgicalPatchResponseSchema = z
     success: z.boolean(),
     original_text: z.string().nullable().optional(),
     patched_source: z.string(),
-    execution_time_micros: z.number().int().nonnegative(),
+    execution_time_micros: SafeJsIntegerSchema.min(0),
   })
   .strict();
 
@@ -99,7 +132,7 @@ export const AstInjectionRequestSchema = z
 
 export const AstInjectionResponseSchema = z
   .object({
-    total_elements_tagged: z.number().int().nonnegative(),
+    total_elements_tagged: SafeJsIntegerSchema.min(0),
     tagged_source: z.string(),
     generated_ids: z.array(z.string()),
   })

@@ -1,7 +1,7 @@
 ---
 type: I-Wish Story
 id: "10.2"
-title: "Story 10.2: Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)"
+title: "Story 10.2: Hộp thư Điều phối .cowok-design/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)"
 description: "Điều phối đa Execution Agents (Claude, Codex, AGY, Grok, Muse, Duet, Dot) qua hộp thư file-backed với hợp đồng ONE_JOB + NEVER và tách biệt hoàn toàn Builder Agent khỏi Verifier Agent theo thang bằng chứng E1..E4."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-10/Story-10.2/story.md"
 status: refactored
@@ -23,9 +23,9 @@ provides_apis:
 consumes_apis: []
 ---
 
-# Story 10.2: Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)
+# Story 10.2: Hộp thư Điều phối .cowok-design/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)
 
-- **FR Covered:** [FR-25: Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
+- **FR Covered:** [FR-25: Hộp thư Điều phối .cowok-design/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 10: cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design Tournament](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-10/epic.md)
 - **Status:** `planned`
 - **Risk Tier:** `3`
@@ -37,13 +37,13 @@ consumes_apis: []
 - **Complexity Score (CS):** `CS = 4` (Scope=1, Data=1, Integration=1, UI=0.5, Security=0.5, Unknowns=0 $\rightarrow$ `CS = 4 < 7`, đạt ngưỡng an toàn, không cần tách nhỏ Story).
 
 ## 3. Acceptance Criteria (AC)
-- **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
+- **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Hộp thư Điều phối .cowok-design/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
 - **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Chặn tuyệt đối mọi nỗ lực của Builder Agent tự ghi kết quả PASS vào file kiểm định của Verifier Agent.
 - **AC-04 (Single-Session Design Jury / Critique Theater on Frozen Bundle):** Trước khi bàn giao một thiết kế lớn, kích hoạt hội đồng chấm điểm đa vai nội tuyến (`Visual`, `UX Flow`, `Copy`, `Brand Identity`) làm việc trên gói chụp đóng băng (`review_freeze` có `generation fencing`); chỉ khi đạt ngưỡng điểm chất lượng mới trình người dùng duyệt.
 
 ## 4. Tasks
-- [ ] **Task 10.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)" (thỏa mãn `AC-01`).
+- [ ] **Task 10.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Hộp thư Điều phối .cowok-design/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)" (thỏa mãn `AC-01`).
 - [ ] **Task 10.2.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
 - [ ] **Task 10.2.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
 - [ ] **Task 10.2.4**: Cài đặt hội đồng chấm điểm Single-Session Design Jury / Critique Theater trên gói chụp đóng băng (thỏa mãn `AC-04`).

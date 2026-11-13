@@ -164,3 +164,123 @@ fn test_cross_platform_lock_exclusive_mutual_exclusion() {
         "Lock must be acquirable after previous guard dropped"
     );
 }
+
+#[test]
+fn test_post_tombstone_recreation_and_occ_sequence() {
+    let dir = tempdir().expect("tempdir");
+    let db_path = dir.path().join("recreate.db");
+    let pool = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, dir.path())).expect("open_wal");
+    let registry = SpecRegistry::new(pool);
+
+    let project_id = Uuid::new_v4();
+    registry
+        .create_project(project_id, "recreate", "Recreate", "Brief", None)
+        .expect("create_project");
+
+    let spec_key = CanonicalSpecKey::ProductOverview;
+    let (v1, _) = registry
+        .upsert_spec(UpsertSpecInput {
+            project_id,
+            spec_key,
+            actor_kind: "USER".to_string(),
+            actor_id: "u1".to_string(),
+            change_summary: "v1".to_string(),
+            status: ProvenanceStatus::Confirmed,
+            markdown_content: "# V1".to_string(),
+            expected_sha256: None,
+            source_project_id: None,
+            source_revision_sha256: None,
+            provenance_summary_json: "{}".to_string(),
+        })
+        .expect("upsert v1");
+
+    let (v2, _) = registry
+        .upsert_spec(UpsertSpecInput {
+            project_id,
+            spec_key,
+            actor_kind: "USER".to_string(),
+            actor_id: "u1".to_string(),
+            change_summary: "v2".to_string(),
+            status: ProvenanceStatus::Confirmed,
+            markdown_content: "# V2".to_string(),
+            expected_sha256: Some(v1.content_sha256),
+            source_project_id: None,
+            source_revision_sha256: None,
+            provenance_summary_json: "{}".to_string(),
+        })
+        .expect("upsert v2");
+
+    registry
+        .delete_spec_checked(project_id, spec_key, Some(&v2.content_sha256), "u1")
+        .expect("delete v2");
+
+    let (v4, _) = registry
+        .upsert_spec(UpsertSpecInput {
+            project_id,
+            spec_key,
+            actor_kind: "USER".to_string(),
+            actor_id: "u1".to_string(),
+            change_summary: "recreated".to_string(),
+            status: ProvenanceStatus::Confirmed,
+            markdown_content: "# Recreated".to_string(),
+            expected_sha256: None,
+            source_project_id: None,
+            source_revision_sha256: None,
+            provenance_summary_json: "{}".to_string(),
+        })
+        .expect("recreate after tombstone");
+
+    assert!(v4.version >= 4);
+    let revs = registry
+        .list_revisions(project_id, spec_key)
+        .expect("list_revisions");
+    assert_eq!(revs.len(), 4);
+    assert_eq!(revs[2].content_hash, "FILE_DELETED");
+    assert_eq!(revs[3].content_hash, v4.content_sha256);
+}
+
+#[test]
+fn test_spec_watcher_external_write_and_echo_suppression() {
+    let dir = tempdir().expect("tempdir");
+    let db_path = dir.path().join("watcher.db");
+    let pool = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, dir.path())).expect("open_wal");
+    let registry = SpecRegistry::new(pool);
+
+    let project_id = Uuid::new_v4();
+    registry
+        .create_project(project_id, "watch", "Watch", "Brief", None)
+        .expect("create_project");
+
+    let spec_key = CanonicalSpecKey::Architecture;
+    let (v1, _) = registry
+        .upsert_spec(UpsertSpecInput {
+            project_id,
+            spec_key,
+            actor_kind: "USER".to_string(),
+            actor_id: "u1".to_string(),
+            change_summary: "seed".to_string(),
+            status: ProvenanceStatus::Confirmed,
+            markdown_content: "# Initial Arch".to_string(),
+            expected_sha256: None,
+            source_project_id: None,
+            source_revision_sha256: None,
+            provenance_summary_json: "{}".to_string(),
+        })
+        .expect("upsert v1");
+
+    let watcher = spec_registry::SpecWatcher::start(registry.clone(), project_id).expect("start watcher");
+    let spec_path = spec_registry::resolve_jailed_spec_path(dir.path(), spec_key).expect("spec_path");
+
+    // Identical content echo must be suppressed
+    let echo = watcher.process_path(&spec_path).expect("echo");
+    assert!(matches!(echo, SyncOutcome::SuppressedNoOp { .. }));
+
+    // External disk modification must reconcile to version 2
+    std::fs::write(&spec_path, "# Updated External Arch").expect("write external edit");
+    let synced = watcher.process_path(&spec_path).expect("sync external edit");
+    assert!(matches!(synced, SyncOutcome::SyncedToDiskAndDb { version: 2, .. }));
+
+    let latest = registry.get_spec(project_id, spec_key).expect("get_spec").expect("exists");
+    assert_eq!(latest.version, 2);
+    assert_ne!(latest.content_sha256, v1.content_sha256);
+}

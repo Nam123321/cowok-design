@@ -134,6 +134,9 @@ impl<'a> ContextSlicer<'a> {
         // Step 6: Token Budget Governor & Priority Pruning
         let final_slices = self.prune_to_token_ceiling(raw_slices, token_ceiling);
         let total_tokens: usize = final_slices.iter().map(|s| s.estimated_tokens).sum();
+        let was_truncated = final_slices
+            .iter()
+            .any(|s| s.content.contains("<!-- [TRUNCATED_BY_TOKEN_GOVERNOR] -->"));
 
         Ok(AuthorizedContextSlice {
             project_id,
@@ -144,11 +147,15 @@ impl<'a> ContextSlicer<'a> {
                 allowed_spec_keys: allowed_keys,
                 denied_spec_keys: denied_keys,
                 token_ceiling,
-                primary_reason: ReasonCode::Success,
+                primary_reason: if was_truncated {
+                    ReasonCode::TokenBudgetExceeded
+                } else {
+                    ReasonCode::Success
+                },
             },
             slices: final_slices,
             total_estimated_tokens: total_tokens,
-            atomic_complete: true,
+            atomic_complete: !was_truncated,
         })
     }
 
@@ -165,7 +172,17 @@ impl<'a> ContextSlicer<'a> {
                 Ok(Some(record)) => {
                     let title = key.as_str().to_string();
                     let content = match read_jailed_spec_bytes(workspace_root, key)? {
-                        Some(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+                        Some(bytes) => {
+                            let disk_sha = crate::sync::compute_sha256_hex(&bytes);
+                            if disk_sha != record.content_sha256 {
+                                return Err(HarnessError::StaleFile {
+                                    path: format!("product/specs/{}", key.as_str()),
+                                    expected_hash: record.content_sha256.clone(),
+                                    actual_hash: disk_sha,
+                                });
+                            }
+                            String::from_utf8_lossy(&bytes).into_owned()
+                        }
                         None => {
                             return Err(HarnessError::StaleFile {
                                 path: format!("Spec file for {:?}", key),

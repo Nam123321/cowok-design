@@ -35,17 +35,42 @@ export class PerRunStagingManager {
     return hasher.digest("hex");
   }
 
+  private static assertSafeSegment(kind: string, segment: string): void {
+    if (
+      !segment ||
+      segment === "." ||
+      segment === ".." ||
+      segment.includes("/") ||
+      segment.includes("\\") ||
+      segment.includes("\0") ||
+      /[\x00-\x1f\x7f]/.test(segment)
+    ) {
+      throw new Error(
+        `Invalid ${kind} segment '${segment}': path separators and traversal segments are forbidden`,
+      );
+    }
+  }
+
   /**
    * Stages active skills into an isolated run directory (.cowok-skills/<run_id>/)
    */
   public stageRun(runId: string, skills: SkillManifest[]): StagingRunReceipt {
-    const runDir = path.join(this.baseStagingDir, runId);
+    PerRunStagingManager.assertSafeSegment("runId", runId);
+    const baseResolved = path.resolve(this.baseStagingDir);
+    const runDir = path.resolve(baseResolved, runId);
+    if (!runDir.startsWith(`${baseResolved}${path.sep}`)) {
+      throw new Error(`Resolved runDir escaped baseStagingDir: ${runDir}`);
+    }
     fs.mkdirSync(runDir, { recursive: true });
 
     const stagedSkills: string[] = [];
 
     for (const skill of skills) {
-      const skillDir = path.join(runDir, skill.name);
+      PerRunStagingManager.assertSafeSegment("skill.name", skill.name);
+      const skillDir = path.resolve(runDir, skill.name);
+      if (!skillDir.startsWith(`${runDir}${path.sep}`)) {
+        throw new Error(`Resolved skillDir escaped runDir: ${skillDir}`);
+      }
       fs.mkdirSync(skillDir, { recursive: true });
 
       const manifestPath = path.join(skillDir, "plugin.json");

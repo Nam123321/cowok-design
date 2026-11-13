@@ -1,5 +1,6 @@
 // @story 03.2
 import { z } from "zod";
+import flagshipIconManifestRaw from "./flagship-icon-manifest.json";
 
 export const FLAGSHIP_MANIFEST_SENTINEL = "builtin://flagship";
 export const MAX_MANIFEST_ICONS = 2048;
@@ -114,12 +115,6 @@ export type ConstraintViolation = z.infer<typeof ConstraintViolationSchema>;
 export type LintSourceInput = z.infer<typeof LintSourceInputSchema>;
 export type LintSourceResponse = z.infer<typeof LintSourceResponseSchema>;
 
-export const DEFAULT_SEEDED_ICON_MANIFEST: IconManifest = {
-  name: "cowok.ai Iconography v2",
-  status: "seeded-default",
-  count: 2,
-  icons: [
-    { name: "workflow", tier: "workflow", file: "workflow.svg", source: "cowok", tags: ["workflow"] },
-    { name: "settings", tier: "core", file: "settings.svg", source: "cowok", tags: ["settings"] },
-  ],
-};
+export const DEFAULT_SEEDED_ICON_MANIFEST: IconManifest = IconManifestSchema.parse(
+  flagshipIconManifestRaw,
+);

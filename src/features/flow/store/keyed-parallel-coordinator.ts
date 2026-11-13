@@ -135,7 +135,11 @@ export class KeyedParallelCoordinator {
   }): NodeExecutionJob {
     this.fencingCounter++;
     const compositeScopeKey = `${params.projectId}::${params.sessionId}::${params.nodeId}`;
-    const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const randomSuffix =
+      typeof globalThis.crypto?.randomUUID === "function"
+        ? globalThis.crypto.randomUUID().slice(0, 8)
+        : String(this.fencingCounter).padStart(8, "0");
+    const jobId = `job-${Date.now()}-${randomSuffix}`;
 
     let queue = this.nodeQueues.get(params.nodeId);
     if (!queue) {

@@ -61,6 +61,14 @@ impl SpecWatcher {
         let mut results = Vec::new();
         while let Ok(event_res) = self.rx.try_recv() {
             if let Ok(event) = event_res {
+                if !matches!(
+                    event.kind,
+                    notify::EventKind::Create(_)
+                        | notify::EventKind::Modify(_)
+                        | notify::EventKind::Remove(_)
+                ) {
+                    continue;
+                }
                 for path in event.paths {
                     if let Some(fname) = path.file_name().and_then(|s| s.to_str()) {
                         // Ignore temporary sibling files (.01-product-overview.md.tmp.<uuid>)

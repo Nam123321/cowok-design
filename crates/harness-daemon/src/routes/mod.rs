@@ -4,18 +4,23 @@ pub mod legacy_proposals;
 pub mod legacy_sdi;
 pub mod legacy_sessions;
 pub mod legacy_specs;
+pub mod legacy_workbench_v6;
 
 use std::sync::Arc;
 
 use axum::{
     extract::State,
-    routing::{get, post, put},
+    middleware,
+    routing::{get, patch, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use spec_registry::SpecRegistry;
 
-use crate::daemon_auth::{handle_issue_local_session, DaemonAuthState};
+use crate::daemon_auth::{
+    cors_and_loopback_middleware, handle_issue_local_session, legacy_project_auth_middleware,
+    DaemonAuthState,
+};
 use crate::flow_routes::build_flow_subrouter;
 use crate::lockfile::CURRENT_SCHEMA_VERSION;
 
@@ -26,14 +31,16 @@ pub use legacy_specs::*;
 
 use legacy_proposals::{
     handle_apply_proposal, handle_create_pr, handle_create_proposal, handle_create_snapshot,
-    handle_download_export, handle_export_snapshots, handle_list_proposals, handle_list_snapshots,
-    handle_reject_proposal, handle_revert_snapshot, handle_validate_proposal,
+    handle_download_export, handle_export_snapshots, handle_get_proposal, handle_get_snapshot,
+    handle_list_proposals, handle_list_snapshots, handle_reject_proposal, handle_revert_snapshot,
+    handle_validate_proposal,
 };
 use legacy_sdi::{
     handle_get_constraint_profile, handle_get_design_contracts, handle_get_icon_manifest,
-    handle_inject_ff_id, handle_lint_source, handle_model_adapter, handle_prompt_compile,
-    handle_put_constraint_profile, handle_put_design_contracts, handle_sdi_clarification,
-    handle_sdi_intent, handle_surgical_patch, handle_validate_component, handle_validate_icon,
+    handle_get_sdi_intent, handle_inject_ff_id, handle_lint_source, handle_list_sdi_intents,
+    handle_model_adapter, handle_prompt_compile, handle_put_constraint_profile,
+    handle_put_design_contracts, handle_sdi_clarification, handle_sdi_intent,
+    handle_surgical_patch, handle_validate_component, handle_validate_icon,
     handle_validate_typography,
 };
 use legacy_sessions::{
@@ -43,17 +50,34 @@ use legacy_sessions::{
     parse_project_uuid,
 };
 use legacy_specs::{
-    constant_time_eq, handle_context_slice, handle_create_project, handle_list_projects,
-    handle_list_specs, handle_put_spec, handle_synthesize_specs,
-    verify_anti_idor_and_resolve_registry,
+    handle_context_slice, handle_create_project, handle_delete_project, handle_delete_spec,
+    handle_list_projects, handle_list_specs, handle_put_spec, handle_synthesize_specs,
+    handle_update_project,
 };
+pub(crate) use legacy_specs::constant_time_eq;
 
 impl DaemonAppState {
     pub fn new(registry: Arc<SpecRegistry>, host: String, port: u16) -> Self {
+        let auth = DaemonAuthState::from_registry_root(registry.pool().workspace_root());
         Self {
             registry,
             host,
             port,
+            auth,
+        }
+    }
+
+    pub fn with_auth(
+        registry: Arc<SpecRegistry>,
+        host: String,
+        port: u16,
+        auth: Arc<DaemonAuthState>,
+    ) -> Self {
+        Self {
+            registry,
+            host,
+            port,
+            auth,
         }
     }
 }
@@ -63,30 +87,11 @@ pub struct DaemonAppState {
     pub registry: Arc<SpecRegistry>,
     pub host: String,
     pub port: u16,
-}
-
-fn registry_auth(registry: &SpecRegistry) -> Arc<DaemonAuthState> {
-    static AUTH_BY_ROOT: std::sync::OnceLock<
-        std::sync::Mutex<std::collections::HashMap<std::path::PathBuf, Arc<DaemonAuthState>>>,
-    > = std::sync::OnceLock::new();
-    let map_mutex =
-        AUTH_BY_ROOT.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
-    let root = registry
-        .pool()
-        .workspace_root()
-        .canonicalize()
-        .unwrap_or_else(|_| registry.pool().workspace_root().to_path_buf());
-    let mut map = map_mutex.lock().expect("auth_by_root");
-    if let Some(existing) = map.get(&root) {
-        return Arc::clone(existing);
-    }
-    let created = DaemonAuthState::from_registry_root(&root);
-    map.insert(root, Arc::clone(&created));
-    created
+    pub auth: Arc<DaemonAuthState>,
 }
 
 pub(crate) fn state_auth(state: &DaemonAppState) -> Arc<DaemonAuthState> {
-    registry_auth(&state.registry)
+    Arc::clone(&state.auth)
 }
 
 /// Health response returned by `GET /api/v1/health` (redacts `hmac_key_hex` unconditionally).
@@ -123,18 +128,20 @@ pub fn build_router(state: DaemonAppState) -> Router {
     let _ = ensure_ac06_tables(&state.registry);
     let flow_router = build_flow_subrouter(state.clone());
 
-    Router::new()
-        .route("/api/v1/health", get(handle_health))
-        .route(
-            "/api/v1/auth/local-session",
-            post(handle_issue_local_session),
-        )
+    let protected_legacy_router = Router::new()
         .route(
             "/api/v1/projects",
             get(handle_list_projects).post(handle_create_project),
         )
+        .route(
+            "/api/v1/projects/:id",
+            patch(handle_update_project).delete(handle_delete_project),
+        )
         .route("/api/v1/projects/:id/specs", get(handle_list_specs))
-        .route("/api/v1/projects/:id/specs/:spec_key", put(handle_put_spec))
+        .route(
+            "/api/v1/projects/:id/specs/:spec_key",
+            put(handle_put_spec).delete(handle_delete_spec),
+        )
         .route(
             "/api/v1/projects/:id/specs/synthesize",
             post(handle_synthesize_specs),
@@ -196,7 +203,14 @@ pub fn build_router(state: DaemonAppState) -> Router {
             "/api/v1/projects/:id/surgical-patch",
             post(handle_surgical_patch),
         )
-        .route("/api/v1/projects/:id/sdi/intent", post(handle_sdi_intent))
+        .route(
+            "/api/v1/projects/:id/sdi/intent",
+            get(handle_list_sdi_intents).post(handle_sdi_intent),
+        )
+        .route(
+            "/api/v1/projects/:id/sdi/intent/:intent_id",
+            get(handle_get_sdi_intent),
+        )
         .route(
             "/api/v1/projects/:id/sdi/clarification",
             post(handle_sdi_clarification),
@@ -204,6 +218,10 @@ pub fn build_router(state: DaemonAppState) -> Router {
         .route(
             "/api/v1/projects/:id/proposals",
             get(handle_list_proposals).post(handle_create_proposal),
+        )
+        .route(
+            "/api/v1/projects/:id/proposals/:proposal_id",
+            get(handle_get_proposal),
         )
         .route(
             "/api/v1/projects/:id/proposals/:proposal_id/validate",
@@ -220,6 +238,10 @@ pub fn build_router(state: DaemonAppState) -> Router {
         .route(
             "/api/v1/projects/:id/snapshots",
             get(handle_list_snapshots).post(handle_create_snapshot),
+        )
+        .route(
+            "/api/v1/projects/:id/snapshots/:snapshot_id",
+            get(handle_get_snapshot),
         )
         .route(
             "/api/v1/projects/:id/snapshots/:snapshot_id/revert",
@@ -254,6 +276,19 @@ pub fn build_router(state: DaemonAppState) -> Router {
             "/api/v1/projects/:id/verify-path-token",
             post(handle_verify_path_token),
         )
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            legacy_project_auth_middleware,
+        ));
+
+    Router::new()
+        .route("/api/v1/health", get(handle_health))
+        .route(
+            "/api/v1/auth/local-session",
+            post(handle_issue_local_session),
+        )
+        .merge(protected_legacy_router)
         .merge(flow_router)
+        .layer(middleware::from_fn(cors_and_loopback_middleware))
         .with_state(state)
 }

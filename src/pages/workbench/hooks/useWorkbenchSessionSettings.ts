@@ -4,6 +4,7 @@ import { getGlobalLocale, setGlobalLocale } from "../../../hooks/useTranslation"
 import type { ThemeMode } from "../components/WorkbenchTopNav";
 import { DEFAULT_FLOW_PROJECT_ID, DEFAULT_PROJECTS, DEFAULT_SESSIONS, type WorkbenchProject } from "../constants";
 import type { ChatSession, PersistedWorkbenchSettings } from "../types";
+import { apiHarnessDaemon } from "../../../api/harness-daemon";
 
 export const WORKBENCH_SETTINGS_STORAGE_KEY = "cowok:workbench:settings";
 
@@ -91,11 +92,7 @@ function useSessionCrudActions(
       setSessions((prev) => {
         const target = prev.find((s) => s.id === id);
         if (target?.projectId) {
-          fetch(`/api/projects/${target.projectId}/sessions/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: title.trim() }),
-          }).catch(() => undefined);
+          apiHarnessDaemon.updateSession(target.projectId, id, { title: title.trim() }).catch(() => undefined);
         }
         return prev.map((s) => (s.id === id ? { ...s, title: title.trim() } : s));
       });
@@ -106,7 +103,7 @@ function useSessionCrudActions(
     setSessions((prev) => {
       const target = prev.find((s) => s.id === id);
       if (target?.projectId) {
-        fetch(`/api/projects/${target.projectId}/sessions/${id}`, { method: "DELETE" }).catch(() => undefined);
+        apiHarnessDaemon.deleteSession(target.projectId, id).catch(() => undefined);
       }
       const filtered = prev.filter((s) => s.id !== id);
       if (activeSessionId === id && filtered.length > 0) setActiveSessionId(filtered[0].id);
@@ -115,12 +112,20 @@ function useSessionCrudActions(
   }, [activeSessionId, setActiveSessionId, setSessions]);
 
   const handleRenameProject = useCallback((id: string, name: string) => {
-    if (name.trim()) setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, name: name.trim() } : p)));
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, name: trimmed } : p)));
+    void apiHarnessDaemon.updateProject(id, { name: trimmed }).catch(() => {
+      // Offline optimistic UI fallback until daemon reconnects
+    });
   }, [setProjects]);
 
   const handleDeleteProject = useCallback((id: string) => {
     setProjects((prev) => prev.filter((p) => p.id !== id));
     setSessions((prev) => prev.filter((s) => s.projectId !== id));
+    void apiHarnessDaemon.deleteProject(id).catch(() => {
+      // Offline optimistic UI fallback until daemon reconnects
+    });
   }, [setProjects, setSessions]);
 
   const handleLinkProjectFolder = useCallback((id: string, path: string) => {
@@ -142,35 +147,32 @@ export function useWorkbenchProjectsAndSessions() {
     let isCancelled = false;
     async function hydrateProjectsAndSessions() {
       try {
-        const res = await fetch("/api/projects");
-        if (res.ok) {
-          const list = await res.json();
-          if (Array.isArray(list) && list.length > 0 && !isCancelled) {
-            const mappedProjs: WorkbenchProject[] = list.map((p: any) => ({
+        const list = await apiHarnessDaemon.listProjects();
+        if (Array.isArray(list) && list.length > 0 && !isCancelled) {
+          const mappedProjs: WorkbenchProject[] = list.map((p) => {
+            const isScratchRoot = !p.workspace_root || p.workspace_root.includes("/.cowok-design/projects/");
+            return {
               id: p.id,
               name: p.name,
               isExpanded: true,
-              provenance: p.workspace_root ? "folder-backed" : "scratch",
+              provenance: isScratchRoot ? "scratch" : "folder-backed",
               localPath: p.workspace_root || `./projects/${p.slug || p.id}`,
-            }));
-            setProjects(mappedProjs);
+            };
+          });
+          setProjects(mappedProjs);
 
-            const targetProjId = mappedProjs[0].id;
-            const sessRes = await fetch(`/api/projects/${targetProjId}/sessions`);
-            if (sessRes.ok) {
-              const sessList = await sessRes.json();
-              if (Array.isArray(sessList) && sessList.length > 0 && !isCancelled) {
-                const mappedSess: ChatSession[] = sessList.map((s: any) => ({
-                  id: s.id,
-                  title: s.title,
-                  projectId: s.project_id || targetProjId,
-                  updatedAt: new Date(s.updated_at || Date.now()).toLocaleTimeString(),
-                }));
-                setSessions(mappedSess);
-                setActiveSessionId(mappedSess[0].id);
-                setActiveProjectId(targetProjId);
-              }
-            }
+          const targetProjId = mappedProjs[0].id;
+          const sessList = await apiHarnessDaemon.listSessions(targetProjId);
+          if (Array.isArray(sessList) && sessList.length > 0 && !isCancelled) {
+            const mappedSess: ChatSession[] = sessList.map((s) => ({
+              id: s.id,
+              title: s.title,
+              projectId: s.project_id || targetProjId,
+              updatedAt: new Date(s.updated_at || Date.now()).toLocaleTimeString(),
+            }));
+            setSessions(mappedSess);
+            setActiveSessionId(mappedSess[0].id);
+            setActiveProjectId(targetProjId);
           }
         }
       } catch {
@@ -194,11 +196,7 @@ export function useWorkbenchProjectsAndSessions() {
     setActiveSessionId(s.id);
     setActiveProjectId(targetProjectId);
 
-    fetch(`/api/projects/${targetProjectId}/sessions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: sId, title, project_id: targetProjectId }),
-    }).catch(() => undefined);
+    apiHarnessDaemon.createSession(targetProjectId, { id: sId, title }).catch(() => undefined);
   }, []);
 
   const handleCreateNewProject = useCallback((name: string, title: string, provenance: "folder-backed" | "scratch" = "folder-backed", localPath?: string) => {
@@ -208,24 +206,19 @@ export function useWorkbenchProjectsAndSessions() {
     setActiveSessionId(newSession.id);
     setActiveProjectId(newProj.id);
 
-    fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    apiHarnessDaemon
+      .createProject({
         id: newProj.id,
         slug: newProj.name.toLowerCase().replace(/\s+/g, "-"),
         name: newProj.name,
         product_brief: `Created via workbench in ${provenance} mode`,
         workspace_root: localPath || null,
-      }),
-    })
-      .then(() => {
-        fetch(`/api/projects/${newProj.id}/sessions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: newSession.id, title: newSession.title, project_id: newProj.id }),
-        }).catch(() => undefined);
       })
+      .then(() =>
+        apiHarnessDaemon
+          .createSession(newProj.id, { id: newSession.id, title: newSession.title })
+          .catch(() => undefined)
+      )
       .catch(() => undefined);
   }, []);
 

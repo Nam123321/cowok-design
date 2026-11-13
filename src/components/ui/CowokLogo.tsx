@@ -66,6 +66,54 @@ export const CowokSymbolVector: React.FC<{
   </svg>
 );
 
+const BASE_IMG_STYLE: React.CSSProperties = {
+  display: "inline-block",
+  objectFit: "contain",
+  verticalAlign: "middle",
+  flexShrink: 0,
+  imageRendering: "-webkit-optimize-contrast",
+};
+
+const LOCKUP_BADGE_STYLE: React.CSSProperties = {
+  fontFamily: "'Geist Mono', monospace",
+  fontWeight: 600,
+  fontSize: "12px",
+  letterSpacing: "+0.02em",
+  color: "var(--human-accent)",
+  backgroundColor: "var(--human-soft)",
+  padding: "1px 5px",
+  borderRadius: "4px",
+  border: "1px solid var(--human-border)",
+};
+
+const LockupBadgeLogo: React.FC<{
+  height: number | string;
+  className: string;
+  style: React.CSSProperties;
+  badgeText: string;
+}> = ({ height, className, style, badgeText }) => (
+  <div
+    className={`cowok-lockup-badge ${className}`}
+    style={{ display: "inline-flex", alignItems: "center", gap: "8px", lineHeight: 1, ...style }}
+  >
+    <img src={symbolColor} alt="cowok symbol" height={height} width={height} style={BASE_IMG_STYLE} />
+    <div style={{ display: "inline-flex", alignItems: "baseline", gap: "4px" }}>
+      <span style={{ fontFamily: "'Geist', sans-serif", fontWeight: 600, fontSize: "15px", letterSpacing: "-0.032em", color: "var(--cw-text-primary)" }}>
+        cowok
+      </span>
+      {badgeText && <span style={LOCKUP_BADGE_STYLE}>-{badgeText}</span>}
+    </div>
+  </div>
+);
+
+function resolveBrandAsset(variant: LogoVariant, isDark: boolean, size?: number | string, height?: number | string) {
+  const pxHeight = variant === "wordmark" ? height || size || 20 : height || size || 26;
+  const src = variant === "wordmark" ? (isDark ? wordmarkWhite : wordmarkNavy) : isDark ? horizontalDark : horizontalLight;
+  const alt = variant === "wordmark" ? "cowok wordmark" : "cowok logo";
+  const variantClass = variant === "wordmark" ? "cowok-logo-wordmark" : "cowok-logo cowok-logo-horizontal";
+  return { pxHeight, src, alt, variantClass };
+}
+
 export const CowokLogo: React.FC<CowokLogoProps> = ({
   variant = "horizontal",
   theme = "warm",
@@ -75,125 +123,17 @@ export const CowokLogo: React.FC<CowokLogoProps> = ({
   style = {},
   badgeText = "design",
 }) => {
+  const { t } = useTranslation();
   const isDark = theme === "night" || theme === "night-low" || theme === "monochrome";
 
+  if (variant === "lockup-badge") {
+    return <LockupBadgeLogo height={height || size || 24} className={className} style={style} badgeText={badgeText} />;
+  }
   if (variant === "symbol") {
     const pxSize = size || height || 24;
-    return (
-      <img
-        src={symbolColor}
-        alt="cowok symbol"
-        width={pxSize}
-        height={pxSize}
-        className={`cowok-logo cowok-logo-symbol ${className}`}
-        style={{
-          display: "inline-block",
-          objectFit: "contain",
-          verticalAlign: "middle",
-          flexShrink: 0,
-          imageRendering: "-webkit-optimize-contrast",
-          ...style,
-        }}
-      />
-    );
+    return <img src={symbolColor} alt={t("brand.symbolAlt", "cowok symbol")} width={pxSize} height={pxSize} className={`cowok-logo cowok-logo-symbol ${className}`} style={{ ...BASE_IMG_STYLE, ...style }} />;
   }
 
-  if (variant === "wordmark") {
-    const pxHeight = height || size || 20;
-    return (
-      <img
-        src={isDark ? wordmarkWhite : wordmarkNavy}
-        alt="cowok wordmark"
-        height={pxHeight}
-        className={`cowok-logo-wordmark ${className}`}
-        style={{
-          display: "inline-block",
-          objectFit: "contain",
-          verticalAlign: "middle",
-          height: pxHeight,
-          imageRendering: "-webkit-optimize-contrast",
-          ...style,
-        }}
-      />
-    );
-  }
-
-  if (variant === "lockup-badge") {
-    const h = height || size || 24;
-    return (
-      <div
-        className={`cowok-lockup-badge ${className}`}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "8px",
-          lineHeight: 1,
-          ...style,
-        }}
-      >
-        <img
-          src={symbolColor}
-          alt="cowok symbol"
-          height={h}
-          width={h}
-          style={{
-            objectFit: "contain",
-            imageRendering: "-webkit-optimize-contrast",
-            flexShrink: 0,
-          }}
-        />
-        <div style={{ display: "inline-flex", alignItems: "baseline", gap: "4px" }}>
-          <span
-            style={{
-              fontFamily: "'Geist', sans-serif",
-              fontWeight: 650,
-              fontSize: "15px",
-              letterSpacing: "-0.032em",
-              color: "var(--cw-text-primary)",
-            }}
-          >
-            cowok
-          </span>
-          {badgeText && (
-            <span
-              style={{
-                fontFamily: "'Geist Mono', monospace",
-                fontWeight: 600,
-                fontSize: "10px",
-                letterSpacing: "+0.02em",
-                color: "var(--human-accent)",
-                backgroundColor: "var(--human-soft)",
-                padding: "1px 5px",
-                borderRadius: "4px",
-                border: "1px solid var(--human-border)",
-              }}
-            >
-              -{badgeText}
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Default: variant === "horizontal"
-  const pxHeight = height || size || 26;
-  const src = isDark ? horizontalDark : horizontalLight;
-
-  return (
-    <img
-      src={src}
-      alt="cowok logo"
-      height={pxHeight}
-      className={`cowok-logo cowok-logo-horizontal ${className}`}
-      style={{
-        display: "inline-block",
-        objectFit: "contain",
-        verticalAlign: "middle",
-        height: pxHeight,
-        imageRendering: "-webkit-optimize-contrast",
-        ...style,
-      }}
-    />
-  );
+  const { pxHeight, src, alt, variantClass } = resolveBrandAsset(variant, isDark, size, height);
+  return <img src={src} alt={alt} height={pxHeight} className={`${variantClass} ${className}`} style={{ ...BASE_IMG_STYLE, height: pxHeight, ...style }} />;
 };

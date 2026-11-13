@@ -9,63 +9,196 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ============================================================================
+// Bounded Context: domain-core (Epic-01)
+// ============================================================================
+
 model Project {
-  id        String   @id @default(uuid())
-  tenantId  String   @default("local-default") @map("tenant_id")
-  name      String
-  slug      String   @unique
-  createdAt BigInt   @map("created_at")
-  updatedAt BigInt   @map("updated_at")
+  id                        String   @id @default(uuid())
+  tenantId                  String   @default("local-default") @map("tenant_id")
+  name                      String
+  slug                      String   @unique
+  workspaceRoot             String   @default(".") @map("workspace_root")
+  productBrief              String   @default("") @map("product_brief")
+  inheritBrandFromProjectId String?  @map("inherit_brand_from_project_id")
+  status                    String   @default("ACTIVE")
+  createdAt                 BigInt   @map("created_at")
+  updatedAt                 BigInt   @map("updated_at")
 
-  specs     ProjectSpec[]
+  specs          ProjectSpec[]
+  boundaries     ProjectBoundary[]
+  workspaceFiles ProjectWorkspaceFile[]
+  tombstones     SpecTombstone[]
+  recoveryCommits RecoveryCommit[]
 
+  @@index([inheritBrandFromProjectId])
   @@map("projects")
 }
 
 model ProjectSpec {
-  id        String   @id @default(uuid())
-  projectId String   @map("project_id")
-  specKey   String   @map("spec_key")
-  status    String   @default("CONFIRMED")
-  updatedAt BigInt   @map("updated_at")
+  id                    String   @id @default(uuid())
+  projectId             String   @map("project_id")
+  specKey               String   @map("spec_key")
+  filePath              String   @default("") @map("file_path")
+  status                String   @default("CONFIRMED")
+  version               Int      @default(1)
+  contentSha256         String   @default("") @map("content_sha256")
+  summaryDigest         String   @default("") @map("summary_digest")
+  provenanceSummaryJson String   @default("{}") @map("provenance_summary_json")
+  sourceProjectId       String?  @map("source_project_id")
+  sourceRevisionSha256  String?  @map("source_revision_sha256")
+  createdAt             BigInt   @default(0) @map("created_at")
+  updatedAt             BigInt   @map("updated_at")
 
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   revisions SpecRevision[]
+  intents   SpecWriteIntent[]
 
   @@unique([projectId, specKey])
   @@index([projectId])
+  @@index([projectId, contentSha256])
   @@map("project_specs")
 }
 
 model SpecRevision {
-  id             String      @id @default(uuid())
-  specId         String      @map("spec_id")
-  revisionNumber Int         @map("revision_number")
-  contentHash    String      @map("content_hash")
-  createdAt      BigInt      @map("created_at")
+  id                   String  @id @default(uuid())
+  specId               String  @map("spec_id")
+  projectId            String  @map("project_id")
+  specKey              String  @map("spec_key")
+  revisionNumber       Int     @map("revision_number")
+  operationId          String  @map("operation_id")
+  previousSha256       String? @map("previous_sha256")
+  contentHash          String  @map("content_hash")
+  actorKind            String  @default("SYSTEM") @map("actor_kind")
+  actorId              String  @default("system") @map("actor_id")
+  changeSummary        String  @default("") @map("change_summary")
+  sourceProjectId      String? @map("source_project_id")
+  sourceRevisionSha256 String? @map("source_revision_sha256")
+  createdAt            BigInt  @map("created_at")
 
-  spec           ProjectSpec @relation(fields: [specId], references: [id], onDelete: Cascade)
+  spec ProjectSpec @relation(fields: [specId], references: [id], onDelete: Cascade)
 
   @@unique([specId, revisionNumber])
+  @@unique([specId, operationId])
   @@index([specId])
+  @@index([projectId, specKey, revisionNumber])
   @@map("spec_revisions")
 }
 
-model ConstraintProfile {
+model SpecWriteIntent {
+  operationId           String  @id @map("operation_id")
+  specId                String  @map("spec_id")
+  projectId             String  @map("project_id")
+  specKey               String  @map("spec_key")
+  expectedVersion       Int     @map("expected_version")
+  oldSha256             String? @map("old_sha256")
+  newSha256             String  @map("new_sha256")
+  actorKind             String  @default("SYSTEM") @map("actor_kind")
+  actorId               String  @default("system") @map("actor_id")
+  changeSummary         String  @default("") @map("change_summary")
+  provenanceSummaryJson String  @default("{}") @map("provenance_summary_json")
+  sourceProjectId       String? @map("source_project_id")
+  sourceRevisionSha256  String? @map("source_revision_sha256")
+  state                 String
+  createdAt             BigInt  @map("created_at")
+  updatedAt             BigInt  @map("updated_at")
+
+  spec ProjectSpec @relation(fields: [specId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, specKey, state])
+  @@map("spec_write_intents")
+}
+
+model SpecTombstone {
   id                     String   @id @default(uuid())
   projectId              String   @map("project_id")
-  presetProfile          String   @default("DEFAULT") @map("preset_profile")
-  stylingPolicy          String   @default("CSS_MODULES") @map("styling_policy")
-  forbidTailwind         Int      @default(1) @map("forbid_tailwind")
-  forbidRawHex           Int      @default(1) @map("forbid_raw_hex")
-  tokensCssPath          String   @default("src/styles/tokens.css") @map("tokens_css_path")
-  iconManifestPath       String   @default("icons/icon-manifest.json") @map("icon_manifest_path")
-  allowedIconSetJson     String   @default("[]") @map("allowed_icon_set_json")
-  typographyContractJson String   @default("{}") @map("typography_contract_json")
-  minWcagContrast        Float    @default(4.5) @map("min_wcag_contrast")
-  updatedAt              BigInt   @map("updated_at")
+  specKey                String   @map("spec_key")
+  deletedAt              DateTime @default(now()) @map("deleted_at")
+  deletedBy              String   @map("deleted_by")
+  contentSha256AtDeletion String  @map("content_sha256_at_deletion")
 
-  rules                  ConstraintRule[]
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, specKey])
+  @@map("spec_tombstones")
+}
+
+model ProjectBoundary {
+  projectId             String  @id @map("project_id")
+  boundaryType          String  @default("SANDBOXED") @map("boundary_type")
+  workspacePath         String  @map("workspace_path")
+  configDir             String  @default(".cowok-design") @map("config_dir")
+  isGitRepository       Int     @default(0) @map("is_git_repository")
+  promotedAt            BigInt? @map("promoted_at")
+  allowedExtensionsJson String  @default("[\".md\",\".json\",\".ts\",\".tsx\",\".css\",\".html\"]") @map("allowed_extensions_json")
+  maxFileSizeBytes      Int     @default(5242880) @map("max_file_size_bytes")
+  createdAt             BigInt  @map("created_at")
+  updatedAt             BigInt  @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_boundaries")
+}
+
+model RecoveryCommit {
+  journalId String   @id @map("journal_id")
+  projectId String   @map("project_id")
+  specKey   String   @map("spec_key")
+  nextRev   Int      @map("next_rev")
+  appliedAt DateTime @default(now()) @map("applied_at")
+  status    String   @default("PENDING")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, specKey, nextRev])
+  @@map("recovery_commits")
+}
+
+model ProjectWorkspaceFile {
+  id           String   @id @default(uuid())
+  projectId    String   @map("project_id")
+  relativePath String   @map("relative_path")
+  fileSha256   String   @map("file_sha256")
+  byteSize     Int      @map("byte_size")
+  content      String   @default("")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, relativePath])
+  @@index([projectId, relativePath])
+  @@map("project_workspace_files")
+}
+
+model SchemaMigration {
+  version        Int    @id
+  name           String
+  checksumSha256 String @map("checksum_sha256")
+  appliedAt      BigInt @map("applied_at")
+
+  @@map("schema_migrations")
+}
+
+// ============================================================================
+// Bounded Context: constraint-engine (Epic-03)
+// ============================================================================
+
+model ConstraintProfile {
+  id                     String @id @default(uuid())
+  projectId              String @map("project_id")
+  presetProfile          String @default("DEFAULT") @map("preset_profile")
+  stylingPolicy          String @default("CSS_MODULES") @map("styling_policy")
+  forbidTailwind         Int    @default(1) @map("forbid_tailwind")
+  forbidRawHex           Int    @default(1) @map("forbid_raw_hex")
+  tokensCssPath          String @default("src/styles/tokens.css") @map("tokens_css_path")
+  iconManifestPath       String @default("icons/icon-manifest.json") @map("icon_manifest_path")
+  allowedIconSetJson     String @default("[]") @map("allowed_icon_set_json")
+  typographyContractJson String @default("{}") @map("typography_contract_json")
+  minWcagContrast        Float  @default(4.5) @map("min_wcag_contrast")
+  updatedAt              BigInt @map("updated_at")
+
+  rules ConstraintRule[]
 
   @@unique([projectId, presetProfile])
   @@index([projectId])
@@ -73,30 +206,91 @@ model ConstraintProfile {
 }
 
 model ConstraintRule {
-  id         String            @id @default(uuid())
-  profileId  String            @map("profile_id")
-  ruleCode   String            @map("rule_code")
+  id         String @id @default(uuid())
+  profileId  String @map("profile_id")
+  ruleCode   String @map("rule_code")
   severity   String
-  configJson String            @default("{}") @map("config_json")
-  enabled    Int               @default(1)
-  updatedAt  BigInt            @map("updated_at")
+  configJson String @default("{}") @map("config_json")
+  enabled    Int    @default(1)
+  updatedAt  BigInt @map("updated_at")
 
-  profile    ConstraintProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profile ConstraintProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@unique([profileId, ruleCode])
   @@index([profileId])
   @@map("constraint_rules")
 }
 
+model GateReport {
+  id           String @id @default(uuid())
+  projectId    String @map("project_id")
+  gateName     String @map("gate_name")
+  passed       Int
+  checkerId    String @map("checker_id")
+  evidenceHash String @map("evidence_hash")
+  timestamp    BigInt
+
+  @@index([projectId, gateName])
+  @@map("gate_reports")
+}
+
+model SdiIntent {
+  id               String  @id @default(uuid())
+  tenantId         String  @default("local-default") @map("tenant_id")
+  projectId        String  @map("project_id")
+  rawPrompt        String  @map("raw_prompt")
+  intentType       String  @map("intent_type")
+  targetScopeJson  String  @default("{}") @map("target_scope_json")
+  ambiguityScore   Float   @default(0.0) @map("ambiguity_score")
+  riskScore        Float   @default(0.0) @map("risk_score")
+  variantsJson     String? @map("variants_json")
+  selectedVariantId String? @map("selected_variant_id")
+  status           String  @default("clarifying")
+  designIntentJson String? @map("design_intent_json")
+  createdAt        String  @map("created_at")
+  updatedAt        String  @map("updated_at")
+
+  @@index([tenantId, projectId])
+  @@map("sdi_intents")
+}
+
+model ModelTournament {
+  id             String  @id @default(uuid())
+  projectId      String  @map("project_id")
+  promptDigest   String  @map("prompt_digest")
+  candidatesJson String  @map("candidates_json")
+  winnerModel    String? @map("winner_model")
+  createdAt      BigInt  @map("created_at")
+
+  @@map("model_tournaments")
+}
+
+model BotJob {
+  id          String  @id @default(uuid())
+  projectId   String  @map("project_id")
+  taskType    String  @map("task_type")
+  payloadHash String  @map("payload_hash")
+  status      String  @default("QUEUED")
+  enqueuedAt  BigInt  @map("enqueued_at")
+  completedAt BigInt? @map("completed_at")
+
+  @@index([projectId, status])
+  @@map("bot_jobs")
+}
+
+// ============================================================================
+// Bounded Context: flow-workbench (Epic-04)
+// ============================================================================
+
 model FlowGraph {
-  id            String   @id @default(uuid())
-  tenantId      String   @map("tenant_id")
-  projectId     String   @map("project_id")
-  portalKey     String   @default("default") @map("portal_key")
-  title         String   @default("Default Flow")
-  version       Int      @default(1)
-  layoutVersion Int      @default(1) @map("layout_version")
-  updatedAt     BigInt   @map("updated_at")
+  id            String @id @default(uuid())
+  tenantId      String @map("tenant_id")
+  projectId     String @map("project_id")
+  portalKey     String @default("default") @map("portal_key")
+  title         String @default("Default Flow")
+  version       Int    @default(1)
+  layoutVersion Int    @default(1) @map("layout_version")
+  updatedAt     BigInt @map("updated_at")
 
   @@unique([projectId, portalKey])
   @@unique([id, tenantId, projectId])
@@ -122,30 +316,48 @@ model FlowDraftDeployment {
   @@map("flow_draft_deployments")
 }
 
-model FlowNode {
-  id                  String   @id @default(uuid())
-  graphId             String   @map("graph_id")
-  tenantId            String   @map("tenant_id")
-  projectId           String   @map("project_id")
-  portalId            String   @default("default") @map("portal_id")
-  screenKey           String   @map("screen_key")
-  title               String
-  nodeType            String   @default("screen") @map("node_type")
-  routePath           String   @default("/") @map("route_path")
-  componentEntryPath  String   @default("") @map("component_entry_path")
-  fixtureRef          String   @default("Default") @map("fixture_ref")
-  fixtureJson         String   @default("{}") @map("fixture_json")
-  note                String   @default("")
-  viewportPreset      String   @default("desktop-1440") @map("viewport_preset")
-  posX                Float    @default(0.0) @map("pos_x")
-  posY                Float    @default(0.0) @map("pos_y")
-  version             Int      @default(1)
-  layoutVersion       Int      @default(1) @map("layout_version")
-  createdAt           BigInt   @map("created_at")
-  updatedAt           BigInt   @map("updated_at")
+model Storyboard {
+  id               String  @id @default(uuid())
+  tenantId         String  @default("local-default") @map("tenant_id")
+  projectId        String  @map("project_id")
+  flowGraphId      String? @map("flow_graph_id")
+  title            String  @default("Untitled Storyboard")
+  narrativeSummary String  @default("") @map("narrative_summary")
+  status           String  @default("DRAFT")
+  version          Int     @default(1)
+  createdAt        BigInt  @map("created_at")
+  updatedAt        BigInt  @map("updated_at")
 
-  outgoingTransitions FlowTransition[] @relation("SourceTransitions")
-  incomingTransitions FlowTransition[] @relation("TargetTransitions")
+  @@index([tenantId, projectId])
+  @@index([projectId])
+  @@map("storyboards")
+}
+
+model FlowNode {
+  id                 String @id @default(uuid())
+  graphId            String @map("graph_id")
+  tenantId           String @map("tenant_id")
+  projectId          String @map("project_id")
+  portalId           String @default("default") @map("portal_id")
+  screenKey          String @map("screen_key")
+  title              String
+  nodeType           String @default("screen") @map("node_type")
+  routePath          String @default("/") @map("route_path")
+  componentEntryPath String @default("") @map("component_entry_path")
+  fixtureRef         String @default("Default") @map("fixture_ref")
+  fixtureJson        String @default("{}") @map("fixture_json")
+  note               String @default("")
+  viewportPreset     String @default("desktop-1440") @map("viewport_preset")
+  posX               Float  @default(0.0) @map("pos_x")
+  posY               Float  @default(0.0) @map("pos_y")
+  version            Int    @default(1)
+  layoutVersion      Int    @default(1) @map("layout_version")
+  createdAt          BigInt @map("created_at")
+  updatedAt          BigInt @map("updated_at")
+
+  outgoingTransitions FlowTransition[]  @relation("SourceTransitions")
+  incomingTransitions FlowTransition[]  @relation("TargetTransitions")
+  screenArtifacts     ScreenArtifact[]
 
   @@unique([projectId, screenKey])
   @@unique([graphId, screenKey])
@@ -159,21 +371,21 @@ model FlowNode {
 }
 
 model FlowTransition {
-  id              String   @id @default(uuid())
-  graphId         String   @map("graph_id")
-  tenantId        String   @map("tenant_id")
-  projectId       String   @map("project_id")
-  sourceNodeId    String   @map("source_node_id")
-  targetNodeId    String   @map("target_node_id")
-  flowType        String   @default("main") @map("flow_type")
-  triggerEvent    String   @default("onClick") @map("trigger_event")
-  guardCondition  String?  @map("guard_condition")
-  version         Int      @default(1)
-  createdAt       BigInt   @map("created_at")
-  updatedAt       BigInt   @map("updated_at")
+  id             String  @id @default(uuid())
+  graphId        String  @map("graph_id")
+  tenantId       String  @map("tenant_id")
+  projectId      String  @map("project_id")
+  sourceNodeId   String  @map("source_node_id")
+  targetNodeId   String  @map("target_node_id")
+  flowType       String  @default("main") @map("flow_type")
+  triggerEvent   String  @default("onClick") @map("trigger_event")
+  guardCondition String? @map("guard_condition")
+  version        Int     @default(1)
+  createdAt      BigInt  @map("created_at")
+  updatedAt      BigInt  @map("updated_at")
 
-  sourceNode      FlowNode @relation("SourceTransitions", fields: [sourceNodeId, tenantId, projectId], references: [id, tenantId, projectId], onDelete: Cascade)
-  targetNode      FlowNode @relation("TargetTransitions", fields: [targetNodeId, tenantId, projectId], references: [id, tenantId, projectId], onDelete: Cascade)
+  sourceNode FlowNode @relation("SourceTransitions", fields: [sourceNodeId, tenantId, projectId], references: [id, tenantId, projectId], onDelete: Cascade)
+  targetNode FlowNode @relation("TargetTransitions", fields: [targetNodeId, tenantId, projectId], references: [id, tenantId, projectId], onDelete: Cascade)
 
   @@unique([projectId, sourceNodeId, targetNodeId, triggerEvent])
   @@index([tenantId])
@@ -182,4 +394,337 @@ model FlowTransition {
   @@index([sourceNodeId])
   @@index([targetNodeId])
   @@map("flow_edges")
+}
+
+model ScreenArtifact {
+  id           String @id @default(uuid())
+  nodeId       String @map("node_id")
+  contentHash  String @map("content_hash")
+  artifactPath String @map("artifact_path")
+  anchorStatus String @default("LINKED") @map("anchor_status")
+  createdAt    BigInt @map("created_at")
+
+  node FlowNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@map("screen_artifacts")
+}
+
+model ElementComment {
+  id           String @id @default(uuid())
+  tenantId     String @default("local-default") @map("tenant_id")
+  projectId    String @map("project_id")
+  nodeId       String @map("node_id")
+  elementFfId  String @map("element_ff_id")
+  author       String @default("designer")
+  content      String
+  domHash      String @default("") @map("dom_hash")
+  anchorStatus String @default("anchored") @map("anchor_status")
+  createdAt    BigInt @map("created_at")
+  updatedAt    BigInt @map("updated_at")
+
+  @@index([tenantId, projectId, nodeId])
+  @@map("element_comments")
+}
+
+model ScreenFixture {
+  id          String @id @default(uuid())
+  tenantId    String @default("local-default") @map("tenant_id")
+  projectId   String @map("project_id")
+  nodeId      String @map("node_id")
+  variant     String @default("default")
+  payloadJson String @default("{}") @map("payload_json")
+  isDefault   Int    @default(0) @map("is_default")
+  createdAt   BigInt @map("created_at")
+  updatedAt   BigInt @map("updated_at")
+
+  @@unique([projectId, nodeId, variant])
+  @@index([tenantId, projectId, nodeId])
+  @@map("screen_fixtures")
+}
+
+model NodeChatSession {
+  id            String @id @default(uuid())
+  tenantId      String @default("local-default") @map("tenant_id")
+  projectId     String @map("project_id")
+  nodeId        String @map("node_id")
+  chatSessionId String @map("chat_session_id")
+  title         String @default("Node Thread")
+  status        String @default("ACTIVE")
+  createdAt     BigInt @map("created_at")
+  updatedAt     BigInt @map("updated_at")
+
+  @@unique([projectId, nodeId, chatSessionId])
+  @@index([tenantId, projectId])
+  @@map("node_chat_sessions")
+}
+
+model NodeExecutionJob {
+  id                  String  @id @default(uuid())
+  projectId           String  @map("project_id")
+  sessionId           String  @map("session_id")
+  nodeId              String  @map("node_id")
+  status              String  @default("QUEUED")
+  fencingToken        Int     @map("fencing_token")
+  priority            Int     @default(0)
+  leaseOwner          String? @map("lease_owner")
+  staleAfterTimestamp BigInt? @map("stale_after_timestamp")
+  errorJson           String? @map("error_json")
+  createdAt           BigInt  @map("created_at")
+  startedAt           BigInt? @map("started_at")
+  completedAt         BigInt? @map("completed_at")
+
+  @@index([projectId, nodeId, status])
+  @@index([status, staleAfterTimestamp])
+  @@map("node_execution_jobs")
+}
+
+model ExecutionEvent {
+  id          String @id @default(uuid())
+  tenantId    String @default("local-default") @map("tenant_id")
+  projectId   String @map("project_id")
+  jobId       String @map("job_id")
+  nodeId      String @map("node_id")
+  eventKind   String @map("event_kind")
+  payloadText String @default("") @map("payload_text")
+  seqNo       Int    @default(0) @map("seq_no")
+  createdAt   BigInt @map("created_at")
+
+  @@index([tenantId, projectId, jobId, seqNo])
+  @@index([projectId, nodeId, createdAt])
+  @@map("execution_events")
+}
+
+// ============================================================================
+// Bounded Context: chat-workbench (Epic-04)
+// ============================================================================
+
+model ChatSession {
+  id            String  @id @default(uuid())
+  tenantId      String  @default("local-default") @map("tenant_id")
+  projectId     String  @map("project_id")
+  title         String
+  modelProvider String  @default("gemini") @map("model_provider")
+  archivedAt    BigInt? @map("archived_at")
+  createdAt     BigInt  @map("created_at")
+  updatedAt     BigInt  @map("updated_at")
+
+  messages ChatMessage[]
+
+  @@index([projectId, createdAt])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id              String  @id @default(uuid())
+  tenantId        String  @default("local-default") @map("tenant_id")
+  sessionId       String  @map("session_id")
+  role            String
+  proseMarkdown   String  @map("prose_markdown")
+  parentMessageId String? @map("parent_message_id")
+  turnReceiptJson String? @map("turn_receipt_json")
+  createdAt       BigInt  @map("created_at")
+
+  session   ChatSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  scopes    ChatMessageNodeScope[]
+  snapshots ChatArtifactSnapshot[]
+
+  @@index([sessionId, createdAt])
+  @@map("chat_messages")
+}
+
+model ChatMessageNodeScope {
+  id                String @id @default(uuid())
+  messageId         String @map("message_id")
+  projectId         String @map("project_id")
+  sessionId         String @map("session_id")
+  nodeId            String @map("node_id")
+  compositeScopeKey String @map("composite_scope_key")
+  createdAt         BigInt @map("created_at")
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, nodeId])
+  @@index([compositeScopeKey, createdAt])
+  @@index([projectId, nodeId])
+  @@map("chat_message_node_scopes")
+}
+
+model ChatArtifactSnapshot {
+  id           String  @id @default(uuid())
+  projectId    String  @map("project_id")
+  sessionId    String  @map("session_id")
+  messageId    String  @map("message_id")
+  nodeId       String? @map("node_id")
+  artifactType String  @map("artifact_type")
+  contentHash  String  @map("content_hash")
+  manifestJson String  @map("manifest_json")
+  createdAt    BigInt  @map("created_at")
+
+  message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, sessionId, messageId])
+  @@map("chat_artifact_snapshots")
+}
+
+model AgentSetting {
+  id            String  @id @default(uuid())
+  tenantId      String  @default("local-default") @map("tenant_id")
+  projectId     String? @map("project_id")
+  providerId    String  @map("provider_id")
+  modelId       String  @map("model_id")
+  endpointUrl   String  @default("") @map("endpoint_url")
+  credentialRef String  @default("") @map("credential_ref")
+  isDefault     Int     @default(0) @map("is_default")
+  status        String  @default("configured")
+  createdAt     BigInt  @map("created_at")
+  updatedAt     BigInt  @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, projectId])
+  @@map("agent_settings")
+}
+
+model McpServer {
+  id               String  @id @default(uuid())
+  tenantId         String  @default("local-default") @map("tenant_id")
+  projectId        String? @map("project_id")
+  serverSlug       String  @map("server_slug")
+  displayName      String  @map("display_name")
+  transportKind    String  @default("stdio") @map("transport_kind")
+  commandOrUrl     String  @map("command_or_url")
+  permissionTier   String  @default("read_only") @map("permission_tier")
+  enabled          Int     @default(1)
+  lastHealthStatus String  @default("unknown") @map("last_health_status")
+  lastCheckedAt    BigInt? @map("last_checked_at")
+  createdAt        BigInt  @map("created_at")
+  updatedAt        BigInt  @map("updated_at")
+
+  @@index([tenantId])
+  @@index([tenantId, projectId])
+  @@map("mcp_servers")
+}
+
+// ============================================================================
+// Bounded Context: version-control (Epic-04)
+// ============================================================================
+
+model ChangeProposal {
+  id                   String   @id @default(uuid())
+  tenantId             String   @default("local-default") @map("tenant_id")
+  projectId            String   @map("project_id")
+  specKey              String   @map("spec_key")
+  intentId             String?  @map("intent_id")
+  title                String   @default("")
+  description          String   @default("")
+  filesJson            String   @default("[]") @map("files_json")
+  diffContent          String   @map("diff_content")
+  status               String   @default("PENDING")
+  validationStatus     String   @default("unverified") @map("validation_status")
+  validationChecksJson String   @default("[]") @map("validation_checks_json")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @default(now()) @map("updated_at")
+
+  @@index([projectId, updatedAt])
+  @@map("change_proposals")
+}
+
+model VersionSnapshot {
+  id             String   @id @default(uuid())
+  tenantId       String   @default("local-default") @map("tenant_id")
+  projectId      String   @map("project_id")
+  snapshotTag    String   @map("snapshot_tag")
+  versionTag     String   @default("") @map("version_tag")
+  label          String   @default("")
+  description    String   @default("")
+  trigger        String   @default("manual")
+  treeSha256     String   @default("") @map("tree_sha256")
+  filesJson      String   @default("[]") @map("files_json")
+  manifestSha256 String   @map("manifest_sha256")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @map("updated_at")
+
+  @@index([projectId, createdAt])
+  @@map("version_snapshots")
+}
+
+model GithubPullRequest {
+  id         String   @id @default(uuid())
+  tenantId   String   @default("local-default") @map("tenant_id")
+  projectId  String   @map("project_id")
+  prNumber   Int      @map("pr_number")
+  branchName String   @map("branch_name")
+  title      String
+  prUrl      String   @default("") @map("pr_url")
+  status     String   @default("OPEN")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @map("updated_at")
+
+  @@map("github_pull_requests")
+}
+
+// ============================================================================
+// Bounded Context: presentation-deck (Epic-08)
+// ============================================================================
+
+model PresentationDeck {
+  id             String  @id @default(uuid())
+  projectId      String  @map("project_id")
+  title          String
+  themePreset    String  @default("DEFAULT") @map("theme_preset")
+  slidesCount    Int     @default(0) @map("slides_count")
+  lastExportedAt BigInt? @map("last_exported_at")
+  updatedAt      BigInt  @map("updated_at")
+
+  slides DeckSlide[]
+
+  @@index([projectId])
+  @@map("presentation_decks")
+}
+
+model DeckSlide {
+  id            String @id @default(uuid())
+  deckId        String @map("deck_id")
+  slideIndex    Int    @map("slide_index")
+  layoutKind    String @default("STANDARD") @map("layout_kind")
+  htmlPath      String @map("html_path")
+  contentSha256 String @map("content_sha256")
+  updatedAt     BigInt @map("updated_at")
+
+  deck         PresentationDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  wordingSlots WordingSlot[]
+
+  @@unique([deckId, slideIndex])
+  @@map("deck_slides")
+}
+
+model WordingSlot {
+  id        String @id @default(uuid())
+  slideId   String @map("slide_id")
+  ffId      String @map("ff_id")
+  slotLabel String @map("slot_label")
+  textValue String @map("text_value")
+  updatedAt BigInt @map("updated_at")
+
+  slide DeckSlide @relation(fields: [slideId], references: [id], onDelete: Cascade)
+
+  @@unique([slideId, ffId])
+  @@map("wording_slots")
+}
+
+// ============================================================================
+// Bounded Context: plugin-ecosystem (Epic-09)
+// ============================================================================
+
+model SkillPlugin {
+  id             String @id @default(uuid())
+  projectId      String @map("project_id")
+  pluginSlug     String @map("plugin_slug")
+  version        String
+  lifecycleState String @default("DISCOVERED") @map("lifecycle_state")
+  sourceRepoUrl  String @map("source_repo_url")
+  manifestJson   String @default("{}") @map("manifest_json")
+  updatedAt      BigInt @map("updated_at")
+
+  @@unique([projectId, pluginSlug])
+  @@map("skill_plugins")
 }

@@ -140,5 +140,18 @@
     "nodeCard": "Thẻ nút màn hình",
     "radarMinimap": "Bản đồ thu nhỏ Radar DAG",
     "radarTitle": "BẢN ĐỒ RADAR"
+  },
+  "brand": {
+    "symbolAlt": "biểu tượng thương hiệu cowok"
+  },
+  "common": {
+    "close": "Đóng"
+  },
+  "floatingChat": {
+    "reviewSummaryAria": "Tóm tắt công việc Node",
+    "nodeSummaryTitle": "Tóm tắt Node",
+    "expandChatTitle": "Mở rộng khung Chat",
+    "contextHeader": "Hội thoại ngữ cảnh",
+    "emptyHint": "Nhập yêu cầu để Agent tự động chỉnh sửa hoặc kết nối luồng"
   }
 }

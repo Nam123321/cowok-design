@@ -6,19 +6,22 @@ use std::sync::{Arc, Mutex};
 use axum::{
     body::{to_bytes, Body},
     extract::{Request, State},
-    http::{HeaderMap, Method, StatusCode},
+    http::{header, HeaderMap, HeaderValue, Method, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
     Json,
 };
 use base64::{engine::general_purpose::STANDARD as B64_STD, Engine as _};
 use chrono::Utc;
+use domain::HarnessError;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use crate::lockfile::{generate_csprng_hex_32, read_daemon_lock};
-use crate::routes::{decode_hex, hmac_sha256, state_auth, DaemonAppState, HttpErrorBody};
+use crate::lockfile::{generate_csprng_hex_32, read_daemon_lock, DaemonLockInfo};
+use crate::routes::{
+    constant_time_eq, decode_hex, hmac_sha256, state_auth, DaemonAppState, HttpErrorBody,
+};
 
 const MAX_SKEW_SECS: i64 = 30;
 const NONCE_LRU_CAPACITY: usize = 10_000;
@@ -70,6 +73,20 @@ struct SessionEntry {
     expires_at: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LegacyAuthKind {
+    HmacV2,
+    SessionToken,
+    Bearer,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedLegacyIngress {
+    pub principal: FlowPrincipal,
+    pub kind: LegacyAuthKind,
+    pub bearer_token: Option<String>,
+}
+
 pub struct DaemonAuthState {
     pub daemon_nonce: String,
     hmac_key: Vec<u8>,
@@ -79,16 +96,30 @@ pub struct DaemonAuthState {
 }
 
 impl DaemonAuthState {
+    pub fn from_lock_info(lock: &DaemonLockInfo) -> Result<Arc<Self>, HarnessError> {
+        let key_bytes = decode_hex(lock.hmac_key_hex.trim()).ok_or_else(|| {
+            HarnessError::ValidationFailed {
+                reason: "DAEMON_LOCK_INVALID_KEY: invalid hmac_key_hex".to_string(),
+            }
+        })?;
+        if key_bytes.len() < 16 || lock.daemon_nonce.trim().is_empty() {
+            return Err(HarnessError::ValidationFailed {
+                reason: "DAEMON_LOCK_INVALID_SECRET: missing daemon_nonce or short hmac_key"
+                    .to_string(),
+            });
+        }
+        Ok(Self::with_secrets(lock.daemon_nonce.clone(), key_bytes))
+    }
+
     pub fn from_registry_root(workspace_root: &std::path::Path) -> Arc<Self> {
         if let Ok(lock) = read_daemon_lock(workspace_root) {
-            if let Some(key_bytes) = decode_hex(lock.hmac_key_hex.trim()) {
-                if !key_bytes.is_empty() && !lock.daemon_nonce.trim().is_empty() {
-                    return Self::with_secrets(lock.daemon_nonce, key_bytes);
-                }
+            if let Ok(state) = Self::from_lock_info(&lock) {
+                return state;
             }
         }
-        let key_hex = generate_csprng_hex_32();
-        let key_bytes = decode_hex(&key_hex).unwrap_or_else(|| vec![0x42; 32]);
+        let mut key_bytes = Vec::with_capacity(32);
+        key_bytes.extend_from_slice(Uuid::new_v4().as_bytes());
+        key_bytes.extend_from_slice(Uuid::new_v4().as_bytes());
         Self::with_secrets(generate_csprng_hex_32(), key_bytes)
     }
 
@@ -100,6 +131,42 @@ impl DaemonAuthState {
             nonce_set: Mutex::new(HashSet::new()),
             sessions: Mutex::new(HashMap::new()),
         })
+    }
+
+    /// Signs a canonical 8-field HMAC-SHA256 v2 tuple `(x-cowok-timestamp, x-cowok-nonce, x-cowok-principal, x-cowok-hmac-sig)`.
+    pub fn sign_hmac_v2_headers(
+        &self,
+        method: &Method,
+        path: &str,
+        query: &str,
+        principal: &FlowPrincipal,
+        raw_body: &[u8],
+    ) -> [(String, String); 4] {
+        let ts = Utc::now().timestamp().to_string();
+        let req_nonce = Uuid::new_v4().to_string();
+        let principal_b64 =
+            B64_STD.encode(serde_json::to_vec(principal).unwrap_or_else(|_| b"{}".to_vec()));
+        let canonical = format!(
+            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{:x}",
+            self.daemon_nonce,
+            ts,
+            req_nonce,
+            method.as_str().to_ascii_uppercase(),
+            path,
+            query,
+            principal_b64,
+            Sha256::digest(raw_body)
+        );
+        let sig_hex: String = hmac_sha256(&self.hmac_key, canonical.as_bytes())
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        [
+            ("x-cowok-timestamp".to_string(), ts),
+            ("x-cowok-nonce".to_string(), req_nonce),
+            ("x-cowok-principal".to_string(), principal_b64),
+            ("x-cowok-hmac-sig".to_string(), sig_hex),
+        ]
     }
 
     pub fn record_nonce_once(&self, nonce: &str) -> bool {
@@ -170,6 +237,17 @@ pub async fn handle_issue_local_session(
     headers: HeaderMap,
     body_opt: Option<Json<LocalSessionRequest>>,
 ) -> Result<Json<LocalSessionResponse>, Response> {
+    let has_loopback_host = headers
+        .get("host")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(is_allowed_loopback_host);
+    if !has_loopback_host {
+        return Err(auth_err_resp(
+            StatusCode::FORBIDDEN,
+            "ORIGIN_REJECTED",
+            "Session bootstrap requires an explicit loopback Host header",
+        ));
+    }
     if let Err((st, code, msg)) = verify_loopback_headers(&headers) {
         return Err(auth_err_resp(st, code, msg));
     }
@@ -182,11 +260,34 @@ pub async fn handle_issue_local_session(
             "Invalid role",
         ));
     }
+    let requested_tenant = req
+        .tenant_id
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(default_tenant_id);
+    let auth = state_auth(&state);
+    let has_daemon_nonce = headers
+        .get("x-cowok-daemon-nonce")
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .is_some_and(|n| !n.is_empty() && constant_time_eq(n.as_bytes(), auth.daemon_nonce.as_bytes()));
+    let is_superadmin = is_valid_superadmin_bearer(&headers);
+
+    if role == "admin" && !is_superadmin {
+        return Err(auth_err_resp(
+            StatusCode::FORBIDDEN,
+            "INSUFFICIENT_ROLE",
+            "Issuing an admin local session requires valid superadmin authorization",
+        ));
+    }
+    if (role == "editor" || requested_tenant != default_tenant_id()) && !is_superadmin && !has_daemon_nonce {
+        return Err(auth_err_resp(
+            StatusCode::FORBIDDEN,
+            "INSUFFICIENT_ROLE",
+            "Elevated role or cross-tenant local session requires daemon nonce proof or superadmin authorization",
+        ));
+    }
     let principal = FlowPrincipal {
-        tenant_id: req
-            .tenant_id
-            .filter(|s| !s.trim().is_empty())
-            .unwrap_or_else(default_tenant_id),
+        tenant_id: requested_tenant,
         user_id: req
             .user_id
             .filter(|s| !s.trim().is_empty())
@@ -388,15 +489,201 @@ fn hdr_str<'a>(
 }
 
 pub fn auth_err_resp(status: StatusCode, code: &str, message: &str) -> Response {
+    let kind = if status == StatusCode::UNAUTHORIZED {
+        "UNAUTHORIZED"
+    } else {
+        code
+    };
     (
         status,
         Json(HttpErrorBody {
             code: code.to_string(),
-            kind: Some(code.to_string()),
+            kind: Some(kind.to_string()),
             message: message.to_string(),
             details: serde_json::Value::Null,
             request_id: Uuid::new_v4().to_string(),
         }),
     )
         .into_response()
+}
+
+pub(crate) fn is_valid_superadmin_bearer(headers: &HeaderMap) -> bool {
+    let Some(auth_hdr) = headers.get("authorization").and_then(|v| v.to_str().ok()) else {
+        return false;
+    };
+    let Some(token) = auth_hdr.strip_prefix("Bearer ").map(str::trim) else {
+        return false;
+    };
+    if token.is_empty() {
+        return false;
+    }
+    match std::env::var("COWOK_SUPERADMIN_SECRET") {
+        Ok(ref secret) if !secret.trim().is_empty() => {
+            constant_time_eq(token.as_bytes(), secret.trim().as_bytes())
+        }
+        _ => false,
+    }
+}
+
+pub async fn cors_and_loopback_middleware(req: Request, next: Next) -> Response {
+    if let Err((st, code, msg)) = verify_loopback_headers(req.headers()) {
+        return auth_err_resp(st, code, msg);
+    }
+    let origin_hdr = req
+        .headers()
+        .get("origin")
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+
+    if req.method() == Method::OPTIONS {
+        let mut resp = StatusCode::NO_CONTENT.into_response();
+        attach_loopback_cors_headers(resp.headers_mut(), origin_hdr.as_deref());
+        return resp;
+    }
+
+    let mut resp = next.run(req).await;
+    attach_loopback_cors_headers(resp.headers_mut(), origin_hdr.as_deref());
+    resp
+}
+
+fn attach_loopback_cors_headers(headers: &mut HeaderMap, origin: Option<&str>) {
+    headers.insert(header::VARY, HeaderValue::from_static("Origin"));
+    if let Some(orig) = origin {
+        let host_part = orig
+            .trim_start_matches("http://")
+            .trim_start_matches("https://");
+        if is_allowed_loopback_host(host_part) {
+            if let Ok(val) = HeaderValue::from_str(orig) {
+                headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, val);
+                headers.insert(
+                    header::ACCESS_CONTROL_ALLOW_METHODS,
+                    HeaderValue::from_static("GET, POST, PUT, PATCH, DELETE, OPTIONS"),
+                );
+                headers.insert(
+                    header::ACCESS_CONTROL_ALLOW_HEADERS,
+                    HeaderValue::from_static(
+                        "Authorization, Content-Type, X-Cowok-Session-Token, X-Cowok-Workspace-Root, X-Cowok-Actor-Id, X-Cowok-Portal, X-Correlation-Id",
+                    ),
+                );
+            }
+        }
+    }
+}
+
+pub async fn legacy_project_auth_middleware(
+    State(state): State<DaemonAppState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    if let Err((st, code, msg)) = verify_loopback_headers(req.headers()) {
+        return auth_err_resp(st, code, msg);
+    }
+    let (parts, body) = req.into_parts();
+    let raw_bytes = match to_bytes(body, MAX_BODY_BYTES * 2).await {
+        Ok(b) => b,
+        Err(_) => {
+            return auth_err_resp(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "PAYLOAD_TOO_LARGE",
+                "Body exceeds 2 MiB",
+            )
+        }
+    };
+    let auth = state_auth(&state);
+    let verified: Option<VerifiedLegacyIngress> = if parts.headers.contains_key("x-cowok-hmac-sig") {
+        match verify_hmac_v2(&auth, &parts.method, &parts.uri, &parts.headers, &raw_bytes) {
+            Ok(principal) => Some(VerifiedLegacyIngress {
+                principal,
+                kind: LegacyAuthKind::HmacV2,
+                bearer_token: None,
+            }),
+            Err((st, code, msg)) => return auth_err_resp(st, code, msg),
+        }
+    } else if let Some(tok) = parts
+        .headers
+        .get("x-cowok-session-token")
+        .and_then(|v| v.to_str().ok())
+    {
+        let found = auth
+            .sessions
+            .lock()
+            .expect("sessions")
+            .get(tok.trim())
+            .cloned();
+        match found {
+            Some(entry) if entry.expires_at >= Utc::now().timestamp() => {
+                Some(VerifiedLegacyIngress {
+                    principal: entry.principal,
+                    kind: LegacyAuthKind::SessionToken,
+                    bearer_token: None,
+                })
+            }
+            _ => {
+                return auth_err_resp(
+                    StatusCode::UNAUTHORIZED,
+                    "UNAUTHENTICATED",
+                    "Invalid session token",
+                )
+            }
+        }
+    } else if let Some(auth_hdr) = parts
+        .headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+    {
+        if let Some(tok) = auth_hdr.strip_prefix("Bearer ").map(str::trim) {
+            let is_superadmin = is_valid_superadmin_bearer(&parts.headers);
+            Some(VerifiedLegacyIngress {
+                principal: FlowPrincipal {
+                    tenant_id: default_tenant_id(),
+                    user_id: default_user_id(),
+                    role: if is_superadmin { "admin" } else { "editor" }.to_string(),
+                },
+                kind: LegacyAuthKind::Bearer,
+                bearer_token: Some(tok.to_string()),
+            })
+        } else {
+            return auth_err_resp(
+                StatusCode::UNAUTHORIZED,
+                "UNAUTHORIZED",
+                "Authorization header must use Bearer scheme",
+            );
+        }
+    } else {
+        None
+    };
+
+    if let Some(ref caller) = verified {
+        if caller.principal.role == "viewer" && parts.method != Method::GET {
+            return auth_err_resp(
+                StatusCode::FORBIDDEN,
+                "INSUFFICIENT_ROLE",
+                "Viewer role cannot mutate project resources",
+            );
+        }
+    } else if parts.uri.path() == "/api/v1/projects" {
+        return auth_err_resp(
+            StatusCode::UNAUTHORIZED,
+            "UNAUTHENTICATED",
+            "Missing authentication for projects endpoint",
+        );
+    }
+
+    if parts.uri.path() == "/api/v1/projects" {
+        if let Some(ref caller) = verified {
+            if caller.kind == LegacyAuthKind::Bearer && !is_valid_superadmin_bearer(&parts.headers) {
+                return auth_err_resp(
+                    StatusCode::FORBIDDEN,
+                    "TENANT_ISOLATION_BREACH",
+                    "Listing or creating root projects requires superadmin Bearer or verified loopback HMAC",
+                );
+            }
+        }
+    }
+
+    let mut rebuilt = Request::from_parts(parts, Body::from(raw_bytes));
+    if let Some(caller) = verified {
+        rebuilt.extensions_mut().insert(caller);
+    }
+    next.run(rebuilt).await
 }

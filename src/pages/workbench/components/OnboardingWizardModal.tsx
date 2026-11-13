@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "../../../hooks/useTranslation";
-import { CliDiagnosticItem } from "../../../app/api/doctor/route";
+import { apiWorkbenchSettings } from "../../../api/workbench-settings";
+import type { CliDiagnosticItem } from "../../../lib/validations/workbench-settings";
+import { OnboardingStepsContent } from "./OnboardingStepsContent";
 
 export interface OnboardingWizardModalProps {
   isOpen: boolean;
@@ -37,17 +39,14 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   const runDoctorScan = async () => {
     setLoadingDoctor(true);
     try {
-      const res = await fetch("/api/doctor");
-      if (res.ok) {
-        const data = await res.json();
-        setCliItems(data.clis || []);
-        const firstReady = data.clis?.find((c: CliDiagnosticItem) => c.installed);
-        if (firstReady) {
-          setSelectedCli(firstReady.id);
-        }
+      const data = await apiWorkbenchSettings.scanDoctor();
+      setCliItems(data.clis || []);
+      const firstReady = data.clis?.find((c) => c.installed);
+      if (firstReady) {
+        setSelectedCli(firstReady.id);
       }
     } catch {
-      // Fallback empty
+      // Fallback empty when daemon is starting
     } finally {
       setLoadingDoctor(false);
     }
@@ -55,7 +54,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      runDoctorScan();
+      void runDoctorScan();
     }
   }, [isOpen]);
 
@@ -66,6 +65,18 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
     localStorage.setItem("cowok_default_agent", selectedCli);
     localStorage.setItem("cowok_storage_mode", storageMode);
     localStorage.setItem("cowok_permission_level", permissionLevel);
+    void apiWorkbenchSettings
+      .upsertAgentSetting({
+        providerId: selectedCli,
+        modelId: selectedCli,
+        endpointUrl: "",
+        credentialRef: storageMode,
+        status: permissionLevel,
+        isDefault: true,
+      })
+      .catch(() => {
+        // Optimistic persistence until daemon reconnects
+      });
     onComplete({
       preferredCli: selectedCli,
       storageMode,
@@ -93,26 +104,26 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
           width: "620px",
           maxWidth: "94vw",
           maxHeight: "88vh",
-          backgroundColor: "var(--bg-surface, #1e1e24)",
-          borderRadius: "12px",
-          border: "1px solid var(--border-default, #2e2e38)",
-          boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+          backgroundColor: "var(--bg-surface)",
+          borderRadius: "var(--radius-lg)",
+          border: "1px solid var(--border-default)",
+          boxShadow: "var(--shadow-lg)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          color: "var(--text-primary, #e2e8f0)",
-          fontFamily: "var(--font-sans, system-ui, -apple-system, sans-serif)",
+          color: "var(--text-primary)",
+          fontFamily: "var(--font-sans)",
         }}
       >
         {/* Header */}
         <div
           style={{
             padding: "18px 24px",
-            borderBottom: "1px solid var(--border-default, #2e2e38)",
+            borderBottom: "1px solid var(--border-default)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            backgroundColor: "var(--bg-subtle, #18181d)",
+            backgroundColor: "var(--bg-subtle)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -120,12 +131,12 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
               style={{
                 width: "28px",
                 height: "28px",
-                borderRadius: "6px",
-                backgroundColor: "var(--action-primary, #3b82f6)",
+                borderRadius: "var(--radius-xs)",
+                backgroundColor: "var(--action-primary)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#fff",
+                color: "var(--action-primary-fg)",
               }}
             >
               <BrandIcon name="terminal" size={16} color="currentColor" />
@@ -134,305 +145,52 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
               <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 600 }}>
                 {t("workbench.onboardingTitle", "Chào mừng đến Cowok-Design (Day-0 Setup)")}
               </h2>
-              <p style={{ margin: "2px 0 0 0", fontSize: "11.5px", color: "var(--text-secondary, #94a3b8)" }}>
+              <p style={{ margin: "2px 0 0 0", fontSize: "11.5px", color: "var(--text-secondary)" }}>
                 {t("workbench.onboardingSubtitle", "Thiết lập môi trường siêu tốc trong <60 giây")}
               </p>
             </div>
           </div>
-          {/* Step pill */}
           <div
             style={{
               padding: "4px 10px",
-              borderRadius: "20px",
-              backgroundColor: "rgba(59, 130, 246, 0.15)",
-              color: "var(--action-primary, #3b82f6)",
+              borderRadius: "var(--radius-pill)",
+              backgroundColor: "var(--bg-selected)",
+              color: "var(--action-primary)",
               fontSize: "11px",
               fontWeight: 600,
             }}
           >
-            Bước {currentStep} / {STEP_COUNT}
+            {t("onboarding.stepLabel", "Bước")} {currentStep} / {STEP_COUNT}
           </div>
         </div>
 
         {/* Body Step Content */}
         <div style={{ padding: "24px", overflowY: "auto", flex: 1, minHeight: "320px" }}>
-          {currentStep === 1 && (
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: "13.5px", fontWeight: 600 }}>
-                    1. CLI Doctor: Kiểm tra các Coding Agent trên máy
-                  </h3>
-                  <p style={{ margin: "4px 0 0 0", fontSize: "11.5px", color: "var(--text-secondary, #94a3b8)" }}>
-                    Quét tự động các CLI được hỗ trợ qua loopback daemon (tối đa 1.5s/probe)
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={runDoctorScan}
-                  disabled={loadingDoctor}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid var(--border-default, #2e2e38)",
-                    backgroundColor: "transparent",
-                    color: "var(--text-primary, #e2e8f0)",
-                    fontSize: "11px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
-                >
-                  <BrandIcon name="refresh-cw" size={11} color="currentColor" />
-                  <span>{loadingDoctor ? "Đang quét..." : "Quét lại"}</span>
-                </button>
-              </div>
-
-              {loadingDoctor ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: "var(--text-secondary, #94a3b8)" }}>
-                  <p style={{ fontSize: "12px" }}>Đang quét hệ thống CLI cục bộ...</p>
-                </div>
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                  {cliItems.map((cli) => {
-                    const isSelected = selectedCli === cli.id;
-                    return (
-                      <div
-                        key={cli.id}
-                        onClick={() => cli.installed && setSelectedCli(cli.id)}
-                        style={{
-                          padding: "10px 12px",
-                          borderRadius: "8px",
-                          border: `1px solid ${
-                            isSelected
-                              ? "var(--action-primary, #3b82f6)"
-                              : "var(--border-default, #2e2e38)"
-                          }`,
-                          backgroundColor: isSelected
-                            ? "rgba(59, 130, 246, 0.08)"
-                            : "var(--bg-subtle, #18181d)",
-                          cursor: cli.installed ? "pointer" : "default",
-                          opacity: cli.installed ? 1 : 0.55,
-                          transition: "all var(--duration-fast, 0.15s)",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <span style={{ fontSize: "12px", fontWeight: 600 }}>{cli.name}</span>
-                          <span
-                            style={{
-                              fontSize: "10px",
-                              padding: "2px 6px",
-                              borderRadius: "4px",
-                              backgroundColor: cli.installed ? "rgba(34, 197, 94, 0.15)" : "rgba(148, 163, 184, 0.12)",
-                              color: cli.installed ? "#4ade80" : "var(--text-secondary, #94a3b8)",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {cli.installed ? "Sẵn sàng" : "Chưa cài"}
-                          </span>
-                        </div>
-                        <div style={{ marginTop: "6px", fontSize: "10.5px", color: "var(--text-secondary, #94a3b8)" }}>
-                          <code>{cli.command}</code> {cli.version ? `• ${cli.version}` : ""}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {currentStep === 2 && (
-            <div>
-              <h3 style={{ margin: 0, fontSize: "13.5px", fontWeight: 600 }}>
-                2. Không gian làm việc & Cơ chế bảo mật lưu trữ
-              </h3>
-              <p style={{ margin: "4px 0 16px 0", fontSize: "11.5px", color: "var(--text-secondary, #94a3b8)" }}>
-                Định cấu hình cách thức lưu trữ dữ liệu dự án và token bảo mật
-              </p>
-
-              <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, marginBottom: "8px" }}>
-                  Chế độ Workspace:
-                </label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                  <div
-                    onClick={() => setWorkspaceMode("sandboxed")}
-                    style={{
-                      padding: "12px",
-                      borderRadius: "8px",
-                      border: `1px solid ${
-                        workspaceMode === "sandboxed"
-                          ? "var(--action-primary, #3b82f6)"
-                          : "var(--border-default, #2e2e38)"
-                      }`,
-                      backgroundColor:
-                        workspaceMode === "sandboxed"
-                          ? "rgba(59, 130, 246, 0.08)"
-                          : "var(--bg-subtle, #18181d)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ fontSize: "12px", fontWeight: 600 }}>Sandbox Tự Quản Lý (Khuyên dùng)</div>
-                    <div style={{ fontSize: "11px", color: "var(--text-secondary, #94a3b8)", marginTop: "4px" }}>
-                      Tự động phân vùng isolated trong <code>.cowok-design/projects/</code> với HMAC token
-                    </div>
-                  </div>
-                  <div
-                    onClick={() => setWorkspaceMode("linked")}
-                    style={{
-                      padding: "12px",
-                      borderRadius: "8px",
-                      border: `1px solid ${
-                        workspaceMode === "linked"
-                          ? "var(--action-primary, #3b82f6)"
-                          : "var(--border-default, #2e2e38)"
-                      }`,
-                      backgroundColor:
-                        workspaceMode === "linked"
-                          ? "rgba(59, 130, 246, 0.08)"
-                          : "var(--bg-subtle, #18181d)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ fontSize: "12px", fontWeight: 600 }}>Liên Kết Thư Mục Local</div>
-                    <div style={{ fontSize: "11px", color: "var(--text-secondary, #94a3b8)", marginTop: "4px" }}>
-                      Chọn một thư mục mã nguồn hiện có trên máy (hỗ trợ Git repo)
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "11.5px", fontWeight: 600, marginBottom: "8px" }}>
-                  Cơ chế lưu trữ Secret & API Keys:
-                </label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                  <div
-                    onClick={() => setStorageMode("vault_0600")}
-                    style={{
-                      padding: "12px",
-                      borderRadius: "8px",
-                      border: `1px solid ${
-                        storageMode === "vault_0600"
-                          ? "var(--action-primary, #3b82f6)"
-                          : "var(--border-default, #2e2e38)"
-                      }`,
-                      backgroundColor:
-                        storageMode === "vault_0600"
-                          ? "rgba(59, 130, 246, 0.08)"
-                          : "var(--bg-subtle, #18181d)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ fontSize: "12px", fontWeight: 600 }}>Daemon 0600 Vault (Bền vững)</div>
-                    <div style={{ fontSize: "11px", color: "var(--text-secondary, #94a3b8)", marginTop: "4px" }}>
-                      Lưu trong tệp mã hóa quyền 0600 của Daemon, giữ nguyên qua các lần khởi động lại
-                    </div>
-                  </div>
-                  <div
-                    onClick={() => setStorageMode("ram_only")}
-                    style={{
-                      padding: "12px",
-                      borderRadius: "8px",
-                      border: `1px solid ${
-                        storageMode === "ram_only"
-                          ? "var(--action-primary, #3b82f6)"
-                          : "var(--border-default, #2e2e38)"
-                      }`,
-                      backgroundColor:
-                        storageMode === "ram_only"
-                          ? "rgba(59, 130, 246, 0.08)"
-                          : "var(--bg-subtle, #18181d)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ fontSize: "12px", fontWeight: 600 }}>RAM Only (Tạm thời)</div>
-                    <div style={{ fontSize: "11px", color: "var(--text-secondary, #94a3b8)", marginTop: "4px" }}>
-                      Chỉ lưu trên bộ nhớ phiên duyệt web, tự hủy khi đóng tab
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {currentStep === 3 && (
-            <div>
-              <h3 style={{ margin: 0, fontSize: "13.5px", fontWeight: 600 }}>
-                3. Quyền hạn thực thi & Khởi chạy Workbench
-              </h3>
-              <p style={{ margin: "4px 0 16px 0", fontSize: "11.5px", color: "var(--text-secondary, #94a3b8)" }}>
-                Chọn mức độ tự động phê duyệt khi Agent can thiệp vào mã nguồn và file hệ thống
-              </p>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {[
-                  {
-                    id: "auto_sandbox",
-                    title: "Tự động trong Sandbox (Khuyên dùng)",
-                    desc: "Tự động ghi các file preview, HTML/CSS, và snapshot trong phạm vi dự án an toàn.",
-                  },
-                  {
-                    id: "ask_risky",
-                    title: "Hỏi khi thao tác rủi ro cao",
-                    desc: "Chỉ hiện hộp thoại xác nhận khi ghi đè mã nguồn gốc hoặc chạy lệnh terminal.",
-                  },
-                  {
-                    id: "ask_all",
-                    title: "Luôn hỏi xác nhận (Nghiêm ngặt)",
-                    desc: "Yêu cầu click Duyệt thủ công cho mọi thay đổi DAG, patch và code generation.",
-                  },
-                ].map((item) => {
-                  const isChecked = permissionLevel === item.id;
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() => setPermissionLevel(item.id as any)}
-                      style={{
-                        padding: "12px 14px",
-                        borderRadius: "8px",
-                        border: `1px solid ${
-                          isChecked ? "var(--action-primary, #3b82f6)" : "var(--border-default, #2e2e38)"
-                        }`,
-                        backgroundColor: isChecked ? "rgba(59, 130, 246, 0.08)" : "var(--bg-subtle, #18181d)",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: "12px",
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="permissionLevel"
-                        checked={isChecked}
-                        onChange={() => setPermissionLevel(item.id as any)}
-                        style={{ marginTop: "2px" }}
-                      />
-                      <div>
-                        <div style={{ fontSize: "12px", fontWeight: 600 }}>{item.title}</div>
-                        <div style={{ fontSize: "11px", color: "var(--text-secondary, #94a3b8)", marginTop: "2px" }}>
-                          {item.desc}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <OnboardingStepsContent
+            currentStep={currentStep}
+            loadingDoctor={loadingDoctor}
+            cliItems={cliItems}
+            selectedCli={selectedCli}
+            onSelectCli={setSelectedCli}
+            onRefreshDoctor={() => void runDoctorScan()}
+            workspaceMode={workspaceMode}
+            onChangeWorkspaceMode={setWorkspaceMode}
+            storageMode={storageMode}
+            onChangeStorageMode={setStorageMode}
+            permissionLevel={permissionLevel}
+            onChangePermissionLevel={setPermissionLevel}
+          />
         </div>
 
         {/* Footer Navigation */}
         <div
           style={{
             padding: "14px 24px",
-            borderTop: "1px solid var(--border-default, #2e2e38)",
+            borderTop: "1px solid var(--border-default)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            backgroundColor: "var(--bg-subtle, #18181d)",
+            backgroundColor: "var(--bg-subtle)",
           }}
         >
           <button
@@ -440,15 +198,15 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
             onClick={onClose}
             style={{
               padding: "7px 14px",
-              borderRadius: "6px",
+              borderRadius: "var(--radius-xs)",
               border: "none",
               backgroundColor: "transparent",
-              color: "var(--text-secondary, #94a3b8)",
+              color: "var(--text-secondary)",
               fontSize: "12px",
               cursor: "pointer",
             }}
           >
-            Bỏ qua (Dùng mặc định)
+            {t("onboarding.skipBtn", "Bỏ qua (Dùng mặc định)")}
           </button>
 
           <div style={{ display: "flex", gap: "8px" }}>
@@ -458,15 +216,15 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                 onClick={() => setCurrentStep((s) => s - 1)}
                 style={{
                   padding: "7px 16px",
-                  borderRadius: "6px",
-                  border: "1px solid var(--border-default, #2e2e38)",
+                  borderRadius: "var(--radius-xs)",
+                  border: "1px solid var(--border-default)",
                   backgroundColor: "transparent",
-                  color: "var(--text-primary, #e2e8f0)",
+                  color: "var(--text-primary)",
                   fontSize: "12px",
                   cursor: "pointer",
                 }}
               >
-                Quay lại
+                {t("onboarding.backBtn", "Quay lại")}
               </button>
             )}
 
@@ -476,16 +234,16 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                 onClick={() => setCurrentStep((s) => s + 1)}
                 style={{
                   padding: "7px 18px",
-                  borderRadius: "6px",
+                  borderRadius: "var(--radius-xs)",
                   border: "none",
-                  backgroundColor: "var(--action-primary, #3b82f6)",
-                  color: "#fff",
+                  backgroundColor: "var(--action-primary)",
+                  color: "var(--action-primary-fg)",
                   fontSize: "12px",
                   fontWeight: 600,
                   cursor: "pointer",
                 }}
               >
-                Tiếp tục
+                {t("onboarding.nextBtn", "Tiếp tục")}
               </button>
             ) : (
               <button
@@ -493,10 +251,10 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                 onClick={handleFinish}
                 style={{
                   padding: "7px 20px",
-                  borderRadius: "6px",
+                  borderRadius: "var(--radius-xs)",
                   border: "none",
-                  backgroundColor: "var(--action-primary, #3b82f6)",
-                  color: "#fff",
+                  backgroundColor: "var(--action-primary)",
+                  color: "var(--action-primary-fg)",
                   fontSize: "12px",
                   fontWeight: 600,
                   cursor: "pointer",
@@ -505,8 +263,8 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                   gap: "6px",
                 }}
               >
-                <BrandIcon name="play" size={12} color="#fff" />
-                <span>Hoàn tất & Mở Canvas (&lt;60s)</span>
+                <BrandIcon name="play" size={12} color="currentColor" />
+                <span>{t("onboarding.finishBtn", "Hoàn tất & Mở Canvas (<60s)")}</span>
               </button>
             )}
           </div>

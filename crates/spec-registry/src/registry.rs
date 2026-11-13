@@ -15,8 +15,8 @@ use crate::lock::SpecLockGuard;
 use crate::pool::SqlitePool;
 use crate::recovery::recover_pending_spec;
 use crate::sync::{
-    atomic_write_spec_file, compute_sha256_hex, compute_summary_digest, read_jailed_spec_bytes,
-    resolve_jailed_spec_path, validate_candidate_spec_path,
+    atomic_write_spec_file, compute_sha256_hex, compute_summary_digest, delete_jailed_spec_file,
+    read_jailed_spec_bytes, resolve_jailed_spec_path, validate_candidate_spec_path,
 };
 
 const MAX_PROVENANCE_JSON_BYTES: usize = 16 * 1024;
@@ -137,34 +137,68 @@ impl SpecRegistry {
             .pool
             .workspace_root()
             .canonicalize()
-            .unwrap_or_else(|_| self.pool.workspace_root().to_path_buf());
+            .map_err(|_| HarnessError::PathTraversalDenied {
+                path: self.pool.workspace_root().display().to_string(),
+            })?;
         let workspace_root_str = canonical_root.display().to_string();
 
-        let conn = self.pool.connection()?;
-        let existing_count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM projects WHERE workspace_root = ?1",
-                params![workspace_root_str],
-                |r| r.get(0),
-            )
-            .unwrap_or(0);
-
-        let final_ws_str = if existing_count > 0 {
-            let isolated = canonical_root
-                .join(".cowok-design")
-                .join("projects")
-                .join(id.to_string());
-            let _ = std::fs::create_dir_all(&isolated);
-            isolated.display().to_string()
-        } else {
-            workspace_root_str
-        };
-
+        let mut conn = self.pool.connection()?;
         let now_ms = Utc::now().timestamp_millis();
         let safe_now = SafeJsInteger::new(now_ms)?;
 
         retry_on_busy("create_project", || {
-            conn.execute(
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let existing_count: i64 = tx.query_row(
+                "SELECT COUNT(*) FROM projects WHERE workspace_root = ?1",
+                params![workspace_root_str],
+                |r| r.get(0),
+            )?;
+
+            let final_ws_str = if existing_count > 0 {
+                let cowok_dir = canonical_root.join(".cowok-design");
+                let projects_dir = cowok_dir.join("projects");
+                let isolated = projects_dir.join(id.to_string());
+                std::fs::create_dir_all(&isolated).map_err(|e| {
+                    rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::other(
+                        format!("Failed to create isolated project dir: {e}"),
+                    )))
+                })?;
+                for dir in [&cowok_dir, &projects_dir, &isolated] {
+                    let meta = std::fs::symlink_metadata(dir).map_err(|e| {
+                        rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::other(
+                            format!("Failed to stat isolated dir {}: {e}", dir.display()),
+                        )))
+                    })?;
+                    if meta.file_type().is_symlink() || !meta.file_type().is_dir() {
+                        return Err(rusqlite::Error::ToSqlConversionFailure(Box::new(
+                            std::io::Error::other(format!(
+                                "Symlink rejected for isolated dir {}",
+                                dir.display()
+                            )),
+                        )));
+                    }
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        let mut perms = meta.permissions();
+                        perms.set_mode(0o700);
+                        let _ = std::fs::set_permissions(dir, perms);
+                    }
+                }
+                isolated
+                    .canonicalize()
+                    .map_err(|e| {
+                        rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::other(
+                            format!("Failed to canonicalize isolated dir: {e}"),
+                        )))
+                    })?
+                    .display()
+                    .to_string()
+            } else {
+                workspace_root_str.clone()
+            };
+
+            tx.execute(
                 "INSERT INTO projects (
                     id, slug, name, workspace_root, product_brief,
                     inherit_brand_from_project_id, status, created_at, updated_at
@@ -179,7 +213,8 @@ impl SpecRegistry {
                     now_ms,
                     now_ms,
                 ],
-            )
+            )?;
+            tx.commit()
         })?;
 
         Ok(Project {
@@ -213,22 +248,40 @@ impl SpecRegistry {
             }
         })?;
 
-        let db_root_path = PathBuf::from(&db_root_str);
-        if db_root_str != "." {
-            if let Ok(canon_db_root) = db_root_path.canonicalize() {
-                if canon_db_root != canonical_pool_root {
-                    return Err(HarnessError::ValidationFailed {
-                        reason: format!(
-                            "PROJECT_SCOPE_VIOLATION: project {project_id} belongs to '{}', not '{}'",
-                            canon_db_root.display(),
-                            canonical_pool_root.display()
-                        ),
-                    });
-                }
-            }
+        if db_root_str == "." {
+            return Ok(canonical_pool_root);
         }
 
-        Ok(canonical_pool_root)
+        let db_root_path = PathBuf::from(&db_root_str);
+        if let Ok(meta) = std::fs::symlink_metadata(&db_root_path) {
+            if meta.file_type().is_symlink() {
+                return Err(HarnessError::PathTraversalDenied {
+                    path: db_root_str,
+                });
+            }
+        }
+        let canon_db_root = db_root_path.canonicalize().map_err(|_| HarnessError::ValidationFailed {
+            reason: format!(
+                "PROJECT_SCOPE_VIOLATION: project {project_id} workspace_root '{}' does not exist or cannot be canonicalized",
+                db_root_str
+            ),
+        })?;
+
+        let isolated_expected = canonical_pool_root
+            .join(".cowok-design")
+            .join("projects")
+            .join(project_id.to_string());
+        if canon_db_root != canonical_pool_root && canon_db_root != isolated_expected {
+            return Err(HarnessError::ValidationFailed {
+                reason: format!(
+                    "PROJECT_SCOPE_VIOLATION: project {project_id} belongs to '{}', not '{}'",
+                    canon_db_root.display(),
+                    canonical_pool_root.display()
+                ),
+            });
+        }
+
+        Ok(canon_db_root)
     }
 
     /// Linearized 10-step atomic disk + SQLite WAL CAS upsert for one of the 9 Foundational Specs.
@@ -278,7 +331,7 @@ impl SpecRegistry {
         let new_sha256 = compute_sha256_hex(new_bytes);
         let now_ms = Utc::now().timestamp_millis();
 
-        let (spec_id_str, expected_ver, old_sha_opt, is_new_row) = match existing_db {
+        let (spec_id_str, expected_ver, prev_db_ver, old_sha_opt, is_new_row) = match existing_db {
             Some((id_str, db_ver, db_sha)) if !db_sha.is_empty() => {
                 // Existing tracked spec: disk file must exist and match DB hash (read via O_NOFOLLOW)
                 let Some(disk_bytes) = read_jailed_spec_bytes(&workspace_root, input.spec_key)?
@@ -303,9 +356,44 @@ impl SpecRegistry {
                     });
                 }
 
-                (id_str, db_ver + 1, Some(db_sha), false)
+                let max_rev: i64 = conn
+                    .query_row(
+                        "SELECT COALESCE(MAX(revision_number), 0) FROM spec_revisions WHERE spec_id = ?1",
+                        params![id_str],
+                        |r| r.get(0),
+                    )
+                    .unwrap_or(db_ver);
+                let next_ver = db_ver.max(max_rev) + 1;
+                (id_str, next_ver, db_ver, Some(db_sha), false)
             }
-            Some((id_str, db_ver, _empty_sha)) => (id_str, db_ver, None, false),
+            Some((id_str, db_ver, _empty_sha)) => {
+                // Post-tombstone or empty placeholder row: check disk OCC if a file already sits on disk
+                if let Some(disk_bytes) = read_jailed_spec_bytes(&workspace_root, input.spec_key)? {
+                    let disk_sha = compute_sha256_hex(&disk_bytes);
+                    if let Some(exp) = input.expected_sha256.as_deref() {
+                        if exp != disk_sha {
+                            return Err(HarnessError::StaleFile {
+                                path: rel_file_path,
+                                expected_hash: exp.to_string(),
+                                actual_hash: disk_sha,
+                            });
+                        }
+                    }
+                }
+                let max_rev: i64 = conn
+                    .query_row(
+                        "SELECT COALESCE(MAX(revision_number), 0) FROM spec_revisions WHERE spec_id = ?1",
+                        params![id_str],
+                        |r| r.get(0),
+                    )
+                    .unwrap_or(0);
+                let next_ver = if max_rev == 0 {
+                    db_ver
+                } else {
+                    db_ver.max(max_rev) + 1
+                };
+                (id_str, next_ver, db_ver, None, false)
+            }
             None => {
                 // Initial creation: if caller supplied a non-matching expected_sha256 while file already exists, check it via O_NOFOLLOW
                 if let Some(disk_bytes) = read_jailed_spec_bytes(&workspace_root, input.spec_key)? {
@@ -320,7 +408,7 @@ impl SpecRegistry {
                         }
                     }
                 }
-                (Uuid::new_v4().to_string(), 1, None, true)
+                (Uuid::new_v4().to_string(), 1, 1, None, true)
             }
         };
 
@@ -421,11 +509,7 @@ impl SpecRegistry {
         }
 
         // 8 & 9. In BEGIN IMMEDIATE, execute SQL CAS + append immutable spec_revision + mark intent COMMITTED
-        let expected_db_ver = if old_sha_opt.is_none() {
-            1
-        } else {
-            expected_ver - 1
-        };
+        let expected_db_ver = prev_db_ver;
         let expected_db_sha = old_sha_opt.clone().unwrap_or_default();
         let rev_id = Uuid::new_v4().to_string();
 
@@ -791,11 +875,20 @@ impl SpecRegistry {
             src_proj_uuid,
             src_rev_opt.as_deref(),
         );
-        let new_ver = db_ver + 1;
+        let new_ver = db_ver
+            .max(
+                conn.query_row(
+                    "SELECT COALESCE(MAX(revision_number), 0) FROM spec_revisions WHERE spec_id = ?1",
+                    params![spec_id_str],
+                    |r| r.get::<_, i64>(0),
+                )
+                .unwrap_or(db_ver),
+            )
+            + 1;
         let now_ms = Utc::now().timestamp_millis();
         let rev_id = Uuid::new_v4().to_string();
 
-        retry_on_busy("watcher_reconcile_cas", || {
+        let cas_updated = retry_on_busy("watcher_reconcile_cas", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
             tx.execute(
                 "INSERT INTO spec_write_intents (
@@ -803,7 +896,7 @@ impl SpecRegistry {
                     old_sha256, new_sha256, actor_kind, actor_id, change_summary,
                     provenance_summary_json, source_project_id, source_revision_sha256,
                     state, created_at, updated_at
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'EXTERNAL_WATCHER', 'external_watcher', ?8, ?9, ?10, ?11, 'COMMITTED', ?12, ?12)",
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'EXTERNAL_WATCHER', 'external_watcher', ?8, ?9, ?10, ?11, 'PENDING', ?12, ?12)",
                 params![
                     operation_id.to_string(),
                     spec_id_str,
@@ -842,7 +935,7 @@ impl SpecRegistry {
 
             if updated == 1 {
                 tx.execute(
-                    "INSERT OR IGNORE INTO spec_revisions (
+                    "INSERT INTO spec_revisions (
                         id, spec_id, project_id, spec_key, revision_number,
                         operation_id, previous_sha256, content_hash,
                         actor_kind, actor_id, change_summary,
@@ -863,9 +956,27 @@ impl SpecRegistry {
                         now_ms,
                     ],
                 )?;
+                tx.execute(
+                    "UPDATE spec_write_intents SET state = 'COMMITTED', updated_at = ?1 WHERE operation_id = ?2",
+                    params![now_ms, operation_id.to_string()],
+                )?;
+            } else {
+                tx.execute(
+                    "UPDATE spec_write_intents SET state = 'ABORTED', updated_at = ?1 WHERE operation_id = ?2",
+                    params![now_ms, operation_id.to_string()],
+                )?;
             }
-            tx.commit()
+            tx.commit()?;
+            Ok(updated == 1)
         })?;
+
+        if !cas_updated {
+            return Err(HarnessError::StaleFile {
+                path: format!("product/specs/{}", spec_key.as_str()),
+                expected_hash: db_sha,
+                actual_hash: "CONCURRENT_CAS_MODIFICATION".to_string(),
+            });
+        }
 
         Ok(SyncOutcome::SyncedToDiskAndDb {
             spec_key,
@@ -893,7 +1004,14 @@ impl SpecRegistry {
             let tombstone_id = Uuid::new_v4().to_string();
             let rev_id = Uuid::new_v4().to_string();
             let now_ms = Utc::now().timestamp_millis();
-            let next_rev = db_ver + 1;
+            let max_rev: i64 = conn
+                .query_row(
+                    "SELECT COALESCE(MAX(revision_number), 0) FROM spec_revisions WHERE spec_id = ?1",
+                    params![spec_id_str],
+                    |r| r.get(0),
+                )
+                .unwrap_or(db_ver);
+            let next_rev = db_ver.max(max_rev) + 1;
 
             retry_on_busy("reconcile_deletion_tombstone", || {
                 let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -911,9 +1029,9 @@ impl SpecRegistry {
                 )?;
                 tx.execute(
                     "UPDATE project_specs 
-                     SET status = 'FILE_DELETED', content_sha256 = '', updated_at = ?1 
-                     WHERE id = ?2",
-                    params![now_ms, spec_id_str],
+                     SET status = 'FILE_DELETED', version = ?1, content_sha256 = '', updated_at = ?2 
+                     WHERE id = ?3",
+                    params![next_rev, now_ms, spec_id_str],
                 )?;
                 tx.execute(
                     "INSERT INTO spec_revisions (
@@ -955,13 +1073,25 @@ impl SpecRegistry {
         spec_key: CanonicalSpecKey,
         deleted_by: &str,
     ) -> Result<SyncOutcome, HarnessError> {
+        self.delete_spec_checked(project_id, spec_key, None, deleted_by)
+    }
+
+    /// Explicitly deletes a spec from disk and SQLite with optional SHA-256 OCC guard and `O_NOFOLLOW` descriptor unlink.
+    pub fn delete_spec_checked(
+        &self,
+        project_id: Uuid,
+        spec_key: CanonicalSpecKey,
+        expected_sha256: Option<&str>,
+        deleted_by: &str,
+    ) -> Result<SyncOutcome, HarnessError> {
         let workspace_root = self.verify_project_scope(project_id)?;
         let _lock = SpecLockGuard::acquire(&workspace_root, project_id, spec_key, LOCK_TIMEOUT)?;
         let mut conn = self.pool.connection()?;
+        recover_pending_spec(&mut conn, &workspace_root, project_id, spec_key)?;
 
         let db_row: Option<(String, i64, String)> = conn
             .query_row(
-                "SELECT id, version, content_sha256 FROM project_specs WHERE project_id = ?1 AND spec_key = ?2",
+                "SELECT id, version, content_sha256 FROM project_specs WHERE project_id = ?1 AND spec_key = ?2 AND content_sha256 != ''",
                 params![project_id.to_string(), spec_key.as_str()],
                 |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
@@ -978,15 +1108,29 @@ impl SpecRegistry {
             });
         };
 
-        let target_path = resolve_jailed_spec_path(&workspace_root, spec_key)?;
-        if target_path.exists() {
-            let _ = std::fs::remove_file(&target_path);
+        if let Some(exp) = expected_sha256 {
+            if exp != db_sha {
+                return Err(HarnessError::StaleFile {
+                    path: format!("product/specs/{}", spec_key.as_str()),
+                    expected_hash: exp.to_string(),
+                    actual_hash: db_sha,
+                });
+            }
         }
+
+        delete_jailed_spec_file(&workspace_root, spec_key)?;
 
         let tombstone_id = Uuid::new_v4().to_string();
         let rev_id = Uuid::new_v4().to_string();
         let now_ms = Utc::now().timestamp_millis();
-        let next_rev = db_ver + 1;
+        let max_rev: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(revision_number), 0) FROM spec_revisions WHERE spec_id = ?1",
+                params![spec_id_str],
+                |r| r.get(0),
+            )
+            .unwrap_or(db_ver);
+        let next_rev = db_ver.max(max_rev) + 1;
 
         retry_on_busy("delete_spec_tombstone", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -1002,12 +1146,16 @@ impl SpecRegistry {
                     db_sha,
                 ],
             )?;
-            tx.execute(
+            let updated = tx.execute(
                 "UPDATE project_specs 
-                 SET status = 'FILE_DELETED', content_sha256 = '', updated_at = ?1 
-                 WHERE id = ?2",
-                params![now_ms, spec_id_str],
+                 SET status = 'FILE_DELETED', version = ?1, content_sha256 = '', updated_at = ?2 
+                 WHERE id = ?3 AND version = ?4 AND content_sha256 = ?5",
+                params![next_rev, now_ms, spec_id_str, db_ver, db_sha],
             )?;
+            if updated != 1 {
+                tx.rollback()?;
+                return Err(rusqlite::Error::StatementChangedRows(0));
+            }
             tx.execute(
                 "INSERT INTO spec_revisions (
                     id, spec_id, project_id, spec_key, revision_number,
@@ -1130,9 +1278,10 @@ fn normalize_and_validate_provenance_json(
     canonical_map
         .entry("origin".to_string())
         .or_insert_with(|| serde_json::Value::String("registry_upsert".to_string()));
-    canonical_map
-        .entry("actor".to_string())
-        .or_insert_with(|| serde_json::Value::String(default_actor.to_string()));
+    canonical_map.insert(
+        "actor".to_string(),
+        serde_json::Value::String(default_actor.to_string()),
+    );
     canonical_map.insert(
         "operation_id".to_string(),
         serde_json::Value::String(operation_id.to_string()),

@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use axum::{
-    extract::{Path as AxumPath, State},
+    extract::{Extension, Path as AxumPath, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
@@ -17,6 +17,7 @@ use spec_registry::{retry_on_busy, SpecRegistry};
 use uuid::Uuid;
 
 use super::*;
+use crate::daemon_auth::VerifiedLegacyIngress;
 use crate::lockfile::validate_and_canonicalize_workspace_root;
 
 pub(super) fn parse_project_uuid(raw: &str) -> Result<Uuid, HarnessError> {
@@ -323,12 +324,13 @@ fn copy_dir_preserving_git(src: &Path, dst: &Path) -> Result<(), HarnessError> {
 
 pub(super) async fn handle_get_boundary(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
     AxumPath(project_id_raw): AxumPath<String>,
 ) -> Result<Json<ProjectBoundaryDto>, Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
     let (_, ws_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let _ = ensure_ac06_tables(&state.registry);
@@ -381,7 +383,7 @@ pub(super) async fn handle_get_boundary(
                 project_id,
                 boundary_type: "folder_backed".to_string(),
                 workspace_path: ws_root.display().to_string(),
-                config_dir: ".opendesign".to_string(),
+                config_dir: ".cowok-design".to_string(),
                 is_git_repository: is_git,
                 promoted_at: None,
                 created_at: now,
@@ -460,13 +462,14 @@ fn is_system_or_root_path(p: &Path) -> bool {
 
 pub(super) async fn handle_promote_scratch(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
     AxumPath(project_id_raw): AxumPath<String>,
     Json(req): Json<PromoteScratchRequest>,
 ) -> Result<Json<ProjectBoundaryDto>, Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
     let (_, current_ws, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let target_dir_str = req.target_directory.trim();
@@ -556,17 +559,17 @@ pub(super) async fn handle_promote_scratch(
         return Err(map_error_to_response(e));
     }
 
-    let opendesign_dir = target_canon.join(".opendesign");
-    let _ = fs::create_dir_all(&opendesign_dir);
-    let opendesign_meta = serde_json::json!({
+    let cowok_dir = target_canon.join(".cowok-design");
+    let _ = fs::create_dir_all(&cowok_dir);
+    let boundary_meta = serde_json::json!({
         "id": project_id,
         "boundary_type": "folder_backed",
         "promoted_at": now_ms,
         "promoted_from": current_ws.display().to_string(),
     });
     let _ = fs::write(
-        opendesign_dir.join("project.json"),
-        serde_json::to_string_pretty(&opendesign_meta).unwrap_or_default(),
+        cowok_dir.join("project.json"),
+        serde_json::to_string_pretty(&boundary_meta).unwrap_or_default(),
     );
 
     let is_git = target_canon.join(".git").exists();
@@ -583,7 +586,7 @@ pub(super) async fn handle_promote_scratch(
             "INSERT OR REPLACE INTO project_boundaries (
                 project_id, boundary_type, workspace_path, config_dir, is_git_repository,
                 promoted_at, created_at, updated_at
-            ) VALUES (?1, 'folder_backed', ?2, '.opendesign', ?3, ?4, ?5, ?4)",
+            ) VALUES (?1, 'folder_backed', ?2, '.cowok-design', ?3, ?4, ?5, ?4)",
             params![
                 project_id.to_string(),
                 target_canon_str,
@@ -608,7 +611,7 @@ pub(super) async fn handle_promote_scratch(
         project_id,
         boundary_type: "folder_backed".to_string(),
         workspace_path: target_canon_str,
-        config_dir: ".opendesign".to_string(),
+        config_dir: ".cowok-design".to_string(),
         is_git_repository: is_git,
         promoted_at: Some(now_ms),
         created_at: now_ms,
@@ -618,11 +621,12 @@ pub(super) async fn handle_promote_scratch(
 
 pub(super) async fn handle_list_chat_sessions(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
     AxumPath(project_id_raw): AxumPath<String>,
 ) -> Result<Json<Vec<ChatSessionDto>>, Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
-    verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+    verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
         .map_err(map_error_to_response)?;
 
     let _ = ensure_ac06_tables(&state.registry);
@@ -670,12 +674,13 @@ pub(super) async fn handle_list_chat_sessions(
 
 pub(super) async fn handle_create_chat_session(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
     AxumPath(project_id_raw): AxumPath<String>,
     Json(req): Json<CreateChatSessionRequest>,
 ) -> Result<(StatusCode, Json<ChatSessionDto>), Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
-    verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+    verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
         .map_err(map_error_to_response)?;
 
     let title = req.title.trim().to_string();
@@ -725,11 +730,12 @@ pub(super) async fn handle_create_chat_session(
 
 pub(super) async fn handle_get_chat_session(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
     AxumPath((project_id_raw, session_id_raw)): AxumPath<(String, String)>,
 ) -> Result<Json<ChatSessionDto>, Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
-    verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+    verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
         .map_err(map_error_to_response)?;
 
     let session_id = Uuid::parse_str(&session_id_raw).map_err(|_| {
@@ -782,12 +788,13 @@ pub(super) async fn handle_get_chat_session(
 
 pub(super) async fn handle_update_chat_session(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
     AxumPath((project_id_raw, session_id_raw)): AxumPath<(String, String)>,
     Json(req): Json<UpdateChatSessionRequest>,
 ) -> Result<Json<ChatSessionDto>, Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
-    verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+    verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
         .map_err(map_error_to_response)?;
 
     let session_id = Uuid::parse_str(&session_id_raw).map_err(|_| {
@@ -847,11 +854,12 @@ pub(super) async fn handle_update_chat_session(
 
 pub(super) async fn handle_delete_chat_session(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
     AxumPath((project_id_raw, session_id_raw)): AxumPath<(String, String)>,
 ) -> Result<StatusCode, Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
-    verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+    verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
         .map_err(map_error_to_response)?;
 
     let session_id = Uuid::parse_str(&session_id_raw).map_err(|_| {
@@ -889,13 +897,14 @@ pub(super) async fn handle_delete_chat_session(
 
 pub(super) async fn handle_issue_path_token(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
     AxumPath(project_id_raw): AxumPath<String>,
     Json(req): Json<IssuePathTokenRequest>,
 ) -> Result<Json<PathTokenResponse>, Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
     let (_, ws_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let norm_path =
@@ -941,13 +950,14 @@ pub(super) async fn handle_issue_path_token(
 
 pub(super) async fn handle_verify_path_token(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
     AxumPath(project_id_raw): AxumPath<String>,
     Json(req): Json<VerifyPathTokenRequest>,
 ) -> Result<Json<serde_json::Value>, Response> {
     let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
     let (_, ws_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let norm_expected = validate_and_normalize_relative_path(&req.expected_relative_path)

@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS project_boundaries (
     project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
     boundary_type TEXT NOT NULL DEFAULT 'managed_scratch',
     workspace_path TEXT NOT NULL DEFAULT '',
-    config_dir TEXT NOT NULL DEFAULT '.opendesign',
+    config_dir TEXT NOT NULL DEFAULT '.cowok-design',
     is_git_repository INTEGER NOT NULL DEFAULT 0,
     promoted_at BIGINT,
     allowed_extensions_json TEXT NOT NULL DEFAULT '["md"]',

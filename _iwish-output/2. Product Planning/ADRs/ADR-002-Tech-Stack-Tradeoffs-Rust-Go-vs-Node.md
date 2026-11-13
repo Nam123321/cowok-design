@@ -22,8 +22,8 @@ Thay vì dùng Node.js tạm thời ở giai đoạn 1, chúng tôi quyết đ�
    - Quản lý tiến trình con bằng POSIX syscalls (`nix` / `tokio::process`), tạo process group độc lập (`setpgid`), truyền prompt qua file descriptor `0600` chống nghẽn kernel buffer 64KB, và tự động gặt (reap) toàn bộ tiến trình mồ côi khi tắt.
 4. **MCP Server Gateway (`crates/mcp-server` - Rust):**
    - Triển khai chuẩn JSON-RPC 2.0 qua `stdio` và `SSE` bằng Rust, đóng gói chung vào một file thực thi tĩnh duy nhất (`uiux-os-daemon`).
-5. **Frontend Workbench (`apps/web` - TypeScript / React 19):**
-   - **Vite v8 + React 19 SPA**, `@xyflow/react` v12 cho State Machine Canvas, Dual-Pane Presentation CMS, **100% Pure Vanilla CSS Custom Properties** (`tokens.css`) và **145 Brand SVG Icons**.
+5. **Frontend Workbench (`src/` - TypeScript / React 19 + Vite BFF Proxy):**
+   - **Vite v8 + React 19 SPA** (với Vite Dev/Preview BFF Proxy forward `/api/*`, `/ws`, SSE sang `harness-daemon`), Native 2D SVG Bezier cho State Machine Canvas, Dual-Pane Presentation CMS, **100% Pure Vanilla CSS Custom Properties** (`tokens.css`) và **143 Brand SVG Icons**.
    - Đồng bộ kiểu dữ liệu tự động từ Rust sang TypeScript thông qua **`specta` / `ts-rs`**.
 
 ## 3. Consequences

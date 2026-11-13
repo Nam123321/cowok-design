@@ -37,6 +37,25 @@ impl SpecLockGuard {
         fs::create_dir_all(&locks_dir).map_err(|e| HarnessError::ValidationFailed {
             reason: format!("LOCK_UNAVAILABLE: failed to create lock directory: {e}"),
         })?;
+        let dir_meta = fs::symlink_metadata(&locks_dir).map_err(|e| {
+            HarnessError::ValidationFailed {
+                reason: format!("LOCK_UNAVAILABLE: failed to stat lock directory: {e}"),
+            }
+        })?;
+        if dir_meta.file_type().is_symlink() || !dir_meta.file_type().is_dir() {
+            return Err(HarnessError::PathTraversalDenied {
+                path: locks_dir.display().to_string(),
+            });
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = dir_meta.permissions();
+            perms.set_mode(0o700);
+            fs::set_permissions(&locks_dir, perms).map_err(|e| HarnessError::ValidationFailed {
+                reason: format!("LOCK_UNAVAILABLE: failed to secure lock directory: {e}"),
+            })?;
+        }
 
         let mut hasher = Sha256::new();
         hasher.update(project_id.to_string().as_bytes());
@@ -45,17 +64,41 @@ impl SpecLockGuard {
         let digest = format!("{:x}", hasher.finalize());
 
         let lock_path = locks_dir.join(format!("{digest}.lock"));
+        if let Ok(meta) = fs::symlink_metadata(&lock_path) {
+            if meta.file_type().is_symlink() || !meta.file_type().is_file() {
+                return Err(HarnessError::PathTraversalDenied {
+                    path: lock_path.display().to_string(),
+                });
+            }
+        }
         let start = Instant::now();
 
-        let mut flock_file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(&lock_path)
-            .map_err(|e| HarnessError::ValidationFailed {
+        let mut opts = OpenOptions::new();
+        opts.read(true).write(true).create(true).truncate(false);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600).custom_flags(libc::O_NOFOLLOW);
+        }
+        let mut flock_file = opts.open(&lock_path).map_err(|e| {
+            if e.raw_os_error() == Some(libc::ELOOP) {
+                return HarnessError::PathTraversalDenied {
+                    path: lock_path.display().to_string(),
+                };
+            }
+            HarnessError::ValidationFailed {
                 reason: format!("LOCK_UNAVAILABLE: failed to open lock file: {e}"),
-            })?;
+            }
+        })?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(meta) = flock_file.metadata() {
+                let mut perms = meta.permissions();
+                perms.set_mode(0o600);
+                let _ = fs::set_permissions(&lock_path, perms);
+            }
+        }
 
         loop {
             match try_acquire_os_flock(&flock_file) {

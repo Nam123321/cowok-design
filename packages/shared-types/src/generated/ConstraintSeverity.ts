@@ -3,4 +3,4 @@
 /**
  * Represents the severity level of a constraint violation.
  */
-export type ConstraintSeverity = "Info" | "Warn" | "Blocker";
+export type ConstraintSeverity = "INFO" | "WARN" | "BLOCKER";

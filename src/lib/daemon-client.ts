@@ -60,7 +60,7 @@ function readValidLock(workspaceRoot: string): DaemonLockRecord | null {
       !isPidAlive(parsed.pid) ||
       !parsed.daemon_nonce ||
       !parsed.hmac_key_hex ||
-      parsed.schema_version < 3
+      parsed.schema_version < 6
     ) {
       return null;
     }
@@ -84,7 +84,7 @@ async function verifyHealthAndSeedDefaultProject(lock: DaemonLockRecord, workspa
     throw new Error(`Daemon health check failed (${healthRes.status})`);
   }
   const health = (await healthRes.json()) as { service?: string; schema_version?: number; daemon_nonce?: string };
-  if (health.service !== "cowok-design-harness-daemon" || (health.schema_version ?? 0) < 3) {
+  if (health.service !== "cowok-design-harness-daemon" || (health.schema_version ?? 0) < 6) {
     throw new Error("Unexpected daemon health identity or schema_version");
   }
   if (!seededWorkspaces.has(workspaceRoot)) {
@@ -110,14 +110,29 @@ async function verifyHealthAndSeedDefaultProject(lock: DaemonLockRecord, workspa
       },
     ];
     for (const proj of defaultProjects) {
+      const rawBody = JSON.stringify({
+        ...proj,
+        workspace_root: null,
+        inherit_brand_from_project_id: null,
+      });
+      const headers = buildCanonicalHmacHeaders({
+        daemonNonce: lock.daemon_nonce,
+        hmacKeyHex: lock.hmac_key_hex,
+        method: "POST",
+        canonicalPath: "/api/v1/projects",
+        rawQuery: "",
+        principal: {
+          tenantId: "local-default",
+          userId: "bff-bootstrap",
+          role: "editor",
+        },
+        rawBody,
+        correlationId: crypto.randomUUID(),
+      });
       await fetch(`http://127.0.0.1:${lock.port}/api/v1/projects`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...proj,
-          workspace_root: null,
-          inherit_brand_from_project_id: null,
-        }),
+        headers,
+        body: rawBody,
       }).catch(() => undefined);
     }
   }
@@ -208,18 +223,17 @@ export async function forwardToDaemonFlow(opts: {
   rawQuery?: string;
   body?: unknown;
   inboundHeaders?: Headers;
+  extraHeaders?: Record<string, string>;
   principal: { tenantId: string; userId: string; role: "viewer" | "editor" | "admin" };
   correlationId?: string;
 }): Promise<Response> {
-  if (opts.inboundHeaders) {
-    stripSpoofedHeaders(opts.inboundHeaders);
-  }
+  const safeInbound = opts.inboundHeaders ? stripSpoofedHeaders(opts.inboundHeaders) : {};
   const lock = await ensureRunningDaemon();
   const rawQuery = (opts.rawQuery || "").replace(/^\?/, "");
   const rawBody = opts.body !== undefined ? JSON.stringify(opts.body) : "";
   const correlationId = opts.correlationId || crypto.randomUUID();
 
-  const headers = buildCanonicalHmacHeaders({
+  const signedHeaders = buildCanonicalHmacHeaders({
     daemonNonce: lock.daemon_nonce,
     hmacKeyHex: lock.hmac_key_hex,
     method: opts.method,
@@ -229,6 +243,20 @@ export async function forwardToDaemonFlow(opts: {
     rawBody,
     correlationId,
   });
+
+  const headers: Record<string, string> = {};
+  if (safeInbound["if-match"]) {
+    headers["If-Match"] = safeInbound["if-match"];
+  }
+  if (safeInbound.accept) {
+    headers.Accept = safeInbound.accept;
+  }
+  if (opts.extraHeaders) {
+    for (const [k, v] of Object.entries(opts.extraHeaders)) {
+      if (v) headers[k] = v;
+    }
+  }
+  Object.assign(headers, signedHeaders);
 
   const qs = rawQuery ? `?${rawQuery}` : "";
   const targetUrl = `http://127.0.0.1:${lock.port}${opts.daemonPath}${qs}`;
@@ -240,12 +268,73 @@ export async function forwardToDaemonFlow(opts: {
     body: opts.method === "GET" || opts.method === "HEAD" || rawBody === "" ? undefined : rawBody,
   });
 
+  const contentType = upstream.headers.get("content-type") || "application/json";
+  const responseHeaders: Record<string, string> = {
+    "Content-Type": contentType,
+    "X-Correlation-Id": correlationId,
+  };
+  const disposition = upstream.headers.get("content-disposition");
+  if (disposition) {
+    responseHeaders["Content-Disposition"] = disposition;
+  }
+  const bundleSha = upstream.headers.get("x-cowok-bundle-sha256");
+  if (bundleSha) {
+    responseHeaders["X-Cowok-Bundle-Sha256"] = bundleSha;
+  }
+
+  if (
+    contentType.includes("text/event-stream") &&
+    upstream.body
+  ) {
+    responseHeaders["Cache-Control"] = "no-cache";
+    responseHeaders.Connection = "keep-alive";
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: responseHeaders,
+    });
+  }
+
+  if (
+    contentType.includes("application/zip") ||
+    contentType.includes("application/octet-stream")
+  ) {
+    const bytes = await upstream.arrayBuffer();
+    return new Response(bytes, {
+      status: upstream.status,
+      headers: responseHeaders,
+    });
+  }
+
   const text = await upstream.text();
   return new Response(text, {
     status: upstream.status,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Correlation-Id": correlationId,
+    headers: responseHeaders,
+  });
+}
+
+export function forwardFromGuardedContext(
+  req: Request,
+  ctx: {
+    tenantId?: string;
+    userId?: string;
+    role?: "viewer" | "editor" | "admin";
+    correlationId?: string;
+  },
+  daemonPath: string,
+  body?: unknown
+): Promise<Response> {
+  const url = new URL(req.url, "http://127.0.0.1");
+  return forwardToDaemonFlow({
+    method: req.method,
+    daemonPath,
+    rawQuery: url.search.replace(/^\?/, ""),
+    body,
+    inboundHeaders: req.headers,
+    principal: {
+      tenantId: ctx.tenantId || "local-default",
+      userId: ctx.userId || "local-operator",
+      role: ctx.role || (req.method === "GET" || req.method === "HEAD" ? "viewer" : "editor"),
     },
+    correlationId: ctx.correlationId,
   });
 }

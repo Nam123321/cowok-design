@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { apiConstraints } from "../../../api/constraints";
 import { apiSdiEngine } from "../../../api/sdi-engine";
 import { DesignIntentResponse } from "../../../lib/validations/sdi";
 
@@ -17,13 +18,16 @@ export const SDIPromptInput: React.FC<SDIPromptInputProps> = ({
 }) => {
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isLoading) return;
 
     setIsLoading(true);
+    setErrorMessage(null);
     try {
+      await apiConstraints.getDesignContracts(projectId).catch(() => null);
       const intent = await apiSdiEngine.compileIntent(projectId, {
         rawPrompt: prompt,
         targetNodeId,
@@ -31,7 +35,9 @@ export const SDIPromptInput: React.FC<SDIPromptInputProps> = ({
       onIntentCompiled(intent);
       setPrompt("");
     } catch (err) {
-      console.error("Failed to compile intent:", err);
+      setErrorMessage(
+        err instanceof Error ? err.message : "Không thể biên dịch Semantic Design Intent."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -46,6 +52,11 @@ export const SDIPromptInput: React.FC<SDIPromptInputProps> = ({
         rows={PROMPT_ROWS}
         className="w-full text-xs p-2.5 rounded-md border border-border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary"
       />
+      {errorMessage && (
+        <div role="alert" className="text-[11px] text-red-600 dark:text-red-400">
+          {errorMessage}
+        </div>
+      )}
       <button
         type="submit"
         disabled={!prompt.trim() || isLoading}

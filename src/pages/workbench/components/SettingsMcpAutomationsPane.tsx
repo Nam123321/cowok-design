@@ -1,16 +1,18 @@
 // @story 04.1
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useTranslation } from "../../../hooks/useTranslation";
+import { apiWorkbenchSettings } from "../../../api/workbench-settings";
+import type { McpServerDto } from "../../../lib/validations/workbench-settings";
 
 interface SettingsMcpAutomationsPaneProps {
   selectedTab: "mcp" | "automations";
 }
 
-const REGISTERED_MCPS = [
-  { name: "cowok-falkordb", desc: "127.0.0.1:6380 • Knowledge Graph & Vector DB", status: "ONLINE" },
-  { name: "local-filesystem", desc: "Native Workspace & In-Place Writeback", status: "ONLINE" },
-  { name: "browser-devtools", desc: "Chrome DevTools Protocol (CDP Automation)", status: "ONLINE" },
-  { name: "github-mcp-server", desc: "GitHub SCM, PRs & Release Pipeline", status: "CONNECTED" },
+const DEFAULT_SYSTEM_MCPS = [
+  { id: "sys-falkordb", name: "cowok-falkordb", desc: "127.0.0.1:6380 • Knowledge Graph & Vector DB", status: "ONLINE" },
+  { id: "sys-fs", name: "local-filesystem", desc: "Native Workspace & In-Place Writeback", status: "ONLINE" },
+  { id: "sys-cdp", name: "browser-devtools", desc: "Chrome DevTools Protocol (CDP Automation)", status: "ONLINE" },
+  { id: "sys-github", name: "github-mcp-server", desc: "GitHub SCM, PRs & Release Pipeline", status: "CONNECTED" },
 ];
 
 const McpHostCredentialsCard: React.FC = () => {
@@ -28,7 +30,11 @@ const McpHostCredentialsCard: React.FC = () => {
     }
   };
   const handleRegenerateKey = () => {
-    const hex = Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+    const bytes = new Uint8Array(16);
+    if (typeof globalThis.crypto?.getRandomValues === "function") {
+      globalThis.crypto.getRandomValues(bytes);
+    }
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
     setHostApiKey(`cwk_local_mcp_dev_${hex}`);
   };
 
@@ -65,23 +71,87 @@ const McpHostCredentialsCard: React.FC = () => {
 
 const McpClientRegistryList: React.FC = () => {
   const { t } = useTranslation();
+  const [servers, setServers] = useState<McpServerDto[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newCommand, setNewCommand] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    void apiWorkbenchSettings.listMcpServers()
+      .then((rows) => { if (active) setServers(rows); })
+      .catch(() => { /* Graceful fallback when daemon is offline */ });
+    return () => { active = false; };
+  }, []);
+
+  const handleAddServer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim() || !newCommand.trim()) return;
+    try {
+      const saved = await apiWorkbenchSettings.upsertMcpServer({
+        serverSlug: newName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        displayName: newName.trim(),
+        transportKind: newCommand.trim().startsWith("http") ? "http_sse" : "stdio",
+        commandOrUrl: newCommand.trim(),
+        permissionTier: "read_only",
+        enabled: true,
+      });
+      setServers((prev) => [...prev.filter((s) => s.id !== saved.id), saved]);
+      setNewName("");
+      setNewCommand("");
+      setAdding(false);
+    } catch {
+      // Ignored until daemon is available
+    }
+  };
+
+  const handleDeleteServer = async (id: string) => {
+    setServers((prev) => prev.filter((s) => s.id !== id));
+    await apiWorkbenchSettings.deleteMcpServer(id).catch(() => {});
+  };
+
+  const displayedRows = servers.length > 0
+    ? servers.map((s) => ({
+        id: s.id,
+        name: s.displayName,
+        desc: `${s.transportKind.toUpperCase()} • ${s.commandOrUrl}`,
+        status: s.lastHealthStatus.toUpperCase(),
+        removable: true,
+      }))
+    : DEFAULT_SYSTEM_MCPS.map((m) => ({ ...m, removable: false }));
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-        <label style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-secondary)" }}>{t("settings.mcpClientTitle", "Danh sách Máy chủ MCP đã đăng ký (Client MCPs)")}</label>
+        <label style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-secondary)" }}>
+          {t("settings.mcpClientTitle", "Danh sách Máy chủ MCP đã đăng ký (Client MCPs)")}
+        </label>
         <div style={{ display: "flex", gap: "6px" }}>
-          <button type="button" className="cowok-btn cowok-btn-secondary" style={{ padding: "4px 8px", fontSize: "10.5px", fontWeight: 500, borderRadius: "var(--radius-xs)", cursor: "pointer" }}>{t("settings.importPluginBtn", "Nhập Plugin (.zip / git)")}</button>
-          <button type="button" className="cowok-btn cowok-btn-primary" style={{ padding: "4px 10px", fontSize: "10.5px", fontWeight: 600, borderRadius: "var(--radius-xs)", cursor: "pointer" }}>{t("settings.addMcpBtn", "+ Thêm MCP Server")}</button>
+          <button type="button" onClick={() => setAdding((v) => !v)} className="cowok-btn cowok-btn-primary" style={{ padding: "4px 10px", fontSize: "10.5px", fontWeight: 600, borderRadius: "var(--radius-xs)", cursor: "pointer" }}>
+            {adding ? t("settings.cancelBtn", "Hủy") : t("settings.addMcpBtn", "+ Thêm MCP Server")}
+          </button>
         </div>
       </div>
+      {adding && (
+        <form onSubmit={handleAddServer} style={{ display: "flex", gap: "6px", marginBottom: "8px" }}>
+          <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t("settings.mcpNamePlaceholder", "Tên MCP (vd: custom-figma)")} className="cowok-input" style={{ flex: 1, height: "28px", padding: "0 8px", fontSize: "11px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)" }} />
+          <input type="text" value={newCommand} onChange={(e) => setNewCommand(e.target.value)} placeholder={t("settings.mcpCmdPlaceholder", "Lệnh / URL (vd: npx -y ...)")} className="cowok-input" style={{ flex: 2, height: "28px", padding: "0 8px", fontSize: "11px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)" }} />
+          <button type="submit" className="cowok-btn cowok-btn-primary" style={{ height: "28px", padding: "0 10px", fontSize: "10.5px", fontWeight: 600, borderRadius: "var(--radius-xs)", cursor: "pointer" }}>{t("settings.saveBtn", "Lưu")}</button>
+        </form>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-        {REGISTERED_MCPS.map((mcp) => (
-          <div key={mcp.name} style={{ padding: "8px 10px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-workspace)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        {displayedRows.map((mcp) => (
+          <div key={mcp.id} style={{ padding: "8px 10px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-workspace)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
             <div>
               <div style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{mcp.name}</div>
               <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{mcp.desc}</div>
             </div>
-            <span style={{ fontSize: "9.5px", fontWeight: 600, padding: "2px 6px", borderRadius: "10px", backgroundColor: "var(--state-success-soft)", color: "var(--state-success)", border: "1px solid var(--border-subtle)" }}>{mcp.status}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "9.5px", fontWeight: 600, padding: "2px 6px", borderRadius: "var(--radius-pill)", backgroundColor: "var(--state-success-soft)", color: "var(--state-success)", border: "1px solid var(--border-subtle)" }}>{mcp.status}</span>
+              {mcp.removable && (
+                <button type="button" onClick={() => void handleDeleteServer(mcp.id)} style={{ border: "none", background: "transparent", color: "var(--text-muted)", fontSize: "10px", cursor: "pointer" }}>×</button>
+              )}
+            </div>
           </div>
         ))}
       </div>

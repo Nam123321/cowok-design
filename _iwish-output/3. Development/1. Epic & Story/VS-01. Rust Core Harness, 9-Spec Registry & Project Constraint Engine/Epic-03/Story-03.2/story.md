@@ -1,8 +1,8 @@
 ---
 type: I-Wish Story
 id: "03.2"
-title: "Story 03.2: Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons)"
-description: "Kiểm tra mọi biểu tượng và component được gọi trong mã nguồn phải nằm trong icon-manifest.json và 07_COMPONENT_REGISTRY của dự án; đóng gói sẵn cowok-brand-product-system-v4.3 (145 SVG Icons) làm Flagship Preset."
+title: "Story 03.2: Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons)"
+description: "Kiểm tra mọi biểu tượng và component được gọi trong mã nguồn phải nằm trong icon-manifest.json và 07_COMPONENT_REGISTRY của dự án; đóng gói sẵn cowok-brand-product-system-v4.3 (143 SVG Icons) làm Flagship Preset."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-03/Story-03.2/story.md"
 status: completed
 risk_tier: 2
@@ -23,26 +23,26 @@ provides_apis:
 consumes_apis: []
 ---
 
-# Story 03.2: Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons)
+# Story 03.2: Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons)
 
-- **FR Covered:** [FR-13: Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
+- **FR Covered:** [FR-13: Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 03: Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-03/epic.md)
 - **Status:** `completed`
 - **Risk Tier:** `2`
 
 ## 1. Story Description & Context
-Kiểm tra mọi biểu tượng và component được gọi trong mã nguồn phải nằm trong icon-manifest.json và 07_COMPONENT_REGISTRY của dự án; đóng gói sẵn cowok-brand-product-system-v4.3 (145 SVG Icons) làm Flagship Preset.
+Kiểm tra mọi biểu tượng và component được gọi trong mã nguồn phải nằm trong icon-manifest.json và 07_COMPONENT_REGISTRY của dự án; đóng gói sẵn cowok-brand-product-system-v4.3 (143 SVG Icons) làm Flagship Preset.
 
 ## 2. Plan-Tune Heuristic & Complexity Score
 - **Complexity Score (CS):** `CS = 4` (Scope=1, Data=1, Integration=1, UI=0.5, Security=0.5, Unknowns=0 $\rightarrow$ `CS = 4 < 7`, đạt ngưỡng an toàn, không cần tách nhỏ Story).
 
 ## 3. Acceptance Criteria (AC)
-- **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons)" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
+- **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons)" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
 - **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Khi Agent gọi tên icon không tồn tại trong icon-manifest.json của dự án, tự động gợi ý 3 icon hợp lệ gần nhất theo ngữ nghĩa.
 
 ## 4. Tasks
-- [x] **Task 03.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons)" (thỏa mãn `AC-01`).
+- [x] **Task 03.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons)" (thỏa mãn `AC-01`).
 - [x] **Task 03.2.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
 - [x] **Task 03.2.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
 

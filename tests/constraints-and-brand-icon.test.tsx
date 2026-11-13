@@ -32,10 +32,14 @@ describe("Story 03.2 Remediation: Constraints SDK, Registry Integrity & BrandIco
     expect(shadowedKeys).toEqual([]);
   });
 
-  it("registers icons referenced across workbench UI components including play and refresh-cw", () => {
+  it("registers icons referenced across workbench UI components and all 143 flagship icons", () => {
     for (const required of ["play", "refresh-cw", "globe", "panel-left-close", "activity", "sparkles"]) {
       expect(isRegisteredIcon(required)).toBe(true);
       expect(ALL_REGISTERED_ICON_NAMES).toContain(required);
+    }
+    expect(DEFAULT_SEEDED_ICON_MANIFEST.count).toBe(143);
+    for (const entry of DEFAULT_SEEDED_ICON_MANIFEST.icons) {
+      expect(isRegisteredIcon(entry.name)).toBe(true);
     }
   });
 

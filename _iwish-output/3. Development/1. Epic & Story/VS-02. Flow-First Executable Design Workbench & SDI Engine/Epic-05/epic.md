@@ -240,3 +240,23 @@ flowchart TD
 | [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
 | [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
 | [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
+| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
+| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
+| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
+| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
+| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
+| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
+| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
+| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | refactored |

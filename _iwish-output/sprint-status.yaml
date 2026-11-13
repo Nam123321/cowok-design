@@ -1,365 +1,98 @@
-project:
-  name: UI/UX OS (FlowForge Harness OS)
-  slug: uxui-os
-  orchestrator_agent: cowok
-  advisor_agent: advisor
-  phases:
-    idea_discovery: completed
-    product_planning: completed
-    development: ready-for-dev
-epics:
-  Epic-01:
-    title: Cargo Workspace, Domain Contracts (ts-rs) & 16-Table SQLite Registry
-    status: planned
-    track: Stream-1
-    wave: 1
-  Epic-02:
-    title: JIT Prompt Assembler & 3-Profile Model Capability Adapter
-    status: planned
-    track: Stream-1
-    wave: 1
-  Epic-03:
-    title: Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher
-    status: completed
-    track: Stream-1
-    wave: 1
-  Epic-04:
-    title: Flow-First XYFlow Canvas, State-Hydrated Preview & Element-Anchored Comments
-    status: planned
-    track: Stream-2
-    wave: 2
-  Epic-05:
-    title: Structured Design Intent (SDI), Visual Clarification Variants & ChangeProposal
-      Gate
-    status: planned
-    track: Stream-2
-    wave: 3
-  Epic-06:
-    title: Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench
-    status: planned
-    track: Stream-3
-    wave: 2
-  Epic-07:
-    title: 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector
-      PDF Exporter
-    status: planned
-    track: Stream-3
-    wave: 3
-  Epic-08:
-    title: agentskills.io Repackager Engine, 6 Built-in Harness Skills & GitHub Cron
-      Lifecycle
-    status: planned
-    track: Stream-4
-    wave: 1
-  Epic-09:
-    title: Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration
-      Engine
-    status: planned
-    track: Stream-4
-    wave: 2
-  Epic-10:
-    title: cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design
-      Tournament
-    status: planned
-    track: Stream-5
-    wave: 3
-  Epic-11:
-    title: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Universal Open MCP Server
-    status: planned
-    track: Stream-5
-    wave: 4
-  Epic-12:
-    title: 4-Channel Packaging & Distribution Architecture
-    status: planned
-    track: Stream-5
-    wave: 4
-stories:
-  '01.1':
-    title: Khởi tạo Hybrid Monorepo (11 Rust Crates + pnpm) & crates/domain Type Sync
-    epic: '01'
-    risk_tier: 2
-    status: ready-for-dev
-    dependencies: []
-  '01.2':
-    title: Xây dựng crates/spec-registry với rusqlite SQLite WAL (16 Bảng) & 2-Way
-      File Sync
-    epic: '01'
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '01.1'
-  '01.3':
-    title: Xây dựng crates/harness-daemon (Axum + Tokio) & 9-Spec Synthesis Pipeline
-    epic: '01'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '01.2'
-  '02.1':
-    title: Bộ định tuyến Task Horizon (short / mid / long) & Cross-Department Context
-      Slicer
-    epic: '02'
-    risk_tier: 2
-    status: ready-for-dev
-    dependencies:
-    - '01.2'
-  '02.2':
-    title: Token Budget Governor (<= 1,500 Input Tokens) & Deterministic Prompt Compiler
-    epic: '02'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '02.1'
-  '02.3':
-    title: Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter)
-    epic: '02'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '02.2'
-  '03.1':
-    title: Động cơ Ràng buộc Cấu hình theo Dự án (PROJECT_CONSTRAINTS) & oxc AST Linter
-    epic: '03'
-    risk_tier: 2
-    status: ready-for-dev
-    dependencies:
-    - '01.2'
-  '03.2':
-    title: Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án
-      (Flagship Preset 145 Icons)
-    epic: '03'
-    risk_tier: 2
-    status: completed
-    dependencies:
-    - '03.1'
-  '03.3':
-    title: Deterministic data-ff-id AST Injector & <1ms Surgical Patcher
-    epic: '03'
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '03.1'
-  '04.1':
-    title: Giao diện Workbench Shell, <BrandIcon /> & Canvas @xyflow/react v12 (ScreenState
-      + Transition)
-    epic: '04'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '01.3'
-    - '03.2'
-  '04.2':
-    title: State-Hydrated Sandboxed Live Preview & Multi-Viewport Switcher (1440 /
-      768 / 390)
-    epic: '04'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '04.1'
-  '04.3':
-    title: Element-Anchored Comments (data-ff-id) & Stale Anchor Detection (stale_mapping)
-    epic: '04'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '04.2'
-    - '03.3'
-  '05.1':
-    title: Trình biên dịch Structured Design Intent (SDI) (DesignIntentV1) & Visual
-      Clarification (2-3 Phương án)
-    epic: '05'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '02.2'
-    - '04.3'
-  '05.2':
-    title: Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject
-    epic: '05'
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '05.1'
-  '05.3':
-    title: Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP /
-      GitHub PR
-    epic: '05'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '05.2'
-  '06.1':
-    title: Khung trình chiếu 16:9 HTML Slide Engine (1920x1080) & 8 Layout Templates
-      chuẩn Dự án
-    epic: '06'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '03.2'
-    - '04.1'
-  '06.2':
-    title: Giao diện Dual-Pane Human CMS Texting Editor đồng bộ <16ms qua data-ff-id
-    epic: '06'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '06.1'
-    - '03.3'
-  '06.3':
-    title: Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen
-      Mode
-    epic: '06'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '06.2'
-  '07.1':
-    title: Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống
-      tràn khung 16:9
-    epic: '07'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '05.2'
-    - '06.2'
-  '07.2':
-    title: Lớp phủ Visual QC Overlay & Vòng lặp Auto-Fix 1-Click trên Workbench
-    epic: '07'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '07.1'
-  '07.3':
-    title: Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)
-    epic: '07'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '07.1'
-    - '06.3'
-  '08.1':
-    title: Xây dựng 6 Built-in Harness Operating Skills chuẩn agentskills.io (packages/builtin-skills)
-    epic: 08
-    risk_tier: 2
-    status: ready-for-dev
-    dependencies:
-    - '01.2'
-    - '02.1'
-  '08.2':
-    title: Động cơ Đóng gói lại Repo GitHub & Skill Ngoài (crates/skill-repackager)
-    epic: 08
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '08.1'
-  '08.3':
-    title: Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub
-      (tokio-cron-scheduler)
-    epic: 08
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '08.2'
-  '09.1':
-    title: Xây dựng crates/design-rea-forge (Trích xuất Design DNA & Ranh giới Design-Only)
-    epic: 09
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '03.1'
-    - '08.2'
-  '09.2':
-    title: Tích hợp Jev Choice (<2ms Routing), Jev Noul (<1ms Pre-Filter) & Speculative
-      Multi-Head (crates/jev-engine)
-    epic: 09
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '03.2'
-    - '08.1'
-  '09.3':
-    title: Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile
-      OCC & 3-Strike Breaker
-    epic: 09
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '09.2'
-  '10.1':
-    title: Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms
-      Hot-Apply + Cmd+Z)
-    epic: '10'
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '05.2'
-    - '08.2'
-    - '09.2'
-  '10.2':
-    title: Hộp thư Điều phối .uiux-os/coordination/ (ONE_JOB + NEVER) & Thang Kiểm
-      chứng Độc lập E1..E4 (Builder != Scorer)
-    epic: '10'
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '10.1'
-    - '09.3'
-  '10.3':
-    title: Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết
-      kế (Design Tournament Mode)
-    epic: '10'
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '10.2'
-  '11.1':
-    title: POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified
-      Gateway
-    epic: '11'
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '02.3'
-    - '09.3'
-  '11.2':
-    title: Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging)
-    epic: '11'
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '11.1'
-    - '10.3'
-  '11.3':
-    title: Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân
-      quyền
-    epic: '11'
-    risk_tier: 3
-    status: planned
-    dependencies:
-    - '11.1'
-    - '10.2'
-  '12.1':
-    title: Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew
-      / npx)
-    epic: '12'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '07.3'
-    - '11.3'
-  '12.2':
-    title: Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native
-      Plugin cho Cowok.ai
-    epic: '12'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '12.1'
-  '12.3':
-    title: Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm
-      & CI/CD
-    epic: '12'
-    risk_tier: 2
-    status: planned
-    dependencies:
-    - '12.1'
+sprint_name: Active Sprint
+status: active
+start_date: '2026-07-24'
+
+# ==================================================
+# Feature Group: VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine
+# ==================================================
+
+# Epic 01: Cargo Workspace, Domain Contracts (ts-rs) & 16-Table SQLite Registry
+"Epic 01 - Cargo Workspace, Domain Contracts (ts-rs) & 16-Table SQLite Registry": planned
+"Story 01.1 - Khởi tạo Hybrid Monorepo (11 Rust Crates + pnpm) & crates/domain Type Sync": completed
+"Story 01.2 - Xây dựng crates/spec-registry với rusqlite SQLite WAL (16 Bảng) & 2-Way File Sync": completed
+"Story 01.3 - Xây dựng crates/harness-daemon (Axum + Tokio) & 9-Spec Synthesis Pipeline": completed
+
+# Epic 02: JIT Prompt Assembler & 3-Profile Model Capability Adapter
+"Epic 02 - JIT Prompt Assembler & 3-Profile Model Capability Adapter": planned
+"Story 02.1 - Bộ định tuyến Task Horizon (short / mid / long) & Cross-Department Context Slicer": ready-for-dev
+"Story 02.2 - Token Budget Governor (<= 1,500 Input Tokens) & Deterministic Prompt Compiler": planned
+"Story 02.3 - Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter)": planned
+
+# Epic 03: Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher
+"Epic 03 - Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher": completed
+"Story 03.1 - Động cơ Ràng buộc Cấu hình theo Dự án (PROJECT_CONSTRAINTS) & oxc AST Linter": ready-for-dev
+"Story 03.2 - Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons)": completed
+"Story 03.3 - Deterministic data-ff-id AST Injector & <1ms Surgical Patcher": planned
+
+# ==================================================
+# Feature Group: VS-02. Flow-First Executable Design Workbench & SDI Engine
+# ==================================================
+
+# Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution
+"Epic 04 - Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution": in_progress
+"Story 04.1 - Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation": refactored
+"Story 04.2 - SQLite V5 Schema Convergence, Streaming Dual-Ingress Vite BFF & Fail-Closed FS Folder Picker": refactored
+"Story 04.3 - Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier": refactored
+"Story 04.4 - Persistent KeyedParallelCoordinator, Monotonic Fencing, SSE Last-Event-ID, Multi-Node Chat v2 & 3-Level Sidebar": refactored
+"Story 04.5 - State-Hydrated Live Preview (CompanionLiveHtmlRightPane), Option CSP-B Epoch/Hash Bridge & Persistent Element Comments (`stale_mapping`)": refactored
+
+# Epic 05: Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR
+"Epic 05 - Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR": in-progress
+"Story 05.1 - Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11)": refactored
+"Story 05.2 - Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup": refactored
+"Story 05.3 - Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17)": refactored
+
+# ==================================================
+# Feature Group: VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio
+# ==================================================
+
+# Epic 06: Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench
+"Epic 06 - Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench": planned
+"Story 06.1 - Khung trình chiếu 16:9 HTML Slide Engine (1920x1080) & 8 Layout Templates chuẩn Dự án": refactored
+"Story 06.2 - Giao diện Dual-Pane Human CMS Texting Editor đồng bộ <16ms qua data-ff-id": refactored
+"Story 06.3 - Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen Mode": refactored
+
+# Epic 07: 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter
+"Epic 07 - 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter": planned
+"Story 07.1 - Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9": refactored
+"Story 07.2 - Lớp phủ Visual QC Overlay & Vòng lặp Auto-Fix 1-Click trên Workbench": refactored
+"Story 07.3 - Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)": refactored
+
+# ==================================================
+# Feature Group: VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe
+# ==================================================
+
+# Epic 08: agentskills.io Repackager Engine, 6 Built-in Harness Skills & GitHub Cron Lifecycle
+"Epic 08 - agentskills.io Repackager Engine, 6 Built-in Harness Skills & GitHub Cron Lifecycle": planned
+"Story 08.1 - Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host)": refactored
+"Story 08.2 - Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills)": refactored
+"Story 08.3 - Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host & packages/builtin-skills)": refactored
+
+# Epic 09: Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine
+"Epic 09 - Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine": planned
+"Story 09.1 - Xây dựng crates/design-rea-forge (Trích xuất Design DNA & Ranh giới Design-Only)": refactored
+"Story 09.2 - Tích hợp Jev Choice (<2ms Routing), Jev Noul (<1ms Pre-Filter) & Speculative Multi-Head (crates/jev-engine)": refactored
+"Story 09.3 - Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile OCC & 3-Strike Breaker": refactored
+
+# ==================================================
+# Feature Group: VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution
+# ==================================================
+
+# Epic 10: cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design Tournament
+"Epic 10 - cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design Tournament": in-progress
+"Story 10.1 - Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z)": refactored
+"Story 10.2 - Hộp thư Điều phối .cowok-design/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)": refactored
+"Story 10.3 - Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode)": refactored
+
+# Epic 11: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Compiler-Grade Open MCP Ecosystem
+"Epic 11 - POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Compiler-Grade Open MCP Ecosystem": in-progress
+"Story 11.1 - POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway": refactored
+"Story 11.2 - Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging)": refactored
+"Story 11.3 - Compiler-Grade Bidirectional Open MCP Server & 1-Click Host Installer UI": refactored
+
+# Epic 12: 4-Channel Packaging & Distribution Architecture
+"Epic 12 - 4-Channel Packaging & Distribution Architecture": in-progress
+"Story 12.1 - Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx)": refactored
+"Story 12.2 - Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai": refactored
+"Story 12.3 - Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD": refactored
+

@@ -33,6 +33,26 @@ pub fn v4_migration_checksum() -> String {
     format!("{:x}", hasher.finalize())
 }
 
+pub const V5_MIGRATION_SQL: &str =
+    include_str!("../migrations/V5__proposals_snapshots_runtime_columns.sql");
+pub const V5_MIGRATION_NAME: &str = "V5__proposals_snapshots_runtime_columns.sql";
+
+pub fn v5_migration_checksum() -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(V5_MIGRATION_SQL.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+pub const V6_MIGRATION_SQL: &str =
+    include_str!("../migrations/V6__epic04_complete_contracts.sql");
+pub const V6_MIGRATION_NAME: &str = "V6__epic04_complete_contracts.sql";
+
+pub fn v6_migration_checksum() -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(V6_MIGRATION_SQL.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
 /// Configuration for the embedded SQLite WAL connection pool.
 #[derive(Debug, Clone)]
 pub struct SqliteWalConfig {
@@ -59,6 +79,13 @@ struct MigrateLockGuard {
 impl MigrateLockGuard {
     #[allow(clippy::suspicious_open_options)]
     fn acquire(lock_path: &Path) -> Result<Self, HarnessError> {
+        if let Ok(meta) = fs::symlink_metadata(lock_path) {
+            if meta.file_type().is_symlink() || !meta.file_type().is_file() {
+                return Err(HarnessError::PathTraversalDenied {
+                    path: lock_path.display().to_string(),
+                });
+            }
+        }
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt;
@@ -68,9 +95,17 @@ impl MigrateLockGuard {
                 .write(true)
                 .create(true)
                 .mode(0o600)
+                .custom_flags(libc::O_NOFOLLOW)
                 .open(lock_path)
-                .map_err(|e| HarnessError::ValidationFailed {
-                    reason: format!("DB_MIGRATE_LOCK_OPEN_FAILED [{}]: {e}", lock_path.display()),
+                .map_err(|e| {
+                    if e.raw_os_error() == Some(libc::ELOOP) {
+                        return HarnessError::PathTraversalDenied {
+                            path: lock_path.display().to_string(),
+                        };
+                    }
+                    HarnessError::ValidationFailed {
+                        reason: format!("DB_MIGRATE_LOCK_OPEN_FAILED [{}]: {e}", lock_path.display()),
+                    }
                 })?;
             enforce_unix_mode(lock_path, 0o600)?;
             let rc = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) };
@@ -87,15 +122,10 @@ impl MigrateLockGuard {
         }
         #[cfg(not(unix))]
         {
-            let _ = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(lock_path)
-                .map_err(|e| HarnessError::ValidationFailed {
-                    reason: format!("DB_MIGRATE_LOCK_OPEN_FAILED [{}]: {e}", lock_path.display()),
-                })?;
-            Ok(Self {})
+            let _ = lock_path;
+            Err(HarnessError::ValidationFailed {
+                reason: "DB_MIGRATE_LOCK_UNSUPPORTED: advisory file locking is required for migrations on non-Unix targets (fail-closed)".to_string(),
+            })
         }
     }
 }
@@ -135,8 +165,8 @@ fn harden_sqlite_files(db_path: &Path) -> Result<(), HarnessError> {
     enforce_unix_mode(db_path, 0o600)?;
     let wal_path = PathBuf::from(format!("{}-wal", db_path.display()));
     let shm_path = PathBuf::from(format!("{}-shm", db_path.display()));
-    let _ = enforce_unix_mode(&wal_path, 0o600);
-    let _ = enforce_unix_mode(&shm_path, 0o600);
+    enforce_unix_mode(&wal_path, 0o600)?;
+    enforce_unix_mode(&shm_path, 0o600)?;
     Ok(())
 }
 
@@ -161,12 +191,23 @@ impl SqlitePool {
         fs::create_dir_all(&parent_dir).map_err(|e| HarnessError::ValidationFailed {
             reason: format!("Failed to create SQLite parent directory: {e}"),
         })?;
-        if parent_dir
-            .file_name()
-            .and_then(|n| n.to_str())
-            .map(|n| n == ".cowok-design")
-            .unwrap_or(false)
-        {
+        let parent_meta = fs::symlink_metadata(&parent_dir).map_err(|e| {
+            HarnessError::ValidationFailed {
+                reason: format!("Failed to stat SQLite parent directory: {e}"),
+            }
+        })?;
+        if parent_meta.file_type().is_symlink() || !parent_meta.file_type().is_dir() {
+            return Err(HarnessError::PathTraversalDenied {
+                path: parent_dir.display().to_string(),
+            });
+        }
+        let is_workspace_root = parent_dir
+            .canonicalize()
+            .ok()
+            .zip(config.workspace_root.canonicalize().ok())
+            .map(|(p, w)| p == w)
+            .unwrap_or(false);
+        if !is_workspace_root {
             enforce_unix_mode(&parent_dir, 0o700)?;
         }
 
@@ -217,6 +258,8 @@ impl SqlitePool {
             Self::apply_v3_rebuild_if_needed(&mut conn, &config.db_path)?;
         }
         Self::apply_v4_migration_if_needed(&mut conn, &config.db_path)?;
+        Self::apply_v5_migration_if_needed(&mut conn, &config.db_path)?;
+        Self::apply_v6_migration_if_needed(&mut conn, &config.db_path)?;
         harden_sqlite_files(&config.db_path)?;
 
         let migration_elapsed_ms = start.elapsed().as_millis();
@@ -415,21 +458,41 @@ impl SqlitePool {
         };
 
         if !pragma_cols.iter().any(|c| c == "project_code") {
-            let _ = conn.execute_batch(
+            conn.execute_batch(
                 "ALTER TABLE projects ADD COLUMN project_code TEXT;
                  CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_code ON projects(project_code) WHERE project_code IS NOT NULL;
                  UPDATE projects SET project_code = 'CWK-' || SUBSTR(UPPER(HEX(RANDOMBLOB(3))), 1, 6) WHERE project_code IS NULL;"
-            );
+            )
+            .map_err(|e| map_sqlite_error(e, "alter_projects_add_project_code"))?;
         }
 
         if !pragma_cols.iter().any(|c| c == "trash_deleted_at") {
-            let _ = conn.execute_batch("ALTER TABLE projects ADD COLUMN trash_deleted_at BIGINT;");
+            conn.execute_batch("ALTER TABLE projects ADD COLUMN trash_deleted_at BIGINT;")
+                .map_err(|e| map_sqlite_error(e, "alter_projects_add_trash_deleted_at"))?;
         }
 
         if !pragma_cols.iter().any(|c| c == "provenance") {
-            let _ = conn.execute_batch(
+            conn.execute_batch(
                 "ALTER TABLE projects ADD COLUMN provenance TEXT NOT NULL DEFAULT 'scratch';",
-            );
+            )
+            .map_err(|e| map_sqlite_error(e, "alter_projects_add_provenance"))?;
+        }
+
+        // Ensure V2-created chat_sessions table receives archived_at required by V4
+        let chat_cols: Vec<String> = {
+            let mut stmt = conn
+                .prepare("PRAGMA table_info(chat_sessions)")
+                .map_err(|e| map_sqlite_error(e, "pragma_chat_sessions_info_v4"))?;
+            let cols = stmt
+                .query_map([], |r| r.get::<_, String>(1))
+                .map_err(|e| map_sqlite_error(e, "query_chat_sessions_cols_v4"))?
+                .filter_map(Result::ok)
+                .collect();
+            cols
+        };
+        if !chat_cols.is_empty() && !chat_cols.iter().any(|c| c == "archived_at") {
+            conn.execute_batch("ALTER TABLE chat_sessions ADD COLUMN archived_at BIGINT;")
+                .map_err(|e| map_sqlite_error(e, "alter_chat_sessions_add_archived_at"))?;
         }
 
         // 2. Execute V4 SQL batch and insert migration receipt
@@ -453,6 +516,196 @@ impl SqlitePool {
 
         tx.commit()
             .map_err(|e| map_sqlite_error(e, "commit_v4_migration"))?;
+
+        Ok(())
+    }
+
+    fn ensure_columns_idempotent(
+        conn: &Connection,
+        table: &str,
+        columns: &[(&str, &str)],
+    ) -> Result<(), HarnessError> {
+        let existing: Vec<String> = {
+            let mut stmt = conn
+                .prepare(&format!("PRAGMA table_info({table})"))
+                .map_err(|e| map_sqlite_error(e, "pragma_table_info_v5"))?;
+            let cols = stmt
+                .query_map([], |r| r.get::<_, String>(1))
+                .map_err(|e| map_sqlite_error(e, "query_table_cols_v5"))?
+                .filter_map(Result::ok)
+                .collect();
+            cols
+        };
+        if existing.is_empty() {
+            return Ok(());
+        }
+        for &(col_name, col_def) in columns {
+            if !existing.iter().any(|c| c == col_name) {
+                conn.execute_batch(&format!(
+                    "ALTER TABLE {table} ADD COLUMN {col_name} {col_def};"
+                ))
+                .map_err(|e| map_sqlite_error(e, "alter_table_add_col_v5"))?;
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_v5_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v5_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 5",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v5_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V5]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+
+        Self::ensure_columns_idempotent(
+            conn,
+            "change_proposals",
+            &[
+                ("tenant_id", "TEXT NOT NULL DEFAULT 'local-default'"),
+                ("intent_id", "TEXT"),
+                ("title", "TEXT NOT NULL DEFAULT ''"),
+                ("description", "TEXT NOT NULL DEFAULT ''"),
+                ("files_json", "TEXT NOT NULL DEFAULT '[]'"),
+                (
+                    "validation_status",
+                    "TEXT NOT NULL DEFAULT 'unverified'",
+                ),
+                ("validation_checks_json", "TEXT NOT NULL DEFAULT '[]'"),
+            ],
+        )?;
+        Self::ensure_columns_idempotent(
+            conn,
+            "version_snapshots",
+            &[
+                ("tenant_id", "TEXT NOT NULL DEFAULT 'local-default'"),
+                ("version_tag", "TEXT NOT NULL DEFAULT ''"),
+                ("label", "TEXT NOT NULL DEFAULT ''"),
+                ("description", "TEXT NOT NULL DEFAULT ''"),
+                ("trigger", "TEXT NOT NULL DEFAULT 'manual'"),
+                ("tree_sha256", "TEXT NOT NULL DEFAULT ''"),
+                ("files_json", "TEXT NOT NULL DEFAULT '[]'"),
+            ],
+        )?;
+        Self::ensure_columns_idempotent(
+            conn,
+            "project_workspace_files",
+            &[("content", "TEXT NOT NULL DEFAULT ''")],
+        )?;
+        Self::ensure_columns_idempotent(
+            conn,
+            "github_pull_requests",
+            &[
+                ("tenant_id", "TEXT NOT NULL DEFAULT 'local-default'"),
+                ("pr_url", "TEXT NOT NULL DEFAULT ''"),
+            ],
+        )?;
+
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v5"))?;
+        tx.execute_batch(V5_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v5_sql"))?;
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (5, ?1, ?2, ?3)",
+            params![
+                V5_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
+        )
+        .map_err(|e| map_sqlite_error(e, "insert_v5_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v5_migration"))?;
+
+        Ok(())
+    }
+
+    fn apply_v6_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v6_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 6",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v6_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V6]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+
+        // Idempotent guards repairing V2->V4->V6 columns if upgraded from earlier schemas
+        Self::ensure_columns_idempotent(
+            conn,
+            "chat_sessions",
+            &[
+                ("tenant_id", "TEXT NOT NULL DEFAULT 'local-default'"),
+                ("archived_at", "BIGINT"),
+            ],
+        )?;
+        Self::ensure_columns_idempotent(
+            conn,
+            "chat_messages",
+            &[("tenant_id", "TEXT NOT NULL DEFAULT 'local-default'")],
+        )?;
+        Self::ensure_columns_idempotent(
+            conn,
+            "node_execution_jobs",
+            &[("tenant_id", "TEXT NOT NULL DEFAULT 'local-default'")],
+        )?;
+        Self::ensure_columns_idempotent(
+            conn,
+            "chat_artifact_snapshots",
+            &[("tenant_id", "TEXT NOT NULL DEFAULT 'local-default'")],
+        )?;
+
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v6"))?;
+        tx.execute_batch(V6_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v6_sql"))?;
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (6, ?1, ?2, ?3)",
+            params![
+                V6_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
+        )
+        .map_err(|e| map_sqlite_error(e, "insert_v6_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v6_migration"))?;
 
         Ok(())
     }
@@ -566,14 +819,14 @@ impl SqlitePool {
 
         conn.busy_timeout(Duration::from_millis(u64::from(config.busy_timeout_ms)))
             .map_err(|e| map_sqlite_error(e, "set_busy_timeout"))?;
-        retry_on_busy("apply_pragmas", || {
-            conn.execute_batch(
-                "PRAGMA busy_timeout = 5000;
-                 PRAGMA journal_mode = WAL;
-                 PRAGMA synchronous = NORMAL;
-                 PRAGMA foreign_keys = ON;",
-            )
-        })?;
+        let pragma_sql = format!(
+            "PRAGMA busy_timeout = {};
+             PRAGMA journal_mode = WAL;
+             PRAGMA synchronous = NORMAL;
+             PRAGMA foreign_keys = ON;",
+            config.busy_timeout_ms
+        );
+        retry_on_busy("apply_pragmas", || conn.execute_batch(&pragma_sql))?;
         Ok(conn)
     }
 }

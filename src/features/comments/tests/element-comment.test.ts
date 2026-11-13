@@ -8,7 +8,45 @@ import {
 import { computeDomHash } from "../utils/dom-hash";
 import { verifyAnchorStatus } from "../utils/stale-anchor-checker";
 import { apiElementComment } from "../../../api/element-comment";
+import { issueBffLoopbackSession } from "../../../lib/api-guard";
+import { buildCanonicalHmacHeaders, ensureRunningDaemon } from "../../../lib/daemon-client";
 import { GET, POST } from "../../../app/api/projects/[id]/flow/nodes/[nodeId]/comments/route";
+
+async function seedCommentTestProject(tenantId: string): Promise<{
+  projectId: string;
+  sessionToken: string;
+}> {
+  const lock = await ensureRunningDaemon();
+  const projectId = crypto.randomUUID();
+  const rawBody = JSON.stringify({
+    id: projectId,
+    slug: `comments-${projectId.slice(0, 8)}`,
+    name: "Comments Integration Project",
+    product_brief: "SQLite WAL test project",
+    workspace_root: null,
+    inherit_brand_from_project_id: null,
+  });
+  const headers = buildCanonicalHmacHeaders({
+    daemonNonce: lock.daemon_nonce,
+    hmacKeyHex: lock.hmac_key_hex,
+    method: "POST",
+    canonicalPath: "/api/v1/projects",
+    rawQuery: "",
+    principal: { tenantId, userId: "comment-tester", role: "editor" },
+    rawBody,
+    correlationId: crypto.randomUUID(),
+  });
+  const seedRes = await fetch(`http://${lock.host}:${lock.port}/api/v1/projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: rawBody,
+  });
+  if (!seedRes.ok) {
+    throw new Error(`Project seed failed: ${seedRes.status} ${await seedRes.text()}`);
+  }
+  const { sessionToken } = issueBffLoopbackSession({ tenantId, role: "editor" });
+  return { projectId, sessionToken };
+}
 
 describe("Story 04.3: Element-Anchored Comments & Stale Anchor Detection", () => {
   describe("AC-01: Element-Anchored Comments & DOM Hash", () => {
@@ -64,9 +102,15 @@ describe("Story 04.3: Element-Anchored Comments & Stale Anchor Detection", () =>
 
   describe("AC-02: Fastify REST API Route Handlers", () => {
     it("should create and retrieve element-anchored comments via REST endpoints", async () => {
-      const req = new Request("http://localhost/api/v1/projects/proj-1/flow/nodes/node-1/comments", {
+      const { projectId, sessionToken } = await seedCommentTestProject("tenant-1");
+      const req = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/flow/nodes/node-1/comments`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Host: "127.0.0.1:5173",
+          Origin: "http://127.0.0.1:5173",
+          "X-Cowok-Session-Token": sessionToken,
+        },
         body: JSON.stringify({
           elementFfId: "ff-nav-logo",
           author: "Product Manager",
@@ -76,9 +120,7 @@ describe("Story 04.3: Element-Anchored Comments & Stale Anchor Detection", () =>
       });
 
       const ctx = {
-        projectId: "proj-1",
-        tenantId: "tenant-1",
-        params: { id: "proj-1", nodeId: "node-1" },
+        params: { id: projectId, nodeId: "node-1" },
       };
 
       const postRes = await POST(req, ctx);
@@ -87,7 +129,13 @@ describe("Story 04.3: Element-Anchored Comments & Stale Anchor Detection", () =>
       expect(comment.elementFfId).toBe("ff-nav-logo");
       expect(comment.anchorStatus).toBe("active");
 
-      const getReq = new Request("http://localhost/api/v1/projects/proj-1/flow/nodes/node-1/comments");
+      const getReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/flow/nodes/node-1/comments`, {
+        headers: {
+          Host: "127.0.0.1:5173",
+          Origin: "http://127.0.0.1:5173",
+          "X-Cowok-Session-Token": sessionToken,
+        },
+      });
       const getRes = await GET(getReq, ctx);
       expect(getRes.status).toBe(200);
       const comments = await getRes.json();

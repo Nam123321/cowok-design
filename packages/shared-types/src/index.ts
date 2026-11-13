@@ -6,6 +6,7 @@ export * from "./primitives.js";
 export * from "./errors.js";
 export * from "./specs.js";
 export * from "./constraints.js";
+export * from "./slicing-prompt.js";
 export * from "./generated/index.js";
 export type { HarnessError } from "./errors.js";
 export { HarnessErrorSchema } from "./errors.js";
