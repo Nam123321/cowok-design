@@ -76,6 +76,10 @@ export function ExternalLinkIcon({ size = 24, strokeWidth = 1.8, ...props }: Cow
   return <svg viewBox="0 0 24 24" width={size} height={size} {...base} strokeWidth={strokeWidth} {...props}><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>;
 }
 
+export function PlayIcon({ size = 24, strokeWidth = 1.8, ...props }: CowokIconProps) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} {...base} strokeWidth={strokeWidth} {...props}><polygon points="6 3 20 12 6 21 6 3" /></svg>;
+}
+
 export const NAV_ICON_COMPONENTS = {
   eye: EyeIcon,
   preview: EyeIcon,
@@ -85,8 +89,10 @@ export const NAV_ICON_COMPONENTS = {
   undo: ReplyIcon,
   redo: RefreshIcon,
   refresh: RefreshIcon,
+  "refresh-cw": RefreshIcon,
   reply: ReplyIcon,
   switch: SwitchIcon,
+  play: PlayIcon,
   "chevron-down": ChevronDownIcon,
   "chevron-right": ChevronRightIcon,
   "panel-close": PanelLeftCloseIcon,

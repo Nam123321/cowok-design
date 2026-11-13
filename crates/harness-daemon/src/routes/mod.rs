@@ -30,9 +30,11 @@ use legacy_proposals::{
     handle_reject_proposal, handle_revert_snapshot, handle_validate_proposal,
 };
 use legacy_sdi::{
-    handle_get_constraint_profile, handle_get_icon_manifest, handle_inject_ff_id,
-    handle_lint_source, handle_model_adapter, handle_prompt_compile, handle_put_constraint_profile,
-    handle_sdi_clarification, handle_sdi_intent, handle_surgical_patch, handle_validate_icon,
+    handle_get_constraint_profile, handle_get_design_contracts, handle_get_icon_manifest,
+    handle_inject_ff_id, handle_lint_source, handle_model_adapter, handle_prompt_compile,
+    handle_put_constraint_profile, handle_put_design_contracts, handle_sdi_clarification,
+    handle_sdi_intent, handle_surgical_patch, handle_validate_component, handle_validate_icon,
+    handle_validate_typography,
 };
 use legacy_sessions::{
     extract_actor_id, handle_create_chat_session, handle_delete_chat_session, handle_get_boundary,
@@ -173,6 +175,18 @@ pub fn build_router(state: DaemonAppState) -> Router {
         .route(
             "/api/v1/projects/:id/validate-icon",
             post(handle_validate_icon),
+        )
+        .route(
+            "/api/v1/projects/:id/validate-typography",
+            post(handle_validate_typography),
+        )
+        .route(
+            "/api/v1/projects/:id/validate-component",
+            post(handle_validate_component),
+        )
+        .route(
+            "/api/v1/projects/:id/design-contracts",
+            get(handle_get_design_contracts).put(handle_put_design_contracts),
         )
         .route(
             "/api/v1/projects/:id/inject-ff-id",

@@ -24,6 +24,15 @@ fn export_typescript_bindings() {
     SkillPlugin::export().expect("Failed to export SkillPlugin");
     BotJob::export().expect("Failed to export BotJob");
     GateReport::export().expect("Failed to export GateReport");
+    IconManifestEntry::export().expect("Failed to export IconManifestEntry");
+    IconManifest::export().expect("Failed to export IconManifest");
+    IconValidationReport::export().expect("Failed to export IconValidationReport");
+    TypographyContract::export().expect("Failed to export TypographyContract");
+    TypographyValidationReport::export().expect("Failed to export TypographyValidationReport");
+    ComponentRegistryEntry::export().expect("Failed to export ComponentRegistryEntry");
+    ComponentRegistryContract::export().expect("Failed to export ComponentRegistryContract");
+    ComponentValidationReport::export().expect("Failed to export ComponentValidationReport");
+    ProjectDesignContracts::export().expect("Failed to export ProjectDesignContracts");
 
     println!("All 17 domain types successfully exported to packages/shared-types/src/generated/");
 }

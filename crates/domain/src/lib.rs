@@ -7,6 +7,7 @@
 //! and has zero internal crate dependencies.
 
 pub mod error;
+pub mod icon_typography;
 pub mod model_adapter;
 pub mod models;
 pub mod prompt_compiler;
@@ -16,6 +17,11 @@ pub mod task_horizon;
 pub mod token_budget;
 
 pub use error::HarnessError;
+pub use icon_typography::{
+    ComponentRegistryContract, ComponentRegistryEntry, ComponentValidationReport, IconManifest,
+    IconManifestEntry, IconValidationReport, ProjectDesignContracts, TypographyContract,
+    TypographyValidationReport,
+};
 pub use model_adapter::{
     AdaptationRequest, AdaptationResponse, DegradationReason, ModelCapabilityAdapter,
     ModelProfileTier, ModelToolDefinition, ReasoningEffort, ToolComplexity,

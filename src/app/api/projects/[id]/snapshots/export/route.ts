@@ -8,6 +8,7 @@ import {
   SnapshotFileItem,
   ExportZipInput,
 } from "../../../../../../lib/validations/version-snapshot";
+import { DEFAULT_SEEDED_ICON_MANIFEST } from "../../../../../../lib/validations/constraints";
 import {
   buildExportZipMetadata,
   createZipArchive,
@@ -59,7 +60,10 @@ function collectProjectFiles(projectId: string, tenantId?: string): SnapshotFile
   return [
     { path: "package.json", content: '{"name":"project","scripts":{"build":"echo ok"}}' },
     { path: "src/theme/tokens.css", content: ":root { --color-primary: #000; }" },
-    { path: "src/assets/icon-manifest.json", content: '{"icons":[]}' },
+    {
+      path: "src/assets/icon-manifest.json",
+      content: JSON.stringify(DEFAULT_SEEDED_ICON_MANIFEST),
+    },
     { path: "src/fixtures/screen-fixture.json", content: '{"fixtures":[]}' },
   ];
 }

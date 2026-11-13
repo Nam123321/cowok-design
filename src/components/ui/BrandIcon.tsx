@@ -22,6 +22,19 @@ export interface BrandIconProps {
 const DEFAULT_ICON_SIZE = 20;
 const DEFAULT_STROKE_WIDTH = 1.8;
 
+/** Canonical list of all icon identifiers registered in the frontend runtime. */
+export const ALL_REGISTERED_ICON_NAMES: readonly string[] = Array.from(
+  new Set([
+    ...Object.keys(COWOK_ICON_REGISTRY),
+    ...Object.keys(SPECIAL_ICON_RENDERERS),
+  ]),
+).sort();
+
+export function isRegisteredIcon(name: string): boolean {
+  const normalized = name.toLowerCase().trim().replace(/^icon-/, "");
+  return Boolean(SPECIAL_ICON_RENDERERS[normalized] || COWOK_ICON_REGISTRY[normalized]);
+}
+
 export const BrandIcon: React.FC<BrandIconProps> = (props) => {
   const {
     name,
@@ -36,7 +49,8 @@ export const BrandIcon: React.FC<BrandIconProps> = (props) => {
   const numSize = typeof size === "number" ? size : parseInt(String(size), 10) || DEFAULT_ICON_SIZE;
   const resolvedLabel = props["aria-label"] || title || name;
 
-  if (SPECIAL_ICON_RENDERERS[normalizedKey]) {
+  const specialRenderer = SPECIAL_ICON_RENDERERS[normalizedKey];
+  if (specialRenderer) {
     return (
       <span
         className={`brand-icon icon-${normalizedKey} ${className}`}
@@ -44,13 +58,15 @@ export const BrandIcon: React.FC<BrandIconProps> = (props) => {
         aria-label={resolvedLabel}
         title={title}
       >
-        {SPECIAL_ICON_RENDERERS[normalizedKey]({ size: numSize, strokeWidth })}
+        {specialRenderer({ size: numSize, strokeWidth })}
       </span>
     );
   }
 
-  const Component = COWOK_ICON_REGISTRY[normalizedKey] || WorkflowIcon;
-  const iconClass = COWOK_ICON_REGISTRY[normalizedKey] ? `icon-${normalizedKey}` : "icon-fallback";
+  const registered = COWOK_ICON_REGISTRY[normalizedKey];
+  const isFallback = !registered;
+  const Component = registered || WorkflowIcon;
+  const iconClass = isFallback ? "icon-fallback" : `icon-${normalizedKey}`;
 
   return (
     <Component
@@ -59,6 +75,8 @@ export const BrandIcon: React.FC<BrandIconProps> = (props) => {
       className={`brand-icon ${iconClass} ${className}`}
       style={{ color, display: "inline-block", verticalAlign: "middle", ...style }}
       aria-label={resolvedLabel}
+      data-icon-fallback={isFallback ? "true" : undefined}
+      data-requested-icon={isFallback ? normalizedKey : undefined}
     />
   );
 };

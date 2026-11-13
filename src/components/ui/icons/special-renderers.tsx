@@ -8,13 +8,6 @@ export const SPECIAL_ICON_RENDERERS: Record<
   string,
   (props: { size: number; strokeWidth: number }) => React.ReactNode
 > = {
-  "panel-left-close": ({ size, strokeWidth }) => (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-      <line x1="9" y1="3" x2="9" y2="21" />
-      <path d="m14 9-3 3 3 3" />
-    </svg>
-  ),
   "panel-left-open": ({ size, strokeWidth }) => (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -65,13 +58,6 @@ export const SPECIAL_ICON_RENDERERS: Record<
       <line x1="4" y1="6" x2="20" y2="6" />
       <line x1="7" y1="12" x2="17" y2="12" />
       <line x1="10" y1="18" x2="14" y2="18" />
-    </svg>
-  ),
-  globe: ({ size, strokeWidth }) => (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" />
-      <line x1="3" y1="12" x2="21" y2="12" />
-      <path d="M12 3a14.5 14.5 0 0 1 0 18M12 3a14.5 14.5 0 0 0 0 18" />
     </svg>
   ),
   "zoom-in": ({ size, strokeWidth }) => (

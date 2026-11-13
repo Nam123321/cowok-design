@@ -400,6 +400,23 @@ impl ConstraintEvaluator {
     }
 }
 
+#[derive(Default)]
+struct AstTypographySample<'a> {
+    font_family: Option<&'a str>,
+    font_weight: Option<u32>,
+    font_size: Option<&'a str>,
+    span: oxc_span::Span,
+}
+
+#[derive(Default)]
+struct AstCollectedNodes<'a> {
+    classes: Vec<(&'a str, oxc_span::Span)>,
+    styles: Vec<(&'a str, oxc_span::Span)>,
+    components: Vec<(String, oxc_span::Span)>,
+    icons: Vec<(&'a str, oxc_span::Span)>,
+    typography_samples: Vec<AstTypographySample<'a>>,
+}
+
 /// AST & Lexical linter scanning source files for forbidden project patterns (<1ms budget).
 pub struct AstLinter;
 
@@ -432,24 +449,24 @@ impl AstLinter {
 
     fn walk_statement<'a>(
         stmt: &'a oxc_ast::ast::Statement<'a>,
-        ast_classes: &mut Vec<(&'a str, oxc_span::Span)>,
-        ast_styles: &mut Vec<(&'a str, oxc_span::Span)>,
+        nodes: &mut AstCollectedNodes<'a>,
+        content: &str,
     ) {
         match stmt {
             oxc_ast::ast::Statement::ExpressionStatement(e) => {
-                Self::walk_expression(&e.expression, ast_classes, ast_styles);
+                Self::walk_expression(&e.expression, nodes, content);
             }
             oxc_ast::ast::Statement::ExportDefaultDeclaration(d) => match &d.declaration {
                 oxc_ast::ast::ExportDefaultDeclarationKind::FunctionDeclaration(f) => {
                     if let Some(body) = &f.body {
                         for s in &body.statements {
-                            Self::walk_statement(s, ast_classes, ast_styles);
+                            Self::walk_statement(s, nodes, content);
                         }
                     }
                 }
                 _ => {
                     if let Some(expr) = d.declaration.as_expression() {
-                        Self::walk_expression(expr, ast_classes, ast_styles);
+                        Self::walk_expression(expr, nodes, content);
                     }
                 }
             },
@@ -457,14 +474,14 @@ impl AstLinter {
                 oxc_ast::ast::Declaration::VariableDeclaration(v) => {
                     for decl in &v.declarations {
                         if let Some(init) = &decl.init {
-                            Self::walk_expression(init, ast_classes, ast_styles);
+                            Self::walk_expression(init, nodes, content);
                         }
                     }
                 }
                 oxc_ast::ast::Declaration::FunctionDeclaration(f) => {
                     if let Some(body) = &f.body {
                         for s in &body.statements {
-                            Self::walk_statement(s, ast_classes, ast_styles);
+                            Self::walk_statement(s, nodes, content);
                         }
                     }
                 }
@@ -473,25 +490,25 @@ impl AstLinter {
             oxc_ast::ast::Statement::VariableDeclaration(v) => {
                 for decl in &v.declarations {
                     if let Some(init) = &decl.init {
-                        Self::walk_expression(init, ast_classes, ast_styles);
+                        Self::walk_expression(init, nodes, content);
                     }
                 }
             }
             oxc_ast::ast::Statement::FunctionDeclaration(f) => {
                 if let Some(body) = &f.body {
                     for s in &body.statements {
-                        Self::walk_statement(s, ast_classes, ast_styles);
+                        Self::walk_statement(s, nodes, content);
                     }
                 }
             }
             oxc_ast::ast::Statement::BlockStatement(b) => {
                 for s in &b.body {
-                    Self::walk_statement(s, ast_classes, ast_styles);
+                    Self::walk_statement(s, nodes, content);
                 }
             }
             oxc_ast::ast::Statement::ReturnStatement(r) => {
                 if let Some(arg) = &r.argument {
-                    Self::walk_expression(arg, ast_classes, ast_styles);
+                    Self::walk_expression(arg, nodes, content);
                 }
             }
             _ => {}
@@ -500,53 +517,53 @@ impl AstLinter {
 
     fn walk_expression<'a>(
         expr: &'a oxc_ast::ast::Expression<'a>,
-        ast_classes: &mut Vec<(&'a str, oxc_span::Span)>,
-        ast_styles: &mut Vec<(&'a str, oxc_span::Span)>,
+        nodes: &mut AstCollectedNodes<'a>,
+        content: &str,
     ) {
         match expr {
             oxc_ast::ast::Expression::JSXElement(el) => {
-                Self::walk_jsx_element(el, ast_classes, ast_styles);
+                Self::walk_jsx_element(el, nodes, content);
             }
             oxc_ast::ast::Expression::JSXFragment(fr) => {
                 for child in &fr.children {
-                    Self::walk_jsx_child(child, ast_classes, ast_styles);
+                    Self::walk_jsx_child(child, nodes, content);
                 }
             }
             oxc_ast::ast::Expression::ParenthesizedExpression(p) => {
-                Self::walk_expression(&p.expression, ast_classes, ast_styles);
+                Self::walk_expression(&p.expression, nodes, content);
             }
             oxc_ast::ast::Expression::ArrowFunctionExpression(a) => match &a.body {
                 oxc_ast::ast::ArrowFunctionBody::FunctionBody(b) => {
                     for s in &b.statements {
-                        Self::walk_statement(s, ast_classes, ast_styles);
+                        Self::walk_statement(s, nodes, content);
                     }
                 }
                 _ => {
                     if let Some(expr) = a.body.as_expression() {
-                        Self::walk_expression(expr, ast_classes, ast_styles);
+                        Self::walk_expression(expr, nodes, content);
                     }
                 }
             },
             oxc_ast::ast::Expression::FunctionExpression(f) => {
                 if let Some(body) = &f.body {
                     for s in &body.statements {
-                        Self::walk_statement(s, ast_classes, ast_styles);
+                        Self::walk_statement(s, nodes, content);
                     }
                 }
             }
             oxc_ast::ast::Expression::ConditionalExpression(c) => {
-                Self::walk_expression(&c.consequent, ast_classes, ast_styles);
-                Self::walk_expression(&c.alternate, ast_classes, ast_styles);
+                Self::walk_expression(&c.consequent, nodes, content);
+                Self::walk_expression(&c.alternate, nodes, content);
             }
             oxc_ast::ast::Expression::LogicalExpression(l) => {
-                Self::walk_expression(&l.left, ast_classes, ast_styles);
-                Self::walk_expression(&l.right, ast_classes, ast_styles);
+                Self::walk_expression(&l.left, nodes, content);
+                Self::walk_expression(&l.right, nodes, content);
             }
             oxc_ast::ast::Expression::CallExpression(c) => {
-                Self::walk_expression(&c.callee, ast_classes, ast_styles);
+                Self::walk_expression(&c.callee, nodes, content);
                 for arg in &c.arguments {
                     if let Some(expr) = arg.as_expression() {
-                        Self::walk_expression(expr, ast_classes, ast_styles);
+                        Self::walk_expression(expr, nodes, content);
                     }
                 }
             }
@@ -598,12 +615,124 @@ impl AstLinter {
         }
     }
 
+    fn extract_jsx_tag_name(name: &oxc_ast::ast::JSXElementName<'_>, content: &str) -> String {
+        use oxc_span::GetSpan;
+        match name {
+            oxc_ast::ast::JSXElementName::Identifier(id) => id.name.to_string(),
+            oxc_ast::ast::JSXElementName::IdentifierReference(id) => id.name.to_string(),
+            oxc_ast::ast::JSXElementName::NamespacedName(ns) => ns.name.name.to_string(),
+            oxc_ast::ast::JSXElementName::MemberExpression(m) => {
+                let s = m.span().start as usize;
+                let e = (m.span().end as usize).min(content.len());
+                content.get(s..e).unwrap_or("").trim().to_string()
+            }
+            oxc_ast::ast::JSXElementName::ThisExpression(_) => "this".to_string(),
+        }
+    }
+
+    fn extract_string_attr_value<'a>(
+        val: &'a oxc_ast::ast::JSXAttributeValue<'a>,
+    ) -> Option<(&'a str, oxc_span::Span)> {
+        match val {
+            oxc_ast::ast::JSXAttributeValue::StringLiteral(lit) => {
+                lit.value.as_str().map(|s| (s, lit.span))
+            }
+            oxc_ast::ast::JSXAttributeValue::ExpressionContainer(c) => match &c.expression {
+                oxc_ast::ast::JSXExpression::StringLiteral(lit) => {
+                    lit.value.as_str().map(|s| (s, lit.span))
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn extract_typography_from_style_expr<'a>(
+        expr: &'a oxc_ast::ast::JSXExpression<'a>,
+        fallback_span: oxc_span::Span,
+    ) -> Option<AstTypographySample<'a>> {
+        let Some(oxc_ast::ast::Expression::ObjectExpression(obj)) = expr.as_expression() else {
+            return None;
+        };
+        let mut sample = AstTypographySample {
+            font_family: None,
+            font_weight: None,
+            font_size: None,
+            span: fallback_span,
+        };
+        let mut found_any = false;
+        for prop_kind in &obj.properties {
+            let oxc_ast::ast::ObjectPropertyKind::ObjectProperty(prop) = prop_kind else {
+                continue;
+            };
+            let key_name = match &prop.key {
+                oxc_ast::ast::PropertyKey::StaticIdentifier(id) => id.name.as_str(),
+                oxc_ast::ast::PropertyKey::StringLiteral(lit) => lit.value.as_str().unwrap_or(""),
+                _ => continue,
+            };
+            match key_name {
+                "fontFamily" | "font-family" => {
+                    if let oxc_ast::ast::Expression::StringLiteral(lit) = &prop.value {
+                        sample.font_family = lit.value.as_str();
+                        sample.span = lit.span;
+                        found_any = true;
+                    }
+                }
+                "fontWeight" | "font-weight" => match &prop.value {
+                    oxc_ast::ast::Expression::NumericLiteral(num) => {
+                        if num.value >= 1.0 && num.value <= 1000.0 {
+                            sample.font_weight = Some(num.value as u32);
+                            sample.span = num.span;
+                            found_any = true;
+                        }
+                    }
+                    oxc_ast::ast::Expression::StringLiteral(lit) => {
+                        if let Some(parsed) = lit
+                            .value
+                            .as_str()
+                            .and_then(|s| s.trim().parse::<u32>().ok())
+                        {
+                            sample.font_weight = Some(parsed);
+                            sample.span = lit.span;
+                            found_any = true;
+                        }
+                    }
+                    _ => {}
+                },
+                "fontSize" | "font-size" => {
+                    if let oxc_ast::ast::Expression::StringLiteral(lit) = &prop.value {
+                        sample.font_size = lit.value.as_str();
+                        sample.span = lit.span;
+                        found_any = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if found_any {
+            Some(sample)
+        } else {
+            None
+        }
+    }
+
     fn walk_jsx_element<'a>(
         el: &'a oxc_ast::ast::JSXElement<'a>,
-        ast_classes: &mut Vec<(&'a str, oxc_span::Span)>,
-        ast_styles: &mut Vec<(&'a str, oxc_span::Span)>,
+        nodes: &mut AstCollectedNodes<'a>,
+        content: &str,
     ) {
         use oxc_span::GetSpan;
+        let tag_name = Self::extract_jsx_tag_name(&el.opening_element.name, content);
+        if !tag_name.is_empty() {
+            nodes
+                .components
+                .push((tag_name.clone(), el.opening_element.name.span()));
+        }
+        let is_icon_component = matches!(
+            tag_name.as_str(),
+            "BrandIcon" | "CowokIcon" | "Icon" | "AgentMktBrandIcon"
+        );
+
         for attr in &el.opening_element.attributes {
             if let oxc_ast::ast::JSXAttributeItem::Attribute(a) = attr {
                 let name = match &a.name {
@@ -615,25 +744,29 @@ impl AstLinter {
                         match val {
                             oxc_ast::ast::JSXAttributeValue::StringLiteral(lit) => {
                                 if let Some(s) = lit.value.as_str() {
-                                    ast_classes.push((s, lit.span));
+                                    nodes.classes.push((s, lit.span));
                                 }
                             }
                             oxc_ast::ast::JSXAttributeValue::ExpressionContainer(c) => {
                                 match &c.expression {
                                     oxc_ast::ast::JSXExpression::StringLiteral(lit) => {
                                         if let Some(s) = lit.value.as_str() {
-                                            ast_classes.push((s, lit.span));
+                                            nodes.classes.push((s, lit.span));
                                         }
                                     }
                                     oxc_ast::ast::JSXExpression::TemplateLiteral(tpl) => {
                                         for quasi in &tpl.quasis {
-                                            ast_classes
+                                            nodes
+                                                .classes
                                                 .push((quasi.value.raw.as_str(), quasi.span));
                                         }
                                     }
                                     _ => {
                                         if let Some(expr) = c.expression.as_expression() {
-                                            Self::extract_classes_from_expr(expr, ast_classes);
+                                            Self::extract_classes_from_expr(
+                                                expr,
+                                                &mut nodes.classes,
+                                            );
                                         }
                                     }
                                 }
@@ -643,33 +776,48 @@ impl AstLinter {
                     }
                 } else if name == "style" {
                     if let Some(ref val) = a.value {
-                        ast_styles.push(("", val.span()));
+                        nodes.styles.push(("", val.span()));
+                        if let oxc_ast::ast::JSXAttributeValue::ExpressionContainer(c) = val {
+                            if let Some(sample) =
+                                Self::extract_typography_from_style_expr(&c.expression, val.span())
+                            {
+                                nodes.typography_samples.push(sample);
+                            }
+                        }
+                    }
+                } else if (is_icon_component && (name == "name" || name == "icon"))
+                    || name == "icon"
+                {
+                    if let Some(ref val) = a.value {
+                        if let Some((icon_str, icon_span)) = Self::extract_string_attr_value(val) {
+                            nodes.icons.push((icon_str, icon_span));
+                        }
                     }
                 }
             }
         }
         for child in &el.children {
-            Self::walk_jsx_child(child, ast_classes, ast_styles);
+            Self::walk_jsx_child(child, nodes, content);
         }
     }
 
     fn walk_jsx_child<'a>(
         child: &'a oxc_ast::ast::JSXChild<'a>,
-        ast_classes: &mut Vec<(&'a str, oxc_span::Span)>,
-        ast_styles: &mut Vec<(&'a str, oxc_span::Span)>,
+        nodes: &mut AstCollectedNodes<'a>,
+        content: &str,
     ) {
         match child {
             oxc_ast::ast::JSXChild::Element(child_el) => {
-                Self::walk_jsx_element(child_el, ast_classes, ast_styles);
+                Self::walk_jsx_element(child_el, nodes, content);
             }
             oxc_ast::ast::JSXChild::Fragment(child_fr) => {
                 for fr_child in &child_fr.children {
-                    Self::walk_jsx_child(fr_child, ast_classes, ast_styles);
+                    Self::walk_jsx_child(fr_child, nodes, content);
                 }
             }
             oxc_ast::ast::JSXChild::ExpressionContainer(c) => {
                 if let Some(expr) = c.expression.as_expression() {
-                    Self::walk_expression(expr, ast_classes, ast_styles);
+                    Self::walk_expression(expr, nodes, content);
                 }
             }
             _ => {}
@@ -681,6 +829,80 @@ impl AstLinter {
     pub fn lint_source(
         content: &str,
         rules: &[ActiveConstraint],
+    ) -> Result<Vec<ConstraintViolation>, HarnessError> {
+        let icon_rule = rules
+            .iter()
+            .find(|r| r.rule_code.eq_ignore_ascii_case("ENFORCE_ICON_MANIFEST"));
+        let typo_rule = rules
+            .iter()
+            .find(|r| r.rule_code.eq_ignore_ascii_case("ENFORCE_TYPOGRAPHY"));
+        let comp_rule = rules.iter().find(|r| {
+            r.rule_code
+                .eq_ignore_ascii_case("ENFORCE_COMPONENT_REGISTRY")
+        });
+
+        let parsed_manifest = if let Some(rule) = icon_rule {
+            let trimmed = rule.config_json.trim();
+            if trimmed.is_empty() || trimmed == "{}" {
+                Some(IconValidator::get_flagship_manifest())
+            } else {
+                Some(IconValidator::parse_manifest(trimmed)?)
+            }
+        } else {
+            None
+        };
+
+        let parsed_typo = if let Some(rule) = typo_rule {
+            let trimmed = rule.config_json.trim();
+            if trimmed.is_empty() || trimmed == "{}" {
+                Some(TypographyContract::default())
+            } else {
+                Some(
+                    serde_json::from_str::<TypographyContract>(trimmed).map_err(|e| {
+                        HarnessError::ValidationFailed {
+                            reason: format!("INVALID_TYPOGRAPHY_RULE_CONFIG: {e}"),
+                        }
+                    })?,
+                )
+            }
+        } else {
+            None
+        };
+
+        let parsed_comp = if let Some(rule) = comp_rule {
+            let trimmed = rule.config_json.trim();
+            if trimmed.is_empty() || trimmed == "{}" {
+                None
+            } else {
+                Some(
+                    serde_json::from_str::<ComponentRegistryContract>(trimmed).map_err(|e| {
+                        HarnessError::ValidationFailed {
+                            reason: format!("INVALID_COMPONENT_REGISTRY_RULE_CONFIG: {e}"),
+                        }
+                    })?,
+                )
+            }
+        } else {
+            None
+        };
+
+        Self::lint_source_with_context(
+            content,
+            rules,
+            parsed_manifest.as_ref(),
+            parsed_typo.as_ref(),
+            parsed_comp.as_ref(),
+        )
+    }
+
+    /// Lints JSX, TSX, or HTML content against active project constraints AND resolved
+    /// project-scoped IconManifest, TypographyContract, and ComponentRegistryContract (`07_COMPONENT_REGISTRY`).
+    pub fn lint_source_with_context(
+        content: &str,
+        rules: &[ActiveConstraint],
+        icon_manifest: Option<&IconManifest>,
+        typography_contract: Option<&TypographyContract>,
+        component_registry: Option<&ComponentRegistryContract>,
     ) -> Result<Vec<ConstraintViolation>, HarnessError> {
         let start_time = Instant::now();
 
@@ -706,11 +928,10 @@ impl AstLinter {
             });
         }
 
-        // 2. Walk OXC AST statements and extract JSX elements & attributes
-        let mut ast_classes = Vec::new();
-        let mut ast_styles = Vec::new();
+        // 2. Walk OXC AST statements and extract JSX elements, classes, styles, icons & typography
+        let mut nodes = AstCollectedNodes::default();
         for stmt in &parsed.program.body {
-            Self::walk_statement(stmt, &mut ast_classes, &mut ast_styles);
+            Self::walk_statement(stmt, &mut nodes, content);
         }
 
         for r in rules {
@@ -723,8 +944,33 @@ impl AstLinter {
         let inline_hex_rule = rules
             .iter()
             .find(|r| r.rule_code.eq_ignore_ascii_case("BAN_INLINE_HEX"));
+        let icon_rule_sev = rules
+            .iter()
+            .find(|r| r.rule_code.eq_ignore_ascii_case("ENFORCE_ICON_MANIFEST"))
+            .map(|r| r.severity.clone())
+            .unwrap_or_else(|| "BLOCKER".to_string());
+        let typo_rule_sev = rules
+            .iter()
+            .find(|r| r.rule_code.eq_ignore_ascii_case("ENFORCE_TYPOGRAPHY"))
+            .map(|r| r.severity.clone())
+            .unwrap_or_else(|| "BLOCKER".to_string());
+        let comp_rule_sev = rules
+            .iter()
+            .find(|r| {
+                r.rule_code
+                    .eq_ignore_ascii_case("ENFORCE_COMPONENT_REGISTRY")
+            })
+            .map(|r| r.severity.clone())
+            .unwrap_or_else(|| "BLOCKER".to_string());
 
-        if tailwind_rule.is_none() && inline_hex_rule.is_none() {
+        let has_comp_enforcement = component_registry.is_some_and(|c| c.forbid_unregistered);
+
+        if tailwind_rule.is_none()
+            && inline_hex_rule.is_none()
+            && icon_manifest.is_none()
+            && typography_contract.is_none()
+            && !has_comp_enforcement
+        {
             return Ok(Vec::new());
         }
 
@@ -754,7 +1000,7 @@ impl AstLinter {
         let mut violations = Vec::new();
 
         if let Some(rule) = tailwind_rule {
-            for (class_str, span) in &ast_classes {
+            for (class_str, span) in &nodes.classes {
                 let base_offset = span.start as usize;
                 let is_quoted = if base_offset < content.len() {
                     let b = content.as_bytes()[base_offset];
@@ -814,7 +1060,7 @@ impl AstLinter {
         }
 
         if let Some(rule) = inline_hex_rule {
-            for (_, span) in &ast_styles {
+            for (_, span) in &nodes.styles {
                 let start_idx = span.start as usize;
                 let end_idx = (span.end as usize).min(content.len());
                 if start_idx < end_idx {
@@ -844,6 +1090,88 @@ impl AstLinter {
                             });
                         }
                         search_pos = hash_pos + 1;
+                    }
+                }
+            }
+        }
+
+        // 3. Enforce Icon Manifest on extracted JSX icon calls
+        if let Some(manifest) = icon_manifest {
+            for (icon_name, span) in &nodes.icons {
+                let report = IconValidator::validate_icon(manifest, icon_name);
+                if !report.is_valid {
+                    let (line, col) = byte_to_line_col(span.start as usize);
+                    violations.push(ConstraintViolation {
+                        rule_code: "ENFORCE_ICON_MANIFEST".to_string(),
+                        severity: icon_rule_sev.clone(),
+                        message: format!(
+                            "ICON_MANIFEST_VIOLATION: Icon '{}' is not registered in project icon manifest '{}'. Did you mean: {:?}?",
+                            report.requested_icon, manifest.name, report.suggestions
+                        ),
+                        line: Some(line),
+                        column: Some(col),
+                    });
+                }
+            }
+        }
+
+        // 4. Enforce TypographyContract on extracted inline JSX typography props
+        if let Some(contract) = typography_contract {
+            let fallback_family = contract
+                .allowed_font_families
+                .first()
+                .map(|s| s.as_str())
+                .unwrap_or("Geist");
+            let fallback_weight = contract
+                .allowed_font_weights
+                .first()
+                .copied()
+                .unwrap_or(400);
+
+            for sample in &nodes.typography_samples {
+                let check_family = sample.font_family.unwrap_or(fallback_family);
+                let check_weight = sample.font_weight.unwrap_or(fallback_weight);
+                if let Err(errs) = IconValidator::validate_typography(
+                    contract,
+                    check_family,
+                    check_weight,
+                    sample.font_size,
+                    contract.min_wcag_contrast,
+                ) {
+                    let (line, col) = byte_to_line_col(sample.span.start as usize);
+                    for err_msg in errs {
+                        violations.push(ConstraintViolation {
+                            rule_code: "ENFORCE_TYPOGRAPHY".to_string(),
+                            severity: typo_rule_sev.clone(),
+                            message: format!("TYPOGRAPHY_CONTRACT_VIOLATION: {err_msg}"),
+                            line: Some(line),
+                            column: Some(col),
+                        });
+                    }
+                }
+            }
+        }
+
+        // 5. Enforce ComponentRegistryContract (`07_COMPONENT_REGISTRY`) on PascalCase JSX tags
+        if let Some(comp_contract) = component_registry {
+            if comp_contract.forbid_unregistered {
+                for (comp_name, span) in &nodes.components {
+                    if matches!(comp_name.as_str(), "BrandIcon" | "Fragment") {
+                        continue;
+                    }
+                    let report = IconValidator::validate_component(comp_contract, comp_name);
+                    if !report.is_valid {
+                        let (line, col) = byte_to_line_col(span.start as usize);
+                        violations.push(ConstraintViolation {
+                            rule_code: "ENFORCE_COMPONENT_REGISTRY".to_string(),
+                            severity: comp_rule_sev.clone(),
+                            message: format!(
+                                "COMPONENT_REGISTRY_VIOLATION: Component '<{} />' is not registered in 07_COMPONENT_REGISTRY. Suggestions: {:?}",
+                                report.requested_component, report.suggestions
+                            ),
+                            line: Some(line),
+                            column: Some(col),
+                        });
                     }
                 }
             }

@@ -1,5 +1,4 @@
 // @story 01.3
-use std::fs;
 
 use axum::{
     extract::{Path as AxumPath, State},
@@ -186,7 +185,7 @@ pub(super) async fn handle_lint_source(
     Json(req): Json<LintSourceRequest>,
 ) -> Result<Json<LintSourceResponse>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) =
+    let (project_registry, canon_project_root, _) =
         verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
             .map_err(map_error_to_response)?;
 
@@ -196,7 +195,19 @@ pub(super) async fn handle_lint_source(
             &conn,
             &project_id.to_string(),
         )?;
-        let violations = constraint_engine::AstLinter::lint_source(&req.source, &constraints)?;
+        let (icon_manifest, typography_contract, component_registry) =
+            constraint_engine::IconValidator::load_project_design_context(
+                &conn,
+                &canon_project_root,
+                &project_id.to_string(),
+            )?;
+        let violations = constraint_engine::AstLinter::lint_source_with_context(
+            &req.source,
+            &constraints,
+            Some(&icon_manifest),
+            Some(&typography_contract),
+            Some(&component_registry),
+        )?;
         let passed = violations.is_empty();
         Ok::<_, HarnessError>(LintSourceResponse { violations, passed })
     })
@@ -276,9 +287,16 @@ pub(super) async fn handle_put_constraint_profile(
             let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
             tx.execute(
                 "INSERT INTO constraint_profiles (id, project_id, preset_profile, styling_policy, forbid_tailwind, forbid_raw_hex, tokens_css_path, icon_manifest_path, allowed_icon_set_json, typography_contract_json, updated_at)
-                 VALUES (?1, ?2, 'custom', 'tokens_strict', ?3, ?4, 'tokens.css', 'icons.json', '[]', '{}', ?5)
-                 ON CONFLICT(project_id, preset_profile) DO UPDATE SET forbid_tailwind = ?3, forbid_raw_hex = ?4, updated_at = ?5",
-                rusqlite::params![prof_id_str, proj_id_str, forbid_tailwind, forbid_raw_hex, now_ms],
+                 VALUES (?1, ?2, 'custom', 'tokens_strict', ?3, ?4, 'tokens.css', ?5, '[]', '{}', ?6)
+                 ON CONFLICT(project_id, preset_profile) DO UPDATE SET forbid_tailwind = ?3, forbid_raw_hex = ?4, updated_at = ?6",
+                rusqlite::params![
+                    prof_id_str,
+                    proj_id_str,
+                    forbid_tailwind,
+                    forbid_raw_hex,
+                    constraint_engine::FLAGSHIP_MANIFEST_SENTINEL,
+                    now_ms
+                ],
             )?;
 
             let effective_prof_id: String = tx.query_row(
@@ -325,6 +343,22 @@ pub struct ValidateIconRequest {
     pub icon: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ValidateTypographyRequest {
+    pub font_family: String,
+    pub font_weight: u32,
+    #[serde(default)]
+    pub font_size: Option<String>,
+    pub contrast_ratio: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ValidateComponentRequest {
+    pub component: String,
+}
+
 pub(super) async fn handle_get_icon_manifest(
     State(state): State<DaemonAppState>,
     AxumPath(id): AxumPath<String>,
@@ -337,32 +371,19 @@ pub(super) async fn handle_get_icon_manifest(
 
     let resp = tokio::task::spawn_blocking(move || {
         let conn = project_registry.pool().connection()?;
-        let manifest_path_rel: Option<String> = conn.query_row(
-            "SELECT icon_manifest_path FROM constraint_profiles WHERE project_id = ?1 ORDER BY updated_at DESC LIMIT 1",
-            rusqlite::params![project_id.to_string()],
-            |r| r.get(0),
-        ).ok();
-
-        if let Some(rel) = manifest_path_rel {
-            let full_path = project_root.join(&rel);
-            let is_jailed = full_path.canonicalize().ok().map(|p| {
-                project_root.canonicalize().ok().map(|r| p.starts_with(&r)).unwrap_or(false)
-            }).unwrap_or(false);
-
-            if is_jailed && full_path.is_file() {
-                if let Ok(content) = fs::read_to_string(&full_path) {
-                    if let Ok(m) = constraint_engine::IconValidator::parse_manifest(&content) {
-                        return Ok::<_, HarnessError>(m);
-                    }
-                }
-            }
-        }
-        Ok::<_, HarnessError>(constraint_engine::IconValidator::get_flagship_manifest())
+        let (manifest, _, _) = constraint_engine::IconValidator::load_project_design_context(
+            &conn,
+            &project_root,
+            &project_id.to_string(),
+        )?;
+        Ok::<_, HarnessError>(manifest)
     })
     .await
-    .map_err(|e| map_error_to_response(HarnessError::ValidationFailed {
-        reason: format!("BLOCKING_TASK_FAILED: {e}"),
-    }))?
+    .map_err(|e| {
+        map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("BLOCKING_TASK_FAILED: {e}"),
+        })
+    })?
     .map_err(map_error_to_response)?;
 
     Ok(Json(resp))
@@ -381,37 +402,161 @@ pub(super) async fn handle_validate_icon(
 
     let resp = tokio::task::spawn_blocking(move || {
         let conn = project_registry.pool().connection()?;
-        let manifest_path_rel: Option<String> = conn.query_row(
-            "SELECT icon_manifest_path FROM constraint_profiles WHERE project_id = ?1 ORDER BY updated_at DESC LIMIT 1",
-            rusqlite::params![project_id.to_string()],
-            |r| r.get(0),
-        ).ok();
-
-        let manifest = if let Some(rel) = manifest_path_rel {
-            let full_path = project_root.join(&rel);
-            let is_jailed = full_path.canonicalize().ok().map(|p| {
-                project_root.canonicalize().ok().map(|r| p.starts_with(&r)).unwrap_or(false)
-            }).unwrap_or(false);
-
-            if is_jailed && full_path.is_file() {
-                fs::read_to_string(&full_path)
-                    .ok()
-                    .and_then(|c| constraint_engine::IconValidator::parse_manifest(&c).ok())
-                    .unwrap_or_else(constraint_engine::IconValidator::get_flagship_manifest)
-            } else {
-                constraint_engine::IconValidator::get_flagship_manifest()
-            }
-        } else {
-            constraint_engine::IconValidator::get_flagship_manifest()
-        };
-
+        let (manifest, _, _) = constraint_engine::IconValidator::load_project_design_context(
+            &conn,
+            &project_root,
+            &project_id.to_string(),
+        )?;
         let report = constraint_engine::IconValidator::validate_icon(&manifest, &req.icon);
         Ok::<_, HarnessError>(report)
     })
     .await
-    .map_err(|e| map_error_to_response(HarnessError::ValidationFailed {
-        reason: format!("BLOCKING_TASK_FAILED: {e}"),
-    }))?
+    .map_err(|e| {
+        map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("BLOCKING_TASK_FAILED: {e}"),
+        })
+    })?
+    .map_err(map_error_to_response)?;
+
+    Ok(Json(resp))
+}
+
+pub(super) async fn handle_validate_typography(
+    State(state): State<DaemonAppState>,
+    AxumPath(id): AxumPath<String>,
+    headers: HeaderMap,
+    Json(req): Json<ValidateTypographyRequest>,
+) -> Result<Json<constraint_engine::TypographyValidationReport>, Response> {
+    let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
+    let (project_registry, project_root, _) =
+        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+            .map_err(map_error_to_response)?;
+
+    let resp = tokio::task::spawn_blocking(move || {
+        let conn = project_registry.pool().connection()?;
+        let (_, typography_contract, _) =
+            constraint_engine::IconValidator::load_project_design_context(
+                &conn,
+                &project_root,
+                &project_id.to_string(),
+            )?;
+        let report = constraint_engine::IconValidator::validate_typography_report(
+            &typography_contract,
+            &req.font_family,
+            req.font_weight,
+            req.font_size.as_deref(),
+            req.contrast_ratio,
+        );
+        Ok::<_, HarnessError>(report)
+    })
+    .await
+    .map_err(|e| {
+        map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("BLOCKING_TASK_FAILED: {e}"),
+        })
+    })?
+    .map_err(map_error_to_response)?;
+
+    Ok(Json(resp))
+}
+
+pub(super) async fn handle_validate_component(
+    State(state): State<DaemonAppState>,
+    AxumPath(id): AxumPath<String>,
+    headers: HeaderMap,
+    Json(req): Json<ValidateComponentRequest>,
+) -> Result<Json<constraint_engine::ComponentValidationReport>, Response> {
+    let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
+    let (project_registry, project_root, _) =
+        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+            .map_err(map_error_to_response)?;
+
+    let resp = tokio::task::spawn_blocking(move || {
+        let conn = project_registry.pool().connection()?;
+        let (_, _, component_registry) =
+            constraint_engine::IconValidator::load_project_design_context(
+                &conn,
+                &project_root,
+                &project_id.to_string(),
+            )?;
+        let report = constraint_engine::IconValidator::validate_component(
+            &component_registry,
+            &req.component,
+        );
+        Ok::<_, HarnessError>(report)
+    })
+    .await
+    .map_err(|e| {
+        map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("BLOCKING_TASK_FAILED: {e}"),
+        })
+    })?
+    .map_err(map_error_to_response)?;
+
+    Ok(Json(resp))
+}
+
+pub(super) async fn handle_get_design_contracts(
+    State(state): State<DaemonAppState>,
+    AxumPath(id): AxumPath<String>,
+    headers: HeaderMap,
+) -> Result<Json<domain::ProjectDesignContracts>, Response> {
+    let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
+    let (project_registry, project_root, _) =
+        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+            .map_err(map_error_to_response)?;
+
+    let resp = tokio::task::spawn_blocking(move || {
+        let conn = project_registry.pool().connection()?;
+        constraint_engine::IconValidator::load_project_design_contracts(
+            &conn,
+            &project_root,
+            &project_id.to_string(),
+        )
+    })
+    .await
+    .map_err(|e| {
+        map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("BLOCKING_TASK_FAILED: {e}"),
+        })
+    })?
+    .map_err(map_error_to_response)?;
+
+    Ok(Json(resp))
+}
+
+pub(super) async fn handle_put_design_contracts(
+    State(state): State<DaemonAppState>,
+    AxumPath(id): AxumPath<String>,
+    headers: HeaderMap,
+    Json(contracts): Json<domain::ProjectDesignContracts>,
+) -> Result<Json<domain::ProjectDesignContracts>, Response> {
+    let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
+    let (project_registry, project_root, _) =
+        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+            .map_err(map_error_to_response)?;
+
+    let resp = tokio::task::spawn_blocking(move || {
+        let mut conn = project_registry.pool().connection()?;
+        let proj_id_str = project_id.to_string();
+        constraint_engine::IconValidator::save_project_design_contracts(
+            &mut conn,
+            &project_root,
+            &proj_id_str,
+            &contracts,
+        )?;
+        constraint_engine::IconValidator::load_project_design_contracts(
+            &conn,
+            &project_root,
+            &proj_id_str,
+        )
+    })
+    .await
+    .map_err(|e| {
+        map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("BLOCKING_TASK_FAILED: {e}"),
+        })
+    })?
     .map_err(map_error_to_response)?;
 
     Ok(Json(resp))
