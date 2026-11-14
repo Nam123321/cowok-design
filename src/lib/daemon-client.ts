@@ -19,7 +19,15 @@ interface DaemonLockRecord {
 
 const STRIP_PREFIXES = ["x-cowok-", "x-tenant-", "x-user-", "x-forwarded-"];
 let spawningPromise: Promise<DaemonLockRecord> | null = null;
-const seededWorkspaces = new Set<string>();
+const SEEDED_WORKSPACES_SYMBOL = Symbol.for("cowok.daemonSeedPromises");
+
+function getSeededWorkspacePromises(): Map<string, Promise<void>> {
+  const g = globalThis as Record<PropertyKey, unknown>;
+  if (!(g[SEEDED_WORKSPACES_SYMBOL] instanceof Map)) {
+    g[SEEDED_WORKSPACES_SYMBOL] = new Map<string, Promise<void>>();
+  }
+  return g[SEEDED_WORKSPACES_SYMBOL] as Map<string, Promise<void>>;
+}
 
 export function resolveWorkspaceRoot(): string {
   const raw = process.env.UXUI_OS_WORKSPACE_ROOT?.trim() || process.cwd();
@@ -78,6 +86,55 @@ function resolveDaemonBinaryPath(): string {
   throw new Error(`Missing harness-daemon binary at ${repoBin}; run 'cargo build --bin harness-daemon'`);
 }
 
+async function seedDefaultProjects(lock: DaemonLockRecord): Promise<void> {
+  const defaultProjects = [
+    {
+      id: DEFAULT_FLOW_PROJECT_ID,
+      slug: "cowok-design-default",
+      name: "cowok-design",
+      product_brief: "Default seeded Flow-First 2D DAG Studio project for local workbench execution.",
+    },
+    {
+      id: "22222222-2222-4222-8222-222222222222",
+      slug: "cowok-ai-workbench",
+      name: "Cowok.ai",
+      product_brief: "Seeded Cowok.ai multi-agent OS workbench project.",
+    },
+    {
+      id: "33333333-3333-4333-8333-333333333333",
+      slug: "markops-platform",
+      name: "Markops_platform",
+      product_brief: "Seeded Markops scratch workbench project.",
+    },
+  ];
+  for (const proj of defaultProjects) {
+    const rawBody = JSON.stringify({
+      ...proj,
+      workspace_root: null,
+      inherit_brand_from_project_id: null,
+    });
+    const headers = buildCanonicalHmacHeaders({
+      daemonNonce: lock.daemon_nonce,
+      hmacKeyHex: lock.hmac_key_hex,
+      method: "POST",
+      canonicalPath: "/api/v1/projects",
+      rawQuery: "",
+      principal: {
+        tenantId: "local-default",
+        userId: "bff-bootstrap",
+        role: "editor",
+      },
+      rawBody,
+      correlationId: crypto.randomUUID(),
+    });
+    await fetch(`http://127.0.0.1:${lock.port}/api/v1/projects`, {
+      method: "POST",
+      headers,
+      body: rawBody,
+    }).catch(() => undefined);
+  }
+}
+
 async function verifyHealthAndSeedDefaultProject(lock: DaemonLockRecord, workspaceRoot: string): Promise<void> {
   const healthRes = await fetch(`http://127.0.0.1:${lock.port}/api/v1/health`);
   if (!healthRes.ok) {
@@ -87,55 +144,16 @@ async function verifyHealthAndSeedDefaultProject(lock: DaemonLockRecord, workspa
   if (health.service !== "cowok-design-harness-daemon" || (health.schema_version ?? 0) < 6) {
     throw new Error("Unexpected daemon health identity or schema_version");
   }
-  if (!seededWorkspaces.has(workspaceRoot)) {
-    seededWorkspaces.add(workspaceRoot);
-    const defaultProjects = [
-      {
-        id: DEFAULT_FLOW_PROJECT_ID,
-        slug: "cowok-design-default",
-        name: "cowok-design",
-        product_brief: "Default seeded Flow-First 2D DAG Studio project for local workbench execution.",
-      },
-      {
-        id: "22222222-2222-4222-8222-222222222222",
-        slug: "cowok-ai-workbench",
-        name: "Cowok.ai",
-        product_brief: "Seeded Cowok.ai multi-agent OS workbench project.",
-      },
-      {
-        id: "33333333-3333-4333-8333-333333333333",
-        slug: "markops-platform",
-        name: "Markops_platform",
-        product_brief: "Seeded Markops scratch workbench project.",
-      },
-    ];
-    for (const proj of defaultProjects) {
-      const rawBody = JSON.stringify({
-        ...proj,
-        workspace_root: null,
-        inherit_brand_from_project_id: null,
-      });
-      const headers = buildCanonicalHmacHeaders({
-        daemonNonce: lock.daemon_nonce,
-        hmacKeyHex: lock.hmac_key_hex,
-        method: "POST",
-        canonicalPath: "/api/v1/projects",
-        rawQuery: "",
-        principal: {
-          tenantId: "local-default",
-          userId: "bff-bootstrap",
-          role: "editor",
-        },
-        rawBody,
-        correlationId: crypto.randomUUID(),
-      });
-      await fetch(`http://127.0.0.1:${lock.port}/api/v1/projects`, {
-        method: "POST",
-        headers,
-        body: rawBody,
-      }).catch(() => undefined);
-    }
+  const seedingPromises = getSeededWorkspacePromises();
+  let seeding = seedingPromises.get(workspaceRoot);
+  if (!seeding) {
+    seeding = seedDefaultProjects(lock).catch((err) => {
+      seedingPromises.delete(workspaceRoot);
+      throw err;
+    });
+    seedingPromises.set(workspaceRoot, seeding);
   }
+  await seeding;
 }
 
 export async function ensureRunningDaemon(): Promise<DaemonLockRecord> {
