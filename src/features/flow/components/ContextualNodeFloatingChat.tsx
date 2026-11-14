@@ -163,6 +163,35 @@ const FloatingChatHeader: React.FC<{
   );
 };
 
+function openFloatingChatEventStream(params: {
+  projectId: string;
+  primaryNode: WorkbenchNode | null;
+  selectedNodesCount: number;
+  streamAbortRef: React.MutableRefObject<AbortController | null>;
+  onAppendMsg: (msg: FloatingChatMessage) => void;
+  t: (key: string, fallback: string) => string;
+}): AbortController {
+  params.streamAbortRef.current?.abort();
+  const controller = new AbortController();
+  params.streamAbortRef.current = controller;
+  void apiWorkbenchSettings
+    .streamJobEvents(params.projectId, {
+      nodeId: params.selectedNodesCount === 1 ? params.primaryNode?.id : undefined,
+      signal: controller.signal,
+      onEvents: (events) => {
+        const summaryText = events.map((ev) => `[${ev.eventKind}] ${ev.payloadText || ev.nodeId}`).join("\n");
+        if (!summaryText) return;
+        params.onAppendMsg({ id: `sse-${Date.now()}-${events[0]?.seqNo ?? 0}`, nodeId: params.primaryNode?.id || "unknown", role: "assistant", content: summaryText, timestamp: Date.now() });
+      },
+    })
+    .catch((err: unknown) => {
+      if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
+      const msg = err instanceof Error ? err.message : "stream_failed";
+      params.onAppendMsg({ id: `sse-err-${Date.now()}`, nodeId: params.primaryNode?.id || "unknown", role: "assistant", content: `${params.t("floatingChat.daemonSyncError", "Không thể đồng bộ với Rust daemon")}: ${msg}`, timestamp: Date.now() });
+    });
+  return controller;
+}
+
 async function dispatchNodeJobToDaemon(params: {
   projectId: string;
   sessionId: string;
@@ -175,22 +204,18 @@ async function dispatchNodeJobToDaemon(params: {
   t: (key: string, fallback: string) => string;
   formatNumber: (value: number) => string;
 }) {
-  if (!UUID_RE.test(params.projectId)) return;
-  params.streamAbortRef.current?.abort();
-  const controller = new AbortController();
-  params.streamAbortRef.current = controller;
-
-  void apiWorkbenchSettings
-    .streamJobEvents(params.projectId, {
-      nodeId: params.primaryNode?.id,
-      signal: controller.signal,
-      onEvents: (events) => {
-        const summaryText = events.map((ev) => `[${ev.eventKind}] ${ev.payloadText || ev.nodeId}`).join("\n");
-        if (!summaryText) return;
-        params.onAppendMsg({ id: `sse-${Date.now()}-${events[0]?.seqNo ?? 0}`, nodeId: params.primaryNode?.id || "unknown", role: "assistant", content: summaryText, timestamp: Date.now() });
-      },
-    })
-    .catch(() => {});
+  if (!UUID_RE.test(params.projectId)) {
+    params.jobs.forEach((job) => params.coordinator.failJob(job.id, "NON_UUID_PROJECT"));
+    return;
+  }
+  const controller = openFloatingChatEventStream({
+    projectId: params.projectId,
+    primaryNode: params.primaryNode,
+    selectedNodesCount: params.jobs.length,
+    streamAbortRef: params.streamAbortRef,
+    onAppendMsg: params.onAppendMsg,
+    t: params.t,
+  });
 
   try {
     for (const job of params.jobs) {
@@ -208,6 +233,7 @@ async function dispatchNodeJobToDaemon(params: {
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : params.t("floatingChat.daemonRequestFailed", "Yêu cầu Daemon thất bại");
+    params.jobs.forEach((job) => params.coordinator.failJob(job.id, msg));
     params.onAppendMsg({ id: `err-${Date.now()}`, nodeId: params.primaryNode?.id || "unknown", role: "assistant", content: `${params.t("floatingChat.daemonSyncError", "Không thể đồng bộ với Rust daemon")}: ${msg}`, timestamp: Date.now() });
   } finally {
     controller.abort();
@@ -260,7 +286,10 @@ function useFloatingChatController(props: ContextualNodeFloatingChatProps) {
     coordinator.steerJob(primaryStatus.jobId, instruction);
     appendMsg({ id: `steer-${Date.now()}`, nodeId: primaryNode?.id || "unknown", role: "user", content: `${t("floatingChat.steerPrefix", "Chỉ dẫn thêm (Steer)")}: ${instruction}`, timestamp: Date.now() });
     if (UUID_RE.test(props.projectId) && primaryNode) {
-      void apiWorkbenchSettings.postJobEvent(props.projectId, { jobId: primaryStatus.jobId, nodeId: primaryNode.id, sessionId: props.sessionId, eventKind: "steered", payloadText: JSON.stringify({ instruction }), jobStatus: "RUNNING" }).catch(() => {});
+      void apiWorkbenchSettings.postJobEvent(props.projectId, { jobId: primaryStatus.jobId, nodeId: primaryNode.id, sessionId: props.sessionId, eventKind: "steered", payloadText: JSON.stringify({ instruction }), jobStatus: "RUNNING" }).catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : "steer_failed";
+        appendMsg({ id: `steer-err-${Date.now()}`, nodeId: primaryNode.id, role: "assistant", content: `${t("floatingChat.daemonSyncError", "Không thể đồng bộ với Rust daemon")}: ${msg}`, timestamp: Date.now() });
+      });
     }
     setSteerDraft("");
     setIsSteering(false);

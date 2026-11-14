@@ -59,13 +59,29 @@ pub fn resolve_project_scoped_registry(
     base_registry: &SpecRegistry,
     project_id: Uuid,
 ) -> Result<(SpecRegistry, PathBuf), HarnessError> {
+    resolve_project_scoped_registry_inner(base_registry, project_id, false)
+}
+
+pub fn resolve_project_scoped_registry_including_trashed(
+    base_registry: &SpecRegistry,
+    project_id: Uuid,
+) -> Result<(SpecRegistry, PathBuf), HarnessError> {
+    resolve_project_scoped_registry_inner(base_registry, project_id, true)
+}
+
+fn resolve_project_scoped_registry_inner(
+    base_registry: &SpecRegistry,
+    project_id: Uuid,
+    allow_trashed: bool,
+) -> Result<(SpecRegistry, PathBuf), HarnessError> {
     let conn = base_registry.pool().connection()?;
+    let sql = if allow_trashed {
+        "SELECT workspace_root FROM projects WHERE id = ?1"
+    } else {
+        "SELECT workspace_root FROM projects WHERE id = ?1 AND trash_deleted_at IS NULL"
+    };
     let row: Option<String> = conn
-        .query_row(
-            "SELECT workspace_root FROM projects WHERE id = ?1",
-            params![project_id.to_string()],
-            |r| r.get(0),
-        )
+        .query_row(sql, params![project_id.to_string()], |r| r.get(0))
         .optional()
         .map_err(|e| map_sqlite_error(e, "resolve_project_scoped_registry"))?;
 
@@ -82,16 +98,18 @@ pub fn resolve_project_scoped_registry(
         PathBuf::from(&db_root_str)
     };
 
-    if !raw_proj_path.exists() {
-        fs::create_dir_all(&raw_proj_path).map_err(|e| HarnessError::ValidationFailed {
-            reason: format!(
-                "PROJECT_WORKSPACE_CREATE_FAILED [{}]: {e}",
-                raw_proj_path.display()
-            ),
-        })?;
-    }
-
-    let proj_canon_root = validate_and_canonicalize_workspace_root(&raw_proj_path)?;
+    let proj_canon_root = if let Ok(rel) = raw_proj_path.strip_prefix(&daemon_canon_root) {
+        let mut cur_fd = crate::routes::fs_jail::open_dir_abs_nofollow(&daemon_canon_root)?;
+        for comp in rel.components() {
+            if let std::path::Component::Normal(seg) = comp {
+                cur_fd = crate::routes::fs_jail::ensure_child_dir_fd(&cur_fd, seg, 0o700)?;
+            }
+        }
+        validate_and_canonicalize_workspace_root(&raw_proj_path)?
+    } else {
+        let anchor = crate::routes::fs_jail::provision_dir_zero_toctou(&raw_proj_path)?;
+        validate_and_canonicalize_workspace_root(&anchor.canonical_path)?
+    };
 
     // AC-07 / F-01: Check boundary_type in project_boundaries.
     // If project is folder_backed (promoted from scratch or linked to an external folder repo),
@@ -128,124 +146,35 @@ pub fn resolve_project_scoped_registry(
 /// Ensures that `.cowok-design/project.token` exists inside `proj_canon_root` with POSIX `0600` permissions.
 /// Returns the secret token string.
 pub fn ensure_project_token(proj_canon_root: &Path) -> Result<String, HarnessError> {
-    let token_dir = proj_canon_root.join(".cowok-design");
-    if !token_dir.exists() {
-        fs::create_dir_all(&token_dir).map_err(|e| HarnessError::ValidationFailed {
-            reason: format!(
-                "Failed to create token directory '{}': {e}",
-                token_dir.display()
-            ),
-        })?;
-    }
+    let root_fd = crate::routes::fs_jail::open_dir_abs_nofollow(proj_canon_root)?;
+    let dir_fd = crate::routes::fs_jail::ensure_child_dir_fd(
+        &root_fd,
+        std::ffi::OsStr::new(".cowok-design"),
+        0o700,
+    )?;
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = fs::set_permissions(&token_dir, fs::Permissions::from_mode(0o700));
-    }
-
-    let token_file = token_dir.join("project.token");
-    if let Ok(meta) = fs::symlink_metadata(&token_dir) {
-        if meta.file_type().is_symlink() {
-            return Err(HarnessError::PathTraversalDenied {
-                path: token_dir.display().to_string(),
+        use std::os::fd::AsRawFd;
+        if unsafe { libc::fchmod(dir_fd.as_raw_fd(), 0o700) } != 0 {
+            return Err(HarnessError::ValidationFailed {
+                reason: format!(
+                    "Failed to chmod 0700 on token directory '{}/.cowok-design': {}",
+                    proj_canon_root.display(),
+                    std::io::Error::last_os_error()
+                ),
             });
         }
     }
-    if let Ok(meta) = fs::symlink_metadata(&token_file) {
-        if meta.file_type().is_symlink() {
-            return Err(HarnessError::PathTraversalDenied {
-                path: token_file.display().to_string(),
-            });
-        }
-    }
-    if !token_file.exists() {
-        let secret = format!("tok_{}", Uuid::new_v4().simple());
-        #[cfg(unix)]
-        {
-            use std::io::Write;
-            use std::os::unix::fs::OpenOptionsExt;
-            let mut opts = fs::OpenOptions::new();
-            opts.write(true)
-                .create_new(true)
-                .custom_flags(libc::O_NOFOLLOW)
-                .mode(0o600);
-            let mut f = opts
-                .open(&token_file)
-                .map_err(|e| HarnessError::ValidationFailed {
-                    reason: format!(
-                        "Failed to create token file '{}': {e}",
-                        token_file.display()
-                    ),
-                })?;
-            f.write_all(secret.as_bytes())
-                .map_err(|e| HarnessError::ValidationFailed {
-                    reason: format!("Failed to write token file '{}': {e}", token_file.display()),
-                })?;
-            f.sync_all().map_err(|e| HarnessError::ValidationFailed {
-                reason: format!("Failed to sync token file '{}': {e}", token_file.display()),
-            })?;
-        }
-        #[cfg(not(unix))]
-        {
-            let mut opts = fs::OpenOptions::new();
-            opts.write(true).create_new(true);
-            use std::io::Write;
-            let mut f = opts
-                .open(&token_file)
-                .map_err(|e| HarnessError::ValidationFailed {
-                    reason: format!(
-                        "Failed to create token file '{}': {e}",
-                        token_file.display()
-                    ),
-                })?;
-            f.write_all(secret.as_bytes())
-                .map_err(|e| HarnessError::ValidationFailed {
-                    reason: format!("Failed to write token file '{}': {e}", token_file.display()),
-                })?;
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&token_file, fs::Permissions::from_mode(0o600)).map_err(|e| {
-                HarnessError::ValidationFailed {
-                    reason: format!("Failed to set 0600 permissions on project.token: {e}"),
-                }
-            })?;
-        }
-        Ok(secret)
-    } else {
-        #[cfg(unix)]
-        {
-            use std::io::Read;
-            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-            fs::set_permissions(&token_file, fs::Permissions::from_mode(0o600)).map_err(|e| {
-                HarnessError::ValidationFailed {
-                    reason: format!("Failed to enforce 0600 permissions on project.token: {e}"),
-                }
-            })?;
-            let mut f = fs::OpenOptions::new()
-                .read(true)
-                .custom_flags(libc::O_NOFOLLOW)
-                .open(&token_file)
-                .map_err(|e| HarnessError::PathTraversalDenied {
-                    path: format!("{} ({e})", token_file.display()),
-                })?;
-            let mut s = String::new();
-            f.read_to_string(&mut s)
-                .map_err(|e| HarnessError::ValidationFailed {
-                    reason: format!("Failed to read project.token: {e}"),
-                })?;
-            Ok(s.trim().to_string())
-        }
-        #[cfg(not(unix))]
-        {
-            fs::read_to_string(&token_file)
-                .map(|s| s.trim().to_string())
-                .map_err(|e| HarnessError::ValidationFailed {
-                    reason: format!("Failed to read project.token: {e}"),
-                })
-        }
-    }
+    let bytes = crate::routes::fs_jail::ensure_regular_file_or_init_in_dir_fd(
+        &dir_fd,
+        std::ffi::OsStr::new("project.token"),
+        0o600,
+        || format!("tok_{}", Uuid::new_v4().simple()).into_bytes(),
+    )?;
+    let s = String::from_utf8(bytes).map_err(|e| HarnessError::ValidationFailed {
+        reason: format!("Invalid UTF-8 in project.token: {e}"),
+    })?;
+    Ok(s.trim().to_string())
 }
 
 /// Validates an optional `seed_repo_path`, rejecting traversal (`..`) and symlinks (`EC-E01-03`),

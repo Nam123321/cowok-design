@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use axum::{
     extract::{Extension, Path as AxumPath, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{
         sse::{Event, KeepAlive, Sse},
         IntoResponse, Response,
@@ -746,6 +746,9 @@ pub struct AgentSettingDto {
     pub credential_ref: String,
     pub is_default: bool,
     pub status: String,
+    pub permission_mode: String,
+    pub vault_mode: String,
+    pub onboarding_done: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -764,10 +767,24 @@ pub struct UpsertAgentSettingInput {
     pub is_default: bool,
     #[serde(default = "default_setting_status")]
     pub status: String,
+    #[serde(default = "default_permission_mode")]
+    pub permission_mode: String,
+    #[serde(default = "default_vault_mode")]
+    pub vault_mode: String,
+    #[serde(default)]
+    pub onboarding_done: bool,
 }
 
 fn default_setting_status() -> String {
     "configured".to_string()
+}
+
+fn default_permission_mode() -> String {
+    "ask-every-time".to_string()
+}
+
+fn default_vault_mode() -> String {
+    "keychain".to_string()
 }
 
 fn sanitize_credential_ref(raw: &str) -> String {
@@ -791,6 +808,7 @@ fn sanitize_credential_ref(raw: &str) -> String {
 
 fn map_agent_setting_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentSettingDto> {
     let is_def: i64 = row.get(7)?;
+    let onboarded: i64 = row.get(11)?;
     Ok(AgentSettingDto {
         id: row.get(0)?,
         tenant_id: row.get(1)?,
@@ -801,8 +819,11 @@ fn map_agent_setting_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AgentSetti
         credential_ref: row.get(6)?,
         is_default: is_def != 0,
         status: row.get(8)?,
-        created_at: epoch_ms_to_iso(row.get(9)?),
-        updated_at: epoch_ms_to_iso(row.get(10)?),
+        permission_mode: row.get(9)?,
+        vault_mode: row.get(10)?,
+        onboarding_done: onboarded != 0,
+        created_at: epoch_ms_to_iso(row.get(12)?),
+        updated_at: epoch_ms_to_iso(row.get(13)?),
     })
 }
 
@@ -816,7 +837,8 @@ pub async fn handle_list_agent_settings(
         let mut stmt = conn
             .prepare(
                 "SELECT id, tenant_id, project_id, provider_id, model_id, endpoint_url,
-                        credential_ref, is_default, status, created_at, updated_at
+                        credential_ref, is_default, status, permission_mode, vault_mode,
+                        onboarding_done, created_at, updated_at
                  FROM agent_settings
                  WHERE tenant_id = ?1
                  ORDER BY is_default DESC, updated_at DESC",
@@ -843,11 +865,36 @@ pub async fn handle_upsert_agent_setting(
 ) -> Result<Json<AgentSettingDto>, Response> {
     let provider_id = check_non_empty_id(&req.provider_id, "providerId")?;
     let model_id = check_non_empty_id(&req.model_id, "modelId")?;
+    let perm_mode = req.permission_mode.trim();
+    if !matches!(
+        perm_mode,
+        "ask-every-time" | "auto_sandbox" | "ask_risky" | "ask_all" | "accept_edits" | "bypass"
+    ) {
+        return Err(json_err(
+            StatusCode::BAD_REQUEST,
+            "VALIDATION_ERROR",
+            "Invalid permissionMode",
+        ));
+    }
+    let vault_mode = req.vault_mode.trim();
+    if !matches!(
+        vault_mode,
+        "keychain" | "vault_0600" | "ram_only" | "ephemeral"
+    ) {
+        return Err(json_err(
+            StatusCode::BAD_REQUEST,
+            "VALIDATION_ERROR",
+            "Invalid vaultMode",
+        ));
+    }
     let proj_opt = match req.project_id {
         Some(ref p) if !p.trim().is_empty() => Some(check_project_uuid(p)?),
         _ => None,
     };
     let safe_cred_ref = sanitize_credential_ref(&req.credential_ref);
+    let perm_owned = perm_mode.to_string();
+    let vault_owned = vault_mode.to_string();
+    let onboarding_int = if req.onboarding_done { 1i64 } else { 0i64 };
     let pool = state.registry.pool().clone();
 
     let saved = run_db(move || {
@@ -880,14 +927,19 @@ pub async fn handle_upsert_agent_setting(
                     "UPDATE agent_settings
                      SET model_id = ?1, endpoint_url = ?2,
                          credential_ref = CASE WHEN ?3 = '' THEN credential_ref ELSE ?3 END,
-                         is_default = ?4, status = ?5, updated_at = ?6
-                     WHERE id = ?7",
+                         is_default = ?4, status = ?5,
+                         permission_mode = ?6, vault_mode = ?7, onboarding_done = ?8,
+                         updated_at = ?9
+                     WHERE id = ?10",
                     params![
                         model_id,
                         req.endpoint_url.trim(),
                         safe_cred_ref,
                         if req.is_default { 1 } else { 0 },
                         req.status.trim(),
+                        perm_owned,
+                        vault_owned,
+                        onboarding_int,
                         now_ms,
                         ex_id
                     ],
@@ -897,8 +949,9 @@ pub async fn handle_upsert_agent_setting(
                 tx.execute(
                     "INSERT INTO agent_settings (
                         id, tenant_id, project_id, provider_id, model_id, endpoint_url,
-                        credential_ref, is_default, status, created_at, updated_at
-                     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)",
+                        credential_ref, is_default, status, permission_mode, vault_mode,
+                        onboarding_done, created_at, updated_at
+                     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)",
                     params![
                         new_id,
                         principal.tenant_id,
@@ -909,6 +962,9 @@ pub async fn handle_upsert_agent_setting(
                         safe_cred_ref,
                         if req.is_default { 1 } else { 0 },
                         req.status.trim(),
+                        perm_owned,
+                        vault_owned,
+                        onboarding_int,
                         now_ms
                     ],
                 )?;
@@ -917,7 +973,8 @@ pub async fn handle_upsert_agent_setting(
 
             let row = tx.query_row(
                 "SELECT id, tenant_id, project_id, provider_id, model_id, endpoint_url,
-                        credential_ref, is_default, status, created_at, updated_at
+                        credential_ref, is_default, status, permission_mode, vault_mode,
+                        onboarding_done, created_at, updated_at
                  FROM agent_settings WHERE id = ?1",
                 params![final_id],
                 map_agent_setting_row,
@@ -1031,6 +1088,38 @@ pub async fn handle_list_mcp_servers(
     Ok(Json(list))
 }
 
+fn validate_mcp_target(transport_kind: &str, raw_target: &str) -> Result<String, Response> {
+    let target = check_non_empty_id(raw_target, "commandOrUrl")?;
+    if target.contains('\n') || target.contains('\r') || target.contains('\0') {
+        return Err(json_err(
+            StatusCode::BAD_REQUEST,
+            "VALIDATION_ERROR",
+            "commandOrUrl cannot contain control characters",
+        ));
+    }
+    if transport_kind == "http_sse" {
+        if !(target.starts_with("http://") || target.starts_with("https://"))
+            || target.contains(char::is_whitespace)
+        {
+            return Err(json_err(
+                StatusCode::BAD_REQUEST,
+                "VALIDATION_ERROR",
+                "http_sse commandOrUrl must be an http:// or https:// URL without whitespace",
+            ));
+        }
+    } else if [";", "&&", "||", "|", "`", "$(", ">", "<"]
+        .iter()
+        .any(|ch| target.contains(ch))
+    {
+        return Err(json_err(
+            StatusCode::BAD_REQUEST,
+            "VALIDATION_ERROR",
+            "stdio commandOrUrl contains disallowed shell metacharacters",
+        ));
+    }
+    Ok(target)
+}
+
 pub async fn handle_upsert_mcp_server(
     State(state): State<DaemonAppState>,
     Extension(principal): Extension<FlowPrincipal>,
@@ -1038,12 +1127,23 @@ pub async fn handle_upsert_mcp_server(
 ) -> Result<(StatusCode, Json<McpServerDto>), Response> {
     let slug = check_non_empty_id(&req.server_slug, "serverSlug")?;
     let name = check_non_empty_id(&req.display_name, "displayName")?;
-    let target = check_non_empty_id(&req.command_or_url, "commandOrUrl")?;
     if !matches!(req.transport_kind.as_str(), "stdio" | "http_sse") {
         return Err(json_err(
             StatusCode::BAD_REQUEST,
             "VALIDATION_ERROR",
             "transportKind must be 'stdio' or 'http_sse'",
+        ));
+    }
+    let target = validate_mcp_target(&req.transport_kind, &req.command_or_url)?;
+    let perm_tier = req.permission_tier.trim().to_string();
+    if !matches!(
+        perm_tier.as_str(),
+        "read_only" | "ask" | "auto_sandbox" | "admin"
+    ) {
+        return Err(json_err(
+            StatusCode::BAD_REQUEST,
+            "VALIDATION_ERROR",
+            "permissionTier must be 'read_only', 'ask', 'auto_sandbox', or 'admin'",
         ));
     }
     let proj_opt = match req.project_id {
@@ -1082,7 +1182,7 @@ pub async fn handle_upsert_mcp_server(
                         name,
                         req.transport_kind,
                         target,
-                        req.permission_tier.trim(),
+                        perm_tier,
                         if req.enabled { 1 } else { 0 },
                         now_ms,
                         ex_id
@@ -1104,7 +1204,7 @@ pub async fn handle_upsert_mcp_server(
                         name,
                         req.transport_kind,
                         target,
-                        req.permission_tier.trim(),
+                        perm_tier,
                         if req.enabled { 1 } else { 0 },
                         now_ms
                     ],
@@ -1145,9 +1245,9 @@ pub async fn handle_delete_mcp_server(
 ) -> Result<Json<DeleteMcpResponse>, Response> {
     let sid = check_non_empty_id(&server_id, "server_id")?;
     let pool = state.registry.pool().clone();
-    let deleted = run_db(move || {
+    let count = run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
-        let count = retry_on_busy("delete_mcp_server", || {
+        retry_on_busy("delete_mcp_server", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
             let c = tx.execute(
                 "DELETE FROM mcp_servers WHERE id = ?1 AND tenant_id = ?2",
@@ -1156,15 +1256,22 @@ pub async fn handle_delete_mcp_server(
             tx.commit()?;
             Ok::<usize, rusqlite::Error>(c)
         })
-        .map_err(|e| map_harness_resp(e, "delete_mcp_server"))?;
-        Ok(DeleteMcpResponse {
-            deleted: count > 0,
-            id: sid,
-        })
+        .map_err(|e| map_harness_resp(e, "delete_mcp_server"))
     })
     .await?;
 
-    Ok(Json(deleted))
+    if count == 0 {
+        return Err(json_err(
+            StatusCode::NOT_FOUND,
+            "MCP_SERVER_NOT_FOUND",
+            format!("MCP server '{server_id}' was not found"),
+        ));
+    }
+
+    Ok(Json(DeleteMcpResponse {
+        deleted: true,
+        id: server_id.trim().to_string(),
+    }))
 }
 
 // -----------------------------------------------------------------------------
@@ -1181,6 +1288,8 @@ pub struct ExecutionEventDto {
     pub event_kind: String,
     pub payload_text: String,
     pub seq_no: i64,
+    pub project_seq: i64,
+    pub composite_scope_key: String,
     pub job_status: String,
     pub created_at: String,
 }
@@ -1216,9 +1325,10 @@ pub async fn handle_post_job_event(
     let node_id = check_non_empty_id(&req.node_id, "nodeId")?;
     let event_kind = check_non_empty_id(&req.event_kind, "eventKind")?;
     let next_status = match req.job_status.as_deref() {
-        Some(st @ ("QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED")) => {
-            Some(st.to_string())
-        }
+        Some(
+            st @ ("QUEUED" | "RUNNING" | "PAUSED" | "INTERRUPTED" | "COMPLETED" | "FAILED"
+            | "CANCELLED"),
+        ) => Some(st.to_string()),
         Some(_) => {
             return Err(json_err(
                 StatusCode::BAD_REQUEST,
@@ -1232,6 +1342,7 @@ pub async fn handle_post_job_event(
         .session_id
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| format!("sess-{pid}"));
+    let scope_key = format!("{pid}::{session_id_req}::{node_id}");
     let pool = state.registry.pool().clone();
 
     let created = run_db(move || {
@@ -1240,41 +1351,79 @@ pub async fn handle_post_job_event(
         let now_ms = Utc::now().timestamp_millis();
         let event_id = Uuid::new_v4().to_string();
 
-        let (seq_no, final_status) = retry_on_busy("append_execution_event", || {
+        let mut cross_scope_err: Option<(StatusCode, &'static str, String)> = None;
+        let outcome = retry_on_busy("append_execution_event", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-            let existing_sess: Option<String> = tx
+            let existing_sess: Option<(String, String)> = tx
                 .query_row(
-                    "SELECT id FROM chat_sessions WHERE id = ?1",
+                    "SELECT project_id, tenant_id FROM chat_sessions WHERE id = ?1",
                     params![session_id_req],
-                    |r| r.get(0),
+                    |r| Ok((r.get(0)?, r.get(1)?)),
                 )
                 .optional()?;
-            if existing_sess.is_none() {
-                tx.execute(
-                    "INSERT INTO chat_sessions (id, project_id, title, model_provider, created_at, updated_at)
-                     VALUES (?1, ?2, 'Execution Stream Session', 'default', ?3, ?3)",
-                    params![session_id_req, pid, now_ms],
-                )?;
+            match existing_sess {
+                Some((_, sess_tid)) if sess_tid != principal.tenant_id => {
+                    cross_scope_err = Some((
+                        StatusCode::FORBIDDEN,
+                        "TENANT_ISOLATION_BREACH",
+                        "Session belongs to another tenant".to_string(),
+                    ));
+                    return Ok(None);
+                }
+                Some((sess_pid, _)) if sess_pid != pid => {
+                    cross_scope_err = Some((
+                        StatusCode::NOT_FOUND,
+                        "PROJECT_NOT_FOUND",
+                        format!("Session '{session_id_req}' does not belong to project '{pid}'"),
+                    ));
+                    return Ok(None);
+                }
+                Some(_) => {}
+                None => {
+                    tx.execute(
+                        "INSERT INTO chat_sessions (id, tenant_id, project_id, title, model_provider, created_at, updated_at)
+                         VALUES (?1, ?2, ?3, 'Execution Stream Session', 'default', ?4, ?4)",
+                        params![session_id_req, principal.tenant_id, pid, now_ms],
+                    )?;
+                }
             }
 
-            let cur_status: Option<String> = tx
+            let cur_job: Option<(String, String, String)> = tx
                 .query_row(
-                    "SELECT status FROM node_execution_jobs WHERE id = ?1 AND project_id = ?2",
-                    params![job_id, pid],
-                    |r| r.get(0),
+                    "SELECT project_id, tenant_id, status FROM node_execution_jobs WHERE id = ?1",
+                    params![job_id],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
                 )
                 .optional()?;
 
-            let eff_status = match cur_status {
-                Some(cur) => {
+            let eff_status = match cur_job {
+                Some((_, job_tid, _)) if job_tid != principal.tenant_id => {
+                    cross_scope_err = Some((
+                        StatusCode::FORBIDDEN,
+                        "TENANT_ISOLATION_BREACH",
+                        "Job belongs to another tenant".to_string(),
+                    ));
+                    return Ok(None);
+                }
+                Some((job_pid, _, _)) if job_pid != pid => {
+                    cross_scope_err = Some((
+                        StatusCode::NOT_FOUND,
+                        "PROJECT_NOT_FOUND",
+                        format!("Job '{job_id}' does not belong to project '{pid}'"),
+                    ));
+                    return Ok(None);
+                }
+                Some((_, _, cur)) => {
                     let target = next_status.clone().unwrap_or(cur);
                     tx.execute(
                         "UPDATE node_execution_jobs
                          SET status = ?1,
-                             started_at = COALESCE(started_at, ?2),
-                             completed_at = CASE WHEN ?1 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?2 ELSE completed_at END
-                         WHERE id = ?3 AND project_id = ?4",
-                        params![target, now_ms, job_id, pid],
+                             composite_scope_key = CASE WHEN composite_scope_key = '' THEN ?2 ELSE composite_scope_key END,
+                             started_at = COALESCE(started_at, ?3),
+                             completed_at = CASE WHEN ?1 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?3 ELSE completed_at END,
+                             updated_at = ?3
+                         WHERE id = ?4 AND project_id = ?5 AND tenant_id = ?6",
+                        params![target, scope_key, now_ms, job_id, pid, principal.tenant_id],
                     )?;
                     target
                 }
@@ -1284,10 +1433,20 @@ pub async fn handle_post_job_event(
                         .unwrap_or_else(|| "RUNNING".to_string());
                     tx.execute(
                         "INSERT INTO node_execution_jobs (
-                            id, project_id, session_id, node_id, status, fencing_token,
-                            priority, created_at, started_at, completed_at
-                         ) VALUES (?1, ?2, ?3, ?4, ?5, 1, 10, ?6, ?6, CASE WHEN ?5 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?6 ELSE NULL END)",
-                        params![job_id, pid, session_id_req, node_id, target, now_ms],
+                            id, tenant_id, project_id, session_id, node_id, composite_scope_key,
+                            daemon_nonce, status, fencing_token, priority,
+                            created_at, started_at, completed_at, updated_at
+                         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, '', ?7, 1, 10, ?8, ?8, CASE WHEN ?7 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?8 ELSE NULL END, ?8)",
+                        params![
+                            job_id,
+                            principal.tenant_id,
+                            pid,
+                            session_id_req,
+                            node_id,
+                            scope_key,
+                            target,
+                            now_ms
+                        ],
                     )?;
                     target
                 }
@@ -1298,27 +1457,44 @@ pub async fn handle_post_job_event(
                 params![job_id],
                 |r| r.get(0),
             )?;
+            let max_proj_seq: i64 = tx.query_row(
+                "SELECT COALESCE(MAX(project_seq), 0) FROM execution_events WHERE project_id = ?1",
+                params![pid],
+                |r| r.get(0),
+            )?;
             let next_seq = max_seq + 1;
+            let next_proj_seq = max_proj_seq + 1;
             tx.execute(
                 "INSERT INTO execution_events (
-                    id, tenant_id, project_id, job_id, node_id, event_kind, payload_text, seq_no, created_at
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    id, tenant_id, project_id, job_id, node_id, composite_scope_key,
+                    event_kind, payload_text, seq_no, project_seq, created_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
                 params![
                     event_id,
                     principal.tenant_id,
                     pid,
                     job_id,
                     node_id,
+                    scope_key,
                     event_kind,
                     req.payload_text,
                     next_seq,
+                    next_proj_seq,
                     now_ms
                 ],
             )?;
             tx.commit()?;
-            Ok::<(i64, String), rusqlite::Error>((next_seq, eff_status))
+            Ok::<Option<(i64, i64, String)>, rusqlite::Error>(Some((next_seq, next_proj_seq, eff_status)))
         })
         .map_err(|e| map_harness_resp(e, "append_execution_event"))?;
+        let Some((seq_no, project_seq, final_status)) = outcome else {
+            let (st, code, msg) = cross_scope_err.unwrap_or((
+                StatusCode::NOT_FOUND,
+                "PROJECT_NOT_FOUND",
+                format!("Resource does not belong to project '{pid}'"),
+            ));
+            return Err(json_err(st, code, msg));
+        };
 
         Ok(ExecutionEventDto {
             id: event_id,
@@ -1328,6 +1504,8 @@ pub async fn handle_post_job_event(
             event_kind,
             payload_text: req.payload_text,
             seq_no,
+            project_seq,
+            composite_scope_key: scope_key,
             job_status: final_status,
             created_at: epoch_ms_to_iso(now_ms),
         })
@@ -1353,18 +1531,20 @@ fn fetch_pending_events(
 ) -> Result<(Vec<ExecutionEventDto>, bool), HarnessError> {
     let conn = state.pool.connection()?;
     let mut sql = String::from(
-        "SELECT e.id, e.job_id, e.project_id, e.node_id, e.event_kind, e.payload_text, e.seq_no,
-                COALESCE(j.status, 'RUNNING'), e.created_at
+        "SELECT e.id, e.job_id, e.project_id, e.node_id, e.event_kind, e.payload_text,
+                e.seq_no, COALESCE(e.project_seq, e.seq_no) AS eff_proj_seq,
+                e.composite_scope_key, COALESCE(j.status, 'RUNNING'), e.created_at
          FROM execution_events e
          LEFT JOIN node_execution_jobs j ON j.id = e.job_id
-         WHERE e.tenant_id = ?1 AND e.project_id = ?2 AND e.seq_no > ?3",
+         WHERE e.tenant_id = ?1 AND e.project_id = ?2
+           AND COALESCE(e.project_seq, e.seq_no) > ?3",
     );
     if state.job_id.is_some() {
         sql.push_str(" AND e.job_id = ?4");
     } else if state.node_id.is_some() {
         sql.push_str(" AND e.node_id = ?4");
     }
-    sql.push_str(" ORDER BY e.seq_no ASC LIMIT 50");
+    sql.push_str(" ORDER BY eff_proj_seq ASC, e.created_at ASC LIMIT 50");
 
     let mut stmt = conn
         .prepare(&sql)
@@ -1379,8 +1559,10 @@ fn fetch_pending_events(
             event_kind: row.get(4)?,
             payload_text: row.get(5)?,
             seq_no: row.get(6)?,
-            job_status: row.get(7)?,
-            created_at: epoch_ms_to_iso(row.get(8)?),
+            project_seq: row.get(7)?,
+            composite_scope_key: row.get(8)?,
+            job_status: row.get(9)?,
+            created_at: epoch_ms_to_iso(row.get(10)?),
         })
     };
 
@@ -1427,6 +1609,7 @@ pub async fn handle_stream_job_events(
     State(state): State<DaemonAppState>,
     Extension(principal): Extension<FlowPrincipal>,
     AxumPath(id): AxumPath<String>,
+    headers: HeaderMap,
     Query(q): Query<StreamJobEventsQuery>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, Response> {
     let pid = check_project_uuid(&id)?;
@@ -1440,13 +1623,18 @@ pub async fn handle_stream_job_events(
     })
     .await?;
 
+    let last_event_id = headers
+        .get("last-event-id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.trim().parse::<i64>().ok());
+
     let init = SsePollState {
         pool: state.registry.pool().clone(),
         tenant_id: principal.tenant_id,
         project_id: pid,
         job_id: q.job_id.filter(|s| !s.trim().is_empty()),
         node_id: q.node_id.filter(|s| !s.trim().is_empty()),
-        last_seq: q.after_seq.unwrap_or(0),
+        last_seq: q.after_seq.or(last_event_id).unwrap_or(0),
         ticks: 0,
         closed: false,
     };
@@ -1475,7 +1663,7 @@ pub async fn handle_stream_job_events(
             match res {
                 Ok(Ok((events, is_terminal))) => {
                     if let Some(last) = events.last() {
-                        st.last_seq = last.seq_no;
+                        st.last_seq = last.project_seq.max(last.seq_no);
                     }
                     if !events.is_empty() {
                         if is_terminal {
@@ -1483,7 +1671,10 @@ pub async fn handle_stream_job_events(
                         }
                         let payload =
                             serde_json::to_string(&events).unwrap_or_else(|_| "[]".into());
-                        let ev = Event::default().event("execution_events").data(payload);
+                        let ev = Event::default()
+                            .id(st.last_seq.to_string())
+                            .event("execution_events")
+                            .data(payload);
                         return Some((Ok(ev), st));
                     }
                     if is_terminal || st.ticks >= 40 {
@@ -1543,8 +1734,8 @@ pub async fn handle_verify_provider_key(
             if key.starts_with("sk-ant-") && key.len() >= 24 {
                 (
                     true,
-                    "verified",
-                    "Anthropic credential format verified locally",
+                    "format_checked",
+                    "Anthropic key format valid (syntax check only; live upstream probe deferred to Story 04.3)",
                 )
             } else {
                 (
@@ -1558,8 +1749,8 @@ pub async fn handle_verify_provider_key(
             if key.starts_with("sk-") && key.len() >= 20 {
                 (
                     true,
-                    "verified",
-                    "OpenAI credential format verified locally",
+                    "format_checked",
+                    "OpenAI key format valid (syntax check only; live upstream probe deferred to Story 04.3)",
                 )
             } else {
                 (
@@ -1573,8 +1764,8 @@ pub async fn handle_verify_provider_key(
             if key.starts_with("AIza") && key.len() >= 24 {
                 (
                     true,
-                    "verified",
-                    "Gemini credential format verified locally",
+                    "format_checked",
+                    "Gemini key format valid (syntax check only; live upstream probe deferred to Story 04.3)",
                 )
             } else {
                 (
@@ -1588,8 +1779,8 @@ pub async fn handle_verify_provider_key(
             if key.starts_with("sk-") && key.len() >= 18 {
                 (
                     true,
-                    "verified",
-                    "DeepSeek credential format verified locally",
+                    "format_checked",
+                    "DeepSeek key format valid (syntax check only; live upstream probe deferred to Story 04.3)",
                 )
             } else {
                 (
@@ -1603,8 +1794,8 @@ pub async fn handle_verify_provider_key(
             if key.starts_with("sk-or-") && key.len() >= 20 {
                 (
                     true,
-                    "verified",
-                    "OpenRouter credential format verified locally",
+                    "format_checked",
+                    "OpenRouter key format valid (syntax check only; live upstream probe deferred to Story 04.3)",
                 )
             } else {
                 (
@@ -1619,7 +1810,11 @@ pub async fn handle_verify_provider_key(
                 || endpoint.starts_with("http://localhost:")
                 || endpoint.starts_with("https://");
             if valid_ep {
-                (true, "verified", "Local/BYOS endpoint URL validated")
+                (
+                    true,
+                    "format_checked",
+                    "Local/BYOS endpoint URL format validated (probe deferred to Story 04.3)",
+                )
             } else {
                 (
                     false,
@@ -1630,7 +1825,11 @@ pub async fn handle_verify_provider_key(
         }
         _ => {
             if key.len() >= 16 {
-                (true, "verified", "Custom provider key shape validated")
+                (
+                    true,
+                    "format_checked",
+                    "Custom provider key format validated (probe deferred to Story 04.3)",
+                )
             } else {
                 (
                     false,

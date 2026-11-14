@@ -43,8 +43,12 @@ export function useKeyedParallelCoordinator() {
     return globalKeyedParallelCoordinator.resumeJob(jobId);
   }, []);
 
-  const cancelJob = useCallback((jobId: string) => {
-    return globalKeyedParallelCoordinator.cancelJob(jobId);
+  const cancelJob = useCallback((jobId: string, reason?: string) => {
+    return globalKeyedParallelCoordinator.cancelJob(jobId, reason);
+  }, []);
+
+  const failJob = useCallback((jobId: string, reason?: string) => {
+    return globalKeyedParallelCoordinator.failJob(jobId, reason);
   }, []);
 
   const completeJob = useCallback((jobId: string, outputSha256?: string) => {
@@ -77,6 +81,7 @@ export function useKeyedParallelCoordinator() {
     pauseJob,
     resumeJob,
     cancelJob,
+    failJob,
     completeJob,
     getNodeStatus,
     getActiveJobs,

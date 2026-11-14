@@ -717,3 +717,57 @@ body {
   background-color: #FFFFFF !important;
   color: #0F172A !important;
 }
+
+/* --------------------------------------------------------------------------
+   9. Story 04.2 Registered Patterns: Metric Line [5.10] & Toast [5.12]
+   -------------------------------------------------------------------------- */
+.ff-metric-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.ff-toast {
+  position: fixed;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  z-index: 9998;
+  max-width: 420px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-lg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ff-toast-danger {
+  border-color: var(--state-danger);
+  background-color: var(--state-danger-soft);
+  color: var(--state-danger);
+}
+
+.ff-toast-success {
+  border-color: var(--state-success);
+  background-color: var(--state-success-soft);
+  color: var(--state-success);
+}
+
+.ff-toast-warning {
+  border-color: var(--state-warning);
+  background-color: var(--state-warning-soft);
+  color: var(--state-warning);
+}

@@ -116,7 +116,10 @@ async fn sec_daemon_01_to_05_dual_ingress_hmac_v2_replay_roles_and_redacted_heal
     )
     .await;
     assert_eq!(h_st, StatusCode::OK);
-    assert_eq!(h_json["schema_version"], 6);
+    assert_eq!(
+        h_json["schema_version"],
+        harness_daemon::lockfile::CURRENT_SCHEMA_VERSION
+    );
     assert!(h_json.get("hmac_key_hex").is_none());
     assert!(h_json.get("daemon_nonce").is_none());
 

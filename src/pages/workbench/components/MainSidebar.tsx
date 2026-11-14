@@ -4,10 +4,12 @@ import React, { useState } from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { DEFAULT_FLOW_PROJECT_ID, type WorkbenchProject } from "../constants";
+import type { ProjectDto } from "../../../lib/validations/harness-daemon";
 import type { ChatSession } from "../types";
 import { SidebarCollapsedRail } from "./SidebarCollapsedRail";
 import { SidebarProjectGroup } from "./SidebarProjectGroup";
 import { SidebarSessionRow } from "./SidebarSessionRow";
+import { SidebarTrashJournalDrawer } from "./SidebarTrashJournalDrawer";
 import type { ThemeMode } from "./WorkbenchTopNav";
 
 export type { ChatSession };
@@ -16,6 +18,8 @@ export interface MainSidebarProps {
   projectName: string;
   projectId?: string;
   projects: WorkbenchProject[];
+  trashedProjects?: ProjectDto[];
+  restoringProjectId?: string | null;
   sessions: ChatSession[];
   activeSessionId: string;
   nodes?: Array<{ id: string; screenKey: string; title: string }>;
@@ -36,6 +40,7 @@ export interface MainSidebarProps {
   onDeleteSession?: (sessionId: string) => void;
   onRenameProject?: (projectId: string, newName: string) => void;
   onDeleteProject?: (projectId: string) => void;
+  onRestoreProject?: (projectId: string) => void;
   onLinkProjectFolder?: (projectId: string) => void;
 }
 
@@ -114,6 +119,26 @@ const SidebarStandaloneGroup: React.FC<{
   );
 };
 
+const SidebarFooter: React.FC<{
+  currentLocale: string;
+  onOpenSettings: (tab?: "general" | "models" | "mcp" | "automations") => void;
+}> = ({ currentLocale, onOpenSettings }) => {
+  const { t } = useTranslation();
+  const settingsLabel = t("workbench.settings", "Settings");
+  return (
+    <div data-testid="sidebar-seamless-footer" style={{ padding: "8px 12px", borderTop: "none", backgroundColor: "var(--bg-workspace)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ fontSize: "11px", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "5px", fontFamily: "var(--font-mono)" }}>
+        <BrandIcon name="globe" size={12} color="var(--text-muted)" />
+        <span>{currentLocale}</span>
+      </div>
+      <button type="button" onClick={() => onOpenSettings("general")} title={settingsLabel} aria-label={settingsLabel} className="cowok-btn cowok-btn-ghost" style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11.5px", color: "var(--text-secondary)", padding: "3px 8px", height: "24px", borderRadius: "var(--radius-xs)", border: "none", backgroundColor: "transparent" }}>
+        <BrandIcon name="settings" size={12} color="currentColor" />
+        <span style={{ fontWeight: 500 }}>{settingsLabel}</span>
+      </button>
+    </div>
+  );
+};
+
 export const MainSidebar: React.FC<MainSidebarProps> = (p) => {
   const { t } = useTranslation();
   const [isPinnedOpen, setIsPinnedOpen] = useState(true);
@@ -124,7 +149,6 @@ export const MainSidebar: React.FC<MainSidebarProps> = (p) => {
 
   const pinned = p.sessions.filter((s) => s.isPinned);
   const standalone = p.sessions.filter((s) => !s.projectId || s.projectId === "general" || s.projectId === "standalone");
-  const settingsLabel = t("workbench.settings", "Settings");
 
   return (
     <aside className="workbench-main-sidebar" aria-label={t("workbench.sidebarAria", "Cây thư mục dự án và phiên hội thoại")} style={{ width: "240px", height: "100%", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-workspace)", borderRight: "1px solid var(--border-subtle)", boxSizing: "border-box", flexShrink: 0, fontFamily: "var(--font-sans)", position: "relative" }}>
@@ -145,37 +169,18 @@ export const MainSidebar: React.FC<MainSidebarProps> = (p) => {
           </div>
         )}
         <SidebarProjectGroup
-          projectId={p.projectId || DEFAULT_FLOW_PROJECT_ID}
-          projectName={p.projectName}
-          projects={p.projects}
-          sessions={p.sessions}
-          activeSessionId={p.activeSessionId}
-          nodes={p.nodes}
-          activeSubSessionKey={p.activeSubSessionKey}
-          onSelectSession={p.onSelectSession}
-          onSelectNodeSubSession={p.onSelectNodeSubSession}
-          onOpenNewConversationModal={p.onOpenNewConversationModal}
-          onToggleProjectFolder={p.onToggleProjectFolder}
-          onCreateSessionInProject={p.onCreateSessionInProject}
-          onTogglePinSession={p.onTogglePinSession}
-          onRenameSession={p.onRenameSession}
-          onDeleteSession={p.onDeleteSession}
-          onRenameProject={p.onRenameProject}
-          onDeleteProject={p.onDeleteProject}
-          onLinkProjectFolder={p.onLinkProjectFolder}
+          projectId={p.projectId || DEFAULT_FLOW_PROJECT_ID} projectName={p.projectName} projects={p.projects} sessions={p.sessions}
+          activeSessionId={p.activeSessionId} nodes={p.nodes} activeSubSessionKey={p.activeSubSessionKey}
+          onSelectSession={p.onSelectSession} onSelectNodeSubSession={p.onSelectNodeSubSession}
+          onOpenNewConversationModal={p.onOpenNewConversationModal} onToggleProjectFolder={p.onToggleProjectFolder}
+          onCreateSessionInProject={p.onCreateSessionInProject} onTogglePinSession={p.onTogglePinSession}
+          onRenameSession={p.onRenameSession} onDeleteSession={p.onDeleteSession} onRenameProject={p.onRenameProject}
+          onDeleteProject={p.onDeleteProject} onLinkProjectFolder={p.onLinkProjectFolder}
         />
         <SidebarStandaloneGroup sessions={standalone} activeSessionId={p.activeSessionId} onSelectSession={p.onSelectSession} onOpenNewConversationModal={p.onOpenNewConversationModal} onTogglePinSession={p.onTogglePinSession} onRenameSession={p.onRenameSession} onDeleteSession={p.onDeleteSession} />
+        <SidebarTrashJournalDrawer trashedProjects={p.trashedProjects} restoringProjectId={p.restoringProjectId} onRestoreProject={p.onRestoreProject} />
       </div>
-      <div data-testid="sidebar-seamless-footer" style={{ padding: "8px 12px", borderTop: "none", backgroundColor: "var(--bg-workspace)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ fontSize: "11px", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "5px", fontFamily: "var(--font-mono)" }}>
-          <BrandIcon name="globe" size={12} color="var(--text-muted)" />
-          <span>{p.currentLocale}</span>
-        </div>
-        <button type="button" onClick={() => p.onOpenSettings("general")} title={settingsLabel} aria-label={settingsLabel} className="cowok-btn cowok-btn-ghost" style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11.5px", color: "var(--text-secondary)", padding: "3px 8px", height: "24px", borderRadius: "var(--radius-xs)", border: "none", backgroundColor: "transparent" }}>
-          <BrandIcon name="settings" size={12} color="currentColor" />
-          <span style={{ fontWeight: 500 }}>{settingsLabel}</span>
-        </button>
-      </div>
+      <SidebarFooter currentLocale={p.currentLocale} onOpenSettings={p.onOpenSettings} />
     </aside>
   );
 };

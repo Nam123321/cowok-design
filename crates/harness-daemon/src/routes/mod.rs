@@ -1,10 +1,12 @@
 // @story 04.1
 // @implements AC-01, AC-03, AC-04, AC-06
+pub mod fs_jail;
 pub mod legacy_proposals;
 pub mod legacy_sdi;
 pub mod legacy_sessions;
 pub mod legacy_specs;
 pub mod legacy_workbench_v6;
+pub mod project_trash;
 
 use std::sync::Arc;
 
@@ -24,10 +26,12 @@ use crate::daemon_auth::{
 use crate::flow_routes::build_flow_subrouter;
 use crate::lockfile::CURRENT_SCHEMA_VERSION;
 
+pub use fs_jail::{FsBrowseEntry, FsBrowseQuery, FsBrowseResponse};
 pub use legacy_proposals::*;
 pub use legacy_sdi::*;
 pub use legacy_sessions::*;
 pub use legacy_specs::*;
+pub use project_trash::RestoreProjectResponse;
 
 use legacy_proposals::{
     handle_apply_proposal, handle_create_pr, handle_create_proposal, handle_create_snapshot,
@@ -55,6 +59,7 @@ use legacy_specs::{
     handle_list_projects, handle_list_specs, handle_put_spec, handle_synthesize_specs,
     handle_update_project,
 };
+use project_trash::handle_restore_project;
 
 impl DaemonAppState {
     pub fn new(registry: Arc<SpecRegistry>, host: String, port: u16) -> Self {
@@ -136,6 +141,7 @@ pub fn build_router(state: DaemonAppState) -> Router {
             "/api/v1/projects/:id",
             patch(handle_update_project).delete(handle_delete_project),
         )
+        .route("/api/v1/projects/:id/restore", post(handle_restore_project))
         .route("/api/v1/projects/:id/specs", get(handle_list_specs))
         .route(
             "/api/v1/projects/:id/specs/:spec_key",
@@ -267,6 +273,7 @@ pub fn build_router(state: DaemonAppState) -> Router {
                 .put(handle_update_chat_session)
                 .delete(handle_delete_chat_session),
         )
+        .route("/api/v1/fs/browse", get(fs_jail::handle_fs_browse))
         .route(
             "/api/v1/projects/:id/path-token",
             post(handle_issue_path_token),

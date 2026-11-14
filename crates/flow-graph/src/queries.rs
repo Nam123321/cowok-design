@@ -73,7 +73,7 @@ pub(crate) fn ensure_project_and_graph(
 ) -> Result<GraphHeader, FlowServiceError> {
     let exists: Option<i64> = tx
         .query_row(
-            "SELECT 1 FROM projects WHERE id = ?1 AND tenant_id = ?2",
+            "SELECT 1 FROM projects WHERE id = ?1 AND tenant_id = ?2 AND trash_deleted_at IS NULL",
             params![project_id, tenant_id],
             |r| r.get(0),
         )

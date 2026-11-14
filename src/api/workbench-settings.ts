@@ -144,15 +144,19 @@ async function consumeExecutionSseBody(
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const frames = buffer.split("\n\n");
-    buffer = frames.pop() || "";
-    for (const frame of frames) {
-      dispatchParsedSseFrame(frame, onEvents);
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() || "";
+      for (const frame of frames) {
+        dispatchParsedSseFrame(frame, onEvents);
+      }
     }
+  } finally {
+    reader.releaseLock();
   }
 }
 
@@ -166,12 +170,14 @@ function dispatchParsedSseFrame(
     .map((l) => l.slice(5).trim())
     .join("\n");
   if (!dataLine) return;
+  let rawJson: unknown;
   try {
-    const parsed = z.array(ExecutionEventDtoSchema).parse(JSON.parse(dataLine));
-    if (parsed.length > 0) onEvents(parsed);
+    rawJson = JSON.parse(dataLine);
   } catch {
-    // Ignore non-JSON heartbeat frame
+    return;
   }
+  const parsed = z.array(ExecutionEventDtoSchema).parse(rawJson);
+  if (parsed.length > 0) onEvents(parsed);
 }
 
 export const apiWorkbenchSettings = new WorkbenchSettingsClient();

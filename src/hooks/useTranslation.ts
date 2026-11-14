@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import viDict from "../i18n/locales/vi.json";
 import enDict from "../i18n/locales/en.json";
 
@@ -66,13 +66,21 @@ export function useTranslation(overrideLocale?: string) {
     };
   }, [overrideLocale]);
 
-  const dict = DICTS[locale] || (locale.startsWith("en") ? enDict : viDict);
+  const dict = useMemo(
+    () => DICTS[locale] || (locale.startsWith("en") ? enDict : viDict),
+    [locale]
+  );
 
-  return {
-    t: (key: string, defaultVal?: string) => {
+  const t = useCallback(
+    (key: string, defaultVal?: string) => {
       const found = resolveKey(dict, key);
       return found !== undefined ? found : defaultVal || key;
     },
+    [dict]
+  );
+
+  return {
+    t,
     locale,
     setLocale: setGlobalLocale,
   };

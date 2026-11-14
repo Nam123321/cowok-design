@@ -9,7 +9,7 @@ export const GET = guardedRoute(
     const projectId = ctx.projectId || ctx.params?.id || "";
     return forwardToDaemonFlow({
       method: "GET",
-      daemonPath: `/api/v1/projects/${projectId}/sessions`,
+      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/sessions`,
       rawQuery: new URL(req.url).search.slice(1),
       inboundHeaders: req.headers,
       principal: {
@@ -28,7 +28,7 @@ export const POST = guardedRoute(
     const projectId = ctx.projectId || ctx.params?.id || "";
     return forwardToDaemonFlow({
       method: "POST",
-      daemonPath: `/api/v1/projects/${projectId}/sessions`,
+      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/sessions`,
       body,
       inboundHeaders: req.headers,
       principal: {

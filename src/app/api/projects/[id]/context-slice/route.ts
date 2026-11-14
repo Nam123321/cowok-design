@@ -9,7 +9,7 @@ export const POST = guardedRoute(
     const projectId = ctx.projectId || ctx.params?.id || "";
     return forwardToDaemonFlow({
       method: "POST",
-      daemonPath: `/api/v1/projects/${projectId}/context-slice`,
+      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/context-slice`,
       body,
       inboundHeaders: req.headers,
       principal: {

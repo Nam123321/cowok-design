@@ -27,7 +27,7 @@ export const CreateSnapshotSchema = z.object({
   metadata: z.record(z.string()).optional(),
 });
 
-export type CreateSnapshotInput = z.infer<typeof CreateSnapshotSchema>;
+export type CreateSnapshotInput = z.input<typeof CreateSnapshotSchema>;
 
 export const VersionSnapshotDtoSchema = z.object({
   id: z.string().uuid(),

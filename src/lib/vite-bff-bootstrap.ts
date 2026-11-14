@@ -127,6 +127,7 @@ function hasEditorBootstrapProof(req: IncomingMessage): boolean {
   if (isValidBootCapHeader(req.headers["x-cowok-boot-cap"])) {
     return !sfs || sfs === "same-origin";
   }
+  if (getBootCapTokens().size > 0) return false;
   return hasSameOriginPortProof(req, sfs);
 }
 

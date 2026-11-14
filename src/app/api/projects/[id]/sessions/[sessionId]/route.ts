@@ -10,7 +10,7 @@ export const GET = guardedRoute(
     const sessionId = ctx.params?.sessionId || "";
     return forwardToDaemonFlow({
       method: "GET",
-      daemonPath: `/api/v1/projects/${projectId}/sessions/${sessionId}`,
+      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}`,
       inboundHeaders: req.headers,
       principal: {
         tenantId: ctx.tenantId || "local-default",
@@ -29,7 +29,7 @@ export const PUT = guardedRoute(
     const sessionId = ctx.params?.sessionId || "";
     return forwardToDaemonFlow({
       method: "PUT",
-      daemonPath: `/api/v1/projects/${projectId}/sessions/${sessionId}`,
+      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}`,
       body,
       inboundHeaders: req.headers,
       principal: {
@@ -49,7 +49,7 @@ export const DELETE = guardedRoute(
     const sessionId = ctx.params?.sessionId || "";
     return forwardToDaemonFlow({
       method: "DELETE",
-      daemonPath: `/api/v1/projects/${projectId}/sessions/${sessionId}`,
+      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/sessions/${encodeURIComponent(sessionId)}`,
       inboundHeaders: req.headers,
       principal: {
         tenantId: ctx.tenantId || "local-default",

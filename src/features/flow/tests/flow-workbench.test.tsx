@@ -727,7 +727,7 @@ describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
             { status: 200, headers: { "Content-Type": "application/json" } }
           );
         }
-        if (url.endsWith("/api/projects")) {
+        if (url.endsWith("/api/projects") || url.includes("/api/projects?include_trashed=")) {
           return new Response(
             JSON.stringify([
               { id: p1Id, name: "Default", slug: "default", product_brief: "Brief 1", workspace_root: "/tmp/p1", created_at: 100, updated_at: 100 },

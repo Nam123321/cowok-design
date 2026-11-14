@@ -453,17 +453,17 @@ fn schema_02_v2_migration_adds_8_tables_and_workspace_root_unique_index() {
         "Must have exactly 24 domain + V2 tables"
     );
 
-    // Verify unique index on projects(workspace_root)
+    // Verify partial unique index on active projects(workspace_root)
     let idx_count: i64 = conn
         .query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='projects_workspace_root_unique'",
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='projects_active_workspace_root_key'",
             [],
             |r| r.get(0),
         )
         .expect("index count");
     assert_eq!(
         idx_count, 1,
-        "Must have projects_workspace_root_unique index"
+        "Must have projects_active_workspace_root_key index"
     );
 
     // Verify spec_tombstones columns

@@ -8,7 +8,7 @@ export const GET = guardedRoute(
     const projectId = ctx.projectId || ctx.params?.id || "";
     return forwardToDaemonFlow({
       method: "GET",
-      daemonPath: `/api/v1/projects/${projectId}/specs`,
+      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/specs`,
       rawQuery: new URL(req.url).search.slice(1),
       inboundHeaders: req.headers,
       principal: {

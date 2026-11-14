@@ -243,7 +243,7 @@ export class KeyedParallelCoordinator {
     this.notify();
   }
 
-  public cancelJob(jobId: string, reason = "USER_CANCELLED"): void {
+  private finalizeTerminalJob(jobId: string, status: "cancelled" | "error", reason: string): void {
     let targetJob: NodeExecutionJob | undefined = this.activeJobs.get(jobId);
     if (targetJob) {
       this.activeJobs.delete(jobId);
@@ -259,7 +259,7 @@ export class KeyedParallelCoordinator {
 
     if (!targetJob) return;
 
-    targetJob.status = "cancelled";
+    targetJob.status = status;
     targetJob.completedAt = Date.now();
     targetJob.errorMessage = reason;
 
@@ -279,6 +279,14 @@ export class KeyedParallelCoordinator {
 
     this.processNext();
     this.notify();
+  }
+
+  public cancelJob(jobId: string, reason = "USER_CANCELLED"): void {
+    this.finalizeTerminalJob(jobId, "cancelled", reason);
+  }
+
+  public failJob(jobId: string, reason = "EXECUTION_FAILED"): void {
+    this.finalizeTerminalJob(jobId, "error", reason);
   }
 
   public getActiveJobs(): NodeExecutionJob[] {

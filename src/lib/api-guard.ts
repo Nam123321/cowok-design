@@ -71,7 +71,7 @@ function resolveAuthIdentity<B, Q>(
   }
   return {
     ok: true,
-    tenantId: context.tenantId || req.headers.get("x-tenant-id") || "default-tenant",
+    tenantId: context.tenantId || req.headers.get("x-tenant-id") || "local-default",
     userId: req.headers.get("x-user-id") || "anonymous",
     role: resolveFallbackRole(userRoles),
   };
