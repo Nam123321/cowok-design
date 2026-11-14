@@ -49,7 +49,7 @@ export const ChangeProposalResponseSchema = z.object({
 export type FileDiffItem = z.infer<typeof FileDiffItemSchema>;
 export type ValidationCheckResult = z.infer<typeof ValidationCheckResultSchema>;
 export type CreateProposalInput = z.infer<typeof CreateProposalSchema>;
-export type ApplyProposalInput = z.infer<typeof ApplyProposalSchema>;
+export type ApplyProposalInput = z.input<typeof ApplyProposalSchema>;
 export type ChangeProposalResponse = z.infer<typeof ChangeProposalResponseSchema>;
 
 export interface RustChangeProposalV1 {
