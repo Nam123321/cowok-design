@@ -34,7 +34,8 @@ test.describe("Story 04.1: Unified DualMainPanel Workbench, Rust SQLite WAL SSOT
     const screenshotInitPath = path.join(evidenceDir, "screenshot-workbench-init.png");
     await page.screenshot({ path: screenshotInitPath, fullPage: true });
 
-    // 2. Wait for initial remote SQLite WAL hydration to settle, then Add a new node -> Deploy Draft -> Reload & verify persistence
+    // 2. Wait for initial remote SQLite WAL hydration (and virgin DB seed) to settle, then Add a new node -> Deploy Draft -> Reload & verify persistence
+    await expect(page.locator('.workbench-shell[data-flow-hydrated="true"]')).toBeVisible({ timeout: 15000 });
     await expect(page.locator("#dagDraftBar")).toBeHidden({ timeout: 15000 });
     const nodesBefore = await page.locator(".dag-node-card").count();
     await page.getByRole("button", { name: "Thêm Node mới" }).click();

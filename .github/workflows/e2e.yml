@@ -49,10 +49,27 @@ jobs:
       - name: Build Rust Backend Daemon
         run: cargo build --bin harness-daemon
 
-      - name: Start Rust Backend Daemon
+      - name: Start Rust Backend Daemon & Wait for Health
+        env:
+          UXUI_OS_DAEMON_PORT: "4170"
         run: |
-          ./target/debug/harness-daemon &
-          sleep 2
+          ./target/debug/harness-daemon >/tmp/harness-daemon-e2e.log 2>&1 &
+          DAEMON_PID=$!
+          for i in $(seq 1 30); do
+            if ! kill -0 "$DAEMON_PID" 2>/dev/null; then
+              echo "❌ harness-daemon exited prematurely."
+              cat /tmp/harness-daemon-e2e.log || true
+              exit 1
+            fi
+            if curl -fsS "http://127.0.0.1:${UXUI_OS_DAEMON_PORT}/api/v1/health" >/dev/null 2>&1; then
+              echo "✅ harness-daemon healthy on port ${UXUI_OS_DAEMON_PORT} (attempt ${i}/30)."
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "❌ harness-daemon health check timed out after 15s."
+          cat /tmp/harness-daemon-e2e.log || true
+          exit 1
 
       - name: Build Production Frontend
         run: pnpm run build

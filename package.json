@@ -10,10 +10,12 @@
   "scripts": {
     "dev": "vite",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p packages/shared-types/tsconfig.json && tsc --noEmit -p tsconfig.flow.json",
+    "typecheck": "pnpm --filter @cowok-design/shared-types build && tsc --noEmit -p tsconfig.flow.json",
     "cargo:test": "cargo test --workspace",
     "build": "pnpm --filter @cowok-design/shared-types build && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preflight:pr": "node scripts/preflight-pr.mjs",
+    "preflight:e2e": "node scripts/preflight-pr.mjs --with-e2e"
   },
   "dependencies": {
     "react": "^19.3.1",

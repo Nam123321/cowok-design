@@ -125,7 +125,12 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
   });
 
   return (
-    <div className={`workbench-shell theme-${settings.themeMode}`} data-theme={settings.themeMode} style={createWorkbenchShellStyle(settings.currentFontSize)}>
+    <div
+      className={`workbench-shell theme-${settings.themeMode}`}
+      data-theme={settings.themeMode}
+      data-flow-hydrated={shell.isFlowHydrated ? "true" : "false"}
+      style={createWorkbenchShellStyle(settings.currentFontSize)}
+    >
       <WorkbenchTopNav projectName={resolvedProjectName} activeSessionTitle={activeSession?.title} isStandaloneConversation={!activeSession?.projectId} themeMode={settings.themeMode} />
       <WorkbenchConnectedBody shell={shell} resolvedProjectName={resolvedProjectName} resolvedProjectId={resolvedProjectId} defaultSessionTitle={t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới")} />
       <NewConversationModal
