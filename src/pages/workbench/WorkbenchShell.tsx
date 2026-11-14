@@ -1,19 +1,16 @@
-// @story 04.1
-// @implements AC-01, AC-02
+// @story 04.1, 04.2
+// @implements AC-01, AC-02, AC-03, AC-04
 import React from "react";
-import {
-  WorkbenchNode,
-  WorkbenchTransition,
-} from "../../features/flow/store/flow-workbench-store";
+import { WorkbenchNode, WorkbenchTransition } from "../../features/flow/store/flow-workbench-store";
 import { WorkbenchTopNav, ThemeMode } from "./components/WorkbenchTopNav";
 import { SettingsModal } from "./components/SettingsModal";
 import { NewConversationModal } from "./components/NewConversationModal";
 import { OnboardingWizardModal } from "./components/OnboardingWizardModal";
+import { DaemonFolderPickerDialog } from "./components/DaemonFolderPickerDialog";
 import { WorkbenchBodyLayout } from "./components/WorkbenchBodyLayout";
 import { useWorkbenchShellState } from "./hooks/useWorkbenchShellState";
 import { DEFAULT_FLOW_PROJECT_ID, DEFAULT_INITIAL_NODES, DEFAULT_INITIAL_TRANSITIONS } from "./constants";
 import { useTranslation } from "../../hooks/useTranslation";
-import { apiHarnessDaemon } from "../../api/harness-daemon";
 
 export type { ThemeMode };
 
@@ -48,33 +45,6 @@ export const WorkbenchSettingsDialog: React.FC<{
   />
 );
 
-async function pickAndLinkProjectFolder(
-  projId: string,
-  onLink: (id: string, path: string) => void
-): Promise<void> {
-  if (typeof window !== "undefined" && "showDirectoryPicker" in window) {
-    try {
-      const dirHandle = await (window as unknown as { showDirectoryPicker: () => Promise<{ name?: string }> }).showDirectoryPicker();
-      if (dirHandle?.name) {
-        try {
-          const data = await apiHarnessDaemon.issuePathToken(projId, {
-            relative_path: dirHandle.name,
-          });
-          onLink(projId, data.normalized_relative_path || `./projects/${dirHandle.name}`);
-          return;
-        } catch {
-          // Fallback to relative path
-        }
-        onLink(projId, `./projects/${dirHandle.name}`);
-        return;
-      }
-    } catch {
-      return;
-    }
-  }
-  onLink(projId, `./projects/${projId}`);
-}
-
 const WorkbenchConnectedBody: React.FC<{
   shell: ReturnType<typeof useWorkbenchShellState>;
   resolvedProjectName: string;
@@ -94,7 +64,10 @@ const WorkbenchConnectedBody: React.FC<{
       onTogglePinSession={sm.handleTogglePinSession} onRenameSession={sm.handleRenameSession}
       onDeleteSession={sm.handleDeleteSession} onRenameProject={sm.handleRenameProject}
       onDeleteProject={sm.handleDeleteProject}
-      onLinkProjectFolder={(id) => void pickAndLinkProjectFolder(id, sm.handleLinkProjectFolder)}
+      onLinkProjectFolder={(id) => {
+        const target = sm.projects.find((p) => p.id === id);
+        sm.openPromoteFolderPicker(id, target?.name);
+      }}
       activeTabId={shell.activeTabId}
       onTabChange={(id, format) => { shell.setActiveTabId(id); store.setActiveFormatTab(format); }}
       splitter={shell.splitter} attachments={shell.attachments} graphHandlers={shell.graphHandlers}
@@ -103,7 +76,79 @@ const WorkbenchConnectedBody: React.FC<{
   );
 };
 
-const DAEMON_WARNING_Z_INDEX = 9998;
+const WorkbenchToastBar: React.FC<{
+  kind: "success" | "danger" | "warning";
+  message: string;
+  undoProjectId?: string;
+  testId: string;
+  onUndo?: (id: string) => void;
+  onDismiss: () => void;
+}> = ({ kind, message, undoProjectId, testId, onUndo, onDismiss }) => {
+  const { t } = useTranslation();
+  return (
+    <div role="alert" data-testid={testId} className={`ff-toast ff-toast-${kind}`}>
+      <span>{message}</span>
+      {undoProjectId && onUndo && (
+        <button
+          type="button"
+          onClick={() => onUndo(undoProjectId)}
+          data-testid="toast-undo-restore-btn"
+          className="cowok-btn cowok-btn-secondary"
+          style={{ fontSize: "11px", padding: "2px 8px", flexShrink: 0 }}
+        >
+          {t("workbench.undoRestoreBtn", "Hoàn tác")}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label={t("common.close", "Đóng")}
+        style={{ border: "none", background: "transparent", color: "currentColor", cursor: "pointer" }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+};
+
+const WorkbenchModalsAndToasts: React.FC<{
+  shell: ReturnType<typeof useWorkbenchShellState>;
+  isOnboardingOpen: boolean;
+  daemonWarning: string | null;
+  onCloseOnboarding: () => void;
+  onSetDaemonWarning: (msg: string | null) => void;
+}> = ({ shell, isOnboardingOpen, daemonWarning, onCloseOnboarding, onSetDaemonWarning }) => {
+  const { settings, sessionManager } = shell;
+  return (
+    <>
+      <NewConversationModal
+        isOpen={sessionManager.isNewConvoModalOpen} onClose={() => sessionManager.setIsNewConvoModalOpen(false)}
+        projects={sessionManager.projects} activeProjectId={sessionManager.activeProjectId}
+        onCreateInProject={sessionManager.handleCreateInProject} onCreateNewProject={sessionManager.handleCreateNewProject}
+        onCreateStandalone={sessionManager.handleCreateStandalone}
+      />
+      <DaemonFolderPickerDialog
+        isOpen={sessionManager.pickerState.isOpen} mode={sessionManager.pickerState.mode}
+        projectId={sessionManager.pickerState.projectId} initialSlug={sessionManager.pickerState.initialSlug}
+        onClose={sessionManager.closeFolderPicker}
+        onConfirmPromote={async (projId, targetDir) => { await sessionManager.handleConfirmPromote(projId, targetDir); }}
+      />
+      <OnboardingWizardModal
+        isOpen={isOnboardingOpen} onDaemonSyncWarning={onSetDaemonWarning}
+        onClose={onCloseOnboarding} onComplete={onCloseOnboarding}
+      />
+      {daemonWarning && <WorkbenchToastBar kind="warning" message={daemonWarning} testId="workbench-daemon-warning" onDismiss={() => onSetDaemonWarning(null)} />}
+      {sessionManager.toastState && (
+        <WorkbenchToastBar
+          kind={sessionManager.toastState.kind} message={sessionManager.toastState.message}
+          undoProjectId={sessionManager.toastState.undoProjectId} testId="workbench-status-toast"
+          onUndo={(id) => void sessionManager.handleRestoreProject(id)} onDismiss={sessionManager.dismissToast}
+        />
+      )}
+      <WorkbenchSettingsDialog settings={settings} />
+    </>
+  );
+};
 
 export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
   projectId = DEFAULT_FLOW_PROJECT_ID,
@@ -115,9 +160,7 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
   const shell = useWorkbenchShellState(initialNodes, initialTransitions, projectId);
   const { settings, sessionManager } = shell;
   const activeSession = shell.activeSession;
-  const activeProjObj = sessionManager.projects.find(
-    (p) => p.id === (activeSession?.projectId || sessionManager.activeProjectId || projectId)
-  );
+  const activeProjObj = sessionManager.projects.find((p) => p.id === (activeSession?.projectId || sessionManager.activeProjectId || projectId));
   const resolvedProjectName = activeProjObj?.name || projectName;
   const resolvedProjectId = activeProjObj?.id || sessionManager.activeProjectId || projectId;
 
@@ -126,72 +169,16 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
     return !window.localStorage.getItem("cowok_first_run_completed");
   });
   const [daemonWarning, setDaemonWarning] = React.useState<string | null>(null);
+  const closeOnboarding = () => {
+    if (typeof window !== "undefined") window.localStorage.setItem("cowok_first_run_completed", "true");
+    setIsOnboardingOpen(false);
+  };
 
   return (
-    <div
-      className={`workbench-shell theme-${settings.themeMode}`}
-      data-theme={settings.themeMode}
-      data-flow-hydrated={shell.isFlowHydrated ? "true" : "false"}
-      style={createWorkbenchShellStyle(settings.currentFontSize)}
-    >
+    <div className={`workbench-shell theme-${settings.themeMode}`} data-theme={settings.themeMode} data-flow-hydrated={shell.isFlowHydrated ? "true" : "false"} style={createWorkbenchShellStyle(settings.currentFontSize)}>
       <WorkbenchTopNav projectName={resolvedProjectName} activeSessionTitle={activeSession?.title} isStandaloneConversation={!activeSession?.projectId} themeMode={settings.themeMode} />
       <WorkbenchConnectedBody shell={shell} resolvedProjectName={resolvedProjectName} resolvedProjectId={resolvedProjectId} defaultSessionTitle={t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới")} />
-      <NewConversationModal
-        isOpen={sessionManager.isNewConvoModalOpen} onClose={() => sessionManager.setIsNewConvoModalOpen(false)}
-        projects={sessionManager.projects} activeProjectId={sessionManager.activeProjectId}
-        onCreateInProject={sessionManager.handleCreateInProject} onCreateNewProject={sessionManager.handleCreateNewProject}
-        onCreateStandalone={sessionManager.handleCreateStandalone}
-      />
-      <OnboardingWizardModal
-        isOpen={isOnboardingOpen}
-        onDaemonSyncWarning={(msg) => setDaemonWarning(msg)}
-        onClose={() => {
-          if (typeof window !== "undefined") {
-            window.localStorage.setItem("cowok_first_run_completed", "true");
-          }
-          setIsOnboardingOpen(false);
-        }}
-        onComplete={(_cfg) => {
-          if (typeof window !== "undefined") {
-            window.localStorage.setItem("cowok_first_run_completed", "true");
-          }
-          setIsOnboardingOpen(false);
-        }}
-      />
-      {daemonWarning && (
-        <div
-          role="alert"
-          data-testid="workbench-daemon-warning"
-          style={{
-            position: "fixed",
-            right: "16px",
-            bottom: "16px",
-            zIndex: DAEMON_WARNING_Z_INDEX,
-            maxWidth: "380px",
-            padding: "8px 12px",
-            borderRadius: "var(--radius-sm)",
-            backgroundColor: "var(--bg-elevated)",
-            border: "1px solid var(--state-warning)",
-            boxShadow: "var(--shadow-lg)",
-            color: "var(--state-warning)",
-            fontSize: "12px",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-          }}
-        >
-          <span>{daemonWarning}</span>
-          <button
-            type="button"
-            onClick={() => setDaemonWarning(null)}
-            aria-label={t("common.close", "Đóng")}
-            style={{ border: "none", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}
-          >
-            ✕
-          </button>
-        </div>
-      )}
-      <WorkbenchSettingsDialog settings={settings} />
+      <WorkbenchModalsAndToasts shell={shell} isOnboardingOpen={isOnboardingOpen} daemonWarning={daemonWarning} onCloseOnboarding={closeOnboarding} onSetDaemonWarning={setDaemonWarning} />
     </div>
   );
 };

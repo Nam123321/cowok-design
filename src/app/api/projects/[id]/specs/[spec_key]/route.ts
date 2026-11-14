@@ -15,7 +15,7 @@ export const PUT = guardedRoute(
     const specKey = ctx.params?.spec_key || "";
     return forwardToDaemonFlow({
       method: "PUT",
-      daemonPath: `/api/v1/projects/${projectId}/specs/${encodeURIComponent(specKey)}`,
+      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/specs/${encodeURIComponent(specKey)}`,
       body,
       inboundHeaders: req.headers,
       principal: {
@@ -38,7 +38,7 @@ export const DELETE = guardedRoute(
       : "";
     return forwardToDaemonFlow({
       method: "DELETE",
-      daemonPath: `/api/v1/projects/${projectId}/specs/${encodeURIComponent(specKey)}`,
+      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/specs/${encodeURIComponent(specKey)}`,
       rawQuery,
       inboundHeaders: req.headers,
       principal: {

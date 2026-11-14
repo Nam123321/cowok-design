@@ -24,6 +24,16 @@ export const SafeJsIntegerSchema = z
   .min(-9_007_199_254_740_991)
   .max(9_007_199_254_740_991);
 
+export const ManagedProjectSlugSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9][a-z0-9_-]{0,62}$/);
+export type ManagedProjectSlug = z.infer<typeof ManagedProjectSlugSchema>;
+
+export const ProjectProvenanceSchema = z
+  .enum(["scratch", "managed", "folder-backed", "folder_backed"])
+  .transform((v) => (v === "folder_backed" ? "folder-backed" : v));
+
 export const CreateProjectInputSchema = z.object({
   id: z.string().uuid().optional(),
   slug: z.string().trim().min(1).max(128),
@@ -31,6 +41,8 @@ export const CreateProjectInputSchema = z.object({
   product_brief: z.string().trim().min(1),
   workspace_root: z.string().trim().min(1).nullable().optional(),
   inherit_brand_from_project_id: z.string().uuid().nullable().optional(),
+  managed_slug: ManagedProjectSlugSchema.nullable().optional(),
+  provenance: ProjectProvenanceSchema.optional(),
 });
 export type CreateProjectInput = z.infer<typeof CreateProjectInputSchema>;
 
@@ -43,8 +55,60 @@ export const ProjectDtoSchema = z.object({
   inherit_brand_from_project_id: z.string().uuid().nullable().optional(),
   created_at: SafeJsIntegerSchema,
   updated_at: SafeJsIntegerSchema,
+  project_code: z.string().nullable().optional(),
+  provenance: ProjectProvenanceSchema.optional(),
+  trash_deleted_at: SafeJsIntegerSchema.nullable().optional(),
 });
 export type ProjectDto = z.infer<typeof ProjectDtoSchema>;
+
+export const DeleteProjectResponseSchema = z.object({
+  deleted: z.boolean(),
+  id: z.string().uuid(),
+  project_id: z.string().uuid().optional(),
+  trash_deleted_at: SafeJsIntegerSchema.optional(),
+  retention_days: z.number().int().nonnegative().optional(),
+});
+export type DeleteProjectResponse = z.infer<typeof DeleteProjectResponseSchema>;
+
+export const RestoreProjectInputSchema = z.object({
+  restore_mode: z.enum(["active", "rename_on_collision"]).optional(),
+}).strict();
+export type RestoreProjectInput = z.infer<typeof RestoreProjectInputSchema>;
+
+export const RestoreProjectResponseSchema = z.object({
+  restored: z.boolean(),
+  project: ProjectDtoSchema,
+  renamed_slug: z.string().nullable().optional(),
+});
+export type RestoreProjectResponse = z.infer<typeof RestoreProjectResponseSchema>;
+
+export const FsBrowseEntrySchema = z.object({
+  name: z.string(),
+  path: z.string(),
+  is_dir: z.boolean(),
+  is_git_repo: z.boolean(),
+});
+export type FsBrowseEntry = z.infer<typeof FsBrowseEntrySchema>;
+
+export const FsBrowseResponseSchema = z.object({
+  current_path: z.string(),
+  parent_path: z.string().nullable(),
+  managed_root: z.string(),
+  entries: z.array(FsBrowseEntrySchema),
+});
+export type FsBrowseResponse = z.infer<typeof FsBrowseResponseSchema>;
+
+export const ProjectBoundaryDtoSchema = z.object({
+  project_id: z.string().uuid(),
+  boundary_type: z.string(),
+  workspace_path: z.string(),
+  config_dir: z.string(),
+  is_git_repository: z.boolean(),
+  promoted_at: SafeJsIntegerSchema.nullable().optional(),
+  created_at: SafeJsIntegerSchema,
+  updated_at: SafeJsIntegerSchema,
+});
+export type ProjectBoundaryDto = z.infer<typeof ProjectBoundaryDtoSchema>;
 
 export const SpecItemWithDriftSchema = z.object({
   id: z.string().uuid(),
@@ -158,19 +222,66 @@ export const UpdateChatSessionInputSchema = z.object({
 });
 export type UpdateChatSessionInput = z.infer<typeof UpdateChatSessionInputSchema>;
 
-export const IssuePathTokenInputSchema = z.object({
-  relative_path: z.string().trim().min(1),
-  principal_id: z.string().trim().min(1).max(128).nullable().optional(),
-  ttl_seconds: z.number().int().positive().max(86400).nullable().optional(),
-});
+export const IssuePathTokenInputSchema = z
+  .object({
+    relative_path: z.string().trim().min(1).optional(),
+    target_path: z.string().trim().min(1).optional(),
+    principal_id: z.string().trim().min(1).max(128).nullable().optional(),
+    ttl_seconds: z.number().int().positive().max(86400).nullable().optional(),
+  })
+  .refine((v) => Boolean(v.relative_path || v.target_path), {
+    message: "relative_path or target_path is required",
+  });
 export type IssuePathTokenInput = z.infer<typeof IssuePathTokenInputSchema>;
 
 export const PathTokenResponseSchema = z.object({
   token: z.string(),
+  path_token: z.string().optional(),
   expires_at: SafeJsIntegerSchema,
   normalized_relative_path: z.string(),
+  daemon_nonce: z.string().optional(),
+  canonical_path: z.string().optional(),
+  dev_ino: z.string().optional(),
+  ancestor_dev_ino: z.string().optional(),
+  target_exists: z.boolean().optional(),
 });
 export type PathTokenResponse = z.infer<typeof PathTokenResponseSchema>;
+
+export const VerifyPathTokenInputSchema = z
+  .object({
+    token: z.string().trim().min(1),
+    target_path: z.string().trim().min(1).optional(),
+    target_directory: z.string().trim().min(1).optional(),
+    expected_relative_path: z.string().trim().min(1).optional(),
+    principal_id: z.string().trim().min(1).max(128).nullable().optional(),
+  })
+  .refine((v) => Boolean(v.target_path || v.target_directory || v.expected_relative_path), {
+    message: "target_path, target_directory, or expected_relative_path is required",
+  });
+export type VerifyPathTokenInput = z.infer<typeof VerifyPathTokenInputSchema>;
+
+export const VerifyPathTokenResponseSchema = z.object({
+  valid: z.boolean(),
+  normalized_relative_path: z.string(),
+  canonical_path: z.string(),
+  project_id: z.string().uuid(),
+  principal_id: z.string(),
+  daemon_nonce: z.string(),
+  ancestor_dev_ino: z.string(),
+  target_exists: z.boolean(),
+});
+export type VerifyPathTokenResponse = z.infer<typeof VerifyPathTokenResponseSchema>;
+
+export const PromoteFolderInputSchema = z
+  .object({
+    target_directory: z.string().trim().min(1),
+    token: z.string().trim().min(1).optional(),
+    path_token: z.string().trim().min(1).optional(),
+  })
+  .refine((v) => Boolean(v.token || v.path_token), {
+    message: "token or path_token is required",
+  });
+export type PromoteFolderInput = z.infer<typeof PromoteFolderInputSchema>;
 
 export const LocalSessionBootstrapInputSchema = z.object({
   tenantId: z.string().trim().min(1).max(128).optional(),

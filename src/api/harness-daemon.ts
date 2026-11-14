@@ -10,18 +10,28 @@ import {
   CreateChatSessionInputSchema,
   CreateProjectInput,
   CreateProjectInputSchema,
+  DeleteProjectResponse,
+  DeleteProjectResponseSchema,
   DeleteSpecResponse,
   DeleteSpecResponseSchema,
+  FsBrowseResponse,
+  FsBrowseResponseSchema,
   IssuePathTokenInput,
   IssuePathTokenInputSchema,
   PathTokenResponse,
   PathTokenResponseSchema,
+  ProjectBoundaryDto,
+  ProjectBoundaryDtoSchema,
   ProjectDto,
   ProjectDtoSchema,
   ProjectSpecsListResponse,
   ProjectSpecsListResponseSchema,
+  PromoteFolderInput,
+  PromoteFolderInputSchema,
   PutSpecInput,
   PutSpecInputSchema,
+  RestoreProjectResponse,
+  RestoreProjectResponseSchema,
   SpecItemWithDrift,
   SpecItemWithDriftSchema,
   SynthesizeSpecsInput,
@@ -30,6 +40,10 @@ import {
   SynthesizeSpecsResponseSchema,
   UpdateChatSessionInput,
   UpdateChatSessionInputSchema,
+  VerifyPathTokenInput,
+  VerifyPathTokenInputSchema,
+  VerifyPathTokenResponse,
+  VerifyPathTokenResponseSchema,
 } from "../lib/validations/harness-daemon";
 import {
   HarnessDaemonApiError,
@@ -40,8 +54,9 @@ import {
 export { HarnessDaemonApiError, type HarnessDaemonClientConfig };
 
 export class HarnessDaemonClient extends HarnessDaemonTransport {
-  listProjects(): Promise<ProjectDto[]> {
-    return this.request("/api/projects", z.array(ProjectDtoSchema), { method: "GET" });
+  listProjects(options?: { includeTrashed?: boolean }): Promise<ProjectDto[]> {
+    const query = options?.includeTrashed ? "?include_trashed=true" : "";
+    return this.request(`/api/projects${query}`, z.array(ProjectDtoSchema), { method: "GET" });
   }
 
   createProject(input: CreateProjectInput): Promise<ProjectDto> {
@@ -66,11 +81,19 @@ export class HarnessDaemonClient extends HarnessDaemonTransport {
     );
   }
 
-  deleteProject(projectId: string): Promise<{ deleted: boolean; id: string }> {
+  deleteProject(projectId: string): Promise<DeleteProjectResponse> {
     return this.request(
       `/api/projects/${encodeURIComponent(projectId)}`,
-      z.object({ deleted: z.boolean(), id: z.string() }),
+      DeleteProjectResponseSchema,
       { method: "DELETE" }
+    );
+  }
+
+  restoreProject(projectId: string): Promise<RestoreProjectResponse> {
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/restore`,
+      RestoreProjectResponseSchema,
+      { method: "POST" }
     );
   }
 
@@ -177,6 +200,36 @@ export class HarnessDaemonClient extends HarnessDaemonTransport {
     return this.request(
       `/api/projects/${encodeURIComponent(projectId)}/path-token`,
       PathTokenResponseSchema,
+      {
+        method: "POST",
+        body: JSON.stringify(validated),
+      }
+    );
+  }
+
+  browseFs(targetPath?: string): Promise<FsBrowseResponse> {
+    const trimmed = targetPath?.trim();
+    const query = trimmed ? `?path=${encodeURIComponent(trimmed)}` : "";
+    return this.request(`/api/fs/browse${query}`, FsBrowseResponseSchema, { method: "GET" });
+  }
+
+  verifyPathToken(projectId: string, input: VerifyPathTokenInput): Promise<VerifyPathTokenResponse> {
+    const validated = VerifyPathTokenInputSchema.parse(input);
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/verify-path-token`,
+      VerifyPathTokenResponseSchema,
+      {
+        method: "POST",
+        body: JSON.stringify(validated),
+      }
+    );
+  }
+
+  promoteProject(projectId: string, input: PromoteFolderInput): Promise<ProjectBoundaryDto> {
+    const validated = PromoteFolderInputSchema.parse(input);
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/promote`,
+      ProjectBoundaryDtoSchema,
       {
         method: "POST",
         body: JSON.stringify(validated),

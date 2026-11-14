@@ -40,6 +40,10 @@ import * as projectListRoute from "../app/api/projects/route";
 import * as projectSessionsRoute from "../app/api/projects/[id]/sessions/route";
 import * as singleSessionRoute from "../app/api/projects/[id]/sessions/[sessionId]/route";
 import * as pathTokenRoute from "../app/api/projects/[id]/path-token/route";
+import * as fsBrowseRoute from "../app/api/fs/browse/route";
+import * as projectRestoreRoute from "../app/api/projects/[id]/restore/route";
+import * as verifyPathTokenRoute from "../app/api/projects/[id]/verify-path-token/route";
+import * as projectPromoteRoute from "../app/api/projects/[id]/promote/route";
 import * as projectSpecsRoute from "../app/api/projects/[id]/specs/route";
 import * as singleSpecRoute from "../app/api/projects/[id]/specs/[spec_key]/route";
 import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize/route";
@@ -65,6 +69,14 @@ function safeEncodeSegment(raw: string): string {
   }
 }
 
+function safeDecodeSegment(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 function forwardGuardedDaemon<B = unknown>(
   daemonPath: string,
   options: { body?: ZodSchema<B>; rawJsonPassthrough?: boolean } = {}
@@ -80,7 +92,7 @@ function forwardGuardedDaemon<B = unknown>(
         principal: {
           tenantId: ctx.tenantId || "local-default",
           userId: ctx.userId || "local-operator",
-          role: ctx.role || "viewer",
+          role: ctx.role || (req.method === "GET" ? "viewer" : "editor"),
         },
         correlationId: ctx.correlationId,
       }),
@@ -154,12 +166,16 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "DELETE", pattern: /^\/api\/projects\/([^/]+)\/sessions\/([^/]+)$/, extractParams: (m) => ({ id: m[1], sessionId: m[2] }), resolveHandler: () => singleSessionRoute.DELETE },
 
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/path-token$/, extractParams: idOnly, resolveHandler: () => pathTokenRoute.POST },
+  { method: "GET", pattern: /^\/api\/fs\/browse$/, extractParams: noParams, resolveHandler: () => fsBrowseRoute.GET },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/restore$/, extractParams: idOnly, resolveHandler: () => projectRestoreRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/verify-path-token$/, extractParams: idOnly, resolveHandler: () => verifyPathTokenRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/promote$/, extractParams: idOnly, resolveHandler: () => projectPromoteRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/context-slice$/, extractParams: idOnly, resolveHandler: () => contextSliceRoute.POST },
 
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/specs$/, extractParams: idOnly, resolveHandler: () => projectSpecsRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/specs\/synthesize$/, extractParams: idOnly, resolveHandler: () => synthesizeSpecsRoute.POST },
-  { method: "PUT", pattern: /^\/api\/projects\/([^/]+)\/specs\/([^/]+)$/, extractParams: (m) => ({ id: m[1], spec_key: decodeURIComponent(m[2]) }), resolveHandler: () => singleSpecRoute.PUT },
-  { method: "DELETE", pattern: /^\/api\/projects\/([^/]+)\/specs\/([^/]+)$/, extractParams: (m) => ({ id: m[1], spec_key: decodeURIComponent(m[2]) }), resolveHandler: () => singleSpecRoute.DELETE },
+  { method: "PUT", pattern: /^\/api\/projects\/([^/]+)\/specs\/([^/]+)$/, extractParams: (m) => ({ id: m[1], spec_key: safeDecodeSegment(m[2]) }), resolveHandler: () => singleSpecRoute.PUT },
+  { method: "DELETE", pattern: /^\/api\/projects\/([^/]+)\/specs\/([^/]+)$/, extractParams: (m) => ({ id: m[1], spec_key: safeDecodeSegment(m[2]) }), resolveHandler: () => singleSpecRoute.DELETE },
 
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/flow\/snapshot$/, extractParams: idOnly, resolveHandler: () => snapshotRoute.GET },
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/flow\/nodes$/, extractParams: idOnly, resolveHandler: () => nodesRoute.GET },
@@ -175,11 +191,11 @@ const ROUTE_TABLE: RouteEntry[] = [
 
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/comments$/, extractParams: (m) => ({ id: m[1], nodeId: m[2] }), resolveHandler: () => commentsRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/comments$/, extractParams: (m) => ({ id: m[1], nodeId: m[2] }), resolveHandler: () => commentsRoute.POST },
-  proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/comments\/([^/]+)$/, (m) => `/api/v1/projects/${m[1]}/flow/nodes/${m[2]}/comments/${m[3]}`, UpdateElementCommentSchema),
+  proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/comments\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/nodes/${safeEncodeSegment(m[2])}/comments/${safeEncodeSegment(m[3])}`, UpdateElementCommentSchema),
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/fixtures$/, extractParams: (m) => ({ id: m[1], nodeId: m[2] }), resolveHandler: () => fixturesRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/fixtures$/, extractParams: (m) => ({ id: m[1], nodeId: m[2] }), resolveHandler: () => fixturesRoute.POST },
-  proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/fixtures\/([^/]+)$/, (m) => `/api/v1/projects/${m[1]}/flow/nodes/${m[2]}/fixtures/${m[3]}`, UpdateScreenFixtureSchema),
-  proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/viewport$/, (m) => `/api/v1/projects/${m[1]}/flow/nodes/${m[2]}/viewport`, ViewportPatchSchema),
+  proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/fixtures\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/nodes/${safeEncodeSegment(m[2])}/fixtures/${safeEncodeSegment(m[3])}`, UpdateScreenFixtureSchema),
+  proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/viewport$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/nodes/${safeEncodeSegment(m[2])}/viewport`, ViewportPatchSchema),
   proxyRoute("POST", /^\/api\/projects\/([^/]+)\/flow\/jobs\/events$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/jobs/events`, PostJobEventInputSchema),
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/flow\/jobs\/stream$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/jobs/stream`),
 
@@ -210,10 +226,10 @@ const ROUTE_TABLE: RouteEntry[] = [
   proxyRoute("POST", /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/apply$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals/${safeEncodeSegment(m[2])}/apply`, ApplyProposalSchema),
   proxyRoute("POST", /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/reject$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals/${safeEncodeSegment(m[2])}/reject`, { rawJsonPassthrough: true }),
 
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/sdi\/intent$/, (m) => `/api/v1/projects/${m[1]}/sdi/intent`),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/sdi\/intent$/, (m) => `/api/v1/projects/${m[1]}/sdi/intent`, CompileIntentSchema),
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/sdi\/intent\/([^/]+)$/, (m) => `/api/v1/projects/${m[1]}/sdi/intent/${m[2]}`),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/sdi\/clarification$/, (m) => `/api/v1/projects/${m[1]}/sdi/clarification`, ClarificationSelectSchema),
+  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/sdi\/intent$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent`),
+  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/sdi\/intent$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent`, CompileIntentSchema),
+  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/sdi\/intent\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent/${safeEncodeSegment(m[2])}`),
+  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/sdi\/clarification$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/clarification`, ClarificationSelectSchema),
 ];
 
 export function matchBffRoute(

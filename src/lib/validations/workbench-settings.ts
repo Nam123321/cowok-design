@@ -11,6 +11,9 @@ export const AgentSettingDtoSchema = z.object({
   credentialRef: z.string().default(""),
   isDefault: z.boolean().default(false),
   status: z.string().default("configured"),
+  permissionMode: z.string().default("ask-every-time"),
+  vaultMode: z.string().default("keychain"),
+  onboardingDone: z.boolean().default(false),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -23,6 +26,9 @@ export const UpsertAgentSettingInputSchema = z.object({
   credentialRef: z.string().default(""),
   isDefault: z.boolean().default(false),
   status: z.string().default("configured"),
+  permissionMode: z.string().optional(),
+  vaultMode: z.string().optional(),
+  onboardingDone: z.boolean().optional(),
 });
 
 export const McpServerDtoSchema = z.object({
@@ -94,6 +100,8 @@ export const ExecutionEventDtoSchema = z.object({
   eventKind: z.string(),
   payloadText: z.string(),
   seqNo: z.number(),
+  projectSeq: z.number().optional(),
+  compositeScopeKey: z.string().optional(),
   jobStatus: z.string(),
   createdAt: z.string(),
 });
@@ -104,7 +112,7 @@ export const PostJobEventInputSchema = z.object({
   sessionId: z.string().optional(),
   eventKind: z.string().min(1),
   payloadText: z.string().default(""),
-  jobStatus: z.enum(["QUEUED", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"]).optional(),
+  jobStatus: z.enum(["QUEUED", "RUNNING", "PAUSED", "INTERRUPTED", "COMPLETED", "FAILED", "CANCELLED"]).optional(),
 });
 
 export type AgentSettingDto = z.infer<typeof AgentSettingDtoSchema>;

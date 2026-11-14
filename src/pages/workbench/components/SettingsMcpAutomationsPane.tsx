@@ -8,62 +8,18 @@ interface SettingsMcpAutomationsPaneProps {
   selectedTab: "mcp" | "automations";
 }
 
-const DEFAULT_SYSTEM_MCPS = [
-  { id: "sys-falkordb", name: "cowok-falkordb", desc: "127.0.0.1:6380 • Knowledge Graph & Vector DB", status: "ONLINE" },
-  { id: "sys-fs", name: "local-filesystem", desc: "Native Workspace & In-Place Writeback", status: "ONLINE" },
-  { id: "sys-cdp", name: "browser-devtools", desc: "Chrome DevTools Protocol (CDP Automation)", status: "ONLINE" },
-  { id: "sys-github", name: "github-mcp-server", desc: "GitHub SCM, PRs & Release Pipeline", status: "CONNECTED" },
-];
-
-const McpHostCredentialsCard: React.FC = () => {
+const McpHostNoticeCard: React.FC = () => {
   const { t } = useTranslation();
-  const [isCopiedKey, setIsCopiedKey] = useState(false);
-  const [isCopiedEndpoint, setIsCopiedEndpoint] = useState(false);
-  const [hostApiKey, setHostApiKey] = useState("cwk_local_mcp_dev_••••••••••••••••");
-  const hostEndpoint = "http://127.0.0.1:3100/mcp";
-
-  const handleCopy = (text: string, type: "key" | "endpoint") => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      void navigator.clipboard.writeText(text);
-      if (type === "key") { setIsCopiedKey(true); setTimeout(() => setIsCopiedKey(false), 2000); }
-      else { setIsCopiedEndpoint(true); setTimeout(() => setIsCopiedEndpoint(false), 2000); }
-    }
-  };
-  const handleRegenerateKey = () => {
-    const bytes = new Uint8Array(16);
-    if (typeof globalThis.crypto?.getRandomValues === "function") {
-      globalThis.crypto.getRandomValues(bytes);
-    }
-    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-    setHostApiKey(`cwk_local_mcp_dev_${hex}`);
-  };
-
   return (
     <div style={{ padding: "12px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
-      <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "3px" }}>{t("settings.mcpHostTitle", "Máy chủ MCP Cowok-Design (Host MCP Server)")}</div>
-      <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginBottom: "10px", lineHeight: "1.35" }}>{t("settings.mcpHostDesc", "Cung cấp Endpoint và API Key để các công cụ ngoài gọi vào Cowok-Design")}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <div>
-          <label style={{ display: "block", fontSize: "10.5px", color: "var(--text-muted)", marginBottom: "3px" }}>{t("settings.mcpEndpointLabel", "MCP Server Endpoint URL")}</label>
-          <div style={{ display: "flex", gap: "6px" }}>
-            <input type="text" readOnly value={hostEndpoint} className="cowok-input" style={{ flex: 1, height: "28px", padding: "0 8px", fontSize: "11px", fontFamily: "var(--font-mono)", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", border: "1px solid var(--border-default)" }} />
-            <button type="button" onClick={() => handleCopy(hostEndpoint, "endpoint")} className="cowok-btn cowok-btn-secondary" style={{ height: "28px", padding: "0 10px", fontSize: "10.5px", borderRadius: "var(--radius-xs)", cursor: "pointer", whiteSpace: "nowrap" }}>
-              {isCopiedEndpoint ? t("settings.copiedKey", "Đã sao chép!") : t("settings.copyKeyBtn", "Sao chép")}
-            </button>
-          </div>
-        </div>
-        <div>
-          <label style={{ display: "block", fontSize: "10.5px", color: "var(--text-muted)", marginBottom: "3px" }}>{t("settings.mcpApiKeyLabel", "Khóa API MCP của Cowok-Design")}</label>
-          <div style={{ display: "flex", gap: "6px" }}>
-            <input type="text" readOnly value={hostApiKey} className="cowok-input" style={{ flex: 1, height: "28px", padding: "0 8px", fontSize: "11px", fontFamily: "var(--font-mono)", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", border: "1px solid var(--border-default)" }} />
-            <button type="button" onClick={() => handleCopy(hostApiKey, "key")} className="cowok-btn cowok-btn-secondary" style={{ height: "28px", padding: "0 10px", fontSize: "10.5px", borderRadius: "var(--radius-xs)", cursor: "pointer", whiteSpace: "nowrap" }}>
-              {isCopiedKey ? t("settings.copiedKey", "Đã sao chép!") : t("settings.copyKeyBtn", "Sao chép Key")}
-            </button>
-            <button type="button" onClick={handleRegenerateKey} className="cowok-btn cowok-btn-ghost" style={{ height: "28px", padding: "0 8px", fontSize: "10.5px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", cursor: "pointer", whiteSpace: "nowrap" }}>
-              {t("settings.regenerateKeyBtn", "Tạo lại Key")}
-            </button>
-          </div>
-        </div>
+      <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "3px" }}>
+        {t("settings.mcpHostTitle", "Máy chủ MCP Cowok-Design (Host MCP Server)")}
+      </div>
+      <div style={{ fontSize: "10.5px", color: "var(--text-muted)", lineHeight: "1.4" }}>
+        {t(
+          "settings.mcpHostStory043Notice",
+          "Cấp phát khóa Host MCP và kiểm tra health probe trực tiếp sẽ được kích hoạt qua Daemon Keychain ở Story 04.3. Hiện chỉ quản lý danh sách Client MCP trong SQLite V7."
+        )}
       </div>
     </div>
   );
@@ -133,15 +89,13 @@ const McpClientRegistryList: React.FC = () => {
     }
   };
 
-  const displayedRows = servers.length > 0
-    ? servers.map((s) => ({
-        id: s.id,
-        name: s.displayName,
-        desc: `${s.transportKind.toUpperCase()} • ${s.commandOrUrl}`,
-        status: s.lastHealthStatus.toUpperCase(),
-        removable: true,
-      }))
-    : DEFAULT_SYSTEM_MCPS.map((m) => ({ ...m, removable: false }));
+  const displayedRows = servers.map((s) => ({
+    id: s.id,
+    name: s.displayName,
+    desc: `${s.transportKind.toUpperCase()} • ${s.commandOrUrl}`,
+    status: s.lastHealthStatus.toUpperCase(),
+    removable: true,
+  }));
 
   return (
     <div>
@@ -180,6 +134,11 @@ const McpClientRegistryList: React.FC = () => {
         </form>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+        {displayedRows.length === 0 && (
+          <div style={{ padding: "10px 12px", borderRadius: "var(--radius-xs)", border: "1px dashed var(--border-subtle)", fontSize: "11px", color: "var(--text-muted)" }}>
+            {t("settings.mcpEmptyRegistry", "Chưa có MCP Server nào được cấu hình trong Daemon SQLite.")}
+          </div>
+        )}
         {displayedRows.map((mcp) => (
           <div key={mcp.id} style={{ padding: "8px 10px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-workspace)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
             <div>
@@ -204,7 +163,7 @@ export const SettingsMcpAutomationsPane: React.FC<SettingsMcpAutomationsPaneProp
   if (selectedTab === "mcp") {
     return (
       <>
-        <McpHostCredentialsCard />
+        <McpHostNoticeCard />
         <McpClientRegistryList />
       </>
     );

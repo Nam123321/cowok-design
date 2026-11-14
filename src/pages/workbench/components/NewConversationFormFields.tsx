@@ -1,9 +1,10 @@
-// @story 04.1
-// @implements AC-01, AC-02
+// @story 04.1, 04.2
+// @implements AC-01, AC-02, AC-04
 import React from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { ProjectProvenance, WorkbenchProject } from "../constants";
+import { MANAGED_SLUG_REGEX } from "../hooks/useProjectTrashAndBrowse";
 
 export interface NewConversationFormFieldsProps {
   mode: "project" | "new-project" | "standalone";
@@ -13,15 +14,15 @@ export interface NewConversationFormFieldsProps {
   onSelectProjectId: (id: string) => void;
   newProjectName: string;
   onChangeNewProjectName: (val: string) => void;
+  managedSlug: string;
+  onChangeManagedSlug: (val: string) => void;
   provenance: ProjectProvenance;
   onChangeProvenance: (val: ProjectProvenance) => void;
   localFolderPath: string;
   onChangeLocalFolderPath: (val: string) => void;
   sessionTitle: string;
   onChangeSessionTitle: (val: string) => void;
-  folderInputRef: React.RefObject<HTMLInputElement | null>;
   onBrowseFolder: () => void;
-  onFolderChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 const INPUT_STYLE: React.CSSProperties = {
@@ -50,7 +51,7 @@ const ProvenanceSelector: React.FC<{
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
         <button type="button" onClick={() => onChangeProvenance("folder-backed")} style={cardOptionStyle(provenance === "folder-backed")}>
           <div style={{ fontSize: "11.5px", fontWeight: 600, marginBottom: "2px", display: "flex", alignItems: "center", gap: "5px" }}>
-            <BrandIcon name="git-branch" size={12} color="var(--human-accent)" />
+            <BrandIcon name="folder-git" size={12} color="var(--human-accent)" />
             <span>{t("workbench.folderBackedTitle", "Folder-Backed (In-Place)")}</span>
           </div>
           <div style={{ fontSize: "10px", color: "var(--text-muted)", lineHeight: "1.35" }}>
@@ -71,13 +72,42 @@ const ProvenanceSelector: React.FC<{
   );
 };
 
+const ManagedSlugField: React.FC<{
+  managedSlug: string;
+  onChangeManagedSlug: (val: string) => void;
+}> = ({ managedSlug, onChangeManagedSlug }) => {
+  const { t } = useTranslation();
+  const isValid = MANAGED_SLUG_REGEX.test(managedSlug.trim());
+  return (
+    <div>
+      <label htmlFor="newConvoManagedSlugInput" style={{ ...LABEL_STYLE, fontSize: "11px", marginBottom: "4px" }}>
+        {t("workbench.managedSlugLabel", "Slug Workspace (~/CowokProjects/<slug>)")}
+      </label>
+      <input
+        id="newConvoManagedSlugInput"
+        type="text"
+        value={managedSlug}
+        onChange={(e) => onChangeManagedSlug(e.target.value)}
+        className="cowok-input"
+        style={{ ...INPUT_STYLE, height: "32px", fontFamily: "var(--font-mono)" }}
+      />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginTop: "4px" }}>
+        <span style={{ fontSize: "10.5px", color: isValid ? "var(--text-muted)" : "var(--state-danger)" }}>
+          {isValid
+            ? t("workbench.managedSlugHint", "Chỉ gồm chữ thường a-z, số 0-9, '-' hoặc '_' (tối đa 63 ký tự)")
+            : t("workbench.invalidSlugError", "Slug không hợp lệ. Phải khớp ^[a-z0-9][a-z0-9_-]{0,62}$")}
+        </span>
+        <span className="ff-metric-line">{`~/CowokProjects/${managedSlug.trim() || "..."}`}</span>
+      </div>
+    </div>
+  );
+};
+
 const FolderPathPicker: React.FC<{
   localFolderPath: string;
   onChangeLocalFolderPath: (val: string) => void;
   onBrowseFolder: () => void;
-  onFolderChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  folderInputRef: React.RefObject<HTMLInputElement | null>;
-}> = ({ localFolderPath, onChangeLocalFolderPath, onBrowseFolder, onFolderChange, folderInputRef }) => {
+}> = ({ localFolderPath, onChangeLocalFolderPath, onBrowseFolder }) => {
   const { t } = useTranslation();
   return (
     <div>
@@ -85,25 +115,41 @@ const FolderPathPicker: React.FC<{
         {t("workbench.localGitPathLabel", "Đường dẫn thư mục dự án cục bộ (Local Folder / Git Repo)")}
       </label>
       <div style={{ display: "flex", gap: "6px" }}>
-        <input type="text" value={localFolderPath} onChange={(e) => onChangeLocalFolderPath(e.target.value)} className="cowok-input" style={{ ...INPUT_STYLE, flex: 1, height: "32px", fontSize: "11.5px", fontFamily: "var(--font-mono)" }} />
-        <button type="button" onClick={onBrowseFolder} className="cowok-btn cowok-btn-secondary" style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 10px", height: "32px", fontSize: "11.5px", fontWeight: 500, borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-          <BrandIcon name="folder" size={13} color="var(--human-accent)" />
-          <span>{t("workbench.browseFolderBtn", "Chọn thư mục")}</span>
+        <input
+          type="text"
+          value={localFolderPath}
+          placeholder={t("workbench.noLocalPathSelected", "Dùng mặc định 1-Click ~/CowokProjects/<slug> hoặc chọn qua Daemon FS")}
+          onChange={(e) => onChangeLocalFolderPath(e.target.value)}
+          className="cowok-input"
+          style={{ ...INPUT_STYLE, flex: 1, height: "32px", fontSize: "11.5px", fontFamily: "var(--font-mono)" }}
+        />
+        <button
+          type="button"
+          onClick={onBrowseFolder}
+          data-testid="open-daemon-fs-picker-btn"
+          className="cowok-btn cowok-btn-secondary"
+          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 10px", height: "32px", fontSize: "11.5px", fontWeight: 500, borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
+        >
+          <BrandIcon name="folder-git" size={13} color="var(--human-accent)" />
+          <span>{t("workbench.browseDaemonFsBtn", "Chọn qua Daemon FS")}</span>
         </button>
-        <input ref={folderInputRef} type="file" {...({ webkitdirectory: "", directory: "" } as Record<string, string>)} style={{ display: "none" }} onChange={onFolderChange} />
       </div>
     </div>
   );
 };
 
+function getTitlePlaceholder(
+  mode: "project" | "new-project" | "standalone",
+  t: (k: string, fallback: string) => string
+): string {
+  if (mode === "project") return t("workbench.sessionPlaceholderProject", "Ví dụ: Thiết kế Luồng Checkout & 3DS...");
+  if (mode === "new-project") return t("workbench.sessionPlaceholderNewProject", "Ví dụ: Khởi tạo kiến trúc Userflow & Tokens...");
+  return t("workbench.sessionPlaceholderStandalone", "Ví dụ: Khảo sát ý tưởng UI nhanh (Không gắn dự án)...");
+}
+
 export const NewConversationFormFields: React.FC<NewConversationFormFieldsProps> = (p) => {
   const { t } = useTranslation();
-  const titlePlaceholder =
-    p.mode === "project"
-      ? t("workbench.sessionPlaceholderProject", "Ví dụ: Thiết kế Luồng Checkout & 3DS...")
-      : p.mode === "new-project"
-      ? t("workbench.sessionPlaceholderNewProject", "Ví dụ: Khởi tạo kiến trúc Userflow & Tokens...")
-      : t("workbench.sessionPlaceholderStandalone", "Ví dụ: Khảo sát ý tưởng UI nhanh (Không gắn dự án)...");
+  const titlePlaceholder = getTitlePlaceholder(p.mode, t);
 
   return (
     <>
@@ -125,9 +171,10 @@ export const NewConversationFormFields: React.FC<NewConversationFormFieldsProps>
             <label style={LABEL_STYLE}>{t("workbench.newProjectNameLabel", "Tên Dự án Mới")}</label>
             <input type="text" value={p.newProjectName} onChange={(e) => p.onChangeNewProjectName(e.target.value)} placeholder={t("workbench.newProjectPlaceholder", "Ví dụ: E-Commerce Checkout V2")} required className="cowok-input" style={INPUT_STYLE} />
           </div>
+          <ManagedSlugField managedSlug={p.managedSlug} onChangeManagedSlug={p.onChangeManagedSlug} />
           <ProvenanceSelector provenance={p.provenance} onChangeProvenance={p.onChangeProvenance} />
           {p.provenance === "folder-backed" && (
-            <FolderPathPicker localFolderPath={p.localFolderPath} onChangeLocalFolderPath={p.onChangeLocalFolderPath} onBrowseFolder={p.onBrowseFolder} onFolderChange={p.onFolderChange} folderInputRef={p.folderInputRef} />
+            <FolderPathPicker localFolderPath={p.localFolderPath} onChangeLocalFolderPath={p.onChangeLocalFolderPath} onBrowseFolder={p.onBrowseFolder} />
           )}
         </>
       )}

@@ -18,7 +18,6 @@ use uuid::Uuid;
 
 use super::*;
 use crate::daemon_auth::VerifiedLegacyIngress;
-use crate::lockfile::validate_and_canonicalize_workspace_root;
 
 pub(super) fn parse_project_uuid(raw: &str) -> Result<Uuid, HarnessError> {
     let trimmed = raw.trim();
@@ -53,6 +52,8 @@ pub fn map_error_to_response(err: HarnessError) -> Response {
         HarnessError::BoundaryViolation { ref reason } => {
             if reason.starts_with("UNAUTHORIZED") {
                 (StatusCode::UNAUTHORIZED, "UNAUTHORIZED")
+            } else if reason.starts_with("FS_JAIL_VIOLATION") {
+                (StatusCode::FORBIDDEN, "FS_JAIL_VIOLATION")
             } else {
                 (StatusCode::FORBIDDEN, "TENANT_ISOLATION_BREACH")
             }
@@ -69,6 +70,8 @@ pub fn map_error_to_response(err: HarnessError) -> Response {
         HarnessError::ValidationFailed { reason } => {
             if reason.contains("UNIQUE_CONSTRAINT") {
                 (StatusCode::CONFLICT, "UNIQUE_CONSTRAINT")
+            } else if reason.contains("WORKSPACE_ROOT_CONFLICT") {
+                (StatusCode::CONFLICT, "WORKSPACE_ROOT_CONFLICT")
             } else if reason.contains("REFERENTIAL_INTEGRITY") {
                 (StatusCode::UNPROCESSABLE_ENTITY, "REFERENTIAL_INTEGRITY")
             } else if reason.contains("PROJECT_SCOPE_VIOLATION") {
@@ -79,6 +82,8 @@ pub fn map_error_to_response(err: HarnessError) -> Response {
                 (StatusCode::NOT_FOUND, "SESSION_NOT_FOUND")
             } else if reason.contains("PROJECT_ALREADY_FOLDER_BACKED") {
                 (StatusCode::CONFLICT, "PROJECT_ALREADY_FOLDER_BACKED")
+            } else if reason.contains("PROMOTE_CONFLICT") {
+                (StatusCode::CONFLICT, "PROMOTE_CONFLICT")
             } else if reason.contains("INVALID_PATH_TOKEN") {
                 (StatusCode::UNPROCESSABLE_ENTITY, "INVALID_PATH_TOKEN")
             } else if reason.contains("SESSION_TITLE_EMPTY") {
@@ -126,6 +131,10 @@ pub struct ProjectBoundaryDto {
 #[derive(Debug, Clone, Deserialize)]
 pub struct PromoteScratchRequest {
     pub target_directory: String,
+    #[serde(default)]
+    pub token: Option<String>,
+    #[serde(default)]
+    pub path_token: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -148,24 +157,47 @@ pub struct UpdateChatSessionRequest {
     pub title: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct IssuePathTokenRequest {
-    pub relative_path: String,
+    #[serde(default)]
+    pub relative_path: Option<String>,
+    #[serde(default)]
+    pub target_path: Option<String>,
+    #[serde(default)]
     pub principal_id: Option<String>,
+    #[serde(default)]
     pub ttl_seconds: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PathTokenResponse {
     pub token: String,
+    #[serde(default)]
+    pub path_token: String,
     pub expires_at: i64,
     pub normalized_relative_path: String,
+    #[serde(default)]
+    pub canonical_path: String,
+    #[serde(default)]
+    pub daemon_nonce: String,
+    #[serde(default)]
+    pub dev_ino: String,
+    #[serde(default)]
+    pub ancestor_dev_ino: String,
+    #[serde(default)]
+    pub target_exists: bool,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct VerifyPathTokenRequest {
     pub token: String,
-    pub expected_relative_path: String,
+    #[serde(default)]
+    pub expected_relative_path: Option<String>,
+    #[serde(default)]
+    pub target_path: Option<String>,
+    #[serde(default)]
+    pub target_directory: Option<String>,
+    #[serde(default)]
     pub principal_id: Option<String>,
 }
 
@@ -177,6 +209,14 @@ pub struct PathTokenPayload {
     pub principal_id: String,
     pub exp: i64,
     pub nonce: String,
+    #[serde(default)]
+    pub daemon_nonce: String,
+    #[serde(default)]
+    pub canonical_path: String,
+    #[serde(default)]
+    pub ancestor_dev_ino: String,
+    #[serde(default)]
+    pub target_exists: bool,
 }
 
 pub fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
@@ -276,50 +316,69 @@ pub fn validate_and_normalize_relative_path(path_str: &str) -> Result<String, Ha
     Ok(components.join("/"))
 }
 
-fn copy_dir_preserving_git(src: &Path, dst: &Path) -> Result<(), HarnessError> {
-    if !src.exists() {
-        return Ok(());
-    }
-    for entry in fs::read_dir(src).map_err(|e| HarnessError::ValidationFailed {
-        reason: format!("READ_DIR_FAILED [{}]: {e}", src.display()),
-    })? {
-        let entry = entry.map_err(|e| HarnessError::ValidationFailed {
-            reason: format!("DIR_ENTRY_FAILED: {e}"),
-        })?;
-        let file_type = entry
-            .file_type()
-            .map_err(|e| HarnessError::ValidationFailed {
-                reason: format!("FILE_TYPE_FAILED: {e}"),
-            })?;
-        let src_path = entry.path();
-        let file_name = entry.file_name();
-        let name_str = file_name.to_string_lossy();
+fn copy_dir_preserving_git_fds(
+    src_label: &Path,
+    src_fd: &std::os::fd::OwnedFd,
+    dst_fd: &std::os::fd::OwnedFd,
+    rel_prefix: &Path,
+    copied_files: &mut Vec<PathBuf>,
+) -> Result<(), HarnessError> {
+    let entries = super::fs_jail::read_dir_fd_nofollow(src_fd, &src_label.display().to_string())?;
+    for entry in entries {
+        let name_str = entry.name.to_string_lossy();
+        if name_str.ends_with(".lock")
+            || name_str.ends_with(".sock")
+            || name_str.starts_with(".cowok-tmp-")
+            || entry.is_symlink
+        {
+            continue;
+        }
+        let child_label = src_label.join(&entry.name);
+        let child_rel = rel_prefix.join(&entry.name);
 
-        if name_str.ends_with(".lock") || name_str.ends_with(".sock") {
+        if name_str == ".git"
+            && super::fs_jail::open_child_dir_fd_nofollow(dst_fd, &entry.name)?.is_some()
+        {
             continue;
         }
 
-        if name_str == ".git" && dst.join(".git").exists() {
-            continue;
-        }
-
-        let dst_path = dst.join(&file_name);
-        if file_type.is_dir() {
-            fs::create_dir_all(&dst_path).map_err(|e| HarnessError::ValidationFailed {
-                reason: format!("CREATE_DIR_FAILED [{}]: {e}", dst_path.display()),
-            })?;
-            copy_dir_preserving_git(&src_path, &dst_path)?;
-        } else if file_type.is_file() {
-            fs::copy(&src_path, &dst_path).map_err(|e| HarnessError::ValidationFailed {
-                reason: format!(
-                    "COPY_FILE_FAILED [{} -> {}]: {e}",
-                    src_path.display(),
-                    dst_path.display()
-                ),
-            })?;
+        if entry.is_dir {
+            let child_src_fd = super::fs_jail::open_child_dir_fd_nofollow(src_fd, &entry.name)?
+                .ok_or_else(|| HarnessError::ValidationFailed {
+                    reason: format!("SRC_DIR_MISSING [{}]", child_label.display()),
+                })?;
+            let child_dst_fd = super::fs_jail::ensure_child_dir_fd(dst_fd, &entry.name, 0o700)?;
+            copy_dir_preserving_git_fds(
+                &child_label,
+                &child_src_fd,
+                &child_dst_fd,
+                &child_rel,
+                copied_files,
+            )?;
+        } else if entry.is_file {
+            super::fs_jail::copy_file_between_dir_fds(src_fd, dst_fd, &entry.name, 0o600)?;
+            copied_files.push(child_rel);
         }
     }
     Ok(())
+}
+
+fn copy_dir_preserving_git(src: &Path, dst: &Path) -> Result<Vec<PathBuf>, HarnessError> {
+    if !src.exists() {
+        return Ok(Vec::new());
+    }
+    let src_fd = super::fs_jail::open_dir_abs_nofollow(src)?;
+    let dst_fd = super::fs_jail::open_dir_abs_nofollow(dst)?;
+    let mut copied_files = Vec::new();
+    if let Err(e) =
+        copy_dir_preserving_git_fds(src, &src_fd, &dst_fd, Path::new(""), &mut copied_files)
+    {
+        for rel in copied_files {
+            let _ = super::fs_jail::remove_rel_file_in_dir_fd(&dst_fd, &rel);
+        }
+        return Err(e);
+    }
+    Ok(copied_files)
 }
 
 pub(super) async fn handle_get_boundary(
@@ -433,7 +492,9 @@ fn is_system_or_root_path(p: &Path) -> bool {
         "/bin/",
         "/sbin/",
         "/System/",
+        "/Library/",
         "/Applications/",
+        "/Volumes/",
         "/dev/",
         "/proc/",
         "/sys/",
@@ -450,11 +511,19 @@ fn is_system_or_root_path(p: &Path) -> bool {
     if norm.starts_with("/usr/") && !norm.starts_with("/usr/local/") {
         return true;
     }
-    // Disallow promoting directly to user's home root
+    // Disallow promoting directly to user's home root or sensitive home subdirectories
     if let Ok(home) = std::env::var("HOME") {
         let home_norm = home.trim_end_matches('/');
-        if norm == home_norm {
+        let norm_lower = norm.to_lowercase();
+        let home_lower = home_norm.to_lowercase();
+        if norm_lower == home_lower {
             return true;
+        }
+        for sub in ["/library", "/.ssh", "/.gnupg", "/.aws", "/.kube"] {
+            let blocked = format!("{home_lower}{sub}");
+            if norm_lower == blocked || norm_lower.starts_with(&format!("{blocked}/")) {
+                return true;
+            }
         }
     }
     false
@@ -488,9 +557,43 @@ pub(super) async fn handle_promote_scratch(
     if is_system_or_root_path(&target_path) {
         return Err(map_error_to_response(HarnessError::BoundaryViolation {
             reason: format!(
-                "SYSTEM_PATH_DENIED: Target directory '{}' is a protected system directory",
+                "FS_JAIL_VIOLATION:SYSTEM_PATH_DENIED: Target directory '{}' is a protected system directory",
                 target_dir_str
             ),
+        }));
+    }
+    let anchor = super::fs_jail::inspect_path_jail(&target_path).map_err(map_error_to_response)?;
+    super::fs_jail::ensure_writable_target_not_home(&anchor.canonical_path)
+        .map_err(map_error_to_response)?;
+
+    let tok = req
+        .path_token
+        .as_deref()
+        .or(req.token.as_deref())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            map_error_to_response(HarnessError::BoundaryViolation {
+                reason: "FS_JAIL_VIOLATION: Promote target requires a signed PathToken".to_string(),
+            })
+        })?;
+    let secret =
+        crate::synthesis::ensure_project_token(&current_ws).map_err(map_error_to_response)?;
+    let payload = super::fs_jail::decode_and_verify_path_token(
+        secret.as_bytes(),
+        tok,
+        project_id,
+        &state.auth.daemon_nonce,
+        true,
+    )
+    .map_err(map_error_to_response)?;
+    if payload.canonical_path != anchor.canonical_path.display().to_string()
+        || payload.ancestor_dev_ino.is_empty()
+        || payload.ancestor_dev_ino != anchor.ancestor_dev_ino
+    {
+        return Err(map_error_to_response(HarnessError::BoundaryViolation {
+            reason: "FS_JAIL_VIOLATION: Promote target failed PathToken inode/canonical check"
+                .to_string(),
         }));
     }
 
@@ -501,85 +604,164 @@ pub(super) async fn handle_promote_scratch(
         .connection()
         .map_err(map_error_to_response)?;
 
-    let current_boundary_type: Option<String> = conn
-        .query_row(
-            "SELECT boundary_type FROM project_boundaries WHERE project_id = ?1",
-            params![project_id.to_string()],
-            |r| r.get(0),
-        )
-        .optional()
-        .map_err(|e| {
-            map_error_to_response(HarnessError::ValidationFailed {
-                reason: format!("QUERY_BOUNDARY_FAILED: {e}"),
-            })
-        })?;
+    let provisioned = super::fs_jail::provision_dir_zero_toctou_checked(
+        &target_path,
+        Some(&payload.canonical_path),
+        Some(&payload.ancestor_dev_ino),
+    )
+    .map_err(map_error_to_response)?;
+    let target_canon = provisioned.canonical_path;
+    let target_canon_str = target_canon.display().to_string();
 
-    if let Some(ref bt) = current_boundary_type {
-        if bt == "folder_backed" {
-            return Err(map_error_to_response(HarnessError::ValidationFailed {
-                reason: "PROJECT_ALREADY_FOLDER_BACKED: Project is already folder-backed and cannot be promoted again".to_string(),
-            }));
-        }
-    }
-
-    fs::create_dir_all(&target_path).map_err(|e| {
-        map_error_to_response(HarnessError::ValidationFailed {
-            reason: format!("FAILED_TO_CREATE_TARGET_DIRECTORY: {e}"),
-        })
-    })?;
-    let target_canon =
-        validate_and_canonicalize_workspace_root(&target_path).map_err(map_error_to_response)?;
-
-    if target_canon == current_ws {
+    if target_canon == current_ws || target_canon.starts_with(&current_ws) {
         return Err(map_error_to_response(HarnessError::ValidationFailed {
-            reason: "TARGET_DIRECTORY_IDENTICAL: Target directory cannot be identical to current workspace".to_string(),
+            reason: "TARGET_DIRECTORY_IDENTICAL: Target directory cannot be identical to or nested inside current workspace".to_string(),
         }));
     }
 
+    let rollback_promote_intent = |conn_ref: &mut rusqlite::Connection, ts: i64| {
+        if let Err(rb_err) = retry_on_busy("rollback_promote_intent_tx", || {
+            let tx = conn_ref.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            tx.execute(
+                "UPDATE projects SET status = 'ACTIVE', updated_at = ?1 WHERE id = ?2 AND status = 'PROMOTING'",
+                params![ts, project_id.to_string()],
+            )?;
+            tx.commit()
+        }) {
+            eprintln!("[harness-daemon] CRITICAL: Failed to rollback PROMOTING status for {project_id}: {rb_err}");
+        }
+    };
+
     let now_ms = Utc::now().timestamp_millis();
 
-    // AC-09 / F-03: Phase 1 (Intent Phase) - Record PROMOTING status before modifying filesystem
+    // AC-09 / F-01: Phase 1 (Atomic Intent Phase) - Validate boundary, active conflicts & CAS PROMOTING lock inside BEGIN IMMEDIATE
+    let mut precheck_boundary_type: Option<String> = None;
+    let mut phase1_domain_err: Option<HarnessError> = None;
     retry_on_busy("record_promote_intent_tx", || {
+        precheck_boundary_type = None;
+        phase1_domain_err = None;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        tx.execute(
-            "UPDATE projects SET status = 'PROMOTING', updated_at = ?1 WHERE id = ?2",
+        let bt: Option<String> = tx
+            .query_row(
+                "SELECT boundary_type FROM project_boundaries WHERE project_id = ?1",
+                params![project_id.to_string()],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if bt.as_deref() == Some("folder_backed") {
+            phase1_domain_err = Some(HarnessError::ValidationFailed {
+                reason: "PROJECT_ALREADY_FOLDER_BACKED: Project is already folder-backed and cannot be promoted again".to_string(),
+            });
+            return Ok(());
+        }
+        let ws_conflicts: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM projects WHERE workspace_root = ?1 AND trash_deleted_at IS NULL AND id != ?2",
+            params![target_canon_str, project_id.to_string()],
+            |r| r.get(0),
+        )?;
+        if ws_conflicts > 0 {
+            phase1_domain_err = Some(HarnessError::ValidationFailed {
+                reason: "WORKSPACE_ROOT_CONFLICT: Target directory is already bound to another active project".to_string(),
+            });
+            return Ok(());
+        }
+        let changed = tx.execute(
+            "UPDATE projects SET status = 'PROMOTING', updated_at = ?1 WHERE id = ?2 AND status = 'ACTIVE' AND trash_deleted_at IS NULL",
             params![now_ms, project_id.to_string()],
         )?;
+        if changed == 0 {
+            phase1_domain_err = Some(HarnessError::ValidationFailed {
+                reason: "PROMOTE_CONFLICT: Project is already promoting, trashed, or not ACTIVE".to_string(),
+            });
+            return Ok(());
+        }
+        precheck_boundary_type = bt;
         tx.commit()
     })
     .map_err(map_error_to_response)?;
-
-    // Phase 2 (Filesystem Phase) - Copy directory preserving git
-    if let Err(e) = copy_dir_preserving_git(&current_ws, &target_canon) {
-        // Rollback intent
-        let _ = conn.execute(
-            "UPDATE projects SET status = 'ACTIVE', updated_at = ?1 WHERE id = ?2",
-            params![now_ms, project_id.to_string()],
-        );
-        return Err(map_error_to_response(e));
+    if let Some(err) = phase1_domain_err {
+        return Err(map_error_to_response(err));
     }
 
-    let cowok_dir = target_canon.join(".cowok-design");
-    let _ = fs::create_dir_all(&cowok_dir);
+    let rollback_copied_files = |files: &[PathBuf], remove_project_json: bool| {
+        if let Ok(target_fd) = super::fs_jail::open_dir_abs_nofollow(&target_canon) {
+            for rel in files {
+                let _ = super::fs_jail::remove_rel_file_in_dir_fd(&target_fd, rel);
+            }
+            if remove_project_json {
+                let _ = super::fs_jail::remove_rel_file_in_dir_fd(
+                    &target_fd,
+                    Path::new(".cowok-design/project.json"),
+                );
+            }
+        }
+    };
+
+    // Phase 2 (Filesystem Phase) - Copy directory preserving git using FD-anchored openat/O_NOFOLLOW
+    let copied_files = match copy_dir_preserving_git(&current_ws, &target_canon) {
+        Ok(files) => files,
+        Err(e) => {
+            rollback_promote_intent(&mut conn, now_ms);
+            return Err(map_error_to_response(e));
+        }
+    };
+
+    let target_fd = match super::fs_jail::open_dir_abs_nofollow(&target_canon) {
+        Ok(fd) => fd,
+        Err(e) => {
+            rollback_copied_files(&copied_files, false);
+            rollback_promote_intent(&mut conn, now_ms);
+            return Err(map_error_to_response(e));
+        }
+    };
+    let cowok_fd = match super::fs_jail::ensure_child_dir_fd(
+        &target_fd,
+        std::ffi::OsStr::new(".cowok-design"),
+        0o700,
+    ) {
+        Ok(fd) => fd,
+        Err(e) => {
+            rollback_copied_files(&copied_files, false);
+            rollback_promote_intent(&mut conn, now_ms);
+            return Err(map_error_to_response(e));
+        }
+    };
     let boundary_meta = serde_json::json!({
         "id": project_id,
         "boundary_type": "folder_backed",
         "promoted_at": now_ms,
         "promoted_from": current_ws.display().to_string(),
     });
-    let _ = fs::write(
-        cowok_dir.join("project.json"),
-        serde_json::to_string_pretty(&boundary_meta).unwrap_or_default(),
-    );
+    let bytes = serde_json::to_vec_pretty(&boundary_meta).unwrap_or_default();
+    if let Err(e) = super::fs_jail::write_file_in_dir_fd(
+        &cowok_fd,
+        std::ffi::OsStr::new("project.json"),
+        &bytes,
+        0o600,
+    ) {
+        rollback_copied_files(&copied_files, false);
+        rollback_promote_intent(&mut conn, now_ms);
+        return Err(map_error_to_response(e));
+    }
 
-    let is_git = target_canon.join(".git").exists();
-    let target_canon_str = target_canon.display().to_string();
+    let is_git = match super::fs_jail::open_child_dir_fd_nofollow(
+        &target_fd,
+        std::ffi::OsStr::new(".git"),
+    ) {
+        Ok(Some(_)) => true,
+        Ok(None) => false,
+        Err(e) => {
+            rollback_copied_files(&copied_files, true);
+            rollback_promote_intent(&mut conn, now_ms);
+            return Err(map_error_to_response(e));
+        }
+    };
 
-    // Phase 3 (Commit Phase) - Update workspace_root, reset status to ACTIVE, update boundary
-    retry_on_busy("promote_project_boundary_tx", || {
+    // Phase 3 (Commit Phase) - Update workspace_root, provenance, reset status to ACTIVE, update boundary
+    if let Err(e) = retry_on_busy("promote_project_boundary_tx", || {
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         tx.execute(
-            "UPDATE projects SET workspace_root = ?1, status = 'ACTIVE', updated_at = ?2 WHERE id = ?3",
+            "UPDATE projects SET workspace_root = ?1, provenance = 'folder-backed', status = 'ACTIVE', updated_at = ?2 WHERE id = ?3",
             params![target_canon_str, now_ms, project_id.to_string()],
         )?;
         tx.execute(
@@ -596,15 +778,24 @@ pub(super) async fn handle_promote_scratch(
             ],
         )?;
         tx.commit()
-    })
-    .map_err(map_error_to_response)?;
+    }) {
+        rollback_copied_files(&copied_files, true);
+        rollback_promote_intent(&mut conn, now_ms);
+        return Err(map_error_to_response(e));
+    }
 
     // Phase 4 (Cleanup Phase) - Clean up old managed scratch workspace
-    if current_boundary_type.as_deref() == Some("managed_scratch")
-        && current_ws.exists()
+    if precheck_boundary_type.as_deref() == Some("managed_scratch")
+        && fs::symlink_metadata(&current_ws)
+            .is_ok_and(|m| m.is_dir() && !m.file_type().is_symlink())
         && current_ws != target_canon
     {
-        let _ = fs::remove_dir_all(&current_ws);
+        if let Err(rm_err) = fs::remove_dir_all(&current_ws) {
+            eprintln!(
+                "[harness-daemon] WARN: Failed to remove old managed_scratch dir '{}' for project {project_id}: {rm_err}",
+                current_ws.display()
+            );
+        }
     }
 
     Ok(Json(ProjectBoundaryDto {
@@ -896,143 +1087,21 @@ pub(super) async fn handle_delete_chat_session(
 }
 
 pub(super) async fn handle_issue_path_token(
-    State(state): State<DaemonAppState>,
+    state: State<DaemonAppState>,
     caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
-    AxumPath(project_id_raw): AxumPath<String>,
-    Json(req): Json<IssuePathTokenRequest>,
+    project_id_raw: AxumPath<String>,
+    req: Json<IssuePathTokenRequest>,
 ) -> Result<Json<PathTokenResponse>, Response> {
-    let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
-    let (_, ws_root, _) =
-        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
-            .map_err(map_error_to_response)?;
-
-    let norm_path =
-        validate_and_normalize_relative_path(&req.relative_path).map_err(map_error_to_response)?;
-
-    let principal = req
-        .principal_id
-        .unwrap_or_else(|| extract_actor_id(&headers));
-    let secret = crate::synthesis::ensure_project_token(&ws_root).map_err(map_error_to_response)?;
-
-    let ttl = req.ttl_seconds.unwrap_or(3600).max(1);
-    let exp = Utc::now().timestamp() + ttl;
-    let nonce = Uuid::new_v4().to_string();
-
-    let payload = PathTokenPayload {
-        v: 1,
-        project_id,
-        normalized_relative_path: norm_path.clone(),
-        principal_id: principal,
-        exp,
-        nonce,
-    };
-
-    let payload_bytes = serde_json::to_vec(&payload).map_err(|e| {
-        map_error_to_response(HarnessError::ValidationFailed {
-            reason: format!("SERIALIZE_PAYLOAD_FAILED: {e}"),
-        })
-    })?;
-    let payload_hex = payload_bytes
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<String>();
-    let mac = hmac_sha256(secret.as_bytes(), payload_hex.as_bytes());
-    let mac_hex = mac.iter().map(|b| format!("{:02x}", b)).collect::<String>();
-    let token = format!("{payload_hex}.{mac_hex}");
-
-    Ok(Json(PathTokenResponse {
-        token,
-        expires_at: exp,
-        normalized_relative_path: norm_path,
-    }))
+    super::fs_jail::handle_issue_path_token_v2(state, caller, headers, project_id_raw, req).await
 }
 
 pub(super) async fn handle_verify_path_token(
-    State(state): State<DaemonAppState>,
+    state: State<DaemonAppState>,
     caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
-    AxumPath(project_id_raw): AxumPath<String>,
-    Json(req): Json<VerifyPathTokenRequest>,
+    project_id_raw: AxumPath<String>,
+    req: Json<VerifyPathTokenRequest>,
 ) -> Result<Json<serde_json::Value>, Response> {
-    let project_id = parse_project_uuid(&project_id_raw).map_err(map_error_to_response)?;
-    let (_, ws_root, _) =
-        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
-            .map_err(map_error_to_response)?;
-
-    let norm_expected = validate_and_normalize_relative_path(&req.expected_relative_path)
-        .map_err(map_error_to_response)?;
-
-    let secret = crate::synthesis::ensure_project_token(&ws_root).map_err(map_error_to_response)?;
-
-    let parts: Vec<&str> = req.token.split('.').collect();
-    if parts.len() != 2 {
-        return Err(map_error_to_response(HarnessError::ValidationFailed {
-            reason: "INVALID_PATH_TOKEN: Malformed token structure".to_string(),
-        }));
-    }
-
-    let payload_hex = parts[0];
-    let mac_hex = parts[1];
-
-    let expected_mac = hmac_sha256(secret.as_bytes(), payload_hex.as_bytes());
-    let expected_mac_hex = expected_mac
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<String>();
-
-    if !constant_time_eq(mac_hex.as_bytes(), expected_mac_hex.as_bytes()) {
-        return Err(map_error_to_response(HarnessError::ValidationFailed {
-            reason: "INVALID_PATH_TOKEN: Signature verification failed".to_string(),
-        }));
-    }
-
-    let payload_bytes = decode_hex(payload_hex).ok_or_else(|| {
-        map_error_to_response(HarnessError::ValidationFailed {
-            reason: "INVALID_PATH_TOKEN: Payload hex decode failed".to_string(),
-        })
-    })?;
-
-    let payload: PathTokenPayload = serde_json::from_slice(&payload_bytes).map_err(|e| {
-        map_error_to_response(HarnessError::ValidationFailed {
-            reason: format!("INVALID_PATH_TOKEN: Invalid payload json: {e}"),
-        })
-    })?;
-
-    if payload.project_id != project_id {
-        return Err(map_error_to_response(HarnessError::ValidationFailed {
-            reason: "INVALID_PATH_TOKEN: Token project mismatch".to_string(),
-        }));
-    }
-
-    let now_sec = Utc::now().timestamp();
-    if payload.exp < now_sec {
-        return Err(map_error_to_response(HarnessError::ValidationFailed {
-            reason: "INVALID_PATH_TOKEN: Token expired".to_string(),
-        }));
-    }
-
-    if payload.normalized_relative_path != norm_expected {
-        return Err(map_error_to_response(HarnessError::ValidationFailed {
-            reason: format!(
-                "INVALID_PATH_TOKEN: Path mismatch (expected '{}', got '{}')",
-                norm_expected, payload.normalized_relative_path
-            ),
-        }));
-    }
-
-    if let Some(ref p) = req.principal_id {
-        if payload.principal_id != *p {
-            return Err(map_error_to_response(HarnessError::BoundaryViolation {
-                reason: "UNAUTHORIZED: Principal ID mismatch".to_string(),
-            }));
-        }
-    }
-
-    Ok(Json(serde_json::json!({
-        "valid": true,
-        "normalized_relative_path": norm_expected,
-        "project_id": project_id,
-        "principal_id": payload.principal_id,
-    })))
+    super::fs_jail::handle_verify_path_token_v2(state, caller, headers, project_id_raw, req).await
 }

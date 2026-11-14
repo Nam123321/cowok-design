@@ -1,11 +1,11 @@
-// @story 04.2
-// @implements AC-02 (Real CLI Doctor & Auth/Session Verification Probe)
+// @story 04.2 (Local CLI Doctor; 16-CLI Active Probe Matrix in Story 04.3)
+// @implements AC-02 (Honest CLI Presence & Config File Sanity Check)
 import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { guardedRoute } from "../../../lib/api-guard";
+import { guardedRoute } from "@/lib/api-guard";
 
 const execFileAsync = promisify(execFile);
 
@@ -63,7 +63,7 @@ const SUPPORTED_CLIS: CliTargetSpec[] = [
     command: "gemini",
     versionFlag: "--version",
     envKeys: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-    configPaths: [path.join(HOME, ".gemini", "oauth_creds.json"), path.join(HOME, ".config", "gemini")],
+    configPaths: [path.join(HOME, ".gemini", "oauth_creds.json"), path.join(HOME, ".config", "gemini", "oauth_creds.json")],
   },
   {
     id: "cursor",
@@ -109,14 +109,20 @@ async function checkCliAuthentication(
   }
   for (const cfgPath of target.configPaths) {
     try {
-      if (fs.existsSync(cfgPath)) {
-        const stat = fs.statSync(cfgPath);
-        if (stat.isDirectory() || stat.size > 2) {
+      const lstat = fs.lstatSync(cfgPath);
+      if (lstat.isSymbolicLink() || !lstat.isFile()) continue;
+      const raw = fs.readFileSync(cfgPath, "utf8").trim();
+      if (raw.length <= 2 || raw === "{}" || raw === "[]" || raw === "null") continue;
+      if (cfgPath.endsWith(".json")) {
+        const parsed = JSON.parse(raw) as unknown;
+        if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
           return { authenticated: true };
         }
+        continue;
       }
+      return { authenticated: true };
     } catch {
-      // Ignore unreadable config file and continue checking
+      // Ignore missing, symlinked, or malformed config files and continue checking
     }
   }
   if (target.id === "ollama") {

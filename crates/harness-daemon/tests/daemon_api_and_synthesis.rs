@@ -1633,6 +1633,22 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
     fs::create_dir_all(&git_dir).expect("create .git");
     fs::write(git_dir.join("HEAD"), "ref: refs/heads/main\n").expect("write .git/HEAD");
 
+    let (tok_status, tok_prom_val) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/path-token", proj.id),
+        &[],
+        Some(serde_json::json!({
+            "target_path": target_dir.display().to_string(),
+        })),
+    )
+    .await;
+    assert_eq!(tok_status, StatusCode::OK);
+    let prom_tok = tok_prom_val["token"]
+        .as_str()
+        .expect("promote path token")
+        .to_string();
+
     let (status, prom_val) = send_json_request(
         &router,
         "POST",
@@ -1640,6 +1656,7 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
         &[],
         Some(serde_json::json!({
             "target_directory": target_dir.display().to_string(),
+            "token": prom_tok,
         })),
     )
     .await;
@@ -1674,13 +1691,29 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
     );
 
     // Subsequent promote should fail with 409 Conflict
+    let another_repo = tmp.path().join("another-repo");
+    let (_, tok_conflict_val) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/path-token", proj.id),
+        &[],
+        Some(serde_json::json!({
+            "target_path": another_repo.display().to_string(),
+        })),
+    )
+    .await;
+    let conflict_tok = tok_conflict_val["token"]
+        .as_str()
+        .expect("conflict path token")
+        .to_string();
     let (status_conflict, _) = send_json_request(
         &router,
         "POST",
         &format!("/api/v1/projects/{}/promote", proj.id),
         &[],
         Some(serde_json::json!({
-            "target_directory": tmp.path().join("another-repo").display().to_string(),
+            "target_directory": another_repo.display().to_string(),
+            "token": conflict_tok,
         })),
     )
     .await;
@@ -1837,6 +1870,22 @@ async fn test_ac07_ac08_ac09_ac10_hardening() {
     let ext_target = ext_tmp.path().join("external-repo");
     fs::create_dir_all(&ext_target).expect("create ext target");
 
+    let (tok_st, tok_ext_val) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/path-token", proj.id),
+        &[],
+        Some(serde_json::json!({
+            "target_path": ext_target.display().to_string(),
+        })),
+    )
+    .await;
+    assert_eq!(tok_st, StatusCode::OK);
+    let ext_tok = tok_ext_val["token"]
+        .as_str()
+        .expect("ext path token")
+        .to_string();
+
     let (status, prom_val) = send_json_request(
         &router,
         "POST",
@@ -1844,6 +1893,7 @@ async fn test_ac07_ac08_ac09_ac10_hardening() {
         &[],
         Some(serde_json::json!({
             "target_directory": ext_target.display().to_string(),
+            "token": ext_tok,
         })),
     )
     .await;

@@ -68,7 +68,9 @@ function readValidLock(workspaceRoot: string): DaemonLockRecord | null {
       !isPidAlive(parsed.pid) ||
       !parsed.daemon_nonce ||
       !parsed.hmac_key_hex ||
-      parsed.schema_version < 6
+      typeof parsed.schema_version !== "number" ||
+      !Number.isFinite(parsed.schema_version) ||
+      parsed.schema_version < 7
     ) {
       return null;
     }
@@ -141,7 +143,7 @@ async function verifyHealthAndSeedDefaultProject(lock: DaemonLockRecord, workspa
     throw new Error(`Daemon health check failed (${healthRes.status})`);
   }
   const health = (await healthRes.json()) as { service?: string; schema_version?: number };
-  if (health.service !== "cowok-design-harness-daemon" || (health.schema_version ?? 0) < 6) {
+  if (health.service !== "cowok-design-harness-daemon" || (health.schema_version ?? 0) < 7) {
     throw new Error("Unexpected daemon health identity or schema_version");
   }
   const seedingPromises = getSeededWorkspacePromises();

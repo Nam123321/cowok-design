@@ -304,6 +304,7 @@ fn verify_loopback_headers(
             "Non-loopback or cross-port Host rejected",
         ));
     }
+    let mut sec_fetch_site_val: Option<&str> = None;
     if let Some(sfs) = headers.get("sec-fetch-site").and_then(|v| v.to_str().ok()) {
         let sfs_trimmed = sfs.trim();
         if sfs_trimmed != "same-origin" && sfs_trimmed != "none" {
@@ -313,13 +314,21 @@ fn verify_loopback_headers(
                 "Cross-site Sec-Fetch-Site rejected",
             ));
         }
+        sec_fetch_site_val = Some(sfs_trimmed);
     }
     if let Some(orig) = headers.get("origin").and_then(|v| v.to_str().ok()) {
-        if extract_loopback_origin_host(orig).is_none() {
+        let Some(orig_host) = extract_loopback_origin_host(orig) else {
             return Err((
                 StatusCode::FORBIDDEN,
                 "ORIGIN_REJECTED",
                 "Non-loopback Origin rejected",
+            ));
+        };
+        if sec_fetch_site_val == Some("same-origin") && !orig_host.eq_ignore_ascii_case(host) {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "ORIGIN_REJECTED",
+                "Cross-port Origin rejected for same-origin request",
             ));
         }
     }
@@ -701,7 +710,11 @@ pub async fn legacy_project_auth_middleware(
         .get("authorization")
         .and_then(|v| v.to_str().ok())
     {
-        if let Some(tok) = auth_hdr.strip_prefix("Bearer ").map(str::trim) {
+        if let Some(tok) = auth_hdr
+            .strip_prefix("Bearer ")
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+        {
             let is_superadmin = is_valid_superadmin_bearer(&parts.headers);
             Some(VerifiedLegacyIngress {
                 principal: FlowPrincipal {
@@ -716,7 +729,7 @@ pub async fn legacy_project_auth_middleware(
             return auth_err_resp(
                 StatusCode::UNAUTHORIZED,
                 "UNAUTHORIZED",
-                "Authorization header must use Bearer scheme",
+                "Authorization header must provide a non-empty Bearer token",
             );
         }
     } else {
@@ -747,6 +760,19 @@ pub async fn legacy_project_auth_middleware(
                     StatusCode::FORBIDDEN,
                     "TENANT_ISOLATION_BREACH",
                     "Listing or creating root projects requires superadmin Bearer or verified loopback HMAC",
+                );
+            }
+        }
+    }
+
+    if parts.uri.path() == "/api/v1/fs/browse" {
+        if let Some(ref caller) = verified {
+            if caller.kind == LegacyAuthKind::Bearer && !is_valid_superadmin_bearer(&parts.headers)
+            {
+                return auth_err_resp(
+                    StatusCode::FORBIDDEN,
+                    "AUTH_SCOPE_MISMATCH",
+                    "Browsing host filesystem requires superadmin Bearer, session token, or verified loopback HMAC",
                 );
             }
         }

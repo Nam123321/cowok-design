@@ -48,6 +48,7 @@ export interface SettingsGeneralModelsPaneProps {
   onEphemeralKeyChange: (key: "gemini" | "claude" | "openai" | "byosToken", val: string) => void;
   showKeys: boolean;
   onToggleShowKeys: () => void;
+  onAgentPrefsChange?: (vaultMode: string, permissionMode: string) => void;
 }
 
 const INPUT_STYLE: React.CSSProperties = {
@@ -174,12 +175,8 @@ const ModelsByosSection: React.FC<
   const { t } = useTranslation();
   const inputType = p.showKeys ? "text" : "password";
 
-  const [storageMode, setStorageMode] = useState<string>(
-    () => localStorage.getItem("cowok_storage_mode") || "vault_0600"
-  );
-  const [permissionLevel, setPermissionLevel] = useState<string>(
-    () => localStorage.getItem("cowok_permission_level") || "auto_sandbox"
-  );
+  const [storageMode, setStorageMode] = useState<string>("vault_0600");
+  const [permissionLevel, setPermissionLevel] = useState<string>("auto_sandbox");
   const [verifyStates, setVerifyStates] = useState<Record<string, VerifyState>>({});
   const [daemonNotice, setDaemonNotice] = useState<string | null>(null);
 
@@ -191,18 +188,20 @@ const ModelsByosSection: React.FC<
         if (!active || rows.length === 0) return;
         setDaemonNotice(null);
         const def = rows.find((r) => r.isDefault) || rows[0];
-        if (def.credentialRef === "vault_0600" || def.credentialRef === "ram_only") {
-          setStorageMode(def.credentialRef);
+        const vMode = def.vaultMode || def.credentialRef;
+        if (vMode === "keychain" || vMode === "vault_0600" || vMode === "ram_only") {
+          setStorageMode(vMode);
         }
-        if (def.status === "auto_sandbox" || def.status === "ask_risky" || def.status === "ask_all") {
-          setPermissionLevel(def.status);
+        const pMode = def.permissionMode || def.status;
+        if (pMode === "auto_sandbox" || pMode === "ask_risky" || pMode === "ask_all" || pMode === "accept_edits" || pMode === "ask-every-time" || pMode === "bypass") {
+          setPermissionLevel(pMode);
         }
       })
       .catch((err) => {
         if (!active) return;
         const detail = err instanceof Error ? `: ${err.message}` : "";
         setDaemonNotice(
-          `${t("settings.daemonSyncWarning", "Daemon offline — đang dùng cài đặt cục bộ")}${detail}`
+          `${t("settings.daemonSyncWarning", "Daemon offline — chỉ dùng trạng thái trong phiên")}${detail}`
         );
       });
     return () => {
@@ -210,37 +209,53 @@ const ModelsByosSection: React.FC<
     };
   }, [t]);
 
-  const persistAgentPrefs = (nextStorage: string, nextPerm: string, modelId: string, endpoint: string) => {
-    void apiWorkbenchSettings
-      .upsertAgentSetting({
+  const persistAgentPrefs = async (opts: {
+    nextStorage: string;
+    nextPerm: string;
+    prevStorage?: string;
+    prevPerm?: string;
+    modelId: string;
+    endpoint: string;
+  }) => {
+    const { nextStorage, nextPerm, prevStorage, prevPerm, modelId, endpoint } = opts;
+    const vaultMap: Record<string, "ram_only" | "keychain" | "vault_0600"> = { ram_only: "ram_only", keychain: "keychain" };
+    const resolvedVault = vaultMap[nextStorage] ?? "vault_0600";
+    const resolvedPerm = nextPerm === "ask_risky" || nextPerm === "ask_all" || nextPerm === "accept_edits" || nextPerm === "ask-every-time" || nextPerm === "bypass"
+      ? nextPerm
+      : "auto_sandbox";
+    try {
+      await apiWorkbenchSettings.upsertAgentSetting({
         providerId: modelId || "cowok-swarm",
         modelId: modelId || "cowok-swarm",
         endpointUrl: endpoint || "",
-        credentialRef: nextStorage === "ram_only" ? "ram_only" : "vault_0600",
-        status: nextPerm === "ask_risky" || nextPerm === "ask_all" ? nextPerm : "auto_sandbox",
+        credentialRef: resolvedVault,
+        status: resolvedPerm,
+        permissionMode: resolvedPerm,
+        vaultMode: resolvedVault,
         isDefault: true,
-      })
-      .then(() => {
-        setDaemonNotice(null);
-      })
-      .catch((err) => {
-        const detail = err instanceof Error ? `: ${err.message}` : "";
-        setDaemonNotice(
-          `${t("settings.saveDaemonWarning", "Không thể lưu cấu hình lên daemon (đã lưu cục bộ)")}${detail}`
-        );
       });
+      setDaemonNotice(null);
+      p.onAgentPrefsChange?.(resolvedVault, resolvedPerm);
+    } catch (err) {
+      if (prevStorage !== undefined) setStorageMode(prevStorage);
+      if (prevPerm !== undefined) setPermissionLevel(prevPerm);
+      const detail = err instanceof Error ? `: ${err.message}` : "";
+      setDaemonNotice(
+        `${t("settings.saveDaemonWarning", "Không thể lưu cấu hình lên daemon SQLite V7")}${detail}`
+      );
+    }
   };
 
   const handleStorageModeChange = (mode: string) => {
+    const prevStorage = storageMode;
     setStorageMode(mode);
-    localStorage.setItem("cowok_storage_mode", mode);
-    persistAgentPrefs(mode, permissionLevel, p.defaultModel, p.byosEndpoint);
+    void persistAgentPrefs({ nextStorage: mode, nextPerm: permissionLevel, prevStorage, modelId: p.defaultModel, endpoint: p.byosEndpoint });
   };
 
   const handlePermissionLevelChange = (level: string) => {
+    const prevPerm = permissionLevel;
     setPermissionLevel(level);
-    localStorage.setItem("cowok_permission_level", level);
-    persistAgentPrefs(storageMode, level, p.defaultModel, p.byosEndpoint);
+    void persistAgentPrefs({ nextStorage: storageMode, nextPerm: level, prevPerm, modelId: p.defaultModel, endpoint: p.byosEndpoint });
   };
 
   const verifyEndpoint = async (
@@ -292,7 +307,7 @@ const ModelsByosSection: React.FC<
           {t("settings.modelsTitle", "Khóa API & Tự cấp gói thuê bao (BYOS)")}
         </div>
         <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", lineHeight: "1.4" }}>
-          {t("settings.modelsDesc", "Cấu hình API Key và quyền hạn thực thi an toàn với Live Verifier <3s")}
+          {t("settings.modelsDesc", "Cấu hình quyền hạn thực thi và kiểm tra định dạng Key/Endpoint (Live upstream probe ở Story 04.3)")}
         </div>
         {daemonNotice && (
           <div
@@ -323,7 +338,7 @@ const ModelsByosSection: React.FC<
           value={p.defaultModel}
           onChange={(e) => {
             p.onDefaultModelChange(e.target.value);
-            persistAgentPrefs(storageMode, permissionLevel, e.target.value, p.byosEndpoint);
+            void persistAgentPrefs({ nextStorage: storageMode, nextPerm: permissionLevel, modelId: e.target.value, endpoint: p.byosEndpoint });
           }}
           className="cowok-input"
           style={{
@@ -379,7 +394,7 @@ const ModelsByosSection: React.FC<
         </div>
       </div>
 
-      {/* Keys with Live Verifier */}
+      {/* Keys with Format Validation (Live upstream probe in Story 04.3) */}
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         {PROVIDER_KEY_FIELDS.map((field, idx) => (
           <div key={field.id}>

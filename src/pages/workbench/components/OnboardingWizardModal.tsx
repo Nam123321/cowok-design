@@ -1,4 +1,4 @@
-// @story 04.2
+// @story 04.2 (Onboarding Wizard UI; Full 16-CLI Live Auth in Story 04.3)
 // @implements AC-02 (Day-0 Onboarding Wizard & CLI Doctor)
 import React, { useState, useEffect } from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
@@ -38,6 +38,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   const [storageMode, setStorageMode] = useState<"vault_0600" | "ram_only">("vault_0600");
   const [permissionLevel, setPermissionLevel] = useState<"auto_sandbox" | "ask_risky" | "ask_all">("auto_sandbox");
   const [workspaceMode, setWorkspaceMode] = useState<"sandboxed" | "linked">("sandboxed");
+  const [isFinishing, setIsFinishing] = useState<boolean>(false);
 
   const runDoctorScan = async () => {
     setLoadingDoctor(true);
@@ -65,33 +66,37 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleFinish = () => {
-    localStorage.setItem("cowok_first_run_completed", "true");
-    localStorage.setItem("cowok_default_agent", selectedCli);
-    localStorage.setItem("cowok_storage_mode", storageMode);
-    localStorage.setItem("cowok_permission_level", permissionLevel);
-    void apiWorkbenchSettings
-      .upsertAgentSetting({
+  const handleFinish = async () => {
+    if (isFinishing) return;
+    setIsFinishing(true);
+    setDoctorError(null);
+    try {
+      await apiWorkbenchSettings.upsertAgentSetting({
         providerId: selectedCli,
         modelId: selectedCli,
         endpointUrl: "",
         credentialRef: storageMode,
         status: permissionLevel,
+        permissionMode: permissionLevel,
+        vaultMode: storageMode,
+        onboardingDone: true,
         isDefault: true,
-      })
-      .catch((err) => {
-        const detail = err instanceof Error ? `: ${err.message}` : "";
-        onDaemonSyncWarning?.(
-          `${t("settings.saveDaemonWarning", "Không thể lưu cấu hình lên daemon (đã lưu cục bộ)")}${detail}`
-        );
       });
-    onComplete({
-      preferredCli: selectedCli,
-      storageMode,
-      permissionLevel,
-      workspaceMode,
-    });
-    onClose();
+      onComplete({
+        preferredCli: selectedCli,
+        storageMode,
+        permissionLevel,
+        workspaceMode,
+      });
+      onClose();
+    } catch (err) {
+      const detail = err instanceof Error ? `: ${err.message}` : "";
+      const msg = `${t("settings.saveDaemonWarning", "Không thể lưu cấu hình lên daemon SQLite V7")}${detail}`;
+      setDoctorError(msg);
+      onDaemonSyncWarning?.(msg);
+    } finally {
+      setIsFinishing(false);
+    }
   };
 
   return (
@@ -273,7 +278,8 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
             ) : (
               <button
                 type="button"
-                onClick={handleFinish}
+                disabled={isFinishing}
+                onClick={() => void handleFinish()}
                 style={{
                   padding: "7px 20px",
                   borderRadius: "var(--radius-xs)",
@@ -282,7 +288,8 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                   color: "var(--action-primary-fg)",
                   fontSize: "12px",
                   fontWeight: 600,
-                  cursor: "pointer",
+                  cursor: isFinishing ? "wait" : "pointer",
+                  opacity: isFinishing ? 0.7 : 1,
                   display: "flex",
                   alignItems: "center",
                   gap: "6px",

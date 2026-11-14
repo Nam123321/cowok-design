@@ -31,7 +31,7 @@ start_date: '2026-07-24'
 # Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution
 "Epic 04 - Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution": in_progress
 "Story 04.1 - Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation": completed
-"Story 04.2 - SQLite V7 Additive Convergence, Streaming Dual-Ingress Vite BFF, Managed Workspace & Symlink-Safe FS Jail": refactored
+"Story 04.2 - SQLite V7 Additive Convergence, Streaming Dual-Ingress Vite BFF, Managed Workspace & Symlink-Safe FS Jail": completed
 "Story 04.3 - Day-0 Onboarding Wizard, Passive/Active 16+ CLI Doctor (Extension), Keychain->0600 Vault & Connect-Time SSRF Verifier": refactored
 "Story 04.4 - Persistent KeyedParallelCoordinator, Monotonic Fencing, project_seq SSE Last-Event-ID, -PGID CLI Reaper & 3-Level Sidebar": refactored
 "Story 04.5 - State-Hydrated Live Preview (CompanionLiveHtmlRightPane), DOMParser Zero-Network CSP-B, bootSecret Bridge, Interact/Inspect (C) & 409 STALE_MAPPING": refactored

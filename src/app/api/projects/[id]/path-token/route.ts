@@ -9,7 +9,7 @@ export const POST = guardedRoute(
     const projectId = ctx.projectId || ctx.params?.id || "";
     return forwardToDaemonFlow({
       method: "POST",
-      daemonPath: `/api/v1/projects/${projectId}/path-token`,
+      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/path-token`,
       body,
       inboundHeaders: req.headers,
       principal: {
