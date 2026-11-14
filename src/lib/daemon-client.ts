@@ -1,23 +1,21 @@
-// @story 04.1
+// @story 04.1, 04.4
 // @implements AC-03, AC-04, AC-06
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  assembleForwardHeaders,
+  buildCanonicalHmacHeaders,
+  relayDaemonResponse,
+  stripSpoofedHeaders,
+  type DaemonLockRecord,
+} from "./daemon-hmac";
 import { logger } from "./logger";
 
+export { buildCanonicalHmacHeaders, stripSpoofedHeaders };
 export const DEFAULT_FLOW_PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 
-interface DaemonLockRecord {
-  pid: number;
-  host: string;
-  port: number;
-  daemon_nonce: string;
-  hmac_key_hex: string;
-  schema_version: number;
-}
-
-const STRIP_PREFIXES = ["x-cowok-", "x-tenant-", "x-user-", "x-forwarded-"];
 let spawningPromise: Promise<DaemonLockRecord> | null = null;
 const SEEDED_WORKSPACES_SYMBOL = Symbol.for("cowok.daemonSeedPromises");
 
@@ -44,37 +42,21 @@ function isPidAlive(pid: number): boolean {
   }
 }
 
-export function stripSpoofedHeaders(inbound: Headers): Record<string, string> {
-  const clean: Record<string, string> = {};
-  inbound.forEach((value, key) => {
-    const lower = key.toLowerCase();
-    if (STRIP_PREFIXES.some((pfx) => lower.startsWith(pfx))) {
-      return;
-    }
-    clean[key] = value;
-  });
-  return clean;
-}
-
 function readValidLock(workspaceRoot: string): DaemonLockRecord | null {
   const lockPath = path.join(workspaceRoot, ".cowok-design", "daemon.lock");
   if (!fs.existsSync(lockPath)) return null;
   try {
-    const stat = fs.lstatSync(lockPath);
-    if (stat.isSymbolicLink()) return null;
+    if (fs.lstatSync(lockPath).isSymbolicLink()) return null;
     const parsed = JSON.parse(fs.readFileSync(lockPath, "utf8")) as DaemonLockRecord;
-    if (
-      parsed.host !== "127.0.0.1" ||
-      !isPidAlive(parsed.pid) ||
-      !parsed.daemon_nonce ||
-      !parsed.hmac_key_hex ||
-      typeof parsed.schema_version !== "number" ||
-      !Number.isFinite(parsed.schema_version) ||
-      parsed.schema_version < 7
-    ) {
-      return null;
-    }
-    return parsed;
+    const valid =
+      parsed.host === "127.0.0.1" &&
+      isPidAlive(parsed.pid) &&
+      Boolean(parsed.daemon_nonce) &&
+      Boolean(parsed.hmac_key_hex) &&
+      typeof parsed.schema_version === "number" &&
+      Number.isFinite(parsed.schema_version) &&
+      parsed.schema_version >= 7;
+    return valid ? parsed : null;
   } catch {
     return null;
   }
@@ -90,58 +72,25 @@ function resolveDaemonBinaryPath(): string {
 
 async function seedDefaultProjects(lock: DaemonLockRecord): Promise<void> {
   const defaultProjects = [
-    {
-      id: DEFAULT_FLOW_PROJECT_ID,
-      slug: "cowok-design-default",
-      name: "cowok-design",
-      product_brief: "Default seeded Flow-First 2D DAG Studio project for local workbench execution.",
-    },
-    {
-      id: "22222222-2222-4222-8222-222222222222",
-      slug: "cowok-ai-workbench",
-      name: "Cowok.ai",
-      product_brief: "Seeded Cowok.ai multi-agent OS workbench project.",
-    },
-    {
-      id: "33333333-3333-4333-8333-333333333333",
-      slug: "markops-platform",
-      name: "Markops_platform",
-      product_brief: "Seeded Markops scratch workbench project.",
-    },
+    { id: DEFAULT_FLOW_PROJECT_ID, slug: "cowok-design-default", name: "cowok-design", product_brief: "Default seeded Flow-First 2D DAG Studio project for local workbench execution." },
+    { id: "22222222-2222-4222-8222-222222222222", slug: "cowok-ai-workbench", name: "Cowok.ai", product_brief: "Seeded Cowok.ai multi-agent OS workbench project." },
+    { id: "33333333-3333-4333-8333-333333333333", slug: "markops-platform", name: "Markops_platform", product_brief: "Seeded Markops scratch workbench project." },
   ];
   for (const proj of defaultProjects) {
-    const rawBody = JSON.stringify({
-      ...proj,
-      workspace_root: null,
-      inherit_brand_from_project_id: null,
-    });
+    const rawBody = JSON.stringify({ ...proj, workspace_root: null, inherit_brand_from_project_id: null });
     const headers = buildCanonicalHmacHeaders({
-      daemonNonce: lock.daemon_nonce,
-      hmacKeyHex: lock.hmac_key_hex,
-      method: "POST",
-      canonicalPath: "/api/v1/projects",
-      rawQuery: "",
-      principal: {
-        tenantId: "local-default",
-        userId: "bff-bootstrap",
-        role: "editor",
-      },
-      rawBody,
-      correlationId: crypto.randomUUID(),
+      daemonNonce: lock.daemon_nonce, hmacKeyHex: lock.hmac_key_hex,
+      method: "POST", canonicalPath: "/api/v1/projects", rawQuery: "",
+      principal: { tenantId: "local-default", userId: "bff-bootstrap", role: "editor" },
+      rawBody, correlationId: crypto.randomUUID(),
     });
-    await fetch(`http://127.0.0.1:${lock.port}/api/v1/projects`, {
-      method: "POST",
-      headers,
-      body: rawBody,
-    }).catch(() => undefined);
+    await fetch(`http://127.0.0.1:${lock.port}/api/v1/projects`, { method: "POST", headers, body: rawBody }).catch(() => undefined);
   }
 }
 
 async function verifyHealthAndSeedDefaultProject(lock: DaemonLockRecord, workspaceRoot: string): Promise<void> {
   const healthRes = await fetch(`http://127.0.0.1:${lock.port}/api/v1/health`);
-  if (!healthRes.ok) {
-    throw new Error(`Daemon health check failed (${healthRes.status})`);
-  }
+  if (!healthRes.ok) throw new Error(`Daemon health check failed (${healthRes.status})`);
   const health = (await healthRes.json()) as { service?: string; schema_version?: number };
   if (health.service !== "cowok-design-harness-daemon" || (health.schema_version ?? 0) < 7) {
     throw new Error("Unexpected daemon health identity or schema_version");
@@ -166,18 +115,15 @@ export async function ensureRunningDaemon(): Promise<DaemonLockRecord> {
     return existing;
   }
   if (spawningPromise) return spawningPromise;
-
   spawningPromise = (async () => {
     try {
-      const bin = resolveDaemonBinaryPath();
-      const child = spawn(bin, [], {
+      const child = spawn(resolveDaemonBinaryPath(), [], {
         cwd: wsRoot,
         env: { ...process.env, UXUI_OS_WORKSPACE_ROOT: wsRoot, UXUI_OS_DAEMON_PORT: "0" },
         detached: true,
         stdio: "ignore",
       });
       child.unref();
-
       const deadline = Date.now() + 8_000;
       while (Date.now() < deadline) {
         const lock = readValidLock(wsRoot);
@@ -192,49 +138,7 @@ export async function ensureRunningDaemon(): Promise<DaemonLockRecord> {
       spawningPromise = null;
     }
   })();
-
   return spawningPromise;
-}
-
-export function buildCanonicalHmacHeaders(params: {
-  daemonNonce: string;
-  hmacKeyHex: string;
-  method: string;
-  canonicalPath: string;
-  rawQuery: string;
-  principal: { tenantId: string; userId: string; role: string };
-  rawBody: string;
-  correlationId: string;
-}): Record<string, string> {
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const requestNonce = crypto.randomUUID();
-  const principalB64 = Buffer.from(JSON.stringify(params.principal), "utf8").toString("base64");
-  const bodySha = crypto.createHash("sha256").update(params.rawBody, "utf8").digest("hex");
-  const canonical = [
-    params.daemonNonce,
-    timestamp,
-    requestNonce,
-    params.method.toUpperCase(),
-    params.canonicalPath,
-    params.rawQuery,
-    principalB64,
-    bodySha,
-  ].join("\n");
-
-  const sig = crypto
-    .createHmac("sha256", Buffer.from(params.hmacKeyHex, "hex"))
-    .update(canonical, "utf8")
-    .digest("hex");
-
-  return {
-    "Content-Type": "application/json",
-    Host: "127.0.0.1",
-    "X-Correlation-Id": params.correlationId,
-    "X-Cowok-Timestamp": timestamp,
-    "X-Cowok-Nonce": requestNonce,
-    "X-Cowok-Principal": principalB64,
-    "X-Cowok-Hmac-Sig": sig,
-  };
 }
 
 export async function forwardToDaemonFlow(opts: {
@@ -252,97 +156,25 @@ export async function forwardToDaemonFlow(opts: {
   const rawQuery = (opts.rawQuery || "").replace(/^\?/, "");
   const rawBody = opts.body !== undefined ? JSON.stringify(opts.body) : "";
   const correlationId = opts.correlationId || crypto.randomUUID();
-
   const signedHeaders = buildCanonicalHmacHeaders({
-    daemonNonce: lock.daemon_nonce,
-    hmacKeyHex: lock.hmac_key_hex,
-    method: opts.method,
-    canonicalPath: opts.daemonPath,
-    rawQuery,
-    principal: opts.principal,
-    rawBody,
-    correlationId,
+    daemonNonce: lock.daemon_nonce, hmacKeyHex: lock.hmac_key_hex,
+    method: opts.method, canonicalPath: opts.daemonPath, rawQuery,
+    principal: opts.principal, rawBody, correlationId,
   });
-
-  const headers: Record<string, string> = {};
-  if (safeInbound["if-match"]) {
-    headers["If-Match"] = safeInbound["if-match"];
-  }
-  if (safeInbound["last-event-id"]) {
-    headers["Last-Event-ID"] = safeInbound["last-event-id"];
-  }
-  if (safeInbound.accept) {
-    headers.Accept = safeInbound.accept;
-  }
-  if (opts.extraHeaders) {
-    for (const [k, v] of Object.entries(opts.extraHeaders)) {
-      if (v) headers[k] = v;
-    }
-  }
-  Object.assign(headers, signedHeaders);
-
-  const qs = rawQuery ? `?${rawQuery}` : "";
-  const targetUrl = `http://127.0.0.1:${lock.port}${opts.daemonPath}${qs}`;
+  const headers = assembleForwardHeaders(safeInbound, signedHeaders, opts.extraHeaders);
+  const targetUrl = `http://127.0.0.1:${lock.port}${opts.daemonPath}${rawQuery ? `?${rawQuery}` : ""}`;
   logger.info("bff_forward_daemon", { method: opts.method, path: opts.daemonPath, correlationId });
-
   const upstream = await fetch(targetUrl, {
     method: opts.method,
     headers,
     body: opts.method === "GET" || opts.method === "HEAD" || rawBody === "" ? undefined : rawBody,
   });
-
-  const contentType = upstream.headers.get("content-type") || "application/json";
-  const responseHeaders: Record<string, string> = {
-    "Content-Type": contentType,
-    "X-Correlation-Id": correlationId,
-  };
-  const disposition = upstream.headers.get("content-disposition");
-  if (disposition) {
-    responseHeaders["Content-Disposition"] = disposition;
-  }
-  const bundleSha = upstream.headers.get("x-cowok-bundle-sha256");
-  if (bundleSha) {
-    responseHeaders["X-Cowok-Bundle-Sha256"] = bundleSha;
-  }
-
-  if (
-    contentType.includes("text/event-stream") &&
-    upstream.body
-  ) {
-    responseHeaders["Cache-Control"] = "no-cache";
-    responseHeaders.Connection = "keep-alive";
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: responseHeaders,
-    });
-  }
-
-  if (
-    contentType.includes("application/zip") ||
-    contentType.includes("application/octet-stream")
-  ) {
-    const bytes = await upstream.arrayBuffer();
-    return new Response(bytes, {
-      status: upstream.status,
-      headers: responseHeaders,
-    });
-  }
-
-  const text = await upstream.text();
-  return new Response(text, {
-    status: upstream.status,
-    headers: responseHeaders,
-  });
+  return relayDaemonResponse(upstream, correlationId);
 }
 
 export function forwardFromGuardedContext(
   req: Request,
-  ctx: {
-    tenantId?: string;
-    userId?: string;
-    role?: "viewer" | "editor" | "admin";
-    correlationId?: string;
-  },
+  ctx: { tenantId?: string; userId?: string; role?: "viewer" | "editor" | "admin"; correlationId?: string },
   daemonPath: string,
   body?: unknown
 ): Promise<Response> {

@@ -5,6 +5,8 @@ import {
   EnqueueNodeJobInputSchema,
   EnqueueNodeJobsResponseSchema,
   ExecutionEventDtoSchema,
+  MarkNodeSessionReadInputSchema,
+  MarkNodeSessionReadResponseSchema,
   NodeExecutionJobDtoSchema,
   NodeSessionsResponseSchema,
   PostJobEventV2InputSchema,
@@ -12,6 +14,8 @@ import {
   TransitionNodeJobInputSchema,
   type EnqueueNodeJobInput,
   type EnqueueNodeJobsResponse,
+  type MarkNodeSessionReadInput,
+  type MarkNodeSessionReadResponse,
   type NodeExecutionJobDto,
   type NodeSessionsResponse,
   type PostJobEventV2Input,
@@ -97,6 +101,18 @@ export class FlowExecutionClient extends HarnessDaemonTransport {
       `/api/projects/${encodeURIComponent(projectId)}/flow/node-sessions${qs}`,
       NodeSessionsResponseSchema,
       { method: "GET" }
+    );
+  }
+
+  markNodeSessionRead(
+    projectId: string,
+    input: MarkNodeSessionReadInput
+  ): Promise<MarkNodeSessionReadResponse> {
+    const validated = MarkNodeSessionReadInputSchema.parse(input);
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/flow/node-sessions/read`,
+      MarkNodeSessionReadResponseSchema,
+      { method: "POST", body: JSON.stringify(validated) }
     );
   }
 

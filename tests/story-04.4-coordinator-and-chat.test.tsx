@@ -11,6 +11,10 @@ import {
   globalKeyedParallelCoordinator,
   KeyedParallelCoordinator,
 } from "../src/features/flow/store/keyed-parallel-coordinator";
+import { sharedChatStore } from "../src/features/flow/store/shared-chat-sync";
+import { dispatchNodeExecutionToDaemon } from "../src/features/flow/hooks/dispatchNodeExecution";
+import { apiFlowExecution } from "../src/api/flow-execution";
+import { apiSdiEngine } from "../src/api/sdi-engine";
 import type { WorkbenchNode } from "../src/features/flow/store/flow-workbench-store";
 import { AgentChatPanel } from "../src/pages/workbench/components/AgentChatPanel";
 import { SidebarSessionRow } from "../src/pages/workbench/components/SidebarSessionRow";
@@ -33,6 +37,7 @@ const makeNode = (id: string, screenKey: string, title: string): WorkbenchNode =
 describe("Story 04.4 Coordinator, Floating Chat v2, Left-Open Scope Chips & 3-Level Sidebar", () => {
   beforeEach(() => {
     globalKeyedParallelCoordinator.clearAll();
+    sharedChatStore.clearAll();
   });
 
   it("enforces global running + paused <= 4 cap and reconciles daemon fencing tokens + interrupted states", () => {
@@ -221,5 +226,90 @@ describe("Story 04.4 Coordinator, Floating Chat v2, Left-Open Scope Chips & 3-Le
     fireEvent.click(subRow);
     expect(onSelectSub).toHaveBeenCalledWith("proj-local::sess-1::node-scr-01", "proj-local", "sess-1", "node-scr-01");
     expect(manifestJson.id).toBe("cli-worker-subprocess-adapter");
+  });
+
+  it("synchronizes messages across Left-Open and Floating Chat and never posts premature COMPLETED", async () => {
+    const nodeA = makeNode("node-a", "SCR-A", "Checkout");
+    render(
+      <div>
+        <AgentChatPanel
+          projectId="proj-sync"
+          activeSessionId="sess-sync"
+          selectedNodes={[nodeA]}
+          isShortened={false}
+          onToggleShorten={vi.fn()}
+          width={320}
+        />
+        <ContextualNodeFloatingChat
+          projectId="proj-sync"
+          sessionId="sess-sync"
+          selectedNodes={[nodeA]}
+          onDeselectNode={vi.fn()}
+          onClearSelection={vi.fn()}
+          defaultExpanded
+        />
+      </div>
+    );
+
+    sharedChatStore.appendMessage("proj-sync::sess-sync", {
+      id: "sync-msg-1",
+      sender: "human",
+      text: "Cross-surface prompt synced",
+      timestamp: "10:05",
+      createdAtMs: 1000,
+      nodeId: "node-a",
+    });
+    expect((await screen.findAllByText("Cross-surface prompt synced")).length).toBeGreaterThanOrEqual(2);
+
+    const postEventSpy = vi.spyOn(apiFlowExecution, "postJobEvent").mockResolvedValue({
+      id: "ev-x", jobId: "j-x", projectId: "11111111-1111-4111-8111-111111111111", nodeId: "node-a",
+      eventKind: "chunk", payloadText: "ok", seqNo: 1, projectSeq: 1, compositeScopeKey: "p::s::node-a",
+      jobStatus: "RUNNING", createdAt: "2026-11-15T00:00:00Z",
+    });
+    vi.spyOn(apiFlowExecution, "enqueueJobs").mockResolvedValue({
+      jobs: [{
+        id: "job-running-1", projectId: "11111111-1111-4111-8111-111111111111", sessionId: "sess-sync",
+        nodeId: "node-a", compositeScopeKey: "11111111-1111-4111-8111-111111111111::sess-sync::node-a",
+        daemonNonce: "n1", status: "RUNNING", fencingToken: 1, priority: 10, staleAfterTimestamp: null,
+        createdAt: 1000, updatedAt: 1000,
+      }],
+      activeSlotCount: 1,
+    });
+    vi.spyOn(apiSdiEngine, "compileIntent").mockResolvedValue({
+      id: "intent-1", tenantId: "local-default", projectId: "11111111-1111-4111-8111-111111111111",
+      rawPrompt: "Build screen", intentType: "create_screen", status: "ready", ambiguityScore: 0.1, riskScore: 0.1,
+      targetScope: { nodeIds: ["node-a"], screenKeys: ["SCR-A"], components: [] },
+      createdAt: "2026-11-15T00:00:00Z", updatedAt: "2026-11-15T00:00:00Z",
+    });
+    vi.spyOn(apiFlowExecution, "streamJobEvents").mockResolvedValue();
+
+    await dispatchNodeExecutionToDaemon({
+      projectId: "11111111-1111-4111-8111-111111111111",
+      sessionId: "sess-sync",
+      primaryNode: nodeA,
+      selectedNodeIds: ["node-a"],
+      prompt: "Build screen",
+      coordinator: {
+        ...globalKeyedParallelCoordinator,
+        summary: globalKeyedParallelCoordinator.getSummary(),
+        syncFromDaemon: vi.fn(async () => ({ sessions: [], jobs: [], activeSlotCount: 0, maxConcurrent: 4 })),
+        reconcileSingleJob: vi.fn(),
+        enqueueJob: globalKeyedParallelCoordinator.enqueueJob.bind(globalKeyedParallelCoordinator),
+        steerJob: globalKeyedParallelCoordinator.steerJob.bind(globalKeyedParallelCoordinator),
+        pauseJob: globalKeyedParallelCoordinator.pauseJob.bind(globalKeyedParallelCoordinator),
+        resumeJob: globalKeyedParallelCoordinator.resumeJob.bind(globalKeyedParallelCoordinator),
+        cancelJob: globalKeyedParallelCoordinator.cancelJob.bind(globalKeyedParallelCoordinator),
+        failJob: globalKeyedParallelCoordinator.failJob.bind(globalKeyedParallelCoordinator),
+        completeJob: globalKeyedParallelCoordinator.completeJob.bind(globalKeyedParallelCoordinator),
+        getNodeStatus: globalKeyedParallelCoordinator.getNodeStatus.bind(globalKeyedParallelCoordinator),
+        getActiveJobs: globalKeyedParallelCoordinator.getActiveJobs.bind(globalKeyedParallelCoordinator),
+      },
+      onAppendMsg: vi.fn(),
+      t: (_k, f) => f,
+      formatNumber: (n) => String(n),
+    });
+
+    expect(postEventSpy).not.toHaveBeenCalled();
+    expect(globalKeyedParallelCoordinator.getNodeStatus("node-a")?.status).toBe("running");
   });
 });

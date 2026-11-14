@@ -89,7 +89,7 @@ const LeftChatScopeChips: React.FC<{
 
 export const AgentChatPanel: React.FC<AgentChatPanelProps> = (props) => {
   const { t } = useTranslation();
-  const chat = useAgentChatConversation(props.attachmentChips || [], props.onSendMessage, props.projectId, props.activeSessionId);
+  const chat = useAgentChatConversation(props.attachmentChips || [], props.onSendMessage, props.projectId, props.activeSessionId, props.selectedNodes);
 
   if (props.isShortened) return <ChatCollapsedRail onToggleShorten={props.onToggleShorten} />;
   const shortenLabel = t("chat.shortenChat", "Thu gọn khung Chat");

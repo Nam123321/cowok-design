@@ -81,39 +81,53 @@ pub async fn handle_steer_node_job(
     let (pid, root) = authorize_project(&state, &id, &headers, &principal)?;
     let (pool, workers, nonce, sse_tx, pid_c) = (state.registry.pool().clone(), state.active_workers.clone(), state.auth.daemon_nonce.clone(), state.sse_tx.clone(), pid.clone());
     let dto = run_blocking_resp(move || {
-        let mut conn = pool.connection().map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
-        let jid = req.job_id.trim();
-        let (tok, status, nid, scope) = fetch_job_meta(&conn, jid, &principal.tenant_id, &pid_c)?;
-        if tok != req.expected_fencing_token || !matches!(status.as_str(), "QUEUED" | "RUNNING" | "PAUSED") {
-            return Err(err_resp(StatusCode::CONFLICT, "STALE_FENCING_TOKEN", format!("Expected token {tok} (status {status})")));
-        }
+        let dto = steer_tx(&pool, &principal.tenant_id, &pid_c, &nonce, &req)?;
         if req.pgid_reap_requested {
-            let _ = reap_job_worker_and_shadow(&workers, &root, &pid_c, jid);
+            let _ = reap_job_worker_and_shadow(&workers, &root, &pid_c, &dto.id);
         }
-        let now_ms = Utc::now().timestamp_millis();
-        let ok = retry_on_busy("steer_cas", || {
-            let tx = begin_immediate(&mut conn)?;
-            let next_status = if status == "QUEUED" {
-                let active: i64 = tx.query_row("SELECT COUNT(*) FROM node_execution_jobs WHERE status IN ('RUNNING', 'PAUSED')", [], |r| r.get(0))?;
-                if active < MAX_GLOBAL_ACTIVE_SLOTS { "RUNNING" } else { "QUEUED" }
-            } else { "RUNNING" };
-            let stale = (next_status == "RUNNING").then_some(now_ms + LEASE_TTL_MS);
-            let n = tx.execute(
-                "UPDATE node_execution_jobs SET fencing_token = fencing_token + 1, daemon_nonce = ?1, status = ?2, stale_after_timestamp = ?3, updated_at = ?4
-                 WHERE id = ?5 AND tenant_id = ?6 AND project_id = ?7 AND fencing_token = ?8 AND status IN ('QUEUED', 'RUNNING', 'PAUSED')",
-                params![nonce, next_status, stale, now_ms, jid, principal.tenant_id, pid_c, req.expected_fencing_token],
-            )?;
-            if n == 0 { return Ok(false); }
-            let payload = json!({"instruction": req.instruction, "fencingToken": req.expected_fencing_token + 1}).to_string();
-            append_event_tx(&tx, &NewEventParams { tid: &principal.tenant_id, pid: &pid_c, job_id: jid, node_id: &nid, scope_key: &scope, kind: "steered", payload: &payload, now_ms })?;
-            tx.commit()?;
-            Ok(true)
-        }).map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
-        if !ok { return Err(err_resp(StatusCode::CONFLICT, "STALE_FENCING_TOKEN", "Concurrent fencing token mutation")); }
-        read_job_dto_conn(&conn, jid).map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))
+        Ok(dto)
     }).await?;
     let _ = sse_tx.send(pid);
     Ok(Json(dto))
+}
+
+fn steer_tx(
+    pool: &spec_registry::SqlitePool, tid: &str, pid: &str, nonce: &str, req: &SteerNodeJobInput,
+) -> Result<NodeExecutionJobDto, Response> {
+    let mut conn = pool.connection().map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
+    let jid = req.job_id.trim();
+    let now_ms = Utc::now().timestamp_millis();
+    let mut outcome: Result<(), Response> = Err(err_resp(StatusCode::CONFLICT, "STALE_FENCING_TOKEN", "Concurrent fencing token mutation"));
+    retry_on_busy("steer_cas", || {
+        let tx = begin_immediate(&mut conn)?;
+        let (tok, status, nid, scope, _old_nonce) = match fetch_job_meta(&tx, jid, tid, pid) {
+            Ok(v) => v,
+            Err(r) => { outcome = Err(r); return Ok(()); }
+        };
+        if tok != req.expected_fencing_token || !matches!(status.as_str(), "QUEUED" | "RUNNING" | "PAUSED") {
+            outcome = Err(err_resp(StatusCode::CONFLICT, "STALE_FENCING_TOKEN", format!("Expected token {tok} (status {status})")));
+            return Ok(());
+        }
+        let next_status = if status == "QUEUED" {
+            let active: i64 = tx.query_row("SELECT COUNT(*) FROM node_execution_jobs WHERE status IN ('RUNNING', 'PAUSED')", [], |r| r.get(0))?;
+            let scope_busy: i64 = tx.query_row("SELECT COUNT(*) FROM node_execution_jobs WHERE composite_scope_key = ?1 AND status IN ('RUNNING', 'PAUSED')", params![scope], |r| r.get(0))?;
+            if active < MAX_GLOBAL_ACTIVE_SLOTS && scope_busy == 0 { "RUNNING" } else { "QUEUED" }
+        } else { "RUNNING" };
+        let stale = (next_status == "RUNNING").then_some(now_ms + LEASE_TTL_MS);
+        let n = tx.execute(
+            "UPDATE node_execution_jobs SET fencing_token = fencing_token + 1, daemon_nonce = ?1, status = ?2, stale_after_timestamp = ?3, updated_at = ?4
+             WHERE id = ?5 AND tenant_id = ?6 AND project_id = ?7 AND composite_scope_key = ?8 AND fencing_token = ?9 AND status = ?10",
+            params![nonce, next_status, stale, now_ms, jid, tid, pid, scope, req.expected_fencing_token, status],
+        )?;
+        if n == 0 { outcome = Err(err_resp(StatusCode::CONFLICT, "STALE_FENCING_TOKEN", "Concurrent fencing token mutation")); return Ok(()); }
+        let payload = json!({"instruction": req.instruction, "fencingToken": req.expected_fencing_token + 1}).to_string();
+        append_event_tx(&tx, &NewEventParams { tid, pid, job_id: jid, node_id: &nid, scope_key: &scope, kind: "steered", payload: &payload, now_ms })?;
+        tx.commit()?;
+        outcome = Ok(());
+        Ok(())
+    }).map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
+    outcome?;
+    read_job_dto_conn(&conn, jid).map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))
 }
 
 struct TransitionCtx<'a> {
@@ -126,72 +140,73 @@ struct TransitionCtx<'a> {
 }
 
 async fn apply_transition(
-    state: DaemonAppState,
-    principal: FlowPrincipal,
-    id: String,
-    headers: HeaderMap,
-    req: TransitionNodeJobInput,
-    target: &'static str,
+    state: DaemonAppState, principal: FlowPrincipal, id: String, headers: HeaderMap,
+    req: TransitionNodeJobInput, target: &'static str,
 ) -> Result<Json<NodeExecutionJobDto>, Response> {
     if req.job_id.trim().is_empty() {
         return Err(err_resp(StatusCode::BAD_REQUEST, "VALIDATION_ERROR", "jobId is required"));
     }
     let (pid, root) = authorize_project(&state, &id, &headers, &principal)?;
     let (pool, workers, nonce, sse_tx, pid_c) = (state.registry.pool().clone(), state.active_workers.clone(), state.auth.daemon_nonce.clone(), state.sse_tx.clone(), pid.clone());
-    let (dto, extra_pid) = run_blocking_resp(move || {
+    let (dto, promoted) = run_blocking_resp(move || {
         let ctx = TransitionCtx { pool: &pool, workers: &workers, root: &root, tid: &principal.tenant_id, pid: &pid_c, nonce: &nonce };
         transition_tx(&ctx, &req, target)
     }).await?;
     let _ = sse_tx.send(pid);
-    if let Some(promoted_pid) = extra_pid { let _ = sse_tx.send(promoted_pid); }
+    for (_, p_pid) in promoted { let _ = sse_tx.send(p_pid); }
     Ok(Json(dto))
 }
 
+fn resolve_transition_next(status: &str, target: &str) -> Option<(&'static str, &'static str)> {
+    match (target, status) {
+        ("PAUSED", "RUNNING") => Some(("PAUSED", "paused")),
+        ("RUNNING", "PAUSED") => Some(("RUNNING", "resumed")),
+        ("RUNNING", "INTERRUPTED") => Some(("QUEUED", "queued")),
+        ("CANCELLED", "QUEUED" | "RUNNING" | "PAUSED" | "INTERRUPTED") => Some(("CANCELLED", "cancelled")),
+        _ => None,
+    }
+}
+
 fn transition_tx(
-    ctx: &TransitionCtx<'_>,
-    req: &TransitionNodeJobInput,
-    target: &'static str,
-) -> Result<(NodeExecutionJobDto, Option<String>), Response> {
+    ctx: &TransitionCtx<'_>, req: &TransitionNodeJobInput, target: &'static str,
+) -> Result<(NodeExecutionJobDto, Vec<(String, String)>), Response> {
     let mut conn = ctx.pool.connection().map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
     let jid = req.job_id.trim();
-    let (tok, status, nid, scope) = fetch_job_meta(&conn, jid, ctx.tid, ctx.pid)?;
-    let allowed = match target {
-        "PAUSED" => status == "RUNNING",
-        "RUNNING" => matches!(status.as_str(), "PAUSED" | "INTERRUPTED"),
-        "CANCELLED" => matches!(status.as_str(), "QUEUED" | "RUNNING" | "PAUSED" | "INTERRUPTED"),
-        _ => false,
-    };
-    if tok != req.expected_fencing_token || !allowed {
-        return Err(err_resp(StatusCode::CONFLICT, "STALE_FENCING_TOKEN", format!("Cannot transition {status} -> {target} with token {}", req.expected_fencing_token)));
-    }
+    let now_ms = Utc::now().timestamp_millis();
+    let mut promoted = Vec::new();
+    let mut outcome: Result<(), Response> = Err(err_resp(StatusCode::CONFLICT, "STALE_FENCING_TOKEN", "Concurrent fencing token mutation"));
+    retry_on_busy("transition_cas", || {
+        let tx = begin_immediate(&mut conn)?;
+        let (tok, status, nid, scope, _old_nonce) = match fetch_job_meta(&tx, jid, ctx.tid, ctx.pid) {
+            Ok(v) => v,
+            Err(r) => { outcome = Err(r); return Ok(()); }
+        };
+        let Some((next_status, kind)) = resolve_transition_next(&status, target) else {
+            outcome = Err(err_resp(StatusCode::CONFLICT, "STALE_FENCING_TOKEN", format!("Cannot transition {status} -> {target}")));
+            return Ok(());
+        };
+        if tok != req.expected_fencing_token {
+            outcome = Err(err_resp(StatusCode::CONFLICT, "STALE_FENCING_TOKEN", format!("Expected token {tok} (status {status})")));
+            return Ok(());
+        }
+        let stale = (next_status == "RUNNING").then_some(now_ms + LEASE_TTL_MS);
+        let n = tx.execute(
+            "UPDATE node_execution_jobs SET status = ?1, fencing_token = fencing_token + 1, daemon_nonce = ?2, stale_after_timestamp = ?3, completed_at = CASE WHEN ?1 = 'CANCELLED' THEN ?4 ELSE completed_at END, updated_at = ?4
+             WHERE id = ?5 AND tenant_id = ?6 AND project_id = ?7 AND composite_scope_key = ?8 AND fencing_token = ?9 AND status = ?10",
+            params![next_status, ctx.nonce, stale, now_ms, jid, ctx.tid, ctx.pid, scope, req.expected_fencing_token, status],
+        )?;
+        if n == 0 { outcome = Err(err_resp(StatusCode::CONFLICT, "STALE_FENCING_TOKEN", "Concurrent fencing token mutation")); return Ok(()); }
+        let payload = json!({"fencingToken": req.expected_fencing_token + 1, "status": next_status}).to_string();
+        append_event_tx(&tx, &NewEventParams { tid: ctx.tid, pid: ctx.pid, job_id: jid, node_id: &nid, scope_key: &scope, kind, payload: &payload, now_ms })?;
+        if matches!(next_status, "CANCELLED" | "QUEUED") { promoted = promote_next_queued_tx(&tx, ctx.nonce, now_ms)?; }
+        tx.commit()?;
+        outcome = Ok(());
+        Ok(())
+    }).map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
+    outcome?;
     if target == "CANCELLED" {
         let _ = reap_job_worker_and_shadow(ctx.workers, ctx.root, ctx.pid, jid);
     }
-    let now_ms = Utc::now().timestamp_millis();
-    let mut slot_full = false;
-    let mut promoted = None;
-    let ok = retry_on_busy("transition_cas", || {
-        let tx = begin_immediate(&mut conn)?;
-        if target == "RUNNING" && status == "INTERRUPTED" {
-            let active: i64 = tx.query_row("SELECT COUNT(*) FROM node_execution_jobs WHERE status IN ('RUNNING', 'PAUSED')", [], |r| r.get(0))?;
-            if active >= MAX_GLOBAL_ACTIVE_SLOTS { slot_full = true; return Ok(false); }
-        }
-        let stale = (target == "RUNNING").then_some(now_ms + LEASE_TTL_MS);
-        let n = tx.execute(
-            "UPDATE node_execution_jobs SET status = ?1, fencing_token = fencing_token + 1, daemon_nonce = ?2, stale_after_timestamp = ?3, completed_at = CASE WHEN ?1 = 'CANCELLED' THEN ?4 ELSE completed_at END, updated_at = ?4
-             WHERE id = ?5 AND tenant_id = ?6 AND project_id = ?7 AND fencing_token = ?8 AND status = ?9",
-            params![target, ctx.nonce, stale, now_ms, jid, ctx.tid, ctx.pid, req.expected_fencing_token, status],
-        )?;
-        if n == 0 { return Ok(false); }
-        let kind = match target { "PAUSED" => "paused", "RUNNING" => "resumed", _ => "cancelled" };
-        let payload = json!({"fencingToken": req.expected_fencing_token + 1}).to_string();
-        append_event_tx(&tx, &NewEventParams { tid: ctx.tid, pid: ctx.pid, job_id: jid, node_id: &nid, scope_key: &scope, kind, payload: &payload, now_ms })?;
-        if target == "CANCELLED" { promoted = promote_next_queued_tx(&tx, ctx.nonce, now_ms)?; }
-        tx.commit()?;
-        Ok(true)
-    }).map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
-    if slot_full { return Err(err_resp(StatusCode::CONFLICT, "SLOT_LIMIT_REACHED", "Global active slot cap (4) reached")); }
-    if !ok { return Err(err_resp(StatusCode::CONFLICT, "STALE_FENCING_TOKEN", "Concurrent fencing token mutation")); }
     let dto = read_job_dto_conn(&conn, jid).map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
     Ok((dto, promoted))
 }

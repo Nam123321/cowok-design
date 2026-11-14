@@ -1,8 +1,9 @@
 // @story 04.4
-// @implements AC-01, AC-02, AC-03 (Floating Chat Sync, Geometry & Daemon CAS Dispatch)
-import { useEffect, useRef, useState } from "react";
+// @implements AC-01, AC-02, AC-03 (Floating Chat Sync, 8-Dir Resize Geometry & Shared Chat Bridge)
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { apiFlowExecution } from "@/api/flow-execution";
 import { globalKeyedParallelCoordinator, type NodeStatusSnapshot } from "../store/keyed-parallel-coordinator";
+import { sharedChatStore, toSessionChatKey } from "../store/shared-chat-sync";
 export { dispatchNodeExecutionToDaemon, dispatchSteerToDaemon, dispatchTransitionToDaemon } from "./dispatchNodeExecution";
 
 export const FLOATING_CHAT_BOUNDS = {
@@ -15,6 +16,7 @@ export const FLOATING_CHAT_BOUNDS = {
 } as const;
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export type ResizeDirection = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 export interface FloatingChatMessage {
   id: string;
@@ -24,6 +26,10 @@ export interface FloatingChatMessage {
   timestamp: number;
   projectSeq?: number;
   fencingToken?: number;
+}
+
+function clampBound(val: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, val));
 }
 
 function useFloatingDragListeners(params: {
@@ -42,7 +48,7 @@ function useFloatingDragListeners(params: {
       const rawBottom = dragStartRef.current.startBottom - (e.clientY - dragStartRef.current.mouseY);
       const maxX = Math.max(12, window.innerWidth - width - 12);
       const maxBottom = Math.max(12, window.innerHeight - (isCollapsed ? 60 : 220));
-      setAnchor({ x: Math.min(maxX, Math.max(12, rawX)), bottom: Math.min(maxBottom, Math.max(12, rawBottom)) });
+      setAnchor({ x: clampBound(rawX, 12, maxX), bottom: clampBound(rawBottom, 12, maxBottom) });
     };
     const onMouseUp = () => setIsDragging(false);
     window.addEventListener("mousemove", onMouseMove);
@@ -88,32 +94,62 @@ export function useFloatingWindowGeometry(isCollapsed: boolean) {
   return { anchor, setAnchor, width, setWidth, customHeight, setCustomHeight, isDragging, handleHeaderMouseDown, handleRedockToBottom };
 }
 
+export function computeResizedBounds(
+  direction: ResizeDirection,
+  dx: number,
+  dy: number,
+  state: { width: number; height: number; x: number; bottom: number }
+): { width?: number; height?: number; x?: number; bottom?: number } {
+  const out: { width?: number; height?: number; x?: number; bottom?: number } = {};
+  if (direction.includes("e")) {
+    out.width = clampBound(state.width + dx, FLOATING_CHAT_BOUNDS.MIN_WIDTH, FLOATING_CHAT_BOUNDS.MAX_WIDTH);
+  } else if (direction.includes("w")) {
+    const nextW = clampBound(state.width - dx, FLOATING_CHAT_BOUNDS.MIN_WIDTH, FLOATING_CHAT_BOUNDS.MAX_WIDTH);
+    out.width = nextW;
+    out.x = Math.max(12, state.x + (state.width - nextW));
+  }
+  if (direction.includes("n")) {
+    out.height = clampBound(state.height - dy, FLOATING_CHAT_BOUNDS.MIN_HEIGHT, FLOATING_CHAT_BOUNDS.MAX_HEIGHT);
+  } else if (direction.includes("s")) {
+    const rawH = clampBound(state.height + dy, FLOATING_CHAT_BOUNDS.MIN_HEIGHT, FLOATING_CHAT_BOUNDS.MAX_HEIGHT);
+    const maxGrowDown = Math.max(0, state.bottom - 12);
+    const clampedH = dy > 0 ? Math.min(rawH, state.height + maxGrowDown) : rawH;
+    out.height = clampedH;
+    out.bottom = Math.max(12, state.bottom - (clampedH - state.height));
+  }
+  return out;
+}
+
 export function startResizeDrag(
   e: React.MouseEvent,
-  direction: "e" | "w" | "n",
+  direction: ResizeDirection,
   state: { width: number; height: number; x: number; bottom: number },
-  onApply: (next: { width?: number; height?: number; x?: number }) => void
+  onApply: (next: { width?: number; height?: number; x?: number; bottom?: number }) => void
 ) {
   e.preventDefault();
   e.stopPropagation();
   const startX = e.clientX;
   const startY = e.clientY;
-  const onMouseMove = (ev: MouseEvent) => {
-    const dx = ev.clientX - startX;
-    const dy = ev.clientY - startY;
-    if (direction === "e") onApply({ width: Math.min(FLOATING_CHAT_BOUNDS.MAX_WIDTH, Math.max(FLOATING_CHAT_BOUNDS.MIN_WIDTH, state.width + dx)) });
-    if (direction === "w") {
-      const nextW = Math.min(FLOATING_CHAT_BOUNDS.MAX_WIDTH, Math.max(FLOATING_CHAT_BOUNDS.MIN_WIDTH, state.width - dx));
-      onApply({ width: nextW, x: state.x + (state.width - nextW) });
-    }
-    if (direction === "n") onApply({ height: Math.min(FLOATING_CHAT_BOUNDS.MAX_HEIGHT, Math.max(FLOATING_CHAT_BOUNDS.MIN_HEIGHT, state.height - dy)) });
-  };
+  const onMouseMove = (ev: MouseEvent) => onApply(computeResizedBounds(direction, ev.clientX - startX, ev.clientY - startY, state));
   const onMouseUp = () => {
     window.removeEventListener("mousemove", onMouseMove);
     window.removeEventListener("mouseup", onMouseUp);
   };
   window.addEventListener("mousemove", onMouseMove);
   window.addEventListener("mouseup", onMouseUp);
+}
+
+export function useFloatingSharedMessages(projectId: string, sessionId: string, selectedNodeIds: string[]): FloatingChatMessage[] {
+  const snap = useSyncExternalStore(sharedChatStore.subscribe, sharedChatStore.getSnapshot, sharedChatStore.getSnapshot);
+  const scopeKey = toSessionChatKey(projectId, sessionId);
+  const nodeKey = selectedNodeIds.join(",");
+  return useMemo(() => {
+    const allow = new Set(selectedNodeIds);
+    return sharedChatStore.getMessages(scopeKey)
+      .filter((m) => !m.nodeId || allow.size === 0 || allow.has(m.nodeId))
+      .map((m) => ({ id: m.id, nodeId: m.nodeId || "session", role: m.sender === "human" ? "user" : "assistant", content: m.text, timestamp: m.createdAtMs, projectSeq: m.projectSeq, fencingToken: m.fencingToken }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snap.version, scopeKey, nodeKey]);
 }
 
 export function useFloatingChatEffects(params: {
@@ -139,7 +175,7 @@ export function useFloatingChatEffects(params: {
         const res = await apiFlowExecution.listNodeSessions(params.projectId, params.sessionId);
         if (!active) return;
         const seq = apiFlowExecution.getLastProjectSeq(params.projectId);
-        globalKeyedParallelCoordinator.reconcileFromDaemon(res.jobs, seq);
+        globalKeyedParallelCoordinator.reconcileFromDaemon(res.jobs, seq, { projectId: params.projectId, sessionId: params.sessionId });
         setSyncError(null);
         params.onDaemonSynced?.(seq);
       } catch (err) {
@@ -150,7 +186,8 @@ export function useFloatingChatEffects(params: {
     return () => { active = false; };
   }, [params.projectId, params.sessionId]);
 
-  useEffect(() => () => {
-    params.streamAbortRef.current?.abort();
-  }, [params.streamAbortRef]);
+  useEffect(() => {
+    const ref = params.streamAbortRef;
+    return () => { ref.current?.abort(); };
+  }, [params.projectId, params.streamAbortRef]);
 }

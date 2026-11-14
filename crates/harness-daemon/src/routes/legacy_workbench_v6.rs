@@ -1,36 +1,29 @@
 // @story 04.2
 // @implements V6 SQLite Workbench Endpoints (Comments, Fixtures, Viewport, Settings, MCP, Job SSE, Key Verify)
 
-use std::convert::Infallible;
-use std::time::Duration;
-
 use axum::{
-    extract::{Extension, Path as AxumPath, Query, State},
-    http::{HeaderMap, StatusCode},
-    response::{
-        sse::{Event, KeepAlive, Sse},
-        IntoResponse, Response,
-    },
+    extract::{Extension, Path as AxumPath, State},
+    http::StatusCode,
+    response::{IntoResponse, Response},
     Json,
 };
 use chrono::{DateTime, Utc};
 use domain::HarnessError;
-use futures_util::stream::Stream;
 use rusqlite::{params, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
-use spec_registry::{map_sqlite_error, retry_on_busy, SqlitePool};
+use spec_registry::{map_sqlite_error, retry_on_busy};
 use uuid::Uuid;
 
 use crate::daemon_auth::FlowPrincipal;
 use crate::routes::{DaemonAppState, HttpErrorBody};
 
-fn epoch_ms_to_iso(ms: i64) -> String {
+pub(crate) fn epoch_ms_to_iso(ms: i64) -> String {
     DateTime::from_timestamp_millis(ms)
         .map(|dt| dt.to_rfc3339())
         .unwrap_or_else(|| Utc::now().to_rfc3339())
 }
 
-fn json_err(status: StatusCode, code: &str, message: impl Into<String>) -> Response {
+pub(crate) fn json_err(status: StatusCode, code: &str, message: impl Into<String>) -> Response {
     let body = HttpErrorBody {
         code: code.to_string(),
         kind: Some(code.to_string()),
@@ -41,7 +34,7 @@ fn json_err(status: StatusCode, code: &str, message: impl Into<String>) -> Respo
     (status, Json(body)).into_response()
 }
 
-fn check_project_uuid(raw: &str) -> Result<String, Response> {
+pub(crate) fn check_project_uuid(raw: &str) -> Result<String, Response> {
     Uuid::parse_str(raw.trim())
         .map(|u| u.to_string())
         .map_err(|_| {
@@ -53,7 +46,7 @@ fn check_project_uuid(raw: &str) -> Result<String, Response> {
         })
 }
 
-fn check_non_empty_id(raw: &str, label: &str) -> Result<String, Response> {
+pub(crate) fn check_non_empty_id(raw: &str, label: &str) -> Result<String, Response> {
     let trimmed = raw.trim();
     if trimmed.is_empty() || trimmed.len() > 160 {
         return Err(json_err(
@@ -65,7 +58,7 @@ fn check_non_empty_id(raw: &str, label: &str) -> Result<String, Response> {
     Ok(trimmed.to_string())
 }
 
-fn verify_project_ownership(
+pub(crate) fn verify_project_ownership(
     conn: &rusqlite::Connection,
     tenant_id: &str,
     project_id: &str,
@@ -101,7 +94,7 @@ fn verify_project_ownership(
     }
 }
 
-async fn run_db<T, F>(op: F) -> Result<T, Response>
+pub(crate) async fn run_db<T, F>(op: F) -> Result<T, Response>
 where
     T: Send + 'static,
     F: FnOnce() -> Result<T, Response> + Send + 'static,
@@ -115,7 +108,7 @@ where
     })?
 }
 
-fn map_harness_resp(err: HarnessError, op: &str) -> Response {
+pub(crate) fn map_harness_resp(err: HarnessError, op: &str) -> Response {
     json_err(
         StatusCode::INTERNAL_SERVER_ERROR,
         "DB_ERROR",
@@ -1278,487 +1271,7 @@ pub async fn handle_delete_mcp_server(
 // 5. Execution Job Events & SSE Stream (V4 node_execution_jobs + V6 execution_events)
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExecutionEventDto {
-    pub id: String,
-    pub job_id: String,
-    pub project_id: String,
-    pub node_id: String,
-    pub event_kind: String,
-    pub payload_text: String,
-    pub seq_no: i64,
-    pub project_seq: i64,
-    pub composite_scope_key: String,
-    pub job_status: String,
-    pub created_at: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PostJobEventInput {
-    pub job_id: String,
-    pub node_id: String,
-    pub session_id: Option<String>,
-    pub event_kind: String,
-    #[serde(default)]
-    pub payload_text: String,
-    pub job_status: Option<String>,
-    #[serde(default)]
-    pub expected_fencing_token: Option<i64>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StreamJobEventsQuery {
-    pub job_id: Option<String>,
-    pub node_id: Option<String>,
-    pub after_seq: Option<i64>,
-}
-
-pub async fn handle_post_job_event(
-    State(state): State<DaemonAppState>,
-    Extension(principal): Extension<FlowPrincipal>,
-    AxumPath(id): AxumPath<String>,
-    Json(req): Json<PostJobEventInput>,
-) -> Result<(StatusCode, Json<ExecutionEventDto>), Response> {
-    let pid = check_project_uuid(&id)?;
-    let job_id = check_non_empty_id(&req.job_id, "jobId")?;
-    let node_id = check_non_empty_id(&req.node_id, "nodeId")?;
-    let event_kind = check_non_empty_id(&req.event_kind, "eventKind")?;
-    let next_status = match req.job_status.as_deref() {
-        Some(
-            st @ ("QUEUED" | "RUNNING" | "PAUSED" | "INTERRUPTED" | "COMPLETED" | "FAILED"
-            | "CANCELLED"),
-        ) => Some(st.to_string()),
-        Some(_) => {
-            return Err(json_err(
-                StatusCode::BAD_REQUEST,
-                "VALIDATION_ERROR",
-                "Invalid jobStatus",
-            ))
-        }
-        None => None,
-    };
-    let session_id_req = req
-        .session_id
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| format!("sess-{pid}"));
-    let scope_key = format!("{pid}::{session_id_req}::{node_id}");
-    let pool = state.registry.pool().clone();
-    let daemon_nonce = state.auth.daemon_nonce.clone();
-    let sse_tx = state.sse_tx.clone();
-
-    let created = run_db(move || {
-        let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
-        verify_project_ownership(&conn, &principal.tenant_id, &pid)?;
-        let now_ms = Utc::now().timestamp_millis();
-        let event_id = Uuid::new_v4().to_string();
-
-        let mut cross_scope_err: Option<(StatusCode, &'static str, String)> = None;
-        let outcome = retry_on_busy("append_execution_event", || {
-            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-            let existing_sess: Option<(String, String)> = tx
-                .query_row(
-                    "SELECT project_id, tenant_id FROM chat_sessions WHERE id = ?1",
-                    params![session_id_req],
-                    |r| Ok((r.get(0)?, r.get(1)?)),
-                )
-                .optional()?;
-            match existing_sess {
-                Some((_, sess_tid)) if sess_tid != principal.tenant_id => {
-                    cross_scope_err = Some((
-                        StatusCode::FORBIDDEN,
-                        "TENANT_ISOLATION_BREACH",
-                        "Session belongs to another tenant".to_string(),
-                    ));
-                    return Ok(None);
-                }
-                Some((sess_pid, _)) if sess_pid != pid => {
-                    cross_scope_err = Some((
-                        StatusCode::NOT_FOUND,
-                        "PROJECT_NOT_FOUND",
-                        format!("Session '{session_id_req}' does not belong to project '{pid}'"),
-                    ));
-                    return Ok(None);
-                }
-                Some(_) => {}
-                None => {
-                    tx.execute(
-                        "INSERT INTO chat_sessions (id, tenant_id, project_id, title, model_provider, created_at, updated_at)
-                         VALUES (?1, ?2, ?3, 'Execution Stream Session', 'default', ?4, ?4)",
-                        params![session_id_req, principal.tenant_id, pid, now_ms],
-                    )?;
-                }
-            }
-
-            let cur_job: Option<(String, String, String, i64)> = tx
-                .query_row(
-                    "SELECT project_id, tenant_id, status, fencing_token FROM node_execution_jobs WHERE id = ?1",
-                    params![job_id],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
-                )
-                .optional()?;
-
-            let eff_status = match cur_job {
-                Some((_, job_tid, _, _)) if job_tid != principal.tenant_id => {
-                    cross_scope_err = Some((
-                        StatusCode::FORBIDDEN,
-                        "TENANT_ISOLATION_BREACH",
-                        "Job belongs to another tenant".to_string(),
-                    ));
-                    return Ok(None);
-                }
-                Some((job_pid, _, _, _)) if job_pid != pid => {
-                    cross_scope_err = Some((
-                        StatusCode::NOT_FOUND,
-                        "PROJECT_NOT_FOUND",
-                        format!("Job '{job_id}' does not belong to project '{pid}'"),
-                    ));
-                    return Ok(None);
-                }
-                Some((_, _, cur, cur_fence)) => {
-                    if req.expected_fencing_token != Some(cur_fence) {
-                        cross_scope_err = Some((
-                            StatusCode::CONFLICT,
-                            "STALE_FENCING_TOKEN",
-                            format!("Expected fencingToken {cur_fence}, got {:?}", req.expected_fencing_token),
-                        ));
-                        return Ok(None);
-                    }
-                    let target = next_status.clone().unwrap_or(cur);
-                    let updated = tx.execute(
-                        "UPDATE node_execution_jobs
-                         SET status = ?1,
-                             fencing_token = fencing_token + 1,
-                             daemon_nonce = ?2,
-                             composite_scope_key = CASE WHEN composite_scope_key = '' THEN ?3 ELSE composite_scope_key END,
-                             started_at = COALESCE(started_at, ?4),
-                             stale_after_timestamp = CASE WHEN ?1 IN ('RUNNING') THEN ?5 ELSE NULL END,
-                             completed_at = CASE WHEN ?1 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?4 ELSE completed_at END,
-                             updated_at = ?4
-                         WHERE id = ?6 AND project_id = ?7 AND tenant_id = ?8 AND fencing_token = ?9",
-                        params![
-                            target,
-                            daemon_nonce,
-                            scope_key,
-                            now_ms,
-                            now_ms + 15_000,
-                            job_id,
-                            pid,
-                            principal.tenant_id,
-                            cur_fence
-                        ],
-                    )?;
-                    if updated == 0 {
-                        cross_scope_err = Some((
-                            StatusCode::CONFLICT,
-                            "STALE_FENCING_TOKEN",
-                            "Concurrent fencing token update detected".to_string(),
-                        ));
-                        return Ok(None);
-                    }
-                    target
-                }
-                None => {
-                    let next_fence: i64 = tx.query_row(
-                        "SELECT COALESCE(MAX(fencing_token), 0) + 1 FROM node_execution_jobs WHERE composite_scope_key = ?1",
-                        params![scope_key],
-                        |r| r.get(0),
-                    )?;
-                    if let Some(exp) = req.expected_fencing_token {
-                        if exp != next_fence {
-                            cross_scope_err = Some((
-                                StatusCode::CONFLICT,
-                                "STALE_FENCING_TOKEN",
-                                format!("Expected initial fencingToken {next_fence}, got {exp}"),
-                            ));
-                            return Ok(None);
-                        }
-                    }
-                    let target = next_status
-                        .clone()
-                        .unwrap_or_else(|| "RUNNING".to_string());
-                    let lease_ts = (target == "RUNNING").then_some(now_ms + 15_000);
-                    tx.execute(
-                        "INSERT INTO node_execution_jobs (
-                            id, tenant_id, project_id, session_id, node_id, composite_scope_key,
-                            daemon_nonce, status, fencing_token, priority, stale_after_timestamp,
-                            created_at, started_at, completed_at, updated_at
-                         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 10, ?10, ?11, ?11, CASE WHEN ?8 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?11 ELSE NULL END, ?11)",
-                        params![
-                            job_id,
-                            principal.tenant_id,
-                            pid,
-                            session_id_req,
-                            node_id,
-                            scope_key,
-                            daemon_nonce,
-                            target,
-                            next_fence,
-                            lease_ts,
-                            now_ms
-                        ],
-                    )?;
-                    target
-                }
-            };
-
-            let max_seq: i64 = tx.query_row(
-                "SELECT COALESCE(MAX(seq_no), 0) FROM execution_events WHERE job_id = ?1",
-                params![job_id],
-                |r| r.get(0),
-            )?;
-            let max_proj_seq: i64 = tx.query_row(
-                "SELECT COALESCE(MAX(project_seq), 0) FROM execution_events WHERE project_id = ?1",
-                params![pid],
-                |r| r.get(0),
-            )?;
-            let next_seq = max_seq + 1;
-            let next_proj_seq = max_proj_seq + 1;
-            tx.execute(
-                "INSERT INTO execution_events (
-                    id, tenant_id, project_id, job_id, node_id, composite_scope_key,
-                    event_kind, payload_text, seq_no, project_seq, created_at
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                params![
-                    event_id,
-                    principal.tenant_id,
-                    pid,
-                    job_id,
-                    node_id,
-                    scope_key,
-                    event_kind,
-                    req.payload_text,
-                    next_seq,
-                    next_proj_seq,
-                    now_ms
-                ],
-            )?;
-            tx.commit()?;
-            Ok::<Option<(i64, i64, String)>, rusqlite::Error>(Some((next_seq, next_proj_seq, eff_status)))
-        })
-        .map_err(|e| map_harness_resp(e, "append_execution_event"))?;
-        let Some((seq_no, project_seq, final_status)) = outcome else {
-            let (st, code, msg) = cross_scope_err.unwrap_or((
-                StatusCode::NOT_FOUND,
-                "PROJECT_NOT_FOUND",
-                format!("Resource does not belong to project '{pid}'"),
-            ));
-            return Err(json_err(st, code, msg));
-        };
-
-        Ok(ExecutionEventDto {
-            id: event_id,
-            job_id,
-            project_id: pid,
-            node_id,
-            event_kind,
-            payload_text: req.payload_text,
-            seq_no,
-            project_seq,
-            composite_scope_key: scope_key,
-            job_status: final_status,
-            created_at: epoch_ms_to_iso(now_ms),
-        })
-    })
-    .await?;
-
-    let _ = sse_tx.send(created.project_id.clone());
-    Ok((StatusCode::CREATED, Json(created)))
-}
-
-struct SsePollState {
-    pool: SqlitePool,
-    tenant_id: String,
-    project_id: String,
-    job_id: Option<String>,
-    node_id: Option<String>,
-    last_seq: i64,
-    started: bool,
-    closed: bool,
-    rx: tokio::sync::broadcast::Receiver<String>,
-}
-
-fn fetch_pending_events_params(
-    pool: &SqlitePool,
-    tenant_id: &str,
-    project_id: &str,
-    job_id: Option<&str>,
-    node_id: Option<&str>,
-    last_seq: i64,
-) -> Result<(Vec<ExecutionEventDto>, bool), HarnessError> {
-    let conn = pool.connection()?;
-    let mut sql = String::from(
-        "SELECT e.id, e.job_id, e.project_id, e.node_id, e.event_kind, e.payload_text,
-                e.seq_no, COALESCE(e.project_seq, e.seq_no) AS eff_proj_seq,
-                e.composite_scope_key, COALESCE(j.status, 'RUNNING'), e.created_at
-         FROM execution_events e
-         LEFT JOIN node_execution_jobs j ON j.id = e.job_id
-         WHERE e.tenant_id = ?1 AND e.project_id = ?2
-           AND COALESCE(e.project_seq, e.seq_no) > ?3",
-    );
-    if job_id.is_some() {
-        sql.push_str(" AND e.job_id = ?4");
-    } else if node_id.is_some() {
-        sql.push_str(" AND e.node_id = ?4");
-    }
-    sql.push_str(" ORDER BY eff_proj_seq ASC, e.created_at ASC LIMIT 50");
-
-    let mut stmt = conn
-        .prepare(&sql)
-        .map_err(|e| map_sqlite_error(e, "prep_sse_events"))?;
-
-    let map_row = |row: &rusqlite::Row<'_>| -> rusqlite::Result<ExecutionEventDto> {
-        Ok(ExecutionEventDto {
-            id: row.get(0)?,
-            job_id: row.get(1)?,
-            project_id: row.get(2)?,
-            node_id: row.get(3)?,
-            event_kind: row.get(4)?,
-            payload_text: row.get(5)?,
-            seq_no: row.get(6)?,
-            project_seq: row.get(7)?,
-            composite_scope_key: row.get(8)?,
-            job_status: row.get(9)?,
-            created_at: epoch_ms_to_iso(row.get(10)?),
-        })
-    };
-
-    let rows = if let Some(jid) = job_id {
-        stmt.query_map(
-            params![tenant_id, project_id, last_seq, jid],
-            map_row,
-        )
-    } else if let Some(nid) = node_id {
-        stmt.query_map(
-            params![tenant_id, project_id, last_seq, nid],
-            map_row,
-        )
-    } else {
-        stmt.query_map(
-            params![tenant_id, project_id, last_seq],
-            map_row,
-        )
-    }
-    .map_err(|e| map_sqlite_error(e, "query_sse_events"))?;
-
-    let mut events = Vec::new();
-    for r in rows {
-        events.push(r.map_err(|e| map_sqlite_error(e, "row_sse_events"))?);
-    }
-
-    let is_terminal = if let Some(jid) = job_id {
-        conn.query_row(
-            "SELECT status FROM node_execution_jobs WHERE id = ?1 AND project_id = ?2",
-            params![jid, project_id],
-            |r| r.get::<_, String>(0),
-        )
-        .optional()
-        .map_err(|e| map_sqlite_error(e, "sse_job_status"))?
-        .is_some_and(|st| matches!(st.as_str(), "COMPLETED" | "FAILED" | "CANCELLED"))
-    } else {
-        false
-    };
-
-    Ok((events, is_terminal))
-}
-
-pub async fn handle_stream_job_events(
-    State(state): State<DaemonAppState>,
-    Extension(principal): Extension<FlowPrincipal>,
-    AxumPath(id): AxumPath<String>,
-    headers: HeaderMap,
-    Query(q): Query<StreamJobEventsQuery>,
-) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, Response> {
-    let pid = check_project_uuid(&id)?;
-    let pool = state.registry.pool().clone();
-    let tid = principal.tenant_id.clone();
-    let pid_check = pid.clone();
-
-    run_db(move || {
-        let conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
-        verify_project_ownership(&conn, &tid, &pid_check)
-    })
-    .await?;
-
-    let last_event_id = headers
-        .get("last-event-id")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.trim().parse::<i64>().ok());
-
-    let init = SsePollState {
-        pool: state.registry.pool().clone(),
-        tenant_id: principal.tenant_id,
-        project_id: pid,
-        job_id: q.job_id.filter(|s| !s.trim().is_empty()),
-        node_id: q.node_id.filter(|s| !s.trim().is_empty()),
-        last_seq: q.after_seq.or(last_event_id).unwrap_or(0),
-        started: false,
-        closed: false,
-        rx: state.sse_tx.subscribe(),
-    };
-
-    let stream = futures_util::stream::unfold(init, |mut st| async move {
-        if st.closed {
-            return None;
-        }
-        loop {
-            if st.started {
-                let target_pid = st.project_id.clone();
-                tokio::select! {
-                    recv = st.rx.recv() => {
-                        match recv {
-                            Ok(msg_pid) if msg_pid != target_pid => continue,
-                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {}
-                            _ => {}
-                        }
-                    }
-                    _ = tokio::time::sleep(Duration::from_millis(1500)) => {}
-                }
-            }
-            st.started = true;
-
-            let (pool, tid, pid, jid, nid, last_seq) = (
-                st.pool.clone(),
-                st.tenant_id.clone(),
-                st.project_id.clone(),
-                st.job_id.clone(),
-                st.node_id.clone(),
-                st.last_seq,
-            );
-            let res = tokio::task::spawn_blocking(move || {
-                fetch_pending_events_params(&pool, &tid, &pid, jid.as_deref(), nid.as_deref(), last_seq)
-            })
-            .await;
-            match res {
-                Ok(Ok((events, is_terminal))) => {
-                    if let Some(last) = events.last() {
-                        st.last_seq = last.project_seq.max(last.seq_no);
-                    }
-                    if !events.is_empty() {
-                        if is_terminal {
-                            st.closed = true;
-                        }
-                        let payload =
-                            serde_json::to_string(&events).unwrap_or_else(|_| "[]".into());
-                        let ev = Event::default()
-                            .id(st.last_seq.to_string())
-                            .event("execution_events")
-                            .data(payload);
-                        return Some((Ok(ev), st));
-                    }
-                    if is_terminal {
-                        return None;
-                    }
-                }
-                _ => return None,
-            }
-        }
-    });
-
-    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
-}
+pub use super::execution_events::*;
 
 // -----------------------------------------------------------------------------
 // 6. Provider Key Verification (`POST /api/v1/doctor/verify-key`)

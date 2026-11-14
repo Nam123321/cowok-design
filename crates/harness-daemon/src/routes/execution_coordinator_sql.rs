@@ -200,42 +200,42 @@ pub fn read_job_dto_conn(conn: &rusqlite::Connection, job_id: &str) -> Result<No
     )
 }
 
-pub fn fetch_job_meta(conn: &rusqlite::Connection, job_id: &str, tid: &str, pid: &str) -> Result<(i64, String, String, String), Response> {
-    let row: Option<(String, String, i64, String, String, String)> = conn
+pub fn fetch_job_meta(conn: &rusqlite::Connection, job_id: &str, tid: &str, pid: &str) -> Result<(i64, String, String, String, String), Response> {
+    let row: Option<(String, String, i64, String, String, String, String)> = conn
         .query_row(
-            "SELECT tenant_id, project_id, fencing_token, status, node_id, composite_scope_key FROM node_execution_jobs WHERE id = ?1",
-            params![job_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+            "SELECT tenant_id, project_id, fencing_token, status, node_id, composite_scope_key, daemon_nonce FROM node_execution_jobs WHERE id = ?1",
+            params![job_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)),
         )
         .optional().map_err(|e| err_resp(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
-    let Some((j_tid, j_pid, tok, status, nid, scope)) = row else {
+    let Some((j_tid, j_pid, tok, status, nid, scope, nonce)) = row else {
         return Err(err_resp(StatusCode::NOT_FOUND, "JOB_NOT_FOUND", "Job not found"));
     };
     if j_tid != tid { return Err(err_resp(StatusCode::FORBIDDEN, "TENANT_ISOLATION_BREACH", "Cross-tenant job denied")); }
     if j_pid != pid { return Err(err_resp(StatusCode::NOT_FOUND, "JOB_NOT_FOUND", "Job belongs to another project")); }
-    Ok((tok, status, nid, scope))
+    Ok((tok, status, nid, scope, nonce))
 }
 
-pub fn promote_next_queued_tx(tx: &rusqlite::Transaction<'_>, daemon_nonce: &str, now_ms: i64) -> Result<Option<String>, rusqlite::Error> {
-    let active: i64 = tx.query_row("SELECT COUNT(*) FROM node_execution_jobs WHERE status IN ('RUNNING', 'PAUSED')", [], |r| r.get(0))?;
-    if active >= MAX_GLOBAL_ACTIVE_SLOTS { return Ok(None); }
-    let next: Option<(String, String, String, String, String)> = tx
-        .query_row(
-            "SELECT q.id, q.tenant_id, q.project_id, q.node_id, q.composite_scope_key FROM node_execution_jobs q
-             WHERE q.status = 'QUEUED' AND NOT EXISTS (
-                 SELECT 1 FROM node_execution_jobs a WHERE a.composite_scope_key = q.composite_scope_key AND a.status IN ('RUNNING', 'PAUSED')
-             ) ORDER BY q.created_at ASC, q.id ASC LIMIT 1",
-            [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+pub fn promote_next_queued_tx(tx: &rusqlite::Transaction<'_>, daemon_nonce: &str, now_ms: i64) -> Result<Vec<(String, String)>, rusqlite::Error> {
+    let mut promoted = Vec::new();
+    loop {
+        let active: i64 = tx.query_row("SELECT COUNT(*) FROM node_execution_jobs WHERE status IN ('RUNNING', 'PAUSED')", [], |r| r.get(0))?;
+        if active >= MAX_GLOBAL_ACTIVE_SLOTS { break; }
+        let next: Option<(String, String, String, String, String, i64)> = tx.query_row(
+            "SELECT q.id, q.tenant_id, q.project_id, q.node_id, q.composite_scope_key, q.fencing_token FROM node_execution_jobs q WHERE q.status = 'QUEUED' AND NOT EXISTS (SELECT 1 FROM node_execution_jobs a WHERE a.composite_scope_key = q.composite_scope_key AND a.status IN ('RUNNING', 'PAUSED')) ORDER BY q.created_at ASC, q.id ASC LIMIT 1",
+            [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
         ).optional()?;
-    let Some((jid, tid, pid, nid, scope)) = next else { return Ok(None); };
-    tx.execute(
-        "UPDATE node_execution_jobs SET status = 'RUNNING', daemon_nonce = ?1, started_at = COALESCE(started_at, ?2), stale_after_timestamp = ?3, updated_at = ?2 WHERE id = ?4",
-        params![daemon_nonce, now_ms, now_ms + LEASE_TTL_MS, jid],
-    )?;
-    append_event_tx(tx, &NewEventParams {
-        tid: &tid, pid: &pid, job_id: &jid, node_id: &nid, scope_key: &scope,
-        kind: "started", payload: "{\"promoted\":true}", now_ms,
-    })?;
-    Ok(Some(pid))
+        let Some((jid, tid, pid, nid, scope, fence)) = next else { break; };
+        let next_fence = fence + 1;
+        let rows = tx.execute(
+            "UPDATE node_execution_jobs SET status = 'RUNNING', daemon_nonce = ?1, fencing_token = ?2, started_at = COALESCE(started_at, ?3), stale_after_timestamp = ?4, updated_at = ?3 WHERE id = ?5 AND fencing_token = ?6 AND composite_scope_key = ?7 AND status = 'QUEUED'",
+            params![daemon_nonce, next_fence, now_ms, now_ms + LEASE_TTL_MS, jid, fence, scope],
+        )?;
+        if rows == 0 { break; }
+        let payload = serde_json::json!({ "promoted": true, "fencingToken": next_fence }).to_string();
+        append_event_tx(tx, &NewEventParams { tid: &tid, pid: &pid, job_id: &jid, node_id: &nid, scope_key: &scope, kind: "started", payload: &payload, now_ms })?;
+        promoted.push((jid, pid));
+    }
+    Ok(promoted)
 }
 
 pub fn begin_immediate(conn: &mut rusqlite::Connection) -> Result<rusqlite::Transaction<'_>, rusqlite::Error> {

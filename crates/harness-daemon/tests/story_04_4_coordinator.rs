@@ -182,44 +182,63 @@ async fn test_monotonic_fencing_cas_and_409_across_endpoints() {
     let (state, router, tok_a, tok_b) = setup_daemon(&tmp);
     let proj = create_project(&router, &tok_a, "cas-test").await;
 
-    // PostJobEvent None branch stamps active daemon_nonce
-    let (st1, ev1) = send_req(
+    // Reject /flow/jobs/events for non-enqueued jobs (404 JOB_NOT_FOUND)
+    let (st_miss, err_miss) = send_req(
         &router,
         "POST",
         &format!("/api/v1/projects/{}/flow/jobs/events", proj.id),
         &tok_a,
         Some(json!({
-            "jobId": "job-cas-1",
+            "jobId": "job-never-enqueued",
             "sessionId": "sess-cas-1",
             "nodeId": "node-1",
             "eventKind": "started",
             "payloadText": "init",
-            "jobStatus": "RUNNING"
+            "jobStatus": "RUNNING",
+            "expectedFencingToken": 1
         })),
     )
     .await;
-    assert_eq!(st1, StatusCode::CREATED, "{ev1}");
+    assert_eq!(st_miss, StatusCode::NOT_FOUND, "{err_miss}");
+    assert_eq!(err_miss["code"], "JOB_NOT_FOUND");
+
+    // Enqueue first, verify stamped daemon_nonce
+    let (st1, enq1) = send_req(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/flow/jobs/enqueue", proj.id),
+        &tok_a,
+        Some(json!({
+            "sessionId": "sess-cas-1",
+            "nodeIds": ["node-1"],
+            "prompt": "init",
+            "mode": "parallel"
+        })),
+    )
+    .await;
+    assert_eq!(st1, StatusCode::CREATED, "{enq1}");
+    let job_cas_id = enq1["jobs"][0]["id"].as_str().unwrap().to_string();
     let nonce_db: String = state
         .registry
         .pool()
         .connection()
         .unwrap()
         .query_row(
-            "SELECT daemon_nonce FROM node_execution_jobs WHERE id = 'job-cas-1'",
-            [],
+            "SELECT daemon_nonce FROM node_execution_jobs WHERE id = ?1",
+            rusqlite::params![job_cas_id],
             |r| r.get(0),
         )
         .unwrap();
     assert_eq!(nonce_db, state.auth.daemon_nonce);
 
-    // Some branch without expectedFencingToken or with stale token -> 409 STALE_FENCING_TOKEN
+    // Without expectedFencingToken -> 409 STALE_FENCING_TOKEN
     let (st_missing, err_missing) = send_req(
         &router,
         "POST",
         &format!("/api/v1/projects/{}/flow/jobs/events", proj.id),
         &tok_a,
         Some(json!({
-            "jobId": "job-cas-1",
+            "jobId": job_cas_id,
             "sessionId": "sess-cas-1",
             "nodeId": "node-1",
             "eventKind": "chunk",
@@ -238,7 +257,7 @@ async fn test_monotonic_fencing_cas_and_409_across_endpoints() {
         &format!("/api/v1/projects/{}/flow/jobs/events", proj.id),
         &tok_a,
         Some(json!({
-            "jobId": "job-cas-1",
+            "jobId": job_cas_id,
             "sessionId": "sess-cas-1",
             "nodeId": "node-1",
             "eventKind": "chunk",
@@ -257,7 +276,7 @@ async fn test_monotonic_fencing_cas_and_409_across_endpoints() {
         &format!("/api/v1/projects/{}/flow/jobs/steer", proj.id),
         &tok_a,
         Some(json!({
-            "jobId": "job-cas-1",
+            "jobId": job_cas_id,
             "expectedFencingToken": 1,
             "instruction": "Switch palette"
         })),
@@ -265,6 +284,42 @@ async fn test_monotonic_fencing_cas_and_409_across_endpoints() {
     .await;
     assert_eq!(st_steer_stale, StatusCode::CONFLICT, "{err_steer}");
     assert_eq!(err_steer["code"], "STALE_FENCING_TOKEN");
+
+    // Terminal COMPLETED event then refuse reopening COMPLETED -> RUNNING
+    let (st_done, _) = send_req(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/flow/jobs/events", proj.id),
+        &tok_a,
+        Some(json!({
+            "jobId": job_cas_id,
+            "sessionId": "sess-cas-1",
+            "nodeId": "node-1",
+            "eventKind": "completed",
+            "payloadText": "done",
+            "jobStatus": "COMPLETED",
+            "expectedFencingToken": 2
+        })),
+    )
+    .await;
+    assert_eq!(st_done, StatusCode::CREATED);
+    let (st_reopen, _) = send_req(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/flow/jobs/events", proj.id),
+        &tok_a,
+        Some(json!({
+            "jobId": job_cas_id,
+            "sessionId": "sess-cas-1",
+            "nodeId": "node-1",
+            "eventKind": "started",
+            "payloadText": "reopen",
+            "jobStatus": "RUNNING",
+            "expectedFencingToken": 3
+        })),
+    )
+    .await;
+    assert_eq!(st_reopen, StatusCode::CONFLICT);
 
     // Cross-tenant node-sessions blocked with 403
     let (st_idor, _) = send_req(
@@ -414,19 +469,35 @@ async fn test_startup_orphan_reaper_5s_lease_and_persistent_sse() {
     let text1 = String::from_utf8_lossy(frame1.data_ref().unwrap()).into_owned();
     assert!(text1.contains("id: 2"), "got {text1}");
 
-    // Emit another event while stream stays open
+    // Enqueue then emit another event while stream stays open
+    let (enq_live_st, enq_live) = send_req(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/flow/jobs/enqueue", proj.id),
+        &tok_a,
+        Some(json!({
+            "sessionId": "sess-orp",
+            "nodeIds": ["n3"],
+            "prompt": "live",
+            "mode": "parallel"
+        })),
+    )
+    .await;
+    assert_eq!(enq_live_st, StatusCode::CREATED, "{enq_live}");
+    let live_jid = enq_live["jobs"][0]["id"].as_str().unwrap().to_string();
     let (ev_st, _) = send_req(
         &router,
         "POST",
         &format!("/api/v1/projects/{}/flow/jobs/events", proj.id),
         &tok_a,
         Some(json!({
-            "jobId": "job-live-sse",
+            "jobId": live_jid,
             "sessionId": "sess-orp",
             "nodeId": "n3",
             "eventKind": "chunk",
             "payloadText": "live-push",
-            "jobStatus": "RUNNING"
+            "jobStatus": "RUNNING",
+            "expectedFencingToken": 1
         })),
     )
     .await;
@@ -439,4 +510,140 @@ async fn test_startup_orphan_reaper_5s_lease_and_persistent_sse() {
         .expect("frame ok");
     let text2 = String::from_utf8_lossy(frame2.data_ref().unwrap()).into_owned();
     assert!(text2.contains("live-push"), "got {text2}");
+}
+
+#[tokio::test]
+async fn test_stage4_post_commit_reap_interrupted_resume_and_sse_pagination() {
+    use harness_daemon::routes::execution_reaper::{
+        reap_orphan_jobs_with_workers, spawn_managed_worker_heartbeat, sweep_expired_leases_with_workers,
+    };
+
+    let tmp = tempfile::tempdir().unwrap();
+    let (state, router, tok_a, _) = setup_daemon(&tmp);
+    let proj = create_project(&router, &tok_a, "stage4-hardening").await;
+    let pid_str = proj.id.to_string();
+
+    // 1. Spawn active worker + shadow dir; stale 409 steer/cancel must NOT reap or delete shadow
+    let mut cmd = Command::new("sh");
+    cmd.args(["-c", "sleep 30"]);
+    let (mut child, pid, pgid, start_time) = spawn_pgid_child(cmd).unwrap();
+    assert!(terminate_pgid_checked(pid, pgid, "").is_err());
+
+    let (_, enq) = send_req(
+        &router, "POST", &format!("/api/v1/projects/{}/flow/jobs/enqueue", proj.id), &tok_a,
+        Some(json!({ "sessionId": "sess-s4", "nodeIds": ["n1", "n2", "n3", "n4", "n5"], "prompt": "go", "mode": "parallel" })),
+    ).await;
+    let jobs = enq["jobs"].as_array().unwrap();
+    let j0_id = jobs[0]["id"].as_str().unwrap().to_string();
+    let j4_id = jobs[4]["id"].as_str().unwrap().to_string();
+    assert_eq!(jobs[4]["status"], "QUEUED");
+
+    let shadow_dir = shadow_dir_for(tmp.path(), &pid_str, &j0_id).unwrap();
+    fs::create_dir_all(&shadow_dir).unwrap();
+    fs::write(shadow_dir.join("keep.txt"), "live").unwrap();
+    state.active_workers.register(ActiveWorkerEntry {
+        job_id: j0_id.clone(), project_id: pid_str.clone(), fencing_token: 1,
+        pid, pgid, start_time, shadow_dir: shadow_dir.clone(),
+    });
+    let _hb = spawn_managed_worker_heartbeat(state.registry.pool().clone(), state.active_workers.clone(), j0_id.clone(), 1);
+
+    let (st_stale, _) = send_req(
+        &router, "POST", &format!("/api/v1/projects/{}/flow/jobs/steer", proj.id), &tok_a,
+        Some(json!({ "jobId": j0_id, "expectedFencingToken": 999, "instruction": "stale", "pgidReapRequested": true })),
+    ).await;
+    assert_eq!(st_stale, StatusCode::CONFLICT);
+    assert!(shadow_dir.exists(), "409 steer must not discard shadow dir");
+    assert!(child.try_wait().unwrap().is_none(), "409 steer must not kill PGID");
+
+    // 2. Mark j1 INTERRUPTED and expire j0 lease -> sweep_expired_leases_with_workers promotes j4 + reaps j0 + cleans orphan shadow dir
+    let j1_id = jobs[1]["id"].as_str().unwrap().to_string();
+    {
+        let conn = state.registry.pool().connection().unwrap();
+        let now = Utc::now().timestamp_millis();
+        conn.execute(
+            "UPDATE node_execution_jobs SET status = 'INTERRUPTED', stale_after_timestamp = NULL WHERE id = ?1",
+            rusqlite::params![j1_id],
+        ).unwrap();
+        conn.execute(
+            "UPDATE node_execution_jobs SET stale_after_timestamp = ?1 WHERE id = ?2",
+            rusqlite::params![now - 1000, j0_id],
+        ).unwrap();
+        let orphan_shadow = shadow_dir_for(tmp.path(), &pid_str, "orphan-disk-job").unwrap();
+        fs::create_dir_all(&orphan_shadow).unwrap();
+    }
+    let swept = sweep_expired_leases_with_workers(
+        state.registry.pool(), &state.active_workers, Some(tmp.path()), &state.auth.daemon_nonce, &state.sse_tx,
+    ).await.unwrap();
+    assert_eq!(swept, 1);
+    let _ = child.wait();
+    assert!(!shadow_dir.exists());
+
+    // Now j4 was promoted (slots: n3, n4, j4 = 3 active; n1 INTERRUPTED; n2 INTERRUPTED). Verify INTERRUPTED -> QUEUED promotion when < 4
+    let (res_st, resumed) = send_req(
+        &router, "POST", &format!("/api/v1/projects/{}/flow/jobs/resume", proj.id), &tok_a,
+        Some(json!({ "jobId": j1_id, "expectedFencingToken": 1 })),
+    ).await;
+    assert_eq!(res_st, StatusCode::OK, "{resumed}");
+    assert_eq!(resumed["status"], "RUNNING");
+    assert!(resumed["fencingToken"].as_i64().unwrap() >= 3);
+
+    // Fill 4 slots and verify resuming j0 (INTERRUPTED) transitions to QUEUED (not RUNNING!)
+    let (res0_st, res0) = send_req(
+        &router, "POST", &format!("/api/v1/projects/{}/flow/jobs/resume", proj.id), &tok_a,
+        Some(json!({ "jobId": j0_id, "expectedFencingToken": 2 })),
+    ).await;
+    assert_eq!(res0_st, StatusCode::OK, "{res0}");
+    assert_eq!(res0["status"], "QUEUED");
+
+    // 3. Startup orphan shadow cleanup removes non-active disk shadow dir
+    reap_orphan_jobs_with_workers(state.registry.pool(), &state.active_workers, Some(tmp.path()), &state.auth.daemon_nonce).await.unwrap();
+    assert!(!shadow_dir_for(tmp.path(), &pid_str, "orphan-disk-job").unwrap().exists());
+
+    // 4. Test unread reset & >50 SSE events on COMPLETED job without truncation + nodeId/jobId filter + Last-Event-ID precedence
+    for i in 0..55 {
+        let is_last = i == 54;
+        let (st_ev, _) = send_req(
+            &router, "POST", &format!("/api/v1/projects/{}/flow/jobs/events", proj.id), &tok_a,
+            Some(json!({
+                "jobId": j4_id, "sessionId": "sess-s4", "nodeId": "n5",
+                "eventKind": if is_last { "completed" } else { "chunk" },
+                "payloadText": format!("chunk-{i}"),
+                "jobStatus": if is_last { "COMPLETED" } else { "RUNNING" },
+                "expectedFencingToken": 2 + i as i64
+            })),
+        ).await;
+        assert_eq!(st_ev, StatusCode::CREATED);
+    }
+
+    let (read_st, read_res) = send_req(
+        &router, "POST", &format!("/api/v1/projects/{}/flow/node-sessions/read", proj.id), &tok_a,
+        Some(json!({ "sessionId": "sess-s4", "nodeId": "n5" })),
+    ).await;
+    assert_eq!(read_st, StatusCode::OK, "{read_res}");
+    assert_eq!(read_res["ok"], true);
+
+    // Last-Event-ID: 0 overrides afterSeq=99999 and combined jobId+nodeId returns all >50 events before closing
+    let sse_req = Request::builder()
+        .method("GET")
+        .uri(format!("/api/v1/projects/{}/flow/jobs/stream?jobId={}&nodeId=n5&afterSeq=99999", proj.id, j4_id))
+        .header("host", "127.0.0.1:4170")
+        .header("x-cowok-session-token", &tok_a)
+        .header("last-event-id", "0")
+        .body(Body::empty())
+        .unwrap();
+    let sse_resp = router.clone().oneshot(sse_req).await.unwrap();
+    let mut body = sse_resp.into_body();
+    let mut combined = String::new();
+    while let Ok(Some(Ok(frame))) = tokio::time::timeout(Duration::from_secs(2), body.frame()).await {
+        if let Some(d) = frame.data_ref() {
+            combined.push_str(&String::from_utf8_lossy(d));
+        }
+    }
+    assert!(combined.contains("chunk-0"), "missing chunk-0");
+    assert!(combined.contains("chunk-54"), "truncated >50 events: missing chunk-54");
+
+    // 5. Plugins endpoint responds 200 JSON array
+    let (pl_st, pl_body) = send_req(&router, "GET", "/api/v1/plugins?enabled=true", &tok_a, None).await;
+    assert_eq!(pl_st, StatusCode::OK, "{pl_body}");
+    assert!(pl_body.is_array());
 }

@@ -55,7 +55,7 @@ function resolveSessionNodes(session: ChatSession, nodes: Array<{ id: string; sc
       return matched ? { ...sub, screenKey: matched.screenKey, nodeTitle: matched.title } : sub;
     });
   }
-  return nodes.map((n) => ({ nodeId: n.id, nodeTitle: n.title, screenKey: n.screenKey }));
+  return [];
 }
 
 export const SidebarSessionRow: React.FC<SidebarSessionRowProps> = ({

@@ -70,6 +70,22 @@ export const TransitionNodeJobInputSchema = z
   })
   .strict();
 
+export const MarkNodeSessionReadInputSchema = z
+  .object({
+    compositeScopeKey: z.string().min(1).optional(),
+    sessionId: z.string().min(1).optional(),
+    nodeId: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const MarkNodeSessionReadResponseSchema = z
+  .object({
+    ok: z.boolean(),
+    compositeScopeKey: z.string(),
+    clearedRows: z.number().int().nonnegative(),
+  })
+  .strict();
+
 export const PostJobEventV2InputSchema = z
   .object({
     jobId: z.string().min(1),
@@ -106,4 +122,6 @@ export type TransitionNodeJobInput = z.infer<typeof TransitionNodeJobInputSchema
 export type PostJobEventV2Input = z.infer<typeof PostJobEventV2InputSchema>;
 export type EnqueueNodeJobsResponse = z.infer<typeof EnqueueNodeJobsResponseSchema>;
 export type NodeSessionsResponse = z.infer<typeof NodeSessionsResponseSchema>;
+export type MarkNodeSessionReadInput = z.infer<typeof MarkNodeSessionReadInputSchema>;
+export type MarkNodeSessionReadResponse = z.infer<typeof MarkNodeSessionReadResponseSchema>;
 export { ExecutionEventDtoSchema };

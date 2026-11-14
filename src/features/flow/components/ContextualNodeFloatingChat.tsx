@@ -13,10 +13,13 @@ import {
   FLOATING_CHAT_BOUNDS,
   startResizeDrag,
   useFloatingChatEffects,
+  useFloatingSharedMessages,
   useFloatingWindowGeometry,
   type FloatingChatMessage,
+  type ResizeDirection,
 } from "../hooks/useFloatingChatSync";
 import { useKeyedParallelCoordinator } from "../hooks/useKeyedParallelCoordinator";
+import { sharedChatStore, toSessionChatKey } from "../store/shared-chat-sync";
 import { FloatingChatCollapsedPill } from "./FloatingChatCollapsedPill";
 import { FloatingChatStreamPanel } from "./FloatingChatStreamPanel";
 
@@ -92,24 +95,34 @@ const FloatingChatHeader: React.FC<{
   );
 };
 
+const RESIZE_SPECS: Array<{ dir: ResizeDirection; cursor: string; style: React.CSSProperties }> = [
+  { dir: "n", cursor: "ns-resize", style: { top: 0, left: "8px", right: "8px", height: "6px" } },
+  { dir: "s", cursor: "ns-resize", style: { bottom: 0, left: "8px", right: "8px", height: "6px" } },
+  { dir: "e", cursor: "ew-resize", style: { top: "8px", bottom: "8px", right: 0, width: "6px" } },
+  { dir: "w", cursor: "ew-resize", style: { top: "8px", bottom: "8px", left: 0, width: "6px" } },
+  { dir: "ne", cursor: "nesw-resize", style: { top: 0, right: 0, width: "10px", height: "10px" } },
+  { dir: "nw", cursor: "nwse-resize", style: { top: 0, left: 0, width: "10px", height: "10px" } },
+  { dir: "se", cursor: "nwse-resize", style: { bottom: 0, right: 0, width: "10px", height: "10px" } },
+  { dir: "sw", cursor: "nesw-resize", style: { bottom: 0, left: 0, width: "10px", height: "10px" } },
+];
+
 const FloatingChatResizeHandles: React.FC<{
   resizeCtx: { width: number; height: number; x: number; bottom: number };
-  onApply: (next: { width?: number; height?: number; x?: number }) => void;
+  onApply: (next: { width?: number; height?: number; x?: number; bottom?: number }) => void;
 }> = ({ resizeCtx, onApply }) => (
   <>
-    <div style={{ position: "absolute", top: "6px", bottom: "6px", right: 0, width: "6px", cursor: "ew-resize" }} onMouseDown={(e) => startResizeDrag(e, "e", resizeCtx, onApply)} />
-    <div style={{ position: "absolute", top: "6px", bottom: "6px", left: 0, width: "6px", cursor: "ew-resize" }} onMouseDown={(e) => startResizeDrag(e, "w", resizeCtx, onApply)} />
-    <div style={{ position: "absolute", top: 0, left: "6px", right: "6px", height: "6px", cursor: "ns-resize" }} onMouseDown={(e) => startResizeDrag(e, "n", resizeCtx, onApply)} />
+    {RESIZE_SPECS.map((h) => (
+      <div key={h.dir} data-testid={`fc-resize-${h.dir}`} style={{ position: "absolute", cursor: h.cursor, zIndex: 4, ...h.style }} onMouseDown={(e) => startResizeDrag(e, h.dir, resizeCtx, onApply)} />
+    ))}
   </>
 );
 
 function useFloatingChatController(props: ContextualNodeFloatingChatProps) {
   const { t } = useTranslation();
-  const { formatNumber } = useFormatter();
+  const { formatNumber, formatTime } = useFormatter();
   const coordinator = useKeyedParallelCoordinator();
   const [isCollapsed, setIsCollapsed] = useState(!props.defaultExpanded);
   const [showReviewSummary, setShowReviewSummary] = useState(false);
-  const [messages, setMessages] = useState<FloatingChatMessage[]>([]);
   const [inputPrompt, setInputPrompt] = useState("");
   const [steerDraft, setSteerDraft] = useState("");
   const [isSteering, setIsSteering] = useState(false);
@@ -118,47 +131,52 @@ function useFloatingChatController(props: ContextualNodeFloatingChatProps) {
   const historyEndRef = useRef<HTMLDivElement>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
   const primaryNode = props.selectedNodes[0] || null;
-  const primaryStatus = primaryNode ? coordinator.getNodeStatus(primaryNode.id) : null;
+  const primaryStatus = primaryNode ? coordinator.getNodeStatus(primaryNode.id, { projectId: props.projectId, sessionId: props.sessionId }) : null;
+  const selectedIds = props.selectedNodes.map((n) => n.id);
+  const messages = useFloatingSharedMessages(props.projectId, props.sessionId, selectedIds);
 
   useFloatingChatEffects({ projectId: props.projectId, sessionId: props.sessionId, messages, primaryStatus, historyEndRef, streamAbortRef });
 
-  const appendMsg = useCallback((m: FloatingChatMessage) => setMessages((prev) => [...prev, m]), []);
+  const appendMsg = useCallback((m: FloatingChatMessage) => {
+    sharedChatStore.appendMessage(toSessionChatKey(props.projectId, props.sessionId), {
+      id: m.id, sender: m.role === "user" ? "human" : "agent", text: m.content, timestamp: formatTime(m.timestamp),
+      createdAtMs: m.timestamp, nodeId: m.nodeId, projectSeq: m.projectSeq, fencingToken: m.fencingToken,
+    });
+  }, [props.projectId, props.sessionId, formatTime]);
+
   const handleSendMessage = () => {
     if (!inputPrompt.trim() || props.selectedNodes.length === 0) return;
     const prompt = inputPrompt.trim();
     setInputPrompt("");
     appendMsg({ id: `msg-${Date.now()}`, nodeId: primaryNode?.id || "unknown", role: "user", content: prompt, timestamp: Date.now() });
-    void dispatchNodeExecutionToDaemon({ projectId: props.projectId, sessionId: props.sessionId, primaryNode, selectedNodeIds: props.selectedNodes.map((n) => n.id), prompt, coordinator, streamAbortRef, onAppendMsg: appendMsg, t, formatNumber });
+    void dispatchNodeExecutionToDaemon({ projectId: props.projectId, sessionId: props.sessionId, primaryNode, selectedNodeIds: selectedIds, prompt, coordinator, streamAbortRef, onAppendMsg: appendMsg, t, formatNumber });
   };
   const handleSteerSubmit = () => {
     if (!steerDraft.trim() || !primaryStatus?.jobId) return;
     const instruction = steerDraft.trim();
     const fence = primaryStatus.fencingToken ?? 1;
-    coordinator.steerJob(primaryStatus.jobId, instruction);
-    appendMsg({ id: `steer-${Date.now()}`, nodeId: primaryNode?.id || "unknown", role: "user", content: `${t("floatingChat.steerPrefix", "Chỉ dẫn thêm (Steer)")}: ${instruction}`, timestamp: Date.now(), fencingToken: fence + 1 });
+    appendMsg({ id: `steer-${Date.now()}`, nodeId: primaryNode?.id || "unknown", role: "user", content: `${t("floatingChat.steerPrefix", "Chỉ dẫn thêm (Steer)")}: ${instruction}`, timestamp: Date.now(), fencingToken: fence });
     dispatchSteerToDaemon({ projectId: props.projectId, jobId: primaryStatus.jobId, nodeId: primaryNode?.id || "unknown", fence, instruction, coordinator, appendMsg, errorPrefix: t("floatingChat.daemonSyncError", "Không thể đồng bộ với Rust daemon") });
     setSteerDraft("");
     setIsSteering(false);
   };
   const handleTransition = (kind: "pause" | "resume" | "cancel", jobId: string) =>
-    dispatchTransitionToDaemon({ projectId: props.projectId, kind, jobId, fence: primaryStatus?.fencingToken ?? 1, coordinator });
+    dispatchTransitionToDaemon({
+      projectId: props.projectId, kind, jobId, fence: primaryStatus?.fencingToken ?? 1, coordinator,
+      onErrorMsg: (errText) => appendMsg({ id: `tx-err-${Date.now()}`, nodeId: primaryNode?.id || "unknown", role: "assistant", content: errText, timestamp: Date.now() }),
+    });
   return { isCollapsed, setIsCollapsed, showReviewSummary, setShowReviewSummary, messages, inputPrompt, setInputPrompt, steerDraft, setSteerDraft, isSteering, setIsSteering, geo, containerRef, historyEndRef, primaryNode, primaryStatus, handleSendMessage, handleSteerSubmit, handleTransition };
 }
 
 const ExpandedFloatingChatWindow: React.FC<{
-  props: ContextualNodeFloatingChatProps;
-  c: ReturnType<typeof useFloatingChatController>;
-  isMulti: boolean;
-  winX: number;
-  winBottom: number;
-  titleText: string;
-  composerPlaceholder: string;
+  props: ContextualNodeFloatingChatProps; c: ReturnType<typeof useFloatingChatController>;
+  isMulti: boolean; winX: number; winBottom: number; titleText: string; composerPlaceholder: string;
 }> = ({ props, c, isMulti, winX, winBottom, titleText, composerPlaceholder }) => {
   const resizeCtx = { width: c.geo.width, height: c.geo.customHeight ?? c.containerRef.current?.offsetHeight ?? FLOATING_CHAT_BOUNDS.MIN_HEIGHT, x: winX, bottom: winBottom };
-  const applyResize = (next: { width?: number; height?: number; x?: number }) => {
+  const applyResize = (next: { width?: number; height?: number; x?: number; bottom?: number }) => {
     if (next.width !== undefined) c.geo.setWidth(next.width);
     if (next.height !== undefined) c.geo.setCustomHeight(next.height);
-    if (next.x !== undefined) c.geo.setAnchor({ x: next.x, bottom: winBottom });
+    if (next.x !== undefined || next.bottom !== undefined) c.geo.setAnchor({ x: next.x ?? winX, bottom: next.bottom ?? winBottom });
   };
   return (
     <div

@@ -69,6 +69,10 @@ export function toNodeStatusSnapshot(head: NodeExecutionJob): NodeStatusSnapshot
   };
 }
 
+export function toCompositeScopeKey(projectId: string, sessionId: string, nodeId: string): string {
+  return `${projectId}::${sessionId}::${nodeId}`;
+}
+
 export function buildQueueSummary(nodeQueues: Map<string, NodeExecutionJob[]>): NodeQueueSummary {
   const counts: Record<"running" | "paused" | "interrupted" | "queued", number> = {
     running: 0,
@@ -78,13 +82,17 @@ export function buildQueueSummary(nodeQueues: Map<string, NodeExecutionJob[]>): 
   };
   const nodeStatusMap: Record<string, NodeStatusSnapshot> = {};
 
-  for (const [nodeId, queue] of nodeQueues.entries()) {
+  for (const [scopeKey, queue] of nodeQueues.entries()) {
     if (queue.length === 0) continue;
     const head = queue[0];
     if (head.status in counts) {
       counts[head.status as keyof typeof counts] += 1;
     }
-    nodeStatusMap[nodeId] = toNodeStatusSnapshot(head);
+    const snap = toNodeStatusSnapshot(head);
+    nodeStatusMap[scopeKey] = snap;
+    if (!nodeStatusMap[head.nodeId]) {
+      nodeStatusMap[head.nodeId] = snap;
+    }
     counts.queued += Math.max(0, queue.length - 1);
   }
 
