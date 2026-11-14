@@ -10,7 +10,10 @@ export interface LoopbackSessionRecord {
   expiresAt: number;
 }
 
-const sessionRegistry = new Map<string, LoopbackSessionRecord>();
+const globalSessionRegistryKey = Symbol.for("cowok.loopback.sessionRegistry");
+const sessionRegistry: Map<string, LoopbackSessionRecord> =
+  ((globalThis as unknown as Record<symbol, Map<string, LoopbackSessionRecord>>)[globalSessionRegistryKey] ??=
+    new Map<string, LoopbackSessionRecord>());
 const SESSION_TTL_MS = 8 * 60 * 60 * 1_000;
 
 export function issueBffLoopbackSession(input?: {
