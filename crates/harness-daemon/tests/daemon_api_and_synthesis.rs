@@ -99,9 +99,8 @@ fn setup_daemon_router(tmp: &TempDir) -> (Arc<SpecRegistry>, axum::Router) {
                     // For root `/api/v1/projects` or nonexistent UUID lookup tests, sign with real HMAC-SHA256 v2
                     let should_sign_hmac = if is_projects_root {
                         true
-                    } else if let Some(rest) = path.strip_prefix("/api/v1/projects/") {
-                        let seg = rest.split('/').next().unwrap_or("");
-                        Uuid::parse_str(seg).is_ok() && !injected_bearer
+                    } else if is_project_route {
+                        !injected_bearer
                     } else {
                         false
                     };
@@ -147,8 +146,15 @@ async fn send_json_request(
     json_body: Option<serde_json::Value>,
 ) -> (StatusCode, serde_json::Value) {
     let mut builder = Request::builder().method(method).uri(uri);
+    let mut has_host = false;
     for (k, v) in headers {
+        if k.eq_ignore_ascii_case("host") {
+            has_host = true;
+        }
         builder = builder.header(*k, *v);
+    }
+    if !has_host {
+        builder = builder.header("host", "127.0.0.1:4170");
     }
     let body = if let Some(val) = json_body {
         builder = builder.header("content-type", "application/json");
@@ -2304,6 +2310,7 @@ async fn test_epic01_security_hardening_delete_spec_and_sqlite_proposals_zip_exp
             "/api/v1/projects/{}/snapshots/export/download",
             proj.id
         ))
+        .header("host", "127.0.0.1:4170")
         .body(Body::empty())
         .expect("build download req");
     let dl_resp = router.clone().oneshot(dl_req).await.expect("oneshot dl");

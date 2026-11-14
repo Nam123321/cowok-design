@@ -45,23 +45,41 @@ export function pushHistorySnapshot(state: FlowWorkbenchState): void {
   state.lastCoalescedNoteNodeId = null;
 }
 
+const FALLBACK_META_RE = /fallback|3ds|otp|retry|error/i;
+
+function classifyNodeClusterId(node: WorkbenchNode): string {
+  const explicit = node.clusterId?.trim();
+  if (explicit) return explicit;
+  if (node.nodeType === "condition" || node.nodeType === "decision") return "cluster-fallback";
+  const metaText = `${node.screenKey} ${node.routePath} ${node.title}`;
+  return FALLBACK_META_RE.test(metaText) ? "cluster-fallback" : "cluster-main";
+}
+
 export function createDefaultClusters(initialNodes: WorkbenchNode[]): WorkbenchCluster[] {
-  return [
-    {
-      id: "cluster-main",
-      title: "Luồng Chính (Main Flow)",
-      color: "var(--action-primary)",
-      nodeIds: initialNodes.slice(0, 2).map((n) => n.id),
-      collapsed: false,
-    },
-    {
-      id: "cluster-fallback",
-      title: "Luồng Dự Phòng (IF NOT / Fallback)",
-      color: "var(--state-warning)",
-      nodeIds: initialNodes.slice(2).map((n) => n.id),
-      collapsed: false,
-    },
-  ];
+  const grouped = new Map<string, string[]>([
+    ["cluster-main", []],
+    ["cluster-fallback", []],
+  ]);
+
+  for (const node of initialNodes) {
+    const cid = classifyNodeClusterId(node);
+    const bucket = grouped.get(cid) ?? [];
+    bucket.push(node.id);
+    grouped.set(cid, bucket);
+  }
+
+  const metaByCluster: Record<string, { title: string; color: string }> = {
+    "cluster-main": { title: "Luồng Chính (Main Flow)", color: "var(--action-primary)" },
+    "cluster-fallback": { title: "Luồng Dự Phòng (IF NOT / Fallback)", color: "var(--state-warning)" },
+  };
+
+  return Array.from(grouped.entries()).map(([id, nodeIds]) => ({
+    id,
+    title: metaByCluster[id]?.title ?? id,
+    color: metaByCluster[id]?.color ?? "var(--human-accent)",
+    nodeIds,
+    collapsed: false,
+  }));
 }
 
 export function createInitialWorkbenchState(

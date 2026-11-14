@@ -70,7 +70,7 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
               height: "11px",
               borderRadius: "50%",
               backgroundColor: "var(--window-dot-close)",
-              border: "1px solid rgba(0, 0, 0, 0.12)",
+              border: "1px solid var(--window-dot-border)",
               display: "inline-block",
             }}
           />
@@ -81,7 +81,7 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
               height: "11px",
               borderRadius: "50%",
               backgroundColor: "var(--window-dot-minimize)",
-              border: "1px solid rgba(0, 0, 0, 0.12)",
+              border: "1px solid var(--window-dot-border)",
               display: "inline-block",
             }}
           />
@@ -92,7 +92,7 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
               height: "11px",
               borderRadius: "50%",
               backgroundColor: "var(--window-dot-maximize)",
-              border: "1px solid rgba(0, 0, 0, 0.12)",
+              border: "1px solid var(--window-dot-border)",
               display: "inline-block",
             }}
           />

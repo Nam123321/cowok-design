@@ -11,10 +11,10 @@
 
 | Failure Mode ID | Potential Failure / Edge Case Mode | Severity (S) | Occurrence (O) | Detection (D) | RPN | Mitigation & Remediation Action |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **FMEA-04.3-01** | CLI Doctor treats `--version` exit `0` as `authenticated: true` or hangs on interactive login prompt | 4 | 2 | 1 | 8 | Separate `installed` vs `authenticated` checks honestly; invoke allowlisted `execFile` (`argv`, zero `sh -c`, `/dev/null` stdin, `<=1500ms`). |
-| **FMEA-04.3-02** | Custom BYOK `base_url` exploited for SSRF against loopback services or cloud metadata `169.254.169.254` | 5 | 2 | 1 | 10 | Enforce server-side SSRF URL/IP filter (HTTPS only, reject RFC1918/link-local/`169.254.169.254`, allowlist local Ollama only); `<3s` timeout + log redaction. |
-| **FMEA-04.3-03** | API secrets or security mode flags persisted plaintext in `localStorage` | 5 | 1 | 1 | 5 | Store secrets exclusively in OS Keychain or Argon2id+AES-256-GCM `.cowok-design/vault.enc` (`0o600`), opt-in `COWOK_VAULT_MODE=ephemeral` only; settings in V5 `agent_settings`. |
-| **FMEA-04.3-04** | Client component `OnboardingWizardModal.tsx` imports server route module or sends unsigned probe requests | 4 | 2 | 1 | 8 | Route via `src/api/doctor.ts` and `src/api/byok.ts` using central `apiClient` automatic `X-Cowok-Session-Token` injection. |
+| **FMEA-04.3-01** | Active Day-0 CLI scan triggers macOS `securityd` modal storms / Electron FD hangs (`cursor`/`windsurf`/`trae`) or conflates `--version` with `authenticated: true` | 4 | 2 | 1 | 8 | Split Passive Day-0 Scan (PATH + non-Keychain metadata + IDE `cline`/`roo` classification) from bounded Explicit Per-CLI Active Probe (`concurrency<=4`, `CI=1`, `GIT_TERMINAL_PROMPT=0`, closed FDs, `-PGID` `SIGKILL <= 1500ms`). |
+| **FMEA-04.3-02** | `handle_verify_provider_key` prefix mock (`legacy_workbench_v6.rs:1525-1651`), SSRF via DNS/redirect/IPv4-mapped IPv6, or `byosEndpoint` passed as `byosToken` | 5 | 2 | 1 | 10 | Replace prefix mock with `<3s` live probe on `POST /api/v1/doctor/verify-key` using `Policy::none()`, connect-time `SocketAddr` SSRF blocklist (`[::ffff:127.0.0.1]`, `169.254.0.0/16`, RFC1918, `100.64.0.0/10`), key redaction, and fix `byosToken` field binding in `SettingsGeneralModelsPane.tsx`. |
+| **FMEA-04.3-03** | Silent downgrade to ephemeral vault (`vault_mode = 'ephemeral'`) or plaintext secrets/security flags in `localStorage` | 5 | 1 | 1 | 5 | Auto-fallback OS Keychain -> `.cowok-design/vault.enc` (`0o600`, Argon2id+AES-256-GCM); reject `PUT /api/v1/agent-settings` ephemeral downgrade whenever `vault.enc` is writable; store non-secret flags in SQLite V7 `agent_settings`. |
+| **FMEA-04.3-04** | Client component `OnboardingWizardModal.tsx` imports server route module or calls mismatched URIs | 4 | 1 | 1 | 4 | Route exclusively via `src/api/workbench-settings.ts` (`/api/v1/{doctor/verify-key,agent-settings,mcp-servers}`) with auto `X-Cowok-Session-Token`. |
 
 ---
 

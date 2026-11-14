@@ -6,8 +6,8 @@ use spec_registry::map_sqlite_error;
 use uuid::Uuid;
 
 use crate::models::{
-    CreateFlowNodeInput, FlowGraphSnapshotDto, FlowNodeDto, FlowServiceError, FlowTransitionDto,
-    MAX_FIXTURE_JSON_BYTES,
+    normalize_fixture_ref, normalize_viewport_preset, CreateFlowNodeInput, FlowGraphSnapshotDto,
+    FlowNodeDto, FlowServiceError, FlowTransitionDto, MAX_FIXTURE_JSON_BYTES,
 };
 
 #[derive(Debug, Clone)]
@@ -51,6 +51,8 @@ pub(crate) fn validate_node_payload(input: &CreateFlowNodeInput) -> Result<(), F
         ));
     }
     validate_node_type(input.node_type.trim())?;
+    normalize_fixture_ref(&input.fixture_ref)?;
+    normalize_viewport_preset(&input.viewport_preset)?;
     if input.fixture_json.len() > MAX_FIXTURE_JSON_BYTES {
         return Err(FlowServiceError::new(
             400,
@@ -221,6 +223,12 @@ pub(crate) fn load_snapshot_in_tx(
 pub(crate) fn map_node_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<FlowNodeDto> {
     let created_ms: i64 = r.get(17)?;
     let updated_ms: i64 = r.get(18)?;
+    let raw_fixture_ref: String = r.get(9)?;
+    let fixture_ref =
+        normalize_fixture_ref(&raw_fixture_ref).unwrap_or_else(|_| "DEFAULT".to_string());
+    let raw_viewport_preset: String = r.get(12)?;
+    let viewport_preset = normalize_viewport_preset(&raw_viewport_preset)
+        .unwrap_or_else(|_| "desktop-1440".to_string());
     Ok(FlowNodeDto {
         id: r.get(0)?,
         tenant_id: r.get(1)?,
@@ -231,10 +239,10 @@ pub(crate) fn map_node_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<FlowNodeDt
         node_type: r.get(6)?,
         route_path: r.get(7)?,
         component_entry_path: r.get(8)?,
-        fixture_ref: r.get(9)?,
+        fixture_ref,
         fixture_json: r.get(10)?,
         note: r.get(11)?,
-        viewport_preset: r.get(12)?,
+        viewport_preset,
         pos_x: r.get(13)?,
         pos_y: r.get(14)?,
         version: r.get(15)?,

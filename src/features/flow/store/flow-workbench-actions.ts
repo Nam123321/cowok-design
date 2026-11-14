@@ -83,8 +83,8 @@ export function applyAddNode(
   pushHistorySnapshot(state);
   const newNode: WorkbenchNode = {
     nodeType: "screen",
-    activeSubState: "Default",
-    fixtureRef: "Default",
+    activeSubState: "DEFAULT",
+    fixtureRef: "DEFAULT",
     ...node,
     version: 1,
     layoutVersion: 1,

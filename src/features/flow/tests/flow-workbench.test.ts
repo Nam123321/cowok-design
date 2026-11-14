@@ -6,6 +6,7 @@ import {
   CreateFlowTransitionSchema,
   UpdateFlowNodeSchema,
   FlowNodeResponseSchema,
+  ViewportPresetSchema,
 } from "../../../lib/validations/flow-workbench";
 import {
   findOrphanNodes,
@@ -573,6 +574,86 @@ describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
       expect(store.getState().nodes.length).toBe(1);
       expect(store.getState().nodes[0].title).toBe("DB Screen");
       expect(store.getState().nodes[0].status).toBe("synced");
+    });
+
+    it("TEST-16: Canonical FixtureRef normalization (DEFAULT|LOADING|EMPTY|ERROR) accepts TitleCase aliases and rejects unknown variants", () => {
+      const defaulted = CreateFlowNodeSchema.parse({
+        screenKey: "scr-def",
+        title: "Default Screen",
+      });
+      expect(defaulted.fixtureRef).toBe("DEFAULT");
+
+      const normalizedAlias = CreateFlowNodeSchema.parse({
+        screenKey: "scr-alias",
+        title: "Alias Screen",
+        fixtureRef: "Loading",
+      });
+      expect(normalizedAlias.fixtureRef).toBe("LOADING");
+
+      const legacyResponse = FlowNodeResponseSchema.parse({
+        id: "11111111-1111-4111-8111-111111111111",
+        tenantId: "local-default",
+        projectId: "22222222-2222-4222-8222-222222222222",
+        portalId: "default",
+        screenKey: "home",
+        title: "Home",
+        nodeType: "screen",
+        routePath: "/",
+        componentEntryPath: "",
+        fixtureRef: "Default",
+        fixtureJson: "{}",
+        note: "",
+        viewportPreset: "desktop-1440",
+        posX: 10,
+        posY: 20,
+        version: 1,
+        layoutVersion: 1,
+        createdAt: "1730000000000",
+        updatedAt: "1730000000000",
+      });
+      expect(legacyResponse.fixtureRef).toBe("DEFAULT");
+
+      expect(() =>
+        CreateFlowNodeSchema.parse({
+          screenKey: "scr-bad",
+          title: "Bad Screen",
+          fixtureRef: "UNKNOWN_VARIANT",
+        })
+      ).toThrow();
+    });
+
+    it("TEST-19: ViewportPresetSchema normalizes legacy aliases and fails closed on invalid presets", () => {
+      expect(ViewportPresetSchema.parse("desktop")).toBe("desktop-1440");
+      expect(ViewportPresetSchema.parse("tablet")).toBe("tablet-768");
+      expect(ViewportPresetSchema.parse("mobile")).toBe("mobile-390");
+      expect(ViewportPresetSchema.parse("  ")).toBe("desktop-1440");
+      expect(() => ViewportPresetSchema.parse("bogus-preset")).toThrow();
+    });
+
+    it("TEST-20: setNodeSubState marks draft dirty + undoable and selectNode(id, true) toggles multi-selection cleanly", () => {
+      const store = createNewFlowWorkbenchStore();
+      store.hydrate(
+        [
+          { id: "n-1", screenKey: "k-1", title: "Screen 1", posX: 10, posY: 20, version: 1, status: "synced", fixtureRef: "DEFAULT" },
+          { id: "n-2", screenKey: "k-2", title: "Screen 2", posX: 200, posY: 20, version: 1, status: "synced", fixtureRef: "DEFAULT" },
+        ],
+        []
+      );
+      expect(store.getState().isDraftDirty).toBe(false);
+
+      store.setNodeSubState("n-1", "Loading");
+      expect(store.getState().isDraftDirty).toBe(true);
+      expect(store.getState().draftId).toBeTruthy();
+      expect(store.getState().nodes[0].fixtureRef).toBe("LOADING");
+      expect(store.getState().nodes[0].status).toBe("draft");
+      expect(store.getState().undoStack.length).toBeGreaterThan(0);
+
+      store.selectNode("n-1");
+      store.selectNode("n-2", true);
+      expect(store.getState().selectedNodeIds).toEqual(["n-1", "n-2"]);
+      store.selectNode("n-1", true);
+      expect(store.getState().selectedNodeIds).toEqual(["n-2"]);
+      expect(store.getState().selectedNodeId).toBe("n-2");
     });
   });
 });

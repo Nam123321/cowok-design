@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "../../../hooks/useTranslation";
 import { ClarificationVariant } from "../../../lib/validations/sdi";
 
 interface ClarificationCardProps {
@@ -12,6 +13,7 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({
   isSelected,
   onSelect,
 }) => {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
@@ -25,7 +27,7 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({
       <div className="font-semibold text-sm text-foreground">{variant.title}</div>
       <p className="text-xs text-muted-foreground">{variant.description}</p>
       <div className="space-y-1 text-xs">
-        <div className="font-medium text-emerald-600 dark:text-emerald-400">Ưu điểm:</div>
+        <div className="font-medium text-emerald-600 dark:text-emerald-400">{t("sdi.prosLabel", "Ưu điểm:")}</div>
         <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
           {variant.pros.map((p, idx) => (
             <li key={`pro-${idx}`}>{p}</li>
@@ -33,7 +35,7 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({
         </ul>
       </div>
       <div className="space-y-1 text-xs">
-        <div className="font-semibold text-foreground">Đánh đổi:</div>
+        <div className="font-semibold text-foreground">{t("sdi.consLabel", "Đánh đổi:")}</div>
         <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
           {variant.cons.map((c, idx) => (
             <li key={`con-${idx}`}>{c}</li>

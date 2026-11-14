@@ -2,8 +2,8 @@
 // @implements AC-03, AC-04, AC-05, AC-06, AC-07, AC-08
 import {
   BatchUpdateNodePositionsInput,
+  BatchUpdateNodePositionsPayloadSchema,
   BatchUpdateNodePositionsResponseSchema,
-  BatchUpdateNodePositionsSchema,
   CreateFlowNodeInput,
   CreateFlowNodePayloadSchema,
   CreateFlowTransitionInput,
@@ -14,7 +14,7 @@ import {
   DeployDraftResponseSchema,
   DeployFlowDraftPayloadSchema,
   FlowGraphSnapshot,
-  FlowGraphSnapshotSchema,
+  FlowGraphSnapshotDTOSchema,
   FlowNodeResponse,
   FlowNodeResponseDTOSchema,
   FlowTransitionResponse,
@@ -24,6 +24,7 @@ import {
   UpdateFlowTransitionInput,
   UpdateFlowTransitionPayloadSchema,
 } from "../lib/validations/flow-workbench";
+import { readBootCapHeaders } from "./harness-daemon-transport";
 
 export interface ApiClientConfig {
   baseUrl?: string;
@@ -85,7 +86,7 @@ export class FlowWorkbenchClient {
       try {
         const res = await fetch(`${this.baseUrl}/api/auth/local-session`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...readBootCapHeaders() },
           body: JSON.stringify({
             tenantId: this.tenantId,
             userId: this.userId,
@@ -132,18 +133,18 @@ export class FlowWorkbenchClient {
   }
 
   async getSnapshot(projectId: string): Promise<FlowGraphSnapshot> {
-    const raw = await this.request<unknown>(`/api/projects/${projectId}/flow/snapshot`);
-    return FlowGraphSnapshotSchema.parse(raw);
+    const raw = await this.request<unknown>(`/api/projects/${encodeURIComponent(projectId)}/flow/snapshot`);
+    return FlowGraphSnapshotDTOSchema.parse(raw);
   }
 
   async getNodes(projectId: string): Promise<FlowNodeResponse[]> {
-    const raw = await this.request<unknown[]>(`/api/projects/${projectId}/flow/nodes`);
+    const raw = await this.request<unknown[]>(`/api/projects/${encodeURIComponent(projectId)}/flow/nodes`);
     return raw.map((item) => FlowNodeResponseDTOSchema.parse(item));
   }
 
   async createNode(projectId: string, input: CreateFlowNodeInput): Promise<FlowNodeResponse> {
     const validated = CreateFlowNodePayloadSchema.parse(input);
-    const raw = await this.request<unknown>(`/api/projects/${projectId}/flow/nodes`, {
+    const raw = await this.request<unknown>(`/api/projects/${encodeURIComponent(projectId)}/flow/nodes`, {
       method: "POST",
       body: JSON.stringify(validated),
     });
@@ -152,16 +153,19 @@ export class FlowWorkbenchClient {
 
   async updateNode(projectId: string, nodeId: string, input: UpdateFlowNodeInput): Promise<FlowNodeResponse> {
     const validated = UpdateFlowNodePayloadSchema.parse(input);
-    const raw = await this.request<unknown>(`/api/projects/${projectId}/flow/nodes/${nodeId}`, {
-      method: "PATCH",
-      body: JSON.stringify(validated),
-    });
+    const raw = await this.request<unknown>(
+      `/api/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(validated),
+      }
+    );
     return FlowNodeResponseDTOSchema.parse(raw);
   }
 
   async batchUpdateNodePositions(projectId: string, input: BatchUpdateNodePositionsInput) {
-    const validated = BatchUpdateNodePositionsSchema.parse(input);
-    const raw = await this.request<unknown>(`/api/projects/${projectId}/flow/nodes/positions`, {
+    const validated = BatchUpdateNodePositionsPayloadSchema.parse(input);
+    const raw = await this.request<unknown>(`/api/projects/${encodeURIComponent(projectId)}/flow/nodes/positions`, {
       method: "PATCH",
       body: JSON.stringify(validated),
     });
@@ -173,18 +177,21 @@ export class FlowWorkbenchClient {
     if (query?.expectedVersion !== undefined) qs.set("expectedVersion", String(query.expectedVersion));
     if (query?.expectedGraphVersion !== undefined) qs.set("expectedGraphVersion", String(query.expectedGraphVersion));
     const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    const raw = await this.request<unknown>(`/api/projects/${projectId}/flow/nodes/${nodeId}${suffix}`, { method: "DELETE" });
+    const raw = await this.request<unknown>(
+      `/api/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}${suffix}`,
+      { method: "DELETE" }
+    );
     return DeleteFlowNodeResponseSchema.parse(raw);
   }
 
   async getTransitions(projectId: string): Promise<FlowTransitionResponse[]> {
-    const raw = await this.request<unknown[]>(`/api/projects/${projectId}/flow/transitions`);
+    const raw = await this.request<unknown[]>(`/api/projects/${encodeURIComponent(projectId)}/flow/transitions`);
     return raw.map((item) => FlowTransitionResponseDTOSchema.parse(item));
   }
 
   async createTransition(projectId: string, input: CreateFlowTransitionInput): Promise<FlowTransitionResponse> {
     const validated = CreateFlowTransitionPayloadSchema.parse(input);
-    const raw = await this.request<unknown>(`/api/projects/${projectId}/flow/transitions`, {
+    const raw = await this.request<unknown>(`/api/projects/${encodeURIComponent(projectId)}/flow/transitions`, {
       method: "POST",
       body: JSON.stringify(validated),
     });
@@ -193,22 +200,28 @@ export class FlowWorkbenchClient {
 
   async updateTransition(projectId: string, transitionId: string, input: UpdateFlowTransitionInput): Promise<FlowTransitionResponse> {
     const validated = UpdateFlowTransitionPayloadSchema.parse(input);
-    const raw = await this.request<unknown>(`/api/projects/${projectId}/flow/transitions/${transitionId}`, {
-      method: "PATCH",
-      body: JSON.stringify(validated),
-    });
+    const raw = await this.request<unknown>(
+      `/api/projects/${encodeURIComponent(projectId)}/flow/transitions/${encodeURIComponent(transitionId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(validated),
+      }
+    );
     return FlowTransitionResponseDTOSchema.parse(raw);
   }
 
   async deleteTransition(projectId: string, transitionId: string, query?: { expectedVersion?: number }) {
     const qs = query?.expectedVersion !== undefined ? `?expectedVersion=${query.expectedVersion}` : "";
-    const raw = await this.request<unknown>(`/api/projects/${projectId}/flow/transitions/${transitionId}${qs}`, { method: "DELETE" });
+    const raw = await this.request<unknown>(
+      `/api/projects/${encodeURIComponent(projectId)}/flow/transitions/${encodeURIComponent(transitionId)}${qs}`,
+      { method: "DELETE" }
+    );
     return DeleteTransitionResponseSchema.parse(raw);
   }
 
   async deployDraft(projectId: string, input: DeployDraftInput): Promise<FlowGraphSnapshot> {
     const validated = DeployFlowDraftPayloadSchema.parse(input);
-    const raw = await this.request<unknown>(`/api/projects/${projectId}/flow/deploy-draft`, {
+    const raw = await this.request<unknown>(`/api/projects/${encodeURIComponent(projectId)}/flow/deploy-draft`, {
       method: "POST",
       body: JSON.stringify(validated),
     });

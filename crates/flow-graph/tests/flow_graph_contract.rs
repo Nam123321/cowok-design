@@ -237,4 +237,78 @@ fn it_dag_01_to_05_orthogonal_occ_cycle_check_batch_layout_and_idempotency() {
     )
     .expect("delete n2");
     assert_eq!(del_ok.cascade_deleted_edge_ids, vec![edge_id]);
+
+    // FixtureRef canonical uppercase convergence: "Default" normalizes to "DEFAULT"
+    assert_eq!(n1.fixture_ref, "DEFAULT");
+    let invalid_fixture = create_node(
+        &pool,
+        "local-default",
+        &project_id,
+        &CreateFlowNodeInput {
+            id: None,
+            portal_id: "default".into(),
+            screen_key: "invalid-fx".into(),
+            title: "Invalid Fixture".into(),
+            node_type: "screen".into(),
+            route_path: "/bad".into(),
+            component_entry_path: "".into(),
+            fixture_ref: "INVALID_VARIANT".into(),
+            fixture_json: "{}".into(),
+            note: "".into(),
+            viewport_preset: "desktop-1440".into(),
+            pos_x: 0.0,
+            pos_y: 0.0,
+        },
+    )
+    .expect_err("invalid fixture_ref must fail validation");
+    assert_eq!(invalid_fixture.status, 400);
+    assert_eq!(invalid_fixture.code, "VALIDATION_ERROR");
+
+    // ViewportPreset legacy alias normalization & fail-closed validation
+    let tablet_node = create_node(
+        &pool,
+        "local-default",
+        &project_id,
+        &CreateFlowNodeInput {
+            id: None,
+            portal_id: "default".into(),
+            screen_key: "tablet-alias".into(),
+            title: "Tablet Alias".into(),
+            node_type: "screen".into(),
+            route_path: "/tablet".into(),
+            component_entry_path: "".into(),
+            fixture_ref: "DEFAULT".into(),
+            fixture_json: "{}".into(),
+            note: "".into(),
+            viewport_preset: "tablet".into(),
+            pos_x: 10.0,
+            pos_y: 20.0,
+        },
+    )
+    .expect("legacy tablet viewport alias must normalize");
+    assert_eq!(tablet_node.viewport_preset, "tablet-768");
+
+    let invalid_viewport = create_node(
+        &pool,
+        "local-default",
+        &project_id,
+        &CreateFlowNodeInput {
+            id: None,
+            portal_id: "default".into(),
+            screen_key: "bad-viewport".into(),
+            title: "Bad Viewport".into(),
+            node_type: "screen".into(),
+            route_path: "/bad-vp".into(),
+            component_entry_path: "".into(),
+            fixture_ref: "DEFAULT".into(),
+            fixture_json: "{}".into(),
+            note: "".into(),
+            viewport_preset: "bogus-vp".into(),
+            pos_x: 0.0,
+            pos_y: 0.0,
+        },
+    )
+    .expect_err("invalid viewport_preset must fail validation");
+    assert_eq!(invalid_viewport.status, 400);
+    assert_eq!(invalid_viewport.code, "VALIDATION_ERROR");
 }

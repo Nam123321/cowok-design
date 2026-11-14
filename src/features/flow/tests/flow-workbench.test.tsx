@@ -1,6 +1,18 @@
+/** @vitest-environment jsdom */
 // @story-04.1
 // @implements AC-1 @implements AC-2 @implements AC-3 @implements AC-4 @implements AC-5 @implements AC-6 @implements AC-7 @implements AC-8
-import { describe, expect, it } from "vitest";
+import React from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { DraftDeployBanner } from "../components/DraftDeployBanner";
+import { DagNodeCard } from "../components/DagNodeCard";
+import { WorkbenchShell } from "../../../pages/workbench/WorkbenchShell";
+import { resolveScreenPreviewData } from "../components/companion-canvas-data";
+import { createDefaultClusters } from "../store/flow-workbench-mutations";
+import { AgentChatPanel } from "../../../pages/workbench/components/AgentChatPanel";
+import { SettingsGeneralModelsPane } from "../../../pages/workbench/components/SettingsGeneralModelsPane";
+import { useWorkbenchProjectsAndSessions } from "../../../pages/workbench/hooks/useWorkbenchSessionSettings";
+import { useWorkbenchGraphHandlers } from "../../../pages/workbench/hooks/useWorkbenchGraphHandlers";
 import {
   CreateFlowNodeSchema,
   CreateFlowTransitionSchema,
@@ -467,17 +479,17 @@ describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
       });
 
       expect(added.nodeType).toBe("modal");
-      expect(added.activeSubState).toBe("Default");
-      expect(added.fixtureRef).toBe("Default");
+      expect(added.activeSubState).toBe("DEFAULT");
+      expect(added.fixtureRef).toBe("DEFAULT");
 
-      // Switch sub-state to Loading, Empty, Error
+      // Switch sub-state accepting both legacy TitleCase aliases and canonical uppercase
       store.setNodeSubState("node-sem-1", "Loading");
-      expect(store.getState().nodes[0].activeSubState).toBe("Loading");
-      expect(store.getState().nodes[0].fixtureRef).toBe("Loading");
+      expect(store.getState().nodes[0].activeSubState).toBe("LOADING");
+      expect(store.getState().nodes[0].fixtureRef).toBe("LOADING");
 
-      store.setNodeSubState("node-sem-1", "Error");
-      expect(store.getState().nodes[0].activeSubState).toBe("Error");
-      expect(store.getState().nodes[0].fixtureRef).toBe("Error");
+      store.setNodeSubState("node-sem-1", "ERROR");
+      expect(store.getState().nodes[0].activeSubState).toBe("ERROR");
+      expect(store.getState().nodes[0].fixtureRef).toBe("ERROR");
     });
 
     it("TEST-14: Interactive Node Context Menu Actions (Rename, Duplicate ⌘D) & Topological Auto-Layout (AC-08)", () => {
@@ -511,6 +523,293 @@ describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
 
       // Direct unit check on computeTopologicalAutoLayout empty array guard
       expect(computeTopologicalAutoLayout([], [])).toEqual([]);
+    });
+  });
+
+  describe("Story 04.1 v3.1.0 Parity UI & Singleflight Hydration Regression", () => {
+    afterEach(() => {
+      cleanup();
+    });
+
+    it("TEST-17: DraftDeployBanner and DagNodeCard surface non-blocking var(--state-warning) alerts when orphan nodes exist", () => {
+      const sampleNode: WorkbenchNode = {
+        id: "node-orphan-1",
+        screenKey: "SCR-ORPHAN",
+        title: "Detached Screen",
+        activeSubState: "DEFAULT",
+        fixtureRef: "DEFAULT",
+        posX: 40,
+        posY: 40,
+        version: 1,
+        status: "draft",
+      };
+
+      const { rerender } = render(
+        <div>
+          <DraftDeployBanner isDraftDirty={true} orphanCount={1} onDeployDraft={() => {}} />
+          <DagNodeCard
+            node={sampleNode}
+            isSelected={false}
+            isOrphan={true}
+            nodeWidth={210}
+            nodeHeight={132}
+            onNodeMouseDown={() => {}}
+            onPortMouseDown={() => {}}
+            onUpdateNote={() => {}}
+          />
+        </div>
+      );
+
+      const bannerWarning = screen.getByTestId("dag-draft-orphan-warning");
+      const nodeWarning = screen.getByTestId("dag-node-orphan-badge-node-orphan-1");
+      expect(bannerWarning.textContent).toContain("1 ScreenState cô lập");
+      expect(bannerWarning.getAttribute("style")).toContain("var(--state-warning)");
+      expect(nodeWarning.textContent).toContain("Cô lập");
+      expect(nodeWarning.getAttribute("style")).toContain("var(--state-warning)");
+      expect(document.body.innerHTML).not.toContain(["#", "f59e0b"].join(""));
+
+      rerender(
+        <div>
+          <DraftDeployBanner isDraftDirty={true} orphanCount={0} onDeployDraft={() => {}} />
+          <DagNodeCard
+            node={sampleNode}
+            isSelected={false}
+            isOrphan={false}
+            nodeWidth={210}
+            nodeHeight={132}
+            onNodeMouseDown={() => {}}
+            onPortMouseDown={() => {}}
+            onUpdateNote={() => {}}
+          />
+        </div>
+      );
+      expect(screen.queryByTestId("dag-draft-orphan-warning")).toBeNull();
+      expect(screen.queryByTestId("dag-node-orphan-badge-node-orphan-1")).toBeNull();
+    });
+
+    it("TEST-18: WorkbenchShell deduplicates initial snapshot hydration (singleflight) and sets data-flow-hydrated=true", async () => {
+      const originalFetch = globalThis.fetch;
+      let snapshotCalls = 0;
+      const projectId = "33333333-3333-4333-8333-333333333333";
+
+      globalThis.fetch = (async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.includes("/flow/snapshot")) {
+          snapshotCalls += 1;
+          await new Promise((r) => setTimeout(r, 15));
+          return new Response(
+            JSON.stringify({
+              graphId: "44444444-4444-4444-8444-444444444444",
+              graphVersion: 2,
+              layoutVersion: 1,
+              nodes: [],
+              transitions: [],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+      }) as typeof fetch;
+
+      try {
+        const { container } = render(
+          <React.StrictMode>
+            <WorkbenchShell projectId={projectId} />
+          </React.StrictMode>
+        );
+        await waitFor(() => {
+          const shellEl = container.querySelector(".workbench-shell");
+          expect(shellEl?.getAttribute("data-flow-hydrated")).toBe("true");
+        });
+        expect(snapshotCalls).toBe(1);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it("TEST-19: resolveScreenPreviewData resolves UUID nodes via screenKey and synthesizes non-checkout previews for new nodes", () => {
+      const uuidEntryNode: WorkbenchNode = {
+        id: "11111111-1111-4111-8111-111111111101",
+        screenKey: "SCR-01",
+        title: "Entry Login",
+        routePath: "/login",
+        nodeType: "screen",
+        status: "ready",
+        posX: 0,
+        posY: 0,
+      };
+      const entryPreview = resolveScreenPreviewData(uuidEntryNode, uuidEntryNode.id);
+      expect(entryPreview.eyebrow).toContain("SCR-01");
+      expect(entryPreview.headline).not.toContain("Đa Chữ Ký");
+
+      const brandNewNode: WorkbenchNode = {
+        id: "99999999-9999-4999-8999-999999999999",
+        screenKey: "SCR-99",
+        title: "Analytics Overview",
+        routePath: "/analytics",
+        nodeType: "screen",
+        status: "draft",
+        note: "Telemetry funnel dashboard",
+        posX: 100,
+        posY: 100,
+      };
+      const synthPreview = resolveScreenPreviewData(brandNewNode, brandNewNode.id);
+      expect(synthPreview.eyebrow).toContain("SCR-99");
+      expect(synthPreview.headline).toBe("Analytics Overview");
+      expect(synthPreview.kpi1Display).toBe("/analytics");
+      expect(synthPreview.headline).not.toContain("Đa Chữ Ký");
+    });
+
+    it("TEST-20: createDefaultClusters respects node.clusterId and metadata instead of fixed slice(0, 2)", () => {
+      const nodes: WorkbenchNode[] = [
+        { id: "n1", screenKey: "SCR-01", title: "Login", routePath: "/login", nodeType: "screen", status: "ready", posX: 0, posY: 0, clusterId: "cluster-main" },
+        { id: "n2", screenKey: "SCR-02", title: "Home", routePath: "/home", nodeType: "screen", status: "ready", posX: 100, posY: 0, clusterId: "cluster-main" },
+        { id: "n3", screenKey: "SCR-03", title: "Settings", routePath: "/settings", nodeType: "screen", status: "ready", posX: 200, posY: 0, clusterId: "cluster-main" },
+        { id: "n4", screenKey: "SCR-ERR", title: "3DS Fallback", routePath: "/verify-3ds", nodeType: "condition", status: "draft", posX: 300, posY: 0, clusterId: "cluster-fallback" },
+        { id: "n5", screenKey: "SCR-CUSTOM", title: "Admin", routePath: "/admin", nodeType: "screen", status: "draft", posX: 400, posY: 0, clusterId: "cluster-admin" },
+      ];
+      const clusters = createDefaultClusters(nodes);
+      const main = clusters.find((c) => c.id === "cluster-main");
+      const fallback = clusters.find((c) => c.id === "cluster-fallback");
+      const custom = clusters.find((c) => c.id === "cluster-admin");
+      expect(main?.nodeIds).toEqual(["n1", "n2", "n3"]);
+      expect(fallback?.nodeIds).toEqual(["n4"]);
+      expect(custom?.nodeIds).toEqual(["n5"]);
+    });
+
+    it("TEST-21: DraftDeployBanner requires non-blocking inline confirmation when orphanCount > 0", () => {
+      const onDeploy = vi.fn();
+      render(<DraftDeployBanner isDraftDirty={true} orphanCount={2} onDeployDraft={onDeploy} />);
+      fireEvent.click(screen.getByTestId("deploy-draft-btn"));
+      expect(onDeploy).not.toHaveBeenCalled();
+      expect(screen.getByTestId("orphan-deploy-confirm-bar")).toBeTruthy();
+
+      fireEvent.click(screen.getByTestId("cancel-orphan-deploy-btn"));
+      expect(screen.queryByTestId("orphan-deploy-confirm-bar")).toBeNull();
+      expect(onDeploy).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByTestId("deploy-draft-btn"));
+      fireEvent.click(screen.getByTestId("confirm-orphan-deploy-btn"));
+      expect(onDeploy).toHaveBeenCalledTimes(1);
+    });
+
+    it("TEST-22: AgentChatPanel isolates messages and drafts per activeSessionId", () => {
+      const { rerender } = render(
+        <AgentChatPanel activeSessionId="sess-a" isShortened={false} onToggleShorten={() => {}} width={340} />
+      );
+      const inputA = screen.getByRole("textbox");
+      fireEvent.change(inputA, { target: { value: "Prompt only for session A" } });
+      fireEvent.keyDown(inputA, { key: "Enter", code: "Enter" });
+      expect(screen.getByText("Prompt only for session A")).toBeTruthy();
+
+      rerender(<AgentChatPanel activeSessionId="sess-b" isShortened={false} onToggleShorten={() => {}} width={340} />);
+      expect(screen.queryByText("Prompt only for session A")).toBeNull();
+
+      rerender(<AgentChatPanel activeSessionId="sess-a" isShortened={false} onToggleShorten={() => {}} width={340} />);
+      expect(screen.getByText("Prompt only for session A")).toBeTruthy();
+    });
+
+    it("TEST-23: session hydration preserves multi-project sessions, graph handlers avoid alert(), and BYOS passes byosToken", async () => {
+      const originalFetch = globalThis.fetch;
+      const alertSpy = vi.fn();
+      vi.stubGlobal("alert", alertSpy);
+      let verifiedPayload: Record<string, unknown> | null = null;
+      const p1Id = "11111111-1111-4111-8111-111111111111";
+      const p2Id = "22222222-2222-4222-8222-222222222222";
+      const s1Id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1";
+      const s2Id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2";
+
+      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.includes("/api/auth/local-session")) {
+          return new Response(
+            JSON.stringify({ sessionToken: "test-tok", tenantId: "local-tenant", userId: "local-user", role: "editor" }),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        if (url.endsWith("/api/projects")) {
+          return new Response(
+            JSON.stringify([
+              { id: p1Id, name: "Default", slug: "default", product_brief: "Brief 1", workspace_root: "/tmp/p1", created_at: 100, updated_at: 100 },
+              { id: p2Id, name: "Project Two", slug: "proj-2", product_brief: "Brief 2", workspace_root: "/tmp/p2", created_at: 200, updated_at: 200 },
+            ]),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        if (url.includes(`/api/projects/${p1Id}/sessions`)) {
+          return new Response(
+            JSON.stringify([{ id: s1Id, title: "S1", project_id: p1Id, created_at: 100, updated_at: 100 }]),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        if (url.includes(`/api/projects/${p2Id}/sessions`)) {
+          return new Response(
+            JSON.stringify([{ id: s2Id, title: "S2", project_id: p2Id, created_at: 200, updated_at: 200 }]),
+            { status: 200, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        if (url.includes("/api/doctor/verify-key")) {
+          verifiedPayload = JSON.parse(String(init?.body || "{}"));
+          return new Response(JSON.stringify({ valid: true, status: "ok", providerId: "byos", message: "Verified", credentialRef: "mem" }), { status: 200 });
+        }
+        if (url.includes("/api/agent-settings")) {
+          return new Response(JSON.stringify([]), { status: 200 });
+        }
+        return new Response("{}", { status: 200 });
+      }) as typeof fetch;
+
+      const store = createNewFlowWorkbenchStore(
+        [{ id: "n1", screenKey: "SCR-1", title: "One", routePath: "/1", nodeType: "screen", status: "ready", posX: 0, posY: 0 }],
+        [],
+        p1Id
+      );
+
+      const Harness: React.FC = () => {
+        const sm = useWorkbenchProjectsAndSessions();
+        const gh = useWorkbenchGraphHandlers(store, 1);
+        return (
+          <div>
+            <div data-testid="session-ids">{sm.sessions.map((s) => s.id).join(",")}</div>
+            <button data-testid="trigger-self-loop" onClick={() => gh.handleAddTransition("n1", "n1", "main")}>
+              Add Self Loop
+            </button>
+            {gh.graphError && <div data-testid="harness-graph-err">{gh.graphError}</div>}
+            <SettingsGeneralModelsPane
+              defaultModel="cowok-swarm"
+              onDefaultModelChange={() => {}}
+              byosEndpoint="http://localhost:11434/v1"
+              onByosEndpointChange={() => {}}
+              ephemeralApiKeys={{ gemini: "", claude: "", openai: "", byosToken: "secret-byos-token" }}
+              onEphemeralKeyChange={() => {}}
+            />
+          </div>
+        );
+      };
+
+      try {
+        render(<Harness />);
+        await waitFor(() => {
+          const text = screen.getByTestId("session-ids").textContent || "";
+          expect(text).toContain(s1Id);
+          expect(text).toContain(s2Id);
+        });
+
+        fireEvent.click(screen.getByTestId("trigger-self-loop"));
+        expect(alertSpy).not.toHaveBeenCalled();
+        expect(screen.getByTestId("harness-graph-err")).toBeTruthy();
+
+        fireEvent.click(screen.getByTestId("verify-byos-btn"));
+        await waitFor(() => {
+          expect(verifiedPayload).toEqual({
+            providerId: "byos",
+            apiKey: "secret-byos-token",
+            endpointUrl: "http://localhost:11434/v1",
+          });
+        });
+      } finally {
+        globalThis.fetch = originalFetch;
+        vi.unstubAllGlobals();
+      }
     });
   });
 });

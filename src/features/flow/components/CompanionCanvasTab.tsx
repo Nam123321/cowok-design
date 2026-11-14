@@ -2,8 +2,10 @@
 // @implements AC-03, AC-06
 import React, { useRef } from "react";
 import { useTranslation } from "../../../hooks/useTranslation";
-import type { ConflictState } from "../store/flow-workbench-types";
-import { SCREEN_PREVIEW_MAP } from "./companion-canvas-data";
+import { useFormatter } from "../../../hooks/useFormatter";
+import type { ConflictState, WorkbenchNode } from "../store/flow-workbench-types";
+import { resolveScreenPreviewData } from "./companion-canvas-data";
+import { buildPreviewDocumentHtml } from "../utils/html-sandbox-wrapper";
 import { CompanionTabBar } from "./CompanionTabBar";
 import { CompanionStructureLeftPane } from "./CompanionStructureLeftPane";
 import { CompanionLiveHtmlRightPane } from "./CompanionLiveHtmlRightPane";
@@ -27,7 +29,9 @@ export interface CompanionCanvasTabProps {
   activeTabId?: string;
   onTabChange?: (tabId: string, format: CanvasTabItem["format"]) => void;
   selectedNodeId?: string | null;
+  nodes?: WorkbenchNode[];
   isDraftDirty?: boolean;
+  orphanCount?: number;
   conflictState?: ConflictState | null;
   onDeployDraft?: () => void;
   onDiscardDraft?: () => void;
@@ -43,15 +47,16 @@ const NonHtmlTabView: React.FC<{ activeTab: CanvasTabItem; inlineCodeText: strin
   activeTab,
   inlineCodeText,
 }) => {
+  const { t } = useTranslation();
   if (activeTab.format === "md") {
     return (
       <div data-quotable="true" style={{ flex: 1, padding: "24px", boxSizing: "border-box", overflowY: "auto", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)" }}>
         <h3 style={{ margin: "0 0 12px 0", fontSize: "16px", fontWeight: FONT_WEIGHT_SEMIBOLD }}>
-          # {activeTab.title} — Tài liệu Đặc tả Thiết kế Hệ thống (SSOT)
+          # {activeTab.title} — {t("canvas.mdDocTitleSuffix", "Tài liệu Đặc tả Thiết kế Hệ thống (SSOT)")}
         </h3>
         <p style={{ color: "var(--text-secondary)", fontSize: "13px", lineHeight: "1.6" }}>
-          Bạn có thể bôi đen bất kỳ đoạn văn bản nào trong tài liệu Markdown này để trích dẫn{" "}
-          <code>@[Quote]</code> trực tiếp vào khung trò chuyện cowok Agent.
+          {t("canvas.mdDocQuoteHintPrefix", "Bạn có thể bôi đen bất kỳ đoạn văn bản nào trong tài liệu Markdown này để trích dẫn")}{" "}
+          <code>@[Quote]</code> {t("canvas.mdDocQuoteHintSuffix", "trực tiếp vào khung trò chuyện cowok Agent.")}
         </p>
       </div>
     );
@@ -61,7 +66,7 @@ const NonHtmlTabView: React.FC<{ activeTab: CanvasTabItem; inlineCodeText: strin
       <div style={{ flex: 1, padding: "24px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", backgroundColor: "var(--bg-canvas)", color: "var(--text-primary)", gap: "12px" }}>
         <div style={{ fontSize: "12px", fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>{activeTab.filePath || activeTab.title}</div>
         <div style={{ padding: "24px", borderRadius: "var(--radius-md)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)" }}>
-          <code>[Asset Preview: {activeTab.title}]</code>
+          <code>[{t("canvas.assetPreviewPrefix", "Asset Preview")}: {activeTab.title}]</code>
         </div>
       </div>
     );
@@ -80,42 +85,113 @@ interface StageProps extends CompanionCanvasTabProps {
   splitContainerRef: React.RefObject<HTMLDivElement | null>;
 }
 
+function buildSeedInlineHtml(params: {
+  customRawHtml?: string;
+  structureLens: "userflow" | "slide-cms";
+  activeSlide: ReturnType<typeof useDualPaneViewportState>["slides"][number];
+  activeScreenData: ReturnType<typeof resolveScreenPreviewData>;
+  formatCurrency: (amount: number, currency: string) => string;
+  locale: string;
+  t: (k: string, d?: string) => string;
+}): string {
+  if (params.customRawHtml) return params.customRawHtml;
+  const seedRaw = params.structureLens === "slide-cms" ? params.activeSlide.kpi1 : params.activeScreenData.amount;
+  const formattedAmount = typeof seedRaw === "number" ? params.formatCurrency(seedRaw, "USD") : String(seedRaw);
+  return buildPreviewDocumentHtml({
+    structureLens: params.structureLens,
+    activeSlide: params.activeSlide,
+    activeScreenData: params.activeScreenData,
+    formattedAmount,
+    labels: {
+      lang: params.locale,
+      kpi1Label: params.t("canvas.previewKpiLimitLabel", "Transaction Limit"),
+      kpi2Label: params.t("canvas.previewKpiSecurityLabel", "Security Status"),
+      kpi3Label: params.t("canvas.previewKpiLatencyLabel", "Response Time"),
+      actionHint: params.t("canvas.previewFallbackHint", "Auto-synced live HTML preview from current graph state."),
+    },
+  });
+}
+
+const StageLeftStructureSection: React.FC<{ p: StageProps }> = ({ p }) => {
+  const { vp } = p;
+  if (vp.isLeftStructureHidden || vp.isPresenting) return null;
+  return (
+    <CompanionStructureLeftPane
+      widthPercent={vp.leftPanePercent} isRightPreviewHidden={vp.isRightPreviewHidden} structureLens={vp.structureLens}
+      onSetLens={vp.setStructureLens} onToggleRightPreviewHidden={() => vp.setIsRightPreviewHidden((prev) => !prev)}
+      isDraftDirty={Boolean(p.isDraftDirty)} orphanCount={p.orphanCount} conflictState={p.conflictState} onDeployDraft={p.onDeployDraft}
+      onDiscardDraft={p.onDiscardDraft} onResolveConflict={p.onResolveConflict} slides={vp.slides}
+      activeSlideIndex={vp.activeSlideIndex} isCmsDrawerOpen={vp.isCmsDrawerOpen}
+      onSelectSlide={(idx) => { vp.setActiveSlideIndex(idx); vp.setIsCmsDrawerOpen(true); }}
+      onCloseCmsDrawer={() => vp.setIsCmsDrawerOpen(false)}
+      onUpdateActiveSlide={(patch) => vp.setSlides((prev) => prev.map((item, i) => (i === vp.activeSlideIndex ? { ...item, ...patch } : item)))}
+    >
+      {p.children}
+    </CompanionStructureLeftPane>
+  );
+};
+
+const StageSplitter: React.FC<{ isDragging: boolean; onDragStart: () => void }> = ({ isDragging, onDragStart }) => (
+  <div
+    role="separator"
+    aria-orientation="vertical"
+    onMouseDown={(e) => {
+      e.preventDefault();
+      onDragStart();
+    }}
+    style={{
+      width: "4px",
+      minWidth: "4px",
+      height: "100%",
+      cursor: "col-resize",
+      backgroundColor: isDragging ? "var(--action-primary)" : "var(--border-default)",
+      zIndex: SPLITTER_Z_INDEX,
+    }}
+  />
+);
+
 const DualPaneHtmlStage: React.FC<StageProps> = (p) => {
+  const { t, locale } = useTranslation();
+  const { formatCurrency } = useFormatter({ locale });
   const { activeTab, vp, splitContainerRef } = p;
-  const activeScreenData = SCREEN_PREVIEW_MAP[p.selectedNodeId || "node-scr-02"] || SCREEN_PREVIEW_MAP["node-scr-02"];
+  const selectedNode = p.nodes?.find((n) => n.id === p.selectedNodeId) || null;
+  const activeScreenData = resolveScreenPreviewData(selectedNode, p.selectedNodeId, {
+    kpiRoute: t("canvas.previewSynthKpiRoute", "Route"),
+    kpiState: t("canvas.previewSynthKpiState", "Node Status"),
+    kpiType: t("canvas.previewSynthKpiType", "Node Type"),
+    actionHint: t("canvas.previewSynthActionHint", "Synthesized live preview from WorkbenchNode metadata."),
+    ctaOpen: t("canvas.previewSynthCtaOpen", "Open"),
+  });
   const activeSlide = vp.slides[vp.activeSlideIndex] || vp.slides[0];
+  const lensTag = vp.structureLens === "slide-cms" ? activeSlide.id : "screen";
+  const targetKey = `${activeTab.id}::${vp.structureLens}::${p.selectedNodeId || "default"}::${lensTag}`;
+  const customRawHtml = vp.customHtmlByTarget[targetKey];
   const showSplitter = !vp.isLeftStructureHidden && !vp.isRightPreviewHidden && !vp.isPresenting;
+
+  const handleToggleInlineCode = () => {
+    if (!vp.isInlineCodeOpen) {
+      vp.setHtmlCodeText(
+        buildSeedInlineHtml({ customRawHtml, structureLens: vp.structureLens, activeSlide, activeScreenData, formatCurrency, locale, t })
+      );
+    }
+    vp.setIsInlineCodeOpen((prev) => !prev);
+  };
 
   return (
     <div ref={splitContainerRef} className="canvas-dual-pane-stage" style={{ flex: 1, display: "flex", width: "100%", height: "100%", overflow: "hidden", position: "relative" }}>
-      {!vp.isLeftStructureHidden && !vp.isPresenting && (
-        <CompanionStructureLeftPane
-          widthPercent={vp.leftPanePercent} isRightPreviewHidden={vp.isRightPreviewHidden} structureLens={vp.structureLens}
-          onSetLens={vp.setStructureLens} onToggleRightPreviewHidden={() => vp.setIsRightPreviewHidden((prev) => !prev)}
-          isDraftDirty={Boolean(p.isDraftDirty)} conflictState={p.conflictState} onDeployDraft={p.onDeployDraft}
-          onDiscardDraft={p.onDiscardDraft} onResolveConflict={p.onResolveConflict} slides={vp.slides}
-          activeSlideIndex={vp.activeSlideIndex} isCmsDrawerOpen={vp.isCmsDrawerOpen}
-          onSelectSlide={(idx) => { vp.setActiveSlideIndex(idx); vp.setIsCmsDrawerOpen(true); }}
-          onCloseCmsDrawer={() => vp.setIsCmsDrawerOpen(false)}
-          onUpdateActiveSlide={(patch) => vp.setSlides((prev) => prev.map((item, i) => (i === vp.activeSlideIndex ? { ...item, ...patch } : item)))}
-        >
-          {p.children}
-        </CompanionStructureLeftPane>
-      )}
-      {showSplitter && (
-        <div role="separator" aria-orientation="vertical" onMouseDown={(e) => { e.preventDefault(); vp.setIsDraggingInternalSplit(true); }} style={{ width: "4px", minWidth: "4px", height: "100%", cursor: "col-resize", backgroundColor: vp.isDraggingInternalSplit ? "var(--action-primary)" : "var(--border-default)", zIndex: SPLITTER_Z_INDEX }} />
-      )}
+      <StageLeftStructureSection p={p} />
+      {showSplitter && <StageSplitter isDragging={vp.isDraggingInternalSplit} onDragStart={() => vp.setIsDraggingInternalSplit(true)} />}
       {!vp.isRightPreviewHidden && (
         <CompanionLiveHtmlRightPane
           activeTab={activeTab} structureLens={vp.structureLens} selectedNodeId={p.selectedNodeId}
-          activeSlide={activeSlide} activeScreenData={activeScreenData} pointerMode={vp.pointerMode}
-          onSetPointerMode={vp.setPointerMode} isInlineCodeOpen={vp.isInlineCodeOpen}
-          onToggleInlineCode={() => vp.setIsInlineCodeOpen((prev) => !prev)} inlineCodeText={vp.inlineCodeText}
-          onChangeInlineCode={vp.setInlineCodeText} viewportPreset={vp.viewportPreset}
-          onSetViewportPreset={vp.setViewportPreset} aspectRatio={vp.aspectRatio} onSetAspectRatio={vp.setAspectRatio}
-          isPresenting={vp.isPresenting} onTogglePresenting={() => vp.setIsPresenting((prev) => !prev)}
+          selectedNodeKey={selectedNode?.screenKey || undefined} activeSlide={activeSlide} activeScreenData={activeScreenData}
+          pointerMode={vp.pointerMode} onSetPointerMode={vp.setPointerMode} isInlineCodeOpen={vp.isInlineCodeOpen}
+          onToggleInlineCode={handleToggleInlineCode} inlineCodeText={vp.htmlCodeText} onChangeInlineCode={vp.setHtmlCodeText}
+          viewportPreset={vp.viewportPreset} onSetViewportPreset={vp.setViewportPreset} aspectRatio={vp.aspectRatio}
+          onSetAspectRatio={vp.setAspectRatio} isPresenting={vp.isPresenting} onTogglePresenting={() => vp.setIsPresenting((prev) => !prev)}
           isLeftStructureHidden={vp.isLeftStructureHidden} onToggleLeftStructureHidden={() => vp.setIsLeftStructureHidden((prev) => !prev)}
-          highlightedRegionId={vp.highlightedRegionId}
+          highlightedRegionId={vp.highlightedRegionId} customRawHtml={customRawHtml}
+          onApplyHtml={(html) => vp.setCustomHtmlForTarget(targetKey, html)}
           onRegionClick={(id, label) => { vp.setHighlightedRegionId(id); if (vp.pointerMode !== "interact") p.onAttachRegionToChat?.(`[${label}]`); }}
         />
       )}

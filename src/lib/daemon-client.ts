@@ -140,7 +140,7 @@ async function verifyHealthAndSeedDefaultProject(lock: DaemonLockRecord, workspa
   if (!healthRes.ok) {
     throw new Error(`Daemon health check failed (${healthRes.status})`);
   }
-  const health = (await healthRes.json()) as { service?: string; schema_version?: number; daemon_nonce?: string };
+  const health = (await healthRes.json()) as { service?: string; schema_version?: number };
   if (health.service !== "cowok-design-harness-daemon" || (health.schema_version ?? 0) < 6) {
     throw new Error("Unexpected daemon health identity or schema_version");
   }

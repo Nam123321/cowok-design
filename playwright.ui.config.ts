@@ -4,6 +4,7 @@ const targetPort = Number(process.env.TARGET_PORT || '4173');
 
 export default defineConfig({
   testDir: './tests/e2e',
+  testIgnore: process.env.COWOK_ACCEPTANCE_RUN === '1' ? undefined : ['**/acceptance-*.spec.ts'],
   timeout: 60000,
   expect: {
     timeout: 10000

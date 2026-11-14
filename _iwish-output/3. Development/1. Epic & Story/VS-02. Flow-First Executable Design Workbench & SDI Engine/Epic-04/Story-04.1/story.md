@@ -2,12 +2,12 @@
 type: I-Wish Story
 id: "04.1"
 title: "Story 04.1: Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation"
-description: "Xây dựng khung Workbench (src/) theo chuẩn tối giản cowok.ai (Zero Amber, 40px Shorten Chat rail PD-02 = A), <BrandIcon /> (143 SVGs), CompanionCanvasTab & Native 2D SVG Cubic Bezier DAG Studio (DagCanvas2D + crates/flow-graph + SQLite V3); đồng thời đóng lỗ hổng xác thực legacy_specs.rs (daemon_auth::verify_hmac_v2), giải thể src/features/preview/* trùng lặp về CompanionLiveHtmlRightPane và khử toàn bộ raw hex / raw fetch()."
+description: "Xây dựng khung Workbench (src/) theo chuẩn tối giản cowok.ai (Zero Amber, 40px Shorten Chat rail PD-02 = A), <BrandIcon /> (143 SVGs), CompanionCanvasTab & Native 2D SVG Cubic Bezier DAG Studio (DagCanvas2D + crates/flow-graph + SQLite V3/V6); giữ kiểm thử hồi quy cho phần đã hạ cánh trên master (legacy_specs.rs VerifiedLegacyIngress + verify_anti_idor_with_caller, singleflight hydration), đồng thời xử lý dứt điểm delta còn lại: giải thể src/features/preview/* trùng lặp về CompanionLiveHtmlRightPane, khử mã hex #f59e0b còn sót trong DagCanvas2D.tsx/DagNodeHeaderAndPorts.tsx, chuẩn hóa enum fixture_ref (DEFAULT|LOADING|EMPTY|ERROR) và thêm cảnh báo Orphan ScreenState trước deploy-draft."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-04/Story-04.1/story.md"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: core
-timestamp: "2026-11-13T12:10:00+07:00"
+timestamp: "2026-11-14T08:45:00+07:00"
 tags:
   - "story-04.1"
   - "epic-04"
@@ -23,9 +23,10 @@ links_to:
 dependencies: ["01.3", "03.2"]
 provides_apis:
   - "internal:epic-04/story-04.1"
-  - "GET /api/v1/projects/:id/flow"
+  - "GET /api/v1/projects/:id/flow/snapshot"
   - "POST /api/v1/projects/:id/flow/nodes"
-  - "PATCH /api/v1/projects/:id/flow/nodes/layout"
+  - "PATCH /api/v1/projects/:id/flow/nodes/positions"
+  - "PATCH /api/v1/projects/:id/flow/nodes/:node_id"
   - "POST /api/v1/projects/:id/flow/deploy-draft"
 consumes_apis:
   - "GET /api/v1/health"
@@ -36,39 +37,39 @@ consumes_apis:
 
 - **FR Covered:** [FR-02: Interactive Multi-Portal Flow Graph (ScreenState & Transition)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/3.%20Development/1.%20Epic%20&%20Story/VS-02.%20Flow-First%20Executable%20Design%20Workbench%20&%20SDI%20Engine/Epic-04/epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context
-Story 04.1 thiết lập bề mặt Workbench tối giản theo thiết kế `cowok.ai` và thay thế hoàn toàn đặc tả `@xyflow/react v12` lỗi thời bằng bộ máy đồ thị Native 2D SVG Cubic Bezier `DagCanvas2D` nối thẳng với Rust `crates/flow-graph` & `crates/spec-registry` (`V3__flow_workbench_dag.sql`). Ngoài phần cốt lõi đã dựng bước đầu trên `master`, đánh giá Deep Mode Epic 04 phát hiện các sai lệch nghiêm trọng cần xử lý dứt điểm trong Story 04.1:
-1. Vá lỗ hổng bypass HMAC trong `crates/harness-daemon/src/routes/legacy_specs.rs#L527-L553` (hiện chỉ kiểm tra header không rỗng) bằng xác thực chữ ký thực `daemon_auth::verify_hmac_v2` + `record_nonce_once`.
-2. Giải thể hoàn toàn các component trùng lặp ở `src/features/preview/*` (`SandboxedLivePreview.tsx`, `PreviewToolbar.tsx` dùng Tailwind) và quy về nguồn chân lý duy nhất `CompanionLiveHtmlRightPane.tsx` (`srcDoc` + `sandbox="allow-scripts allow-forms"`, không `allow-same-origin`).
-3. Thanh tẩy toàn bộ mã màu hex cứng (`#f59e0b`, `#4ade80`, `#f87171`) và `fetch()` thô trong `DagCanvas2D.tsx`, `WorkbenchShell.tsx`, `SettingsGeneralModelsPane.tsx` sang `tokens.css` & `src/api/flow-workbench.ts` / `src/api/constraints.ts`.
-4. Chuẩn hóa enum `fixture_ref` (`Default | Loading | Empty | Error`) và `viewport_preset` (`desktop-1440 | tablet-768 | mobile-390`) đồng bộ 3 tầng UI–TS–Rust/SQLite.
+Story 04.1 thiết lập bề mặt Workbench tối giản theo thiết kế `cowok.ai` và bộ máy đồ thị Native 2D SVG Cubic Bezier `DagCanvas2D` nối thẳng với Rust `crates/flow-graph` & `crates/spec-registry` (`V3__flow_workbench_dag.sql` + mở rộng `V6/V7`). Theo kết quả rà soát đối chiếu mã nguồn trên `master`, phần vá HMAC trong `crates/harness-daemon/src/routes/legacy_specs.rs#L527-L553` (`VerifiedLegacyIngress` + `verify_anti_idor_with_caller`) và singleflight hydration (`data-flow-hydrated="true"`) đã hạ cánh làm baseline hồi quy; Story 04.1 chốt phần delta còn lại để khép kín hoàn chỉnh:
+1. **Bảo toàn & kiểm thử hồi quy HMAC / Singleflight baseline:** Đưa kiểm thử hồi quy fail-closed cho `legacy_specs.rs` (`VerifiedLegacyIngress` + `verify_anti_idor_with_caller`) và singleflight hydration (`data-flow-hydrated="true"`) vào bộ test Story 04.1 thay cho công việc cài mới trùng lặp.
+2. **Giải thể `src/features/preview/*` trùng lặp:** Xóa bỏ hoàn toàn các component trùng lặp ở `src/features/preview/*` (`SandboxedLivePreview.tsx`, `PreviewToolbar.tsx` dùng Tailwind) và quy về bề mặt duy nhất `CompanionLiveHtmlRightPane.tsx` (việc gia cố `DOMParser` CSP zero-network & CSPRNG `bootSecret` runtime được thi công thống nhất tại `Story 04.5`).
+3. **Thanh tẩy hex cứng còn sót & chuẩn hóa SDK:** Xóa nốt mã màu `#f59e0b` còn sót trong `DagCanvas2D.tsx` (`L128`, `L168`) và `DagNodeHeaderAndPorts.tsx` (`L124`) cùng bất kỳ `#4ade80`/`#f87171` nào sang `src/styles/tokens.css`; dọn sạch `fetch()` thô trong workbench sang `src/api/flow-workbench.ts` / `src/api/constraints.ts`.
+4. **Chuẩn hóa enum & Orphan `ScreenState` guard:** Thống nhất `fixture_ref` viết hoa **`DEFAULT | LOADING | EMPTY | ERROR`** (khớp bảng `screen_fixtures` và Zod `FixtureVariantSchema`, kèm bộ chuẩn hóa Rust chấp nhận dữ liệu cũ `'Default'`) và `viewport_preset` (`desktop-1440 | tablet-768 | mobile-390`), đồng thời thêm cảnh báo node `ScreenState` mồ côi trước khi `deploy-draft`.
 
 ## 2. Plan-Tune Heuristic & Complexity Score
 - **Complexity Score (CS):** `CS = 5.0` (Scope=1.0, Data=1.0, Integration=1.0, UI=1.0, Security=0.5, Unknowns=0.5 $\rightarrow$ `CS = 5.0 < 7`, đạt ngưỡng an toàn, không tách nhỏ story).
 
 ## 3. Acceptance Criteria (AC)
-- **AC-01 (Unified DualMainPanel Workbench, 40px Shorten Rail & Zero-Amber CSS Tokens):** Xây dựng `WorkbenchShell` với `MainSidebar` thu gọn/mở rộng (`28x28px`), thanh `Shorten Chat` `40px` (`PD-02 = A`), bộ 4 Theme chuẩn (`Warm Paper`, `Focus Dim`, `Night Workspace`, `Monochrome Minimal`), Reactive i18n Store không tải lại trang, component `<BrandIcon />` (143 SVGs từ Story 03.2); đồng thời thay thế 100% mã màu cứng (`#f59e0b`, `#4ade80`, `#f87171`) bằng biến ngữ nghĩa trong `src/styles/tokens.css`.
-- **AC-02 (Multi-Format `CompanionCanvasTab` & Native 2D SVG Cubic Bezier `DagCanvas2D` Studio):** Cài đặt `DagCanvas2D` vẽ trên mặt phẳng `(x, y)` bằng SVG Bezier bậc 3 với cổng `●` Input/Output, Cụm khung (`Cluster Frames`), 3 loại luồng (`Main`, `IF / ELSE`, `IF NOT / Fallback`), tách bạch lưu bố cục tự do (`● Saved` qua `layout_version`) với chỉnh sửa cấu trúc tạo `DRAFT` (`+ Node`, nối/đổi dây, đảo chiều `⇄`, sửa `Condition`/`Note` + `Undo/Redo`), thanh công cụ `.dag-right-vertical-dock` (Zoom `+`/`-`/`Reset`, `Fit View`, `Minimap`, pinch/Ctrl+Scroll/Space+Drag) và đồng bộ OCC qua `crates/flow-graph` + SQLite `V3__flow_workbench_dag.sql`.
-- **AC-03 (`[EDGE-CASE]` Orphan ScreenState Guard, Enum Normalization & Canonical `src/api/` Client SDK):** Phát hiện và cảnh báo nút `ScreenState` mồ côi (`0` cạnh nối vào/ra) trước khi `deploy-draft` (kèm 3-color DFS chặn chu trình vô hạn); chuẩn hóa enum `fixture_ref` (`Default|Loading|Empty|Error`) và `viewport_preset` (`desktop-1440|tablet-768|mobile-390`) ở cả Rust/Zod/UI; và loại bỏ mọi `fetch()` thô trong `src/features/**`/`src/pages/**` về `src/api/flow-workbench.ts` & `src/api/constraints.ts`.
-- **AC-04 (`[EDGE-CASE]` `EC-E04-03 / EC-E04-04`: Close `legacy_specs.rs` HMAC Bypass & Purge Duplicate `src/features/preview/*`):** Xóa hàm `is_loopback_hmac` giả trong `crates/harness-daemon/src/routes/legacy_specs.rs#L527-L553`, buộc mọi endpoint `/specs`, `/promote`, `/path-token`, `/surgical-patch` đi qua `daemon_auth::verify_hmac_v2` + `record_nonce_once` + `flow_dual_ingress_auth_middleware`; đồng thời xóa bỏ toàn bộ mã trùng lặp & Tailwind ở `src/features/preview/*` để `CompanionLiveHtmlRightPane.tsx` là bề mặt preview duy nhất (`sandbox="allow-scripts allow-forms"`, zero `allow-same-origin`).
+- **AC-01 (Unified DualMainPanel Workbench, 40px Shorten Rail & Zero-Amber CSS Tokens):** Xây dựng `WorkbenchShell` với `MainSidebar` thu gọn/mở rộng (`28x28px`), thanh `Shorten Chat` `40px` (`PD-02 = A`), bộ 4 Theme chuẩn (`Warm Paper`, `Focus Dim`, `Night Workspace`, `Monochrome Minimal`), Reactive i18n Store không tải lại trang, component `<BrandIcon />` (143 SVGs từ Story 03.2); đồng thời thay thế 100% mã màu cứng còn sót — bao gồm `#f59e0b` trong `DagCanvas2D.tsx` (`L128, L168`) & `DagNodeHeaderAndPorts.tsx` (`L124`) và mọi `#4ade80`/`#f87171` — bằng biến ngữ nghĩa trong `src/styles/tokens.css`.
+- **AC-02 (Multi-Format `CompanionCanvasTab` & Native 2D SVG Cubic Bezier `DagCanvas2D` Studio):** Cài đặt `DagCanvas2D` vẽ trên mặt phẳng `(x, y)` bằng SVG Bezier bậc 3 với cổng `●` Input/Output, Cụm khung (`Cluster Frames`), 3 loại luồng (`Main`, `IF / ELSE`, `IF NOT / Fallback`), tách bạch lưu bố cục tự do (`● Saved` qua `layout_version`) với chỉnh sửa cấu trúc tạo `DRAFT` (`+ Node`, nối/đổi dây, đảo chiều `⇄`, sửa `Condition`/`Note` + `Undo/Redo`), thanh công cụ `.dag-right-vertical-dock` (Zoom `+`/`-`/`Reset`, `Fit View`, `Minimap`, pinch/Ctrl+Scroll/Space+Drag), đồng bộ OCC qua `GET /api/v1/projects/:id/flow/snapshot` + `crates/flow-graph` + SQLite `V3__flow_workbench_dag.sql`, và bảo đảm hồi quy singleflight hydration (`data-flow-hydrated="true"`).
+- **AC-03 (`[EDGE-CASE]` Orphan ScreenState Guard, Uppercase Enum Normalization & Canonical `src/api/` Client SDK):** Phát hiện và cảnh báo nút `ScreenState` mồ côi (`0` cạnh nối vào/ra) trên `DagNodeCard` và `#dagDraftBar` trước khi `deploy-draft` (kèm 3-color DFS chặn chu trình vô hạn); chuẩn hóa enum `fixture_ref` sang dạng viết hoa **`DEFAULT | LOADING | EMPTY | ERROR`** (khớp `screen_fixtures` & Zod `FixtureVariantSchema`, kèm Rust normalizer chấp nhận an toàn các bản ghi `'Default'` cũ) và `viewport_preset` (`desktop-1440 | tablet-768 | mobile-390`) ở cả Rust/Zod/UI; và loại bỏ mọi `fetch()` thô trong `src/features/**`/`src/pages/**` về `src/api/flow-workbench.ts` & `src/api/constraints.ts`.
+- **AC-04 (`[EDGE-CASE]` `EC-E04-03 / EC-E04-04`: Verified Legacy Ingress Regression & Physical Purge of Duplicate `src/features/preview/*`):** Bắt buộc có regression integration test xác nhận toàn bộ endpoint `legacy_specs.rs#L527-L553` (`/specs`, `/promote`, `/path-token`, `/surgical-patch`) thực thi `VerifiedLegacyIngress` + `verify_anti_idor_with_caller` fail-closed khi thiếu HMAC hoặc sai caller; đồng thời xóa bỏ vật lý 100% mã trùng lặp & Tailwind ở `src/features/preview/*` để `CompanionLiveHtmlRightPane.tsx` là bề mặt preview duy nhất (`sandbox="allow-scripts allow-forms"`, zero `allow-same-origin`, còn gia cố `DOMParser` CSP zero-network & `bootSecret` thực hiện tiếp ở `Story 04.5`).
 
 ## 4. Tasks
-- [ ] **Task 04.1.1**: Tinh chỉnh `WorkbenchShell`, `DualMainPanel`, `40px` Shorten Rail, 4 Theme Tokens & `<BrandIcon />` và thanh tẩy 100% raw hex `#f59e0b`/`#4ade80`/`#f87171` về `tokens.css` (thỏa mãn `AC-01`).
-- [ ] **Task 04.1.2**: Hoàn thiện `CompanionCanvasTab` và Native 2D SVG Bezier `DagCanvas2D` (Cluster Frames, Layout vs `DRAFT` separation, `.dag-right-vertical-dock`, OCC persistence trên `V3__flow_workbench_dag.sql`) (thỏa mãn `AC-02`).
-- [ ] **Task 04.1.3**: Chuẩn hóa kiểm định Orphan ScreenState + 3-color DFS, chuẩn hóa enum `fixture_ref` / `viewport_preset` và di chuyển toàn bộ `fetch()` thô trong workbench/flow/chat sang `src/api/` (thỏa mãn `AC-03`).
-- [ ] **Task 04.1.4**: Vá lỗ hổng HMAC trong `crates/harness-daemon/src/routes/legacy_specs.rs` bằng `daemon_auth::verify_hmac_v2` + `record_nonce_once` (kèm regression test fail-closed) (thỏa mãn `AC-04`).
-- [ ] **Task 04.1.5**: Giải thể và thanh tẩy `src/features/preview/*` trùng lặp, hợp nhất đường dẫn xem trước duy nhất tại `CompanionLiveHtmlRightPane.tsx` (`allow-scripts allow-forms`) (thỏa mãn `AC-04`).
+- [x] **Task 04.1.1**: Tinh chỉnh `WorkbenchShell`, `DualMainPanel`, `40px` Shorten Rail, 4 Theme Tokens & `<BrandIcon />` và thanh tẩy 100% raw hex `#f59e0b` (trong `DagCanvas2D.tsx`, `DagNodeHeaderAndPorts.tsx`) / `#4ade80` / `#f87171` về `tokens.css` (thỏa mãn `AC-01`).
+- [x] **Task 04.1.2**: Hoàn thiện `CompanionCanvasTab` và Native 2D SVG Bezier `DagCanvas2D` (`GET /api/v1/projects/:id/flow/snapshot`, Cluster Frames, Layout vs `DRAFT` separation, `.dag-right-vertical-dock`, OCC persistence trên `V3__flow_workbench_dag.sql` và regression singleflight hydration `data-flow-hydrated="true"`) (thỏa mãn `AC-02`).
+- [x] **Task 04.1.3**: Cài đặt cảnh báo Orphan ScreenState + 3-color DFS, chuẩn hóa enum `fixture_ref` (`DEFAULT|LOADING|EMPTY|ERROR` + normalizer ngược cho `'Default'`) / `viewport_preset` và di chuyển toàn bộ `fetch()` thô trong workbench/flow/chat sang `src/api/flow-workbench.ts` & `src/api/constraints.ts` (thỏa mãn `AC-03`).
+- [x] **Task 04.1.4**: Bổ sung regression suite fail-closed xác minh `crates/harness-daemon/src/routes/legacy_specs.rs` (`VerifiedLegacyIngress` + `verify_anti_idor_with_caller` trên `master`) không bị thoái lui (thỏa mãn `AC-04`).
+- [x] **Task 04.1.5**: Xóa bỏ vật lý và thanh tẩy 100% `src/features/preview/*` trùng lặp, hợp nhất đường dẫn xem trước duy nhất tại `CompanionLiveHtmlRightPane.tsx` (thỏa mãn `AC-04`).
 
 ## 5. AC-to-Task Traceability Matrix
 | AC ID | Description | Mapped Implementation Tasks | Verification Method | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **AC-01** | Unified Workbench, 40px Rail & Zero-Amber CSS Tokens | `Task 04.1.1` | CSS Token Linter & Component Test | pending |
-| **AC-02** | CompanionCanvasTab & Native 2D SVG Bezier DagCanvas2D | `Task 04.1.2` | SVG Bezier & V3 OCC Persistence Test | pending |
-| **AC-03** | [EDGE-CASE] Orphan Node Guard, Enums & `src/api/` SDK | `Task 04.1.3` | DFS Cycle/Orphan & SDK Escapee AST Test | pending |
-| **AC-04** | [EDGE-CASE] `legacy_specs.rs` HMAC Fix & `preview/*` Purge | `Task 04.1.4`, `Task 04.1.5` | Rust HMAC Integration Test & Purge Verification | pending |
+| **AC-01** | Unified Workbench, 40px Rail & Zero-Amber CSS Tokens (`DagCanvas2D`/`DagNodeHeaderAndPorts`) | `Task 04.1.1` | CSS Token Linter (`zero #f59e0b`) & Component Test | completed |
+| **AC-02** | CompanionCanvasTab, Snapshot Singleflight & Native 2D SVG Bezier `DagCanvas2D` | `Task 04.1.2` | SVG Bezier, Singleflight Hydration & V3 OCC Test | completed |
+| **AC-03** | [EDGE-CASE] Orphan Node Guard, Uppercase Enums & `src/api/` SDK | `Task 04.1.3` | DFS Cycle/Orphan, Uppercase Enum & SDK AST Test | completed |
+| **AC-04** | [EDGE-CASE] `legacy_specs.rs` Ingress Regression & `src/features/preview/*` Purge | `Task 04.1.4`, `Task 04.1.5` | Rust Ingress Regression Test & Physical Purge Check | completed |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** `["01.3", "03.2"]`
@@ -103,3 +104,4 @@ Story 04.1 thiết lập bề mặt Workbench tối giản theo thiết kế `co
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 04.1 với @xyflow/react v12 và Canvas ScreenState | cowok Orchestrator |
 | 2026-11-11 | 2.0.0 | Bổ sung DualMainPanel, Native 2D SVG Bezier DAG Canvas (v5.4) & V3 12-Step Rebuild | /refactor-story |
 | 2026-11-13 | 3.0.0 | [evaluate-epic Deep Mode] Loại bỏ toàn bộ dư âm `@xyflow/react v12`; bổ sung vá bảo mật `legacy_specs.rs` HMAC, giải thể `src/features/preview/*`, chuẩn hóa enum & `src/api/` | Party Mode Council & Architect |
+| 2026-11-14 | 3.1.0 | [evaluate-epic Report Sync] Đổi `/flow` -> `/flow/snapshot`, khóa regression `legacy_specs.rs` (`VerifiedLegacyIngress`) & singleflight trên `master`, thống nhất enum `DEFAULT|LOADING|EMPTY|ERROR` và dọn nốt `#f59e0b` (`DagCanvas2D`, `DagNodeHeaderAndPorts`) | /evaluate-epic Council & Architect |

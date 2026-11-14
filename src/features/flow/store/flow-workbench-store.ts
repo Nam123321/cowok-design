@@ -1,6 +1,7 @@
 // @story 04.1
 // @implements AC-06, AC-07, AC-08
 import type { FlowGraphSnapshot } from "../../../lib/validations/flow-workbench";
+import { normalizeFixtureRef } from "../../../lib/validations/screen-fixture";
 import { CoordinateSyncQueue } from "./coordinate-sync-queue";
 import {
   applyAddNode,
@@ -77,8 +78,16 @@ function createViewportAndSelectionMethods(ctx: StoreRuntimeCtx) {
     },
     setNodeSubState(nodeId: string, subState: NodeSubState): void {
       const s = getState();
-      for (const n of s.nodes) if (n.id === nodeId) { n.activeSubState = subState; n.fixtureRef = subState; }
-      s.nodes = [...s.nodes]; notify();
+      const canonical = normalizeFixtureRef(subState);
+      const target = s.nodes.find((n) => n.id === nodeId);
+      if (!target || (target.fixtureRef === canonical && target.activeSubState === canonical)) return;
+      pushHistorySnapshot(s);
+      target.activeSubState = canonical;
+      target.fixtureRef = canonical;
+      if (target.status !== "draft") target.status = "draft";
+      s.nodes = [...s.nodes];
+      ensurePinnedDraftSession(s);
+      notify();
     },
     autoLayoutNodes(): void {
       const s = getState(); applyAutoLayout(s); notify();

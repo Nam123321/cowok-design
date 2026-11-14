@@ -2,86 +2,21 @@
 // @implements AC-06
 import crypto from "node:crypto";
 import { z, ZodSchema } from "zod";
+import { jsonResp, verifyStrictLoopback } from "./api-guard-session";
 
-export interface LoopbackSessionRecord {
-  tenantId: string;
-  userId: string;
-  role: "viewer" | "editor" | "admin";
-  expiresAt: number;
-}
+export {
+  getBffSessionRegistrySize,
+  getBoundBffPort,
+  isAllowedLoopbackHost,
+  issueBffLoopbackSession,
+  pruneExpiredBffSessions,
+  setBoundBffPort,
+  type LoopbackSessionRecord,
+} from "./api-guard-session";
 
-const globalSessionRegistryKey = Symbol.for("cowok.loopback.sessionRegistry");
-const sessionRegistry: Map<string, LoopbackSessionRecord> =
-  ((globalThis as unknown as Record<symbol, Map<string, LoopbackSessionRecord>>)[globalSessionRegistryKey] ??=
-    new Map<string, LoopbackSessionRecord>());
-const SESSION_TTL_MS = 8 * 60 * 60 * 1_000;
-
-export function issueBffLoopbackSession(input?: {
-  tenantId?: string;
-  userId?: string;
-  role?: "viewer" | "editor" | "admin";
-}): { sessionToken: string } & LoopbackSessionRecord {
-  const token = `cwk_bff_${crypto.randomBytes(24).toString("hex")}`;
-  const rec: LoopbackSessionRecord = {
-    tenantId: input?.tenantId?.trim() || "local-default",
-    userId: input?.userId?.trim() || "local-operator",
-    role: input?.role || "editor",
-    expiresAt: Date.now() + SESSION_TTL_MS,
-  };
-  sessionRegistry.set(token, rec);
-  return { sessionToken: token, ...rec };
-}
-
-export function isAllowedLoopbackHost(rawHost: string): boolean {
-  const host = rawHost.trim().toLowerCase();
-  if (host === "127.0.0.1" || host === "localhost") return true;
-  const m = /^(127\.0\.0\.1|localhost):(\d{1,5})$/.exec(host);
-  if (!m) return false;
-  const port = Number(m[2]);
-  return Number.isInteger(port) && port >= 1 && port <= 65535;
-}
-
-function jsonResp(status: number, body: Record<string, unknown>): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function verifyStrictLoopback(
-  req: Request,
-  fallbackUrl: URL
-): { ok: true; session: LoopbackSessionRecord } | { ok: false; response: Response } {
-  const hostHeader = req.headers.get("host") || fallbackUrl.host;
-  if (!isAllowedLoopbackHost(hostHeader)) {
-    return { ok: false, response: jsonResp(403, { code: "ORIGIN_REJECTED", error: "ORIGIN_REJECTED" }) };
-  }
-  const sfs = req.headers.get("sec-fetch-site");
-  if (sfs && sfs !== "same-origin" && sfs !== "none") {
-    return { ok: false, response: jsonResp(403, { code: "ORIGIN_REJECTED", error: "ORIGIN_REJECTED" }) };
-  }
-  const origin = req.headers.get("origin");
-  if (origin) {
-    let originHost = "";
-    try {
-      originHost = new URL(origin).host;
-    } catch {
-      originHost = "";
-    }
-    if (!originHost || !isAllowedLoopbackHost(originHost)) {
-      return { ok: false, response: jsonResp(403, { code: "ORIGIN_REJECTED", error: "ORIGIN_REJECTED" }) };
-    }
-  }
-  const token = req.headers.get("x-cowok-session-token")?.trim() || "";
-  const session = sessionRegistry.get(token);
-  if (!session || session.expiresAt < Date.now()) {
-    return { ok: false, response: jsonResp(401, { code: "UNAUTHENTICATED", error: "UNAUTHENTICATED" }) };
-  }
-  if (session.role === "viewer" && req.method !== "GET" && req.method !== "HEAD") {
-    return { ok: false, response: jsonResp(403, { code: "INSUFFICIENT_ROLE", error: "INSUFFICIENT_ROLE" }) };
-  }
-  return { ok: true, session };
-}
+const HTTP_BAD_REQUEST = 400;
+const HTTP_FORBIDDEN = 403;
+const HTTP_INTERNAL_ERROR = 500;
 
 export interface GuardedContext {
   userId?: string;
@@ -94,6 +29,7 @@ export interface GuardedContext {
 
 export interface GuardedRouteOptions<B = unknown, Q = unknown> {
   body?: ZodSchema<B>;
+  rawJsonPassthrough?: boolean;
   query?: ZodSchema<Q>;
   roles?: string[];
   authMode?: "default" | "strict-loopback";
@@ -117,7 +53,6 @@ function resolveAuthIdentity<B, Q>(
   options: GuardedRouteOptions<B, Q>,
   context: { tenantId?: string }
 ): { ok: true; tenantId: string; userId: string; role: "viewer" | "editor" | "admin" } | { ok: false; response: Response } {
-  // Always enforce strict loopback token verification in non-test runtime or when opted in.
   const isVitestHarness = typeof process !== "undefined" && process.env?.VITEST === "true";
   if (options.authMode === "strict-loopback" || !isVitestHarness) {
     const verified = verifyStrictLoopback(req, url);
@@ -131,7 +66,7 @@ function resolveAuthIdentity<B, Q>(
   if (options.roles && options.roles.length > 0) {
     const allowed = options.roles.map((r) => r.toLowerCase());
     if (!allowed.some((r) => userRoles.includes(r) || userRoles.includes("admin"))) {
-      return { ok: false, response: jsonResp(403, { error: "FORBIDDEN", message: "Insufficient permissions" }) };
+      return { ok: false, response: jsonResp(HTTP_FORBIDDEN, { error: "FORBIDDEN", message: "Insufficient permissions" }) };
     }
   }
   return {
@@ -140,6 +75,33 @@ function resolveAuthIdentity<B, Q>(
     userId: req.headers.get("x-user-id") || "anonymous",
     role: resolveFallbackRole(userRoles),
   };
+}
+
+async function parseGuardedBody<B, Q>(
+  req: Request,
+  options: GuardedRouteOptions<B, Q>
+): Promise<{ ok: true; body: B | undefined } | { ok: false; response: Response }> {
+  if (req.method === "GET" || req.method === "HEAD" || (!options.body && !options.rawJsonPassthrough)) {
+    return { ok: true, body: undefined };
+  }
+  const rawText = await req.text().catch(() => "");
+  if (rawText.trim() === "") {
+    return { ok: true, body: options.body ? options.body.parse({}) : undefined };
+  }
+  let jsonVal: unknown;
+  try {
+    jsonVal = JSON.parse(rawText);
+  } catch {
+    return {
+      ok: false,
+      response: jsonResp(HTTP_BAD_REQUEST, {
+        code: "INVALID_JSON",
+        error: "INVALID_JSON",
+        message: "Malformed JSON request body",
+      }),
+    };
+  }
+  return { ok: true, body: options.body ? options.body.parse(jsonVal) : (jsonVal as B) };
 }
 
 async function executeGuardedRequest<B, Q>(
@@ -153,10 +115,9 @@ async function executeGuardedRequest<B, Q>(
     const auth = resolveAuthIdentity(req, url, options, context);
     if (!auth.ok) return auth.response;
 
-    const parsedBody =
-      options.body && req.method !== "GET" && req.method !== "HEAD"
-        ? options.body.parse(await req.json().catch(() => ({})))
-        : undefined;
+    const bodyOutcome = await parseGuardedBody(req, options);
+    if (!bodyOutcome.ok) return bodyOutcome.response;
+
     const parsedQuery = options.query
       ? options.query.parse(Object.fromEntries(url.searchParams.entries()))
       : undefined;
@@ -169,16 +130,17 @@ async function executeGuardedRequest<B, Q>(
       correlationId: req.headers.get("x-correlation-id") || crypto.randomUUID(),
       params: context.params || {},
     };
-    return await handler(req, ctx, { body: parsedBody, query: parsedQuery });
+    return await handler(req, ctx, { body: bodyOutcome.body, query: parsedQuery });
   } catch (err: unknown) {
     if (err instanceof z.ZodError) {
-      return jsonResp(400, { code: "VALIDATION_ERROR", error: "VALIDATION_ERROR", details: err.errors });
+      return jsonResp(HTTP_BAD_REQUEST, { code: "VALIDATION_ERROR", error: "VALIDATION_ERROR", details: err.errors });
     }
     const message = err instanceof Error ? err.message : "INTERNAL_SERVER_ERROR";
-    return jsonResp(500, { code: "INTERNAL_ERROR", error: message });
+    return jsonResp(HTTP_INTERNAL_ERROR, { code: "INTERNAL_ERROR", error: message });
   }
 }
 
+/** Wraps an HTTP route handler with strict-loopback auth, Zod body/query validation, and context extraction. */
 export function guardedRoute<B = unknown, Q = unknown>(
   handlerOrOptions: GuardedRouteOptions<B, Q> | RouteHandler<B, Q>,
   optionsOrHandler?: GuardedRouteOptions<B, Q> | RouteHandler<B, Q>

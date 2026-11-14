@@ -113,7 +113,7 @@ export const NewConversationFormFields: React.FC<NewConversationFormFieldsProps>
           <select value={p.selectedProjectId} onChange={(e) => p.onSelectProjectId(e.target.value)} className="cowok-input" style={INPUT_STYLE}>
             {p.projects.map((proj) => (
               <option key={proj.id} value={proj.id}>
-                {proj.name} ({proj.provenance === "scratch" ? "Scratch Managed" : "Git Folder In-Place"}) {proj.id === p.activeProjectId ? "• Đang mở" : ""}
+                {proj.name} ({proj.provenance === "scratch" ? t("workbench.provenanceScratch", "Scratch Managed") : t("workbench.provenanceGit", "Git Folder In-Place")}) {proj.id === p.activeProjectId ? `• ${t("workbench.currentlyOpen", "Đang mở")}` : ""}
               </option>
             ))}
           </select>

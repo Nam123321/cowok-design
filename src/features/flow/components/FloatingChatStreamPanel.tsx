@@ -1,8 +1,10 @@
 // @story 04.3
-// @implements AC-02, AC-01 (Scope Strip, Message Stream & Mid-turn Execution Controls)
+// @implements AC-02, AC-01 (Scope Strip, Unified Sidebar Stream & Mid-turn Execution Controls)
 import React from "react";
 import { BrandIcon } from "@/components/ui/BrandIcon";
+import { ChatStreamItem, type ChatMessage } from "@/pages/workbench/components/AgentChatStream";
 import { useTranslation } from "../../../hooks/useTranslation";
+import { useFormatter } from "../../../hooks/useFormatter";
 import { WorkbenchNode } from "../store/flow-workbench-store";
 
 export interface FloatingChatMessage {
@@ -43,33 +45,38 @@ const ScopeChipStrip: React.FC<{
   selectedNodes: WorkbenchNode[];
   onDeselectNode: (nodeId: string) => void;
   onFocusNode?: (nodeId: string) => void;
-}> = ({ projectId, sessionId, selectedNodes, onDeselectNode, onFocusNode }) => (
-  <div
-    className="fc-scope-strip"
-    style={{ padding: "4px 8px", backgroundColor: "var(--bg-workspace)", borderBottom: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}
-  >
-    {selectedNodes.map((n) => (
-      <span
-        key={n.id}
-        title={`Composite Scope: ${projectId}::${sessionId}::${n.id}`}
-        style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "10px", fontWeight: 600, backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-xs)", padding: "1px 5px", color: "var(--text-primary)" }}
-      >
-        <span style={{ cursor: "pointer" }} onClick={() => onFocusNode?.(n.id)} title="Focus Node trên DAG">
-          🎯 {n.screenKey}
+}> = ({ projectId, sessionId, selectedNodes, onDeselectNode, onFocusNode }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      className="fc-scope-strip"
+      style={{ padding: "5px 10px", backgroundColor: "var(--bg-workspace)", borderBottom: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap", flexShrink: 0 }}
+    >
+      {selectedNodes.map((n) => (
+        <span
+          key={n.id}
+          title={`${t("floatingChat.compositeScopePrefix", "Composite Scope")}: ${projectId}::${sessionId}::${n.id}`}
+          style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 500, backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-pill)", padding: "2px 8px", color: "var(--text-primary)" }}
+        >
+          <BrandIcon name="crosshair" size={10} color="var(--action-primary)" />
+          <span style={{ cursor: "pointer" }} onClick={() => onFocusNode?.(n.id)} title={t("floatingChat.focusNodeOnDag", "Focus Node trên DAG")}>
+            {n.screenKey}
+          </span>
+          {selectedNodes.length > 1 && (
+            <button
+              type="button"
+              onClick={() => onDeselectNode(n.id)}
+              aria-label={`${t("floatingChat.deselectNode", "Bỏ chọn")} ${n.screenKey}`}
+              style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center" }}
+            >
+              <BrandIcon name="close" size={10} color="currentColor" />
+            </button>
+          )}
         </span>
-        {selectedNodes.length > 1 && (
-          <button
-            type="button"
-            onClick={() => onDeselectNode(n.id)}
-            style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: 0, fontSize: "9px" }}
-          >
-            ✕
-          </button>
-        )}
-      </span>
-    ))}
-  </div>
-);
+      ))}
+    </div>
+  );
+};
 
 const MessageHistoryList: React.FC<{
   messages: FloatingChatMessage[];
@@ -78,42 +85,35 @@ const MessageHistoryList: React.FC<{
   primaryTitle?: string;
   historyEndRef: React.RefObject<HTMLDivElement | null>;
 }> = ({ messages, isMulti, selectedCount, primaryTitle, historyEndRef }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const { formatTime, formatNumber } = useFormatter({ locale });
+  if (messages.length === 0) {
+    return (
+      <div
+        className="fc-history"
+        style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: "6px", backgroundColor: "var(--bg-canvas)", fontSize: "11.5px", color: "var(--text-muted)", flexShrink: 0 }}
+      >
+        <BrandIcon name="sparkles" size={12} color="var(--agent-accent)" />
+        <span>
+          {t("floatingChat.emptyHint", "Nhập yêu cầu cho")} {isMulti ? `${formatNumber(selectedCount)} ${t("floatingChat.screensUnit", "màn hình")}` : primaryTitle || t("floatingChat.singleScreenFallback", "màn hình")}
+        </span>
+      </div>
+    );
+  }
   return (
     <div
       className="fc-history"
-      style={{ flex: 1, overflowY: "auto", padding: "8px 10px", display: "flex", flexDirection: "column", gap: "6px", backgroundColor: "var(--bg-canvas)", fontSize: "12px" }}
+      style={{ flex: "0 1 auto", minHeight: 0, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: "10px", backgroundColor: "var(--bg-canvas)" }}
     >
-      {messages.length === 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)", textAlign: "center", gap: "4px" }}>
-          <BrandIcon name="sparkles" size={24} color="var(--action-primary)" />
-          <div style={{ fontSize: "11.5px", fontWeight: 500 }}>
-            {t("floatingChat.contextHeader", "Hội thoại ngữ cảnh")} {isMulti ? `${selectedCount} Màn hình` : primaryTitle}
-          </div>
-          <div style={{ fontSize: "10px" }}>
-            {t("floatingChat.emptyHint", "Nhập yêu cầu để Agent tự động chỉnh sửa hoặc kết nối luồng")}
-          </div>
-        </div>
-      ) : (
-        messages.map((m) => (
-          <div
-            key={m.id}
-            style={{
-              alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-              maxWidth: "85%",
-              padding: "6px 9px",
-              borderRadius: "var(--radius-sm)",
-              backgroundColor: m.role === "user" ? "var(--bg-selected)" : "var(--bg-surface)",
-              border: "1px solid var(--border-subtle)",
-              color: "var(--text-primary)",
-              lineHeight: 1.4,
-              fontSize: "11.5px",
-            }}
-          >
-            {m.content}
-          </div>
-        ))
-      )}
+      {messages.map((m) => {
+        const mapped: ChatMessage = {
+          id: m.id,
+          sender: m.role === "user" ? "human" : "agent",
+          text: m.content,
+          timestamp: formatTime(m.timestamp),
+        };
+        return <ChatStreamItem key={m.id} msg={mapped} />;
+      })}
       <div ref={historyEndRef} />
     </div>
   );
@@ -126,62 +126,56 @@ const JobControlBar: React.FC<{
   onResumeJob: (jobId: string) => void;
   onToggleSteer: () => void;
   onCancelJob: (jobId: string) => void;
-}> = ({ activeJobId, isPaused, onPauseJob, onResumeJob, onToggleSteer, onCancelJob }) => (
-  <div style={{ padding: "4px 8px", backgroundColor: "var(--bg-subtle)", borderTop: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "10.5px" }}>
-    <span style={{ fontWeight: 600, color: "var(--action-primary)" }}>
-      {isPaused ? "Đã tạm dừng" : "Đang xử lý..."}
-    </span>
-    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-      <button
-        type="button"
-        onClick={() => (isPaused ? onResumeJob(activeJobId) : onPauseJob(activeJobId))}
-        style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", cursor: "pointer" }}
-      >
-        {isPaused ? "▶ Tiếp tục" : "⏸ Tạm dừng"}
-      </button>
-      <button
-        type="button"
-        onClick={onToggleSteer}
-        style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", cursor: "pointer" }}
-      >
-        🧭 Steer
-      </button>
-      <button
-        type="button"
-        onClick={() => onCancelJob(activeJobId)}
-        style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--state-danger)", color: "var(--state-danger)", backgroundColor: "var(--bg-surface)", cursor: "pointer" }}
-      >
-        ✕ Hủy
-      </button>
+}> = ({ activeJobId, isPaused, onPauseJob, onResumeJob, onToggleSteer, onCancelJob }) => {
+  const { t } = useTranslation();
+  return (
+    <div style={{ padding: "5px 10px", backgroundColor: "var(--bg-subtle)", borderTop: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "10.5px", flexShrink: 0 }}>
+      <span style={{ fontWeight: 600, color: "var(--action-primary)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+        <BrandIcon name={isPaused ? "clock" : "execution-pipeline"} size={11} color="currentColor" />
+        <span>{isPaused ? t("floatingChat.jobPaused", "Đã tạm dừng") : t("floatingChat.jobRunning", "Đang xử lý...")}</span>
+      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+        <button type="button" onClick={() => (isPaused ? onResumeJob(activeJobId) : onPauseJob(activeJobId))} style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+          <BrandIcon name={isPaused ? "play" : "clock"} size={10} color="currentColor" />
+          <span>{isPaused ? t("floatingChat.resumeBtn", "Tiếp tục") : t("floatingChat.pauseBtn", "Tạm dừng")}</span>
+        </button>
+        <button type="button" onClick={onToggleSteer} style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+          <BrandIcon name="switch" size={10} color="currentColor" />
+          <span>{t("floatingChat.steerBtn", "Steer")}</span>
+        </button>
+        <button type="button" onClick={() => onCancelJob(activeJobId)} style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--state-danger)", color: "var(--state-danger)", backgroundColor: "var(--bg-surface)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+          <BrandIcon name="close" size={10} color="currentColor" />
+          <span>{t("workbench.cancelBtn", "Hủy")}</span>
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const SteerInputBar: React.FC<{
   steerDraft: string;
   onSteerDraftChange: (value: string) => void;
   onSteerSubmit: () => void;
-}> = ({ steerDraft, onSteerDraftChange, onSteerSubmit }) => (
-  <div style={{ padding: "6px 8px", backgroundColor: "var(--bg-workspace)", borderTop: "1px solid var(--border-default)", display: "flex", gap: "4px" }}>
-    <input
-      type="text"
-      placeholder="Chỉ dẫn điều hướng giữa phiên (Steer)..."
-      value={steerDraft}
-      onChange={(e) => onSteerDraftChange(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") onSteerSubmit();
-      }}
-      style={{ flex: 1, fontSize: "11px", padding: "4px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)" }}
-    />
-    <button
-      type="button"
-      onClick={onSteerSubmit}
-      style={{ fontSize: "10.5px", padding: "3px 8px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)", border: "none", cursor: "pointer" }}
-    >
-      Gửi
-    </button>
-  </div>
-);
+}> = ({ steerDraft, onSteerDraftChange, onSteerSubmit }) => {
+  const { t } = useTranslation();
+  return (
+    <div style={{ padding: "6px 10px", backgroundColor: "var(--bg-workspace)", borderTop: "1px solid var(--border-default)", display: "flex", gap: "4px", flexShrink: 0 }}>
+      <input
+        type="text"
+        placeholder={t("floatingChat.steerPlaceholder", "Chỉ dẫn điều hướng giữa phiên (Steer)...")}
+        value={steerDraft}
+        onChange={(e) => onSteerDraftChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onSteerSubmit();
+        }}
+        style={{ flex: 1, fontSize: "11px", padding: "4px 8px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)" }}
+      />
+      <button type="button" onClick={onSteerSubmit} style={{ fontSize: "10.5px", padding: "3px 8px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)", border: "none", cursor: "pointer" }}>
+        {t("floatingChat.sendSteerBtn", "Gửi")}
+      </button>
+    </div>
+  );
+};
 
 export const FloatingChatStreamPanel: React.FC<FloatingChatStreamPanelProps> = (props) => {
   const showJobBar = (props.isRunning || props.isQueued || props.isPaused) && Boolean(props.activeJobId);

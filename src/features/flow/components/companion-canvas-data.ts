@@ -1,5 +1,6 @@
 // @story-04.1
 // @implements AC-3
+import type { WorkbenchNode } from "../store/flow-workbench-types";
 import type { CanvasTabItem } from "./CompanionCanvasTab";
 
 export interface SlidePhaseItem {
@@ -8,7 +9,7 @@ export interface SlidePhaseItem {
   title: string;
   headline: string;
   subtitle: string;
-  kpi1: string;
+  kpi1: number;
   kpi2: string;
   kpi3: string;
 }
@@ -22,10 +23,25 @@ export interface ScreenPreviewData {
   latency: string;
   actionTitle: string;
   ctaLabel: string;
+  kpi1Label?: string;
+  kpi1Display?: string;
+  kpi2Label?: string;
+  kpi3Label?: string;
+  actionHint?: string;
+}
+
+export interface SynthPreviewLabels {
+  kpiRoute?: string;
+  kpiState?: string;
+  kpiType?: string;
+  actionHint?: string;
+  ctaOpen?: string;
 }
 
 const AMOUNT_SCR_01 = 4850000;
 const AMOUNT_SCR_02 = 1284500;
+const AMOUNT_SLIDE_01 = 1284500;
+const AMOUNT_SLIDE_03 = 960000;
 
 export const DEFAULT_TABS: CanvasTabItem[] = [
   {
@@ -71,7 +87,7 @@ export const INITIAL_SLIDES: SlidePhaseItem[] = [
     title: "Kiến trúc Điều phối cowok-design v5.4",
     headline: "Kiến trúc Điều phối cowok-design v5.4 — Dual-Pane Studio",
     subtitle: "Kết hợp Userflow (2D DAG) + Slide Deck CMS ở khung trái và Live HTML Preview ở khung phải.",
-    kpi1: "1284500",
+    kpi1: AMOUNT_SLIDE_01,
     kpi2: "99.4% SAFE",
     kpi3: "12.4 ms",
   },
@@ -81,7 +97,7 @@ export const INITIAL_SLIDES: SlidePhaseItem[] = [
     title: "Hybrid Project Boundary & OpenDesign Sync",
     headline: "Đồng bộ 2 chiều Folder-Backed Git & Managed Scratch",
     subtitle: "1 Dự án chia sẻ DESIGN.md, tokens.css và đồ thị Userflow xuyên suốt N phiên hội thoại.",
-    kpi1: "4850000",
+    kpi1: AMOUNT_SCR_01,
     kpi2: "100% SSOT",
     kpi3: "8.2 ms",
   },
@@ -91,7 +107,7 @@ export const INITIAL_SLIDES: SlidePhaseItem[] = [
     title: "Tournament 3 Phương án UI & Zero-Drift AST",
     headline: "So sánh trực tiếp Option A / B / C trên Live HTML Stage",
     subtitle: "Tự động kiểm tra E1..E4 và niêm phong giao diện không lệch token.",
-    kpi1: "960000",
+    kpi1: AMOUNT_SLIDE_03,
     kpi2: "9.6 / 10",
     kpi3: "14.0 ms",
   },
@@ -139,6 +155,79 @@ export const SCREEN_PREVIEW_MAP: Record<string, ScreenPreviewData> = {
     ctaLabel: "Tải Biên nhận PDF / JSON",
   },
 };
+
+const SCREEN_KEY_TO_PREVIEW_ID: Record<string, string> = {
+  "SCR-01": "node-scr-01",
+  "SCR-02": "node-scr-02",
+  "SCR-02B": "node-scr-02b",
+  "SCR-03": "node-scr-03",
+  "11111111-1111-4111-8111-111111111101": "node-scr-01",
+  "11111111-1111-4111-8111-111111111102": "node-scr-02",
+  "11111111-1111-4111-8111-111111111103": "node-scr-02b",
+  "11111111-1111-4111-8111-111111111104": "node-scr-03",
+};
+
+export function synthesizeFallbackScreenPreview(
+  node: Pick<WorkbenchNode, "screenKey" | "title" | "routePath" | "status" | "note" | "nodeType" | "activeSubState">,
+  labels?: SynthPreviewLabels
+): ScreenPreviewData {
+  const route = node.routePath || "/";
+  const subState = node.activeSubState || "DEFAULT";
+  const nodeType = (node.nodeType || "screen").toUpperCase();
+  const statusUpper = (node.status || "draft").toUpperCase();
+  return {
+    eyebrow: `${node.screenKey} • ${nodeType} (${route})`,
+    headline: node.title,
+    subtitle: node.note?.trim() || `${nodeType} • ${route} • ${subState}`,
+    amount: 0,
+    kpi1Label: labels?.kpiRoute || "Route",
+    kpi1Display: route,
+    kpi2Label: labels?.kpiState || "Node Status",
+    statusText: `${statusUpper} • ${subState}`,
+    kpi3Label: labels?.kpiType || "Node Type",
+    latency: nodeType,
+    actionTitle: `${node.title} (${node.screenKey})`,
+    actionHint: node.note?.trim() || labels?.actionHint || "Synthesized live preview from WorkbenchNode metadata.",
+    ctaLabel: `${labels?.ctaOpen || "Open"} ${route}`,
+  };
+}
+
+export function resolveScreenPreviewData(
+  selectedNode?: WorkbenchNode | null,
+  selectedNodeId?: string | null,
+  labels?: SynthPreviewLabels
+): ScreenPreviewData {
+  if (selectedNode) {
+    const normalizedKey = selectedNode.screenKey.trim().toUpperCase();
+    const mappedId = SCREEN_KEY_TO_PREVIEW_ID[normalizedKey];
+    if (mappedId && SCREEN_PREVIEW_MAP[mappedId]) {
+      return SCREEN_PREVIEW_MAP[mappedId];
+    }
+    return synthesizeFallbackScreenPreview(selectedNode, labels);
+  }
+
+  if (selectedNodeId) {
+    if (SCREEN_PREVIEW_MAP[selectedNodeId]) {
+      return SCREEN_PREVIEW_MAP[selectedNodeId];
+    }
+    const normalized = selectedNodeId.trim().toUpperCase();
+    const mappedByKey = SCREEN_KEY_TO_PREVIEW_ID[normalized] || SCREEN_KEY_TO_PREVIEW_ID[selectedNodeId];
+    if (mappedByKey && SCREEN_PREVIEW_MAP[mappedByKey]) {
+      return SCREEN_PREVIEW_MAP[mappedByKey];
+    }
+    return synthesizeFallbackScreenPreview(
+      {
+        screenKey: selectedNodeId,
+        title: selectedNodeId,
+        routePath: "/",
+        status: "draft",
+      },
+      labels
+    );
+  }
+
+  return SCREEN_PREVIEW_MAP["node-scr-02"];
+}
 
 export function createCanvasTabByKind(
   kind: "app-flow" | "slide-deck" | "md" | "assets" | "code",

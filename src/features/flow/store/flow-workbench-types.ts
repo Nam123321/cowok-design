@@ -1,10 +1,12 @@
 // @story 04.1
 // @implements AC-06, AC-07, AC-08
+import type { FixtureRef, ViewportPreset } from "../../../lib/validations/screen-fixture";
+
 export type FlowEdgeType = "main" | "branch" | "fallback";
 export type CanonicalFlowType = "main" | "if_else" | "if_not";
 export type NodeDraftStatus = "synced" | "draft";
 export type SemanticNodeType = "screen" | "modal" | "condition" | "decision" | "action";
-export type NodeSubState = "Default" | "Loading" | "Empty" | "Error";
+export type NodeSubState = FixtureRef | "Default" | "Loading" | "Empty" | "Error";
 
 export interface WorkbenchNode {
   id: string;
@@ -12,11 +14,11 @@ export interface WorkbenchNode {
   title: string;
   nodeType?: SemanticNodeType;
   activeSubState?: NodeSubState;
-  fixtureRef?: string;
+  fixtureRef?: FixtureRef | string;
   fixtureJson?: string;
   routePath?: string;
   componentEntryPath?: string;
-  viewportPreset?: string;
+  viewportPreset?: ViewportPreset | string;
   posX: number;
   posY: number;
   version: number;

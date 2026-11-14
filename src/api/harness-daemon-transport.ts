@@ -9,6 +9,13 @@ const HTTP_STATUS_NO_CONTENT = 204;
 const HTTP_STATUS_UNAUTHORIZED = 401;
 const HTTP_STATUS_BAD_GATEWAY = 502;
 
+/** Reads the server-injected browser boot capability token when executing in a DOM context. */
+export function readBootCapHeaders(): Record<string, string> {
+  if (typeof document === "undefined") return {};
+  const token = document.querySelector('meta[name="cowok-boot-cap"]')?.getAttribute("content")?.trim();
+  return token ? { "X-Cowok-Boot-Cap": token } : {};
+}
+
 export interface HarnessDaemonClientConfig {
   baseUrl?: string;
   getSessionToken?: () => string | null;
@@ -85,7 +92,7 @@ export class HarnessDaemonTransport {
     const doFetch = this.resolveFetch();
     const res = await doFetch(`${this.baseUrl}/api/auth/local-session`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...readBootCapHeaders() },
       body: JSON.stringify({ tenantId: this.tenantId, userId: this.userId, role: this.role }),
     });
     if (!res.ok) {

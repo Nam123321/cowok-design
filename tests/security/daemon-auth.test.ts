@@ -1,7 +1,12 @@
 // @story 04.1
 // @implements AC-06
 import { describe, expect, it } from "vitest";
-import { issueBffLoopbackSession } from "../../src/lib/api-guard";
+import {
+  getBffSessionRegistrySize,
+  issueBffLoopbackSession,
+  pruneExpiredBffSessions,
+  setBoundBffPort,
+} from "../../src/lib/api-guard";
 import { DEFAULT_FLOW_PROJECT_ID, stripSpoofedHeaders } from "../../src/lib/daemon-client";
 import * as snapshotRoute from "../../src/app/api/projects/[id]/flow/snapshot/route";
 import * as nodesRoute from "../../src/app/api/projects/[id]/flow/nodes/route";
@@ -89,5 +94,66 @@ describe("Scoped Dual-Ingress Daemon & BFF Security Gate", () => {
     });
     const res = await snapshotRoute.GET(req, { params: { id: DEFAULT_FLOW_PROJECT_ID } });
     expect(res.status).toBe(404);
+  });
+
+  it("SEC-ORIGIN-PORT: pins bound BFF port when configured and rejects cross-port callers", async () => {
+    const session = issueBffLoopbackSession({ tenantId: "local-default", role: "editor" });
+    setBoundBffPort(5173);
+    try {
+      const wrongPortReq = new Request(`http://127.0.0.1:9999/api/projects/${DEFAULT_FLOW_PROJECT_ID}/flow/snapshot`, {
+        method: "GET",
+        headers: {
+          Host: "127.0.0.1:9999",
+          "X-Cowok-Session-Token": session.sessionToken,
+        },
+      });
+      const wrongPortRes = await snapshotRoute.GET(wrongPortReq, { params: { id: DEFAULT_FLOW_PROJECT_ID } });
+      expect(wrongPortRes.status).toBe(403);
+      const wrongPortBody = await wrongPortRes.json();
+      expect(wrongPortBody.code).toBe("ORIGIN_REJECTED");
+
+      const rightPortReq = new Request(`http://127.0.0.1:5173/api/projects/${DEFAULT_FLOW_PROJECT_ID}/flow/snapshot`, {
+        method: "GET",
+        headers: {
+          Host: "127.0.0.1:5173",
+          "X-Cowok-Session-Token": session.sessionToken,
+        },
+      });
+      const rightPortRes = await snapshotRoute.GET(rightPortReq, { params: { id: DEFAULT_FLOW_PROJECT_ID } });
+      expect(rightPortRes.status).toBe(200);
+    } finally {
+      setBoundBffPort(null);
+    }
+  });
+
+  it("SEC-SESSION-CAP: evicts expired sessions and enforces registry capacity bounds", async () => {
+    const expired = issueBffLoopbackSession({ tenantId: "local-default", role: "viewer", ttlMs: -1 });
+    const expiredReq = new Request(`http://127.0.0.1:5173/api/projects/${DEFAULT_FLOW_PROJECT_ID}/flow/snapshot`, {
+      method: "GET",
+      headers: {
+        Host: "127.0.0.1:5173",
+        "X-Cowok-Session-Token": expired.sessionToken,
+      },
+    });
+    const expiredRes = await snapshotRoute.GET(expiredReq, { params: { id: DEFAULT_FLOW_PROJECT_ID } });
+    expect(expiredRes.status).toBe(401);
+
+    const first = issueBffLoopbackSession({ tenantId: "local-default", role: "viewer", maxCapacity: 2 });
+    const second = issueBffLoopbackSession({ tenantId: "local-default", role: "viewer", maxCapacity: 2 });
+    const third = issueBffLoopbackSession({ tenantId: "local-default", role: "viewer", maxCapacity: 2 });
+    expect(getBffSessionRegistrySize()).toBeLessThanOrEqual(2);
+    expect(third.sessionToken).not.toBe(first.sessionToken);
+    expect(second.sessionToken).not.toBe(third.sessionToken);
+
+    const evictedReq = new Request(`http://127.0.0.1:5173/api/projects/${DEFAULT_FLOW_PROJECT_ID}/flow/snapshot`, {
+      method: "GET",
+      headers: {
+        Host: "127.0.0.1:5173",
+        "X-Cowok-Session-Token": first.sessionToken,
+      },
+    });
+    const evictedRes = await snapshotRoute.GET(evictedReq, { params: { id: DEFAULT_FLOW_PROJECT_ID } });
+    expect(evictedRes.status).toBe(401);
+    expect(pruneExpiredBffSessions()).toBeGreaterThanOrEqual(0);
   });
 });

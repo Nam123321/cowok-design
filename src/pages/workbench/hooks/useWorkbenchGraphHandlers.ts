@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { createNewFlowWorkbenchStore, FlowEdgeType } from "../../../features/flow/store/flow-workbench-store";
 import {
   NEW_NODE_BASE_X,
@@ -35,6 +35,9 @@ function buildNewNodePayload(
 }
 
 export function useWorkbenchGraphHandlers(store: WorkbenchStoreInstance, nodeCount: number) {
+  const [graphError, setGraphError] = useState<string | null>(null);
+  const clearGraphError = useCallback(() => setGraphError(null), []);
+
   const handleUpdatePosition = useCallback(
     (id: string, x: number, y: number) => store.updateNodePosition(id, x, y),
     [store]
@@ -47,6 +50,7 @@ export function useWorkbenchGraphHandlers(store: WorkbenchStoreInstance, nodeCou
 
   const handleAddNode = useCallback(
     (title?: string, posX?: number, posY?: number) => {
+      setGraphError(null);
       store.addNode(buildNewNodePayload(nodeCount + 1, title, posX, posY));
     },
     [store, nodeCount]
@@ -62,7 +66,9 @@ export function useWorkbenchGraphHandlers(store: WorkbenchStoreInstance, nodeCou
         conditionLabel: getConditionLabel(edgeType),
       });
       if (!res.success && res.error) {
-        alert(res.error);
+        setGraphError(res.error);
+      } else {
+        setGraphError(null);
       }
     },
     [store]
@@ -72,13 +78,17 @@ export function useWorkbenchGraphHandlers(store: WorkbenchStoreInstance, nodeCou
     (id: string) => {
       const res = store.reverseTransition(id);
       if (!res.success && res.error) {
-        alert(res.error);
+        setGraphError(res.error);
+      } else {
+        setGraphError(null);
       }
     },
     [store]
   );
 
   return {
+    graphError,
+    clearGraphError,
     handleUpdatePosition,
     handleSetViewport,
     handleAddNode,

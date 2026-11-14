@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "../../../hooks/useTranslation";
 import { ElementCommentResponse } from "../../../lib/validations/element-comment";
 
 interface ElementCommentItemProps {
@@ -12,6 +13,7 @@ export const ElementCommentItem: React.FC<ElementCommentItemProps> = ({
   onResolve,
   onReanchor,
 }) => {
+  const { t } = useTranslation();
   const isStale = comment.anchorStatus === "stale";
   const isResolved = comment.anchorStatus === "resolved";
 
@@ -48,7 +50,7 @@ export const ElementCommentItem: React.FC<ElementCommentItemProps> = ({
           className="stale-anchor-banner"
           style={{
             padding: "6px 8px",
-            backgroundColor: "var(--state-warning-soft, rgba(217, 130, 43, 0.12))",
+            backgroundColor: "var(--state-warning-soft)",
             border: "1px solid var(--state-warning)",
             color: "var(--text-primary)",
             borderRadius: "var(--radius-xs)",
@@ -58,7 +60,7 @@ export const ElementCommentItem: React.FC<ElementCommentItemProps> = ({
             fontSize: "11px",
           }}
         >
-          <span>Phần tử đã đổi cấu trúc (Stale)</span>
+          <span>{t("comments.staleAnchorWarning", "Phần tử đã đổi cấu trúc (Stale)")}</span>
           {onReanchor && (
             <button
               type="button"
@@ -73,7 +75,7 @@ export const ElementCommentItem: React.FC<ElementCommentItemProps> = ({
                 cursor: "pointer",
               }}
             >
-              Gắn lại
+              {t("comments.reanchorBtn", "Gắn lại")}
             </button>
           )}
         </div>
@@ -93,7 +95,7 @@ export const ElementCommentItem: React.FC<ElementCommentItemProps> = ({
             padding: "2px 0",
           }}
         >
-          ✓ Đánh dấu giải quyết
+          {t("comments.resolveBtn", "✓ Đánh dấu giải quyết")}
         </button>
       )}
     </div>

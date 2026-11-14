@@ -136,6 +136,7 @@ flowchart TD
     Story_04_1 --> Story_04_2
     Story_04_2 --> Story_04_3
     Story_04_2 --> Story_04_4
+    Story_04_1 --> Story_04_5
     Story_04_4 --> Story_04_5
     Story_04_5 --> E2E_GATE
 
@@ -198,25 +199,3 @@ flowchart TD
 - [Layer-Epic-DB](./layer-epic-db.md)
 - [Layer-Epic-API](./layer-epic-api.md)
 - [Contract Claims](./contract_claims.yaml)
-
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-04.1](./Story-04.1/story.md) | Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation | 01.3, 03.2 | refactored |
-| [Story-04.2](./Story-04.2/story.md) | SQLite V5 Schema Convergence, Streaming Dual-Ingress Vite BFF & Fail-Closed FS Folder Picker | 04.1 | refactored |
-| [Story-04.3](./Story-04.3/story.md) | Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier | 04.2 | refactored |
-| [Story-04.4](./Story-04.4/story.md) | Persistent KeyedParallelCoordinator, Monotonic Fencing, SSE Last-Event-ID, Multi-Node Chat v2 & 3-Level Sidebar | 04.2 | refactored |
-| [Story-04.5](./Story-04.5/story.md) | State-Hydrated Live Preview (CompanionLiveHtmlRightPane), Option CSP-B Epoch/Hash Bridge & Persistent Element Comments (stale_mapping) | 04.4, 03.3 | refactored |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-04.1](./Story-04.1/story.md) | Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation | 01.3, 03.2 | refactored |
-| [Story-04.2](./Story-04.2/story.md) | SQLite V5 Schema Convergence, Streaming Dual-Ingress Vite BFF & Fail-Closed FS Folder Picker | 04.1 | refactored |
-| [Story-04.3](./Story-04.3/story.md) | Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier | 04.2 | refactored |
-| [Story-04.4](./Story-04.4/story.md) | Persistent KeyedParallelCoordinator, Monotonic Fencing, SSE Last-Event-ID, Multi-Node Chat v2 & 3-Level Sidebar | 04.2 | refactored |
-| [Story-04.5](./Story-04.5/story.md) | State-Hydrated Live Preview (CompanionLiveHtmlRightPane), Option CSP-B Epoch/Hash Bridge & Persistent Element Comments (stale_mapping) | 04.4, 03.3 | refactored |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-04.1](./Story-04.1/story.md) | Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation | 01.3, 03.2 | refactored |
-| [Story-04.2](./Story-04.2/story.md) | SQLite V5 Schema Convergence, Streaming Dual-Ingress Vite BFF & Fail-Closed FS Folder Picker | 04.1 | refactored |
-| [Story-04.3](./Story-04.3/story.md) | Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier | 04.2 | refactored |
-| [Story-04.4](./Story-04.4/story.md) | Persistent KeyedParallelCoordinator, Monotonic Fencing, SSE Last-Event-ID, Multi-Node Chat v2 & 3-Level Sidebar | 04.2 | refactored |
-| [Story-04.5](./Story-04.5/story.md) | State-Hydrated Live Preview (CompanionLiveHtmlRightPane), Option CSP-B Epoch/Hash Bridge & Persistent Element Comments (stale_mapping) | 04.4, 03.3 | refactored |

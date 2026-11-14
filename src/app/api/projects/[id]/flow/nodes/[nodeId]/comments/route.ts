@@ -1,8 +1,8 @@
 // @story 04.3
 // @implements AC-01, AC-02, AC-03
-import { guardedRoute } from "../../../../../../../../lib/api-guard";
-import { forwardFromGuardedContext } from "../../../../../../../../lib/daemon-client";
-import { CreateElementCommentSchema } from "../../../../../../../../lib/validations/element-comment";
+import { guardedRoute } from "@/lib/api-guard";
+import { forwardFromGuardedContext } from "@/lib/daemon-client";
+import { CreateElementCommentSchema } from "@/lib/validations/element-comment";
 
 export const GET = guardedRoute(
   (req, ctx) => {
@@ -11,7 +11,7 @@ export const GET = guardedRoute(
     return forwardFromGuardedContext(
       req,
       ctx,
-      `/api/v1/projects/${projectId}/flow/nodes/${encodeURIComponent(nodeId)}/comments`
+      `/api/v1/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}/comments`
     );
   },
   { authMode: "strict-loopback" }
@@ -24,7 +24,7 @@ export const POST = guardedRoute(
     return forwardFromGuardedContext(
       req,
       ctx,
-      `/api/v1/projects/${projectId}/flow/nodes/${encodeURIComponent(nodeId)}/comments`,
+      `/api/v1/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}/comments`,
       body
     );
   },

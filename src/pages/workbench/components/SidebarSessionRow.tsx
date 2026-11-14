@@ -98,6 +98,7 @@ export const SidebarSessionRow: React.FC<SidebarSessionRowProps> = ({
   onRenameSession,
   onDeleteSession,
 }) => {
+  const { t } = useTranslation();
   const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSubTreeOpen, setIsSubTreeOpen] = useState(true);
@@ -270,14 +271,14 @@ export const SidebarSessionRow: React.FC<SidebarSessionRowProps> = ({
                   transition: "background-color var(--duration-fast)",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "4px", overflow: "hidden" }}>
-                  <span style={{ color: "var(--action-primary)", fontSize: "9px" }}>🎯</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "5px", overflow: "hidden" }}>
+                  <BrandIcon name="crosshair" size={11} color="var(--action-primary)" style={{ flexShrink: 0 }} />
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {sub.screenKey} · {sub.nodeTitle}
                   </span>
                 </div>
                 {sub.status === "running" && (
-                  <span style={{ fontSize: "9px", color: "var(--action-primary)" }}>⚡</span>
+                  <BrandIcon name="execution-pipeline" size={11} color="var(--action-primary)" title={t("floatingChat.processing", "Đang xử lý")} />
                 )}
                 {sub.messageCount ? (
                   <span

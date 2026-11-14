@@ -1,6 +1,7 @@
 // @story 04.1
 // @implements AC-06, AC-08
 import type { DeployDraftInput } from "../../../lib/validations/flow-workbench";
+import { normalizeFixtureRef, normalizeViewportPreset } from "../../../lib/validations/screen-fixture";
 import {
   edgeTypeToCanonical,
   normalizeSemanticNodeType,
@@ -20,7 +21,7 @@ function hasSemanticNodeChange(base: WorkbenchNode, curr: WorkbenchNode): boolea
     base.title !== curr.title ||
     normalizeSemanticNodeType(base.nodeType) !== normalizeSemanticNodeType(curr.nodeType) ||
     (base.routePath || "/") !== (curr.routePath || "/") ||
-    (base.fixtureRef || "Default") !== (curr.fixtureRef || "Default") ||
+    normalizeFixtureRef(base.fixtureRef) !== normalizeFixtureRef(curr.fixtureRef) ||
     (base.fixtureJson || "{}") !== (curr.fixtureJson || "{}") ||
     (base.note || "") !== (curr.note || "")
   );
@@ -47,10 +48,10 @@ function buildCreatedNodeDtos(nodes: WorkbenchNode[], baseNodes: Map<string, Wor
       nodeType: normalizeSemanticNodeType(n.nodeType),
       routePath: n.routePath || "/",
       componentEntryPath: n.componentEntryPath || "",
-      fixtureRef: n.fixtureRef || "Default",
+      fixtureRef: normalizeFixtureRef(n.fixtureRef),
       fixtureJson: n.fixtureJson || "{}",
       note: n.note || "",
-      viewportPreset: (n.viewportPreset as "desktop-1440" | "tablet-768" | "mobile-390") || "desktop-1440",
+      viewportPreset: normalizeViewportPreset(n.viewportPreset),
       posX: n.posX,
       posY: n.posY,
     }));
@@ -65,7 +66,7 @@ function buildUpdatedNodeDtos(nodes: WorkbenchNode[], baseNodes: Map<string, Wor
         title: n.title,
         nodeType: normalizeSemanticNodeType(n.nodeType),
         routePath: n.routePath || "/",
-        fixtureRef: n.fixtureRef || "Default",
+        fixtureRef: normalizeFixtureRef(n.fixtureRef),
         fixtureJson: n.fixtureJson || "{}",
         note: n.note || "",
         expectedVersion: baseNodes.get(n.id)!.version,

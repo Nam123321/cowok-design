@@ -1,6 +1,8 @@
 // @story 04.1
 // @implements AC-04, AC-07, AC-08
 import React, { useRef, useState } from "react";
+import { BrandIcon } from "../../../components/ui/BrandIcon";
+import { useFormatter } from "@/hooks/useFormatter";
 import { useTranslation } from "@/hooks/useTranslation";
 import {
   WorkbenchNode,
@@ -16,6 +18,7 @@ import { DagNodeCard, PortMouseDownArgs } from "./DagNodeCard";
 import { DagRightVerticalDock } from "./DagRightVerticalDock";
 import { DagRadarMinimap } from "./DagRadarMinimap";
 import { EdgeConditionInspector } from "./EdgeConditionInspector";
+import { findOrphanNodes } from "../utils/graph-analysis";
 import {
   NODE_WIDTH,
   NODE_HEIGHT,
@@ -57,18 +60,20 @@ const NOOP = () => {};
 
 const DagNodesList: React.FC<{
   nodes: WorkbenchNode[];
+  orphanNodeIds: Set<string>;
   selectedNodeId: string | null;
   onNodeMouseDown: (e: React.MouseEvent, node: WorkbenchNode) => void;
   onPortMouseDown: (args: PortMouseDownArgs) => void;
   props: DagCanvas2DProps;
   getNodeStatus: (nodeId: string) => { status: "running" | "queued" | "paused" | "completed" | "error" | "cancelled"; queuePosition: number } | null;
-}> = ({ nodes, selectedNodeId, onNodeMouseDown, onPortMouseDown, props, getNodeStatus }) => (
+}> = ({ nodes, orphanNodeIds, selectedNodeId, onNodeMouseDown, onPortMouseDown, props, getNodeStatus }) => (
   <div style={{ position: "relative", width: "100%", height: "100%", pointerEvents: "none" }}>
     {nodes.map((node) => (
       <DagNodeCard
         key={node.id}
         node={node}
         isSelected={selectedNodeId === node.id}
+        isOrphan={orphanNodeIds.has(node.id)}
         onNodeMouseDown={onNodeMouseDown}
         onPortMouseDown={onPortMouseDown}
         onUpdateNote={props.onUpdateNodeNote}
@@ -90,6 +95,8 @@ const DagExecutionSummaryBadge: React.FC<{
   activeJobs: NodeExecutionJob[];
   onCancelJob: (jobId: string) => void;
 }> = ({ summary, activeJobs, onCancelJob }) => {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatter();
   const [popoverOpen, setPopoverOpen] = useState(false);
   if (summary.totalActive === 0) return null;
 
@@ -122,16 +129,17 @@ const DagExecutionSummaryBadge: React.FC<{
           cursor: "pointer",
         }}
       >
-        <span style={{ color: "var(--action-primary)" }}>⚡</span>
-        <span>{summary.runningCount} Đang xử lý</span>
+        <BrandIcon name="execution-pipeline" size={12} color="var(--action-primary)" />
+        <span>{formatNumber(summary.runningCount)} {t("floatingChat.processing", "Đang xử lý")}</span>
         <span style={{ color: "var(--text-muted)" }}>•</span>
-        <span style={{ color: "#f59e0b" }}>⏳ {summary.queuedCount} Chờ</span>
-        <span style={{ fontSize: "9px", color: "var(--text-muted)" }}>▾</span>
+        <BrandIcon name="clock" size={11} color="var(--state-warning)" />
+        <span style={{ color: "var(--state-warning)" }}>{formatNumber(summary.queuedCount)} {t("floatingChat.queuedStatus", "Chờ")}</span>
+        <BrandIcon name="chevron-down" size={10} color="var(--text-muted)" />
       </button>
       {popoverOpen && (
         <div
           role="dialog"
-          aria-label="Danh sách tác vụ đang chạy"
+          aria-label={t("flow.runningJobsAria", "Danh sách tác vụ đang chạy")}
           style={{
             position: "absolute",
             top: "34px",
@@ -150,7 +158,7 @@ const DagExecutionSummaryBadge: React.FC<{
           }}
         >
           <div style={{ fontWeight: 600, borderBottom: "1px solid var(--border-subtle)", paddingBottom: "4px" }}>
-            Hàng đợi thực thi ({activeJobs.length})
+            {t("flow.executionQueueTitle", "Hàng đợi thực thi")} ({formatNumber(activeJobs.length)})
           </div>
           {activeJobs.map((job) => (
             <div
@@ -165,7 +173,7 @@ const DagExecutionSummaryBadge: React.FC<{
               }}
             >
               <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                <span style={{ fontWeight: 600, color: job.status === "running" ? "var(--action-primary)" : "#f59e0b" }}>
+                <span style={{ fontWeight: 600, color: job.status === "running" ? "var(--action-primary)" : "var(--state-warning)" }}>
                   {job.status.toUpperCase()}
                 </span>
                 <span style={{ marginLeft: "4px", color: "var(--text-secondary)" }}>{job.prompt}</span>
@@ -173,7 +181,7 @@ const DagExecutionSummaryBadge: React.FC<{
               <button
                 type="button"
                 onClick={() => onCancelJob(job.id)}
-                title="Hủy lệnh"
+                title={t("floatingChat.cancelJob", "Hủy lệnh")}
                 style={{
                   border: "none",
                   background: "transparent",
@@ -183,7 +191,7 @@ const DagExecutionSummaryBadge: React.FC<{
                   padding: "0 4px",
                 }}
               >
-                ✕
+                <BrandIcon name="close" size={11} color="currentColor" />
               </button>
             </div>
           ))}
@@ -201,8 +209,9 @@ const DagCanvasHudLayer: React.FC<{
   activeJobs: NodeExecutionJob[];
   onCancelJob: (jobId: string) => void;
 }> = ({ props, ix, handleUpdateVp, summary, activeJobs, onCancelJob }) => {
+  const { t } = useTranslation();
   const { state, onAddNode, onAutoLayout, onUndo, onRedo, onToggleMinimap } = props;
-  const selectedTransition = state.transitions.find((t) => t.id === state.selectedTransitionId) || null;
+  const selectedTransition = state.transitions.find((tr) => tr.id === state.selectedTransitionId) || null;
   return (
     <>
       <DagExecutionSummaryBadge summary={summary} activeJobs={activeJobs} onCancelJob={onCancelJob} />
@@ -218,7 +227,7 @@ const DagCanvasHudLayer: React.FC<{
         canUndo={(state.undoStack?.length || 0) > 0}
         canRedo={(state.redoStack?.length || 0) > 0}
         isMinimapOpen={Boolean(state.isMinimapOpen)}
-        onAddNode={() => (onAddNode ? onAddNode("Màn hình mới") : undefined)}
+        onAddNode={() => (onAddNode ? onAddNode(t("flow.defaultNewNodeTitle", "Màn hình mới")) : undefined)}
         onAutoLayout={onAutoLayout}
         onUndo={onUndo || NOOP}
         onRedo={onRedo || NOOP}
@@ -251,13 +260,19 @@ export const DagCanvas2D: React.FC<DagCanvas2DProps> = (props) => {
   const cursor = resolveCanvasCursor(ix.isPanning, ix.isSpacePressed, Boolean(ix.draggedNode));
   const gridPx = `${CANVAS_GRID_SIZE * state.viewport.zoom}px`;
   const stageTransform = `matrix(${state.viewport.zoom}, 0, 0, ${state.viewport.zoom}, ${state.viewport.panX}, ${state.viewport.panY})`;
+  const orphanNodeIds = new Set(
+    findOrphanNodes(
+      state.nodes.map((n) => ({ id: n.id })),
+      state.transitions.map((tr) => ({ source: tr.sourceNodeId, target: tr.targetNodeId }))
+    )
+  );
 
   return (
     <div ref={containerRef} className="dag-canvas-2d-container" data-testid="dag-canvas-2d" aria-label={t("flow.dagCanvas", "DAG 2D Canvas")} onWheel={ix.handleWheel} onMouseDown={ix.handleCanvasMouseDown} onDoubleClick={ix.handleCanvasDoubleClick} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", backgroundColor: "var(--bg-canvas)", cursor, userSelect: "none" }}>
       <div className="dag-canvas-bg" style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle, var(--border-subtle) 1px, transparent 1px)", backgroundSize: `${gridPx} ${gridPx}`, backgroundPosition: `${state.viewport.panX}px ${state.viewport.panY}px`, pointerEvents: "none" }} />
       <div className="dag-zoom-stage" style={{ position: "absolute", left: 0, top: 0, width: "100%", height: "100%", transformOrigin: "0 0", transform: stageTransform, pointerEvents: "none" }}>
         <DagSvgEdges nodes={state.nodes} transitions={state.transitions} clusters={state.clusters} selectedTransitionId={state.selectedTransitionId} onSelectTransition={onSelectTransition} wiringSource={ix.wiringSource} wiringCurrentPos={ix.wiringCurrentPos} nodeWidth={NODE_WIDTH} nodeHeight={NODE_HEIGHT} />
-        <DagNodesList nodes={state.nodes} selectedNodeId={state.selectedNodeId} onNodeMouseDown={ix.handleNodeMouseDown} onPortMouseDown={ix.handlePortMouseDown} props={props} getNodeStatus={coordinator.getNodeStatus} />
+        <DagNodesList nodes={state.nodes} orphanNodeIds={orphanNodeIds} selectedNodeId={state.selectedNodeId} onNodeMouseDown={ix.handleNodeMouseDown} onPortMouseDown={ix.handlePortMouseDown} props={props} getNodeStatus={coordinator.getNodeStatus} />
       </div>
       <DagCanvasHudLayer props={props} ix={ix} handleUpdateVp={handleUpdateVp} summary={coordinator.summary} activeJobs={coordinator.getActiveJobs()} onCancelJob={coordinator.cancelJob} />
     </div>

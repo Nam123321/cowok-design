@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { apiConstraints } from "../../../api/constraints";
 import { apiSdiEngine } from "../../../api/sdi-engine";
+import { useTranslation } from "../../../hooks/useTranslation";
 import { DesignIntentResponse } from "../../../lib/validations/sdi";
 
 const PROMPT_ROWS = 3;
@@ -16,6 +17,7 @@ export const SDIPromptInput: React.FC<SDIPromptInputProps> = ({
   targetNodeId,
   onIntentCompiled,
 }) => {
+  const { t } = useTranslation();
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export const SDIPromptInput: React.FC<SDIPromptInputProps> = ({
       setPrompt("");
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : "Không thể biên dịch Semantic Design Intent."
+        err instanceof Error ? err.message : t("sdi.compileErrorFallback", "Không thể biên dịch Semantic Design Intent.")
       );
     } finally {
       setIsLoading(false);
@@ -48,7 +50,7 @@ export const SDIPromptInput: React.FC<SDIPromptInputProps> = ({
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Mô tả thay đổi bằng ngôn ngữ tự nhiên..."
+        placeholder={t("sdi.promptPlaceholder", "Mô tả thay đổi bằng ngôn ngữ tự nhiên...")}
         rows={PROMPT_ROWS}
         className="w-full text-xs p-2.5 rounded-md border border-border bg-background resize-none focus:outline-none focus:ring-1 focus:ring-primary"
       />
@@ -62,7 +64,7 @@ export const SDIPromptInput: React.FC<SDIPromptInputProps> = ({
         disabled={!prompt.trim() || isLoading}
         className="self-end px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
       >
-        {isLoading ? "Đang phân tích..." : "Biên Dịch SDI"}
+        {isLoading ? t("sdi.analyzing", "Đang phân tích...") : t("sdi.compileButton", "Biên Dịch SDI")}
       </button>
     </form>
   );

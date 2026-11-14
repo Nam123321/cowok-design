@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { apiSdiEngine } from "../../../api/sdi-engine";
+import { useFormatter } from "../../../hooks/useFormatter";
+import { useTranslation } from "../../../hooks/useTranslation";
 import { AMBIGUITY_THRESHOLD, DesignIntentResponse } from "../../../lib/validations/sdi";
 import { SDIPromptInput } from "./SDIPromptInput";
 import { VisualClarificationModal } from "./VisualClarificationModal";
@@ -10,11 +12,13 @@ interface IntentStatusCardProps {
 }
 
 export const IntentStatusCard: React.FC<IntentStatusCardProps> = ({ intent, onOpenModal }) => {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatter();
   const isAmbiguous = intent.ambiguityScore >= AMBIGUITY_THRESHOLD;
   return (
     <div className="p-3 rounded-lg border border-border bg-muted/30 text-xs space-y-2">
       <div className="flex items-center justify-between">
-        <span className="font-semibold text-foreground">Điểm mơ hồ:</span>
+        <span className="font-semibold text-foreground">{t("sdi.ambiguityScoreLabel", "Điểm mơ hồ:")}</span>
         <span
           className={`px-2 py-0.5 rounded text-[10px] font-bold ${
             isAmbiguous
@@ -22,7 +26,7 @@ export const IntentStatusCard: React.FC<IntentStatusCardProps> = ({ intent, onOp
               : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
           }`}
         >
-          {intent.ambiguityScore} ({intent.status})
+          {formatNumber(intent.ambiguityScore)} ({intent.status})
         </span>
       </div>
       {isAmbiguous && intent.status === "clarifying" && (
@@ -31,7 +35,7 @@ export const IntentStatusCard: React.FC<IntentStatusCardProps> = ({ intent, onOp
           onClick={onOpenModal}
           className="w-full py-1 text-xs font-semibold rounded cowok-btn cowok-btn-primary"
         >
-          Xem &amp; Chọn Phương Án Làm Rõ
+          {t("sdi.reviewClarificationsBtn", "Xem & Chọn Phương Án Làm Rõ")}
         </button>
       )}
     </div>

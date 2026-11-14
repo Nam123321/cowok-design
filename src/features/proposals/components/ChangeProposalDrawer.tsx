@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useFormatter } from "../../../hooks/useFormatter";
+import { useTranslation } from "../../../hooks/useTranslation";
 import { ChangeProposalResponse, FileDiffItem } from "../../../lib/validations/change-proposal";
 import { DiffViewer } from "./DiffViewer";
 import { ValidationGateBadge } from "./ValidationGateBadge";
@@ -11,17 +13,20 @@ interface DrawerProps {
   onReject: (proposalId: string) => void;
 }
 
-const ProposalHeader: React.FC<{ proposal: ChangeProposalResponse; onClose: () => void }> = ({ proposal, onClose }) => (
-  <div className="flex items-center justify-between pb-3 border-b border-border">
-    <div>
-      <h3 className="text-sm font-bold text-foreground">{proposal.title}</h3>
-      <p className="text-xs text-muted-foreground">{proposal.description || "Không có mô tả bổ sung"}</p>
+const ProposalHeader: React.FC<{ proposal: ChangeProposalResponse; onClose: () => void }> = ({ proposal, onClose }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center justify-between pb-3 border-b border-border">
+      <div>
+        <h3 className="text-sm font-bold text-foreground">{proposal.title}</h3>
+        <p className="text-xs text-muted-foreground">{proposal.description || t("proposals.noExtraDesc", "Không có mô tả bổ sung")}</p>
+      </div>
+      <button type="button" onClick={onClose} aria-label={t("common.close", "Đóng")} className="p-1 rounded text-muted-foreground hover:bg-muted">
+        ✕
+      </button>
     </div>
-    <button type="button" onClick={onClose} className="p-1 rounded text-muted-foreground hover:bg-muted">
-      ✕
-    </button>
-  </div>
-);
+  );
+};
 
 const ProposalFileItem: React.FC<{ file: FileDiffItem }> = ({ file }) => {
   const [expanded, setExpanded] = useState(false);
@@ -56,22 +61,23 @@ interface FooterProps {
 }
 
 const ProposalActionFooter: React.FC<FooterProps> = ({ proposal, onApply, onReject }) => {
+  const { t } = useTranslation();
   const hasFailedCheck = proposal.validationChecks.some((c) => c.status === "failed");
   const canApply = proposal.status === "ready" && proposal.validationStatus === "passed" && !hasFailedCheck;
 
   return (
     <div className="flex items-center justify-between pt-3 border-t border-border">
       <button type="button" onClick={onReject} className="px-3 py-1.5 text-xs rounded-md border border-border">
-        Từ Chối (Reject)
+        {t("proposals.rejectBtn", "Từ Chối (Reject)")}
       </button>
       <button
         type="button"
         disabled={!canApply}
         onClick={onApply}
-        title={!canApply ? "Apply bị khóa do kiểm tra an toàn chưa đạt [AC-03]" : ""}
+        title={!canApply ? t("proposals.applyBlockedHint", "Apply bị khóa do kiểm tra an toàn chưa đạt [AC-03]") : ""}
         className="px-4 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Áp Dụng Thay Đổi (Apply)
+        {t("proposals.applyBtn", "Áp Dụng Thay Đổi (Apply)")}
       </button>
     </div>
   );
@@ -84,6 +90,8 @@ export const ChangeProposalDrawer: React.FC<DrawerProps> = ({
   onApply,
   onReject,
 }) => {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatter();
   if (!isOpen || !proposal) return null;
 
   return (
@@ -93,7 +101,7 @@ export const ChangeProposalDrawer: React.FC<DrawerProps> = ({
         <ValidationGateBadge checks={proposal.validationChecks} />
         <div className="flex flex-col gap-2">
           <span className="text-xs font-semibold text-foreground">
-            Danh Sách Tệp Đã Sửa Đổi ({proposal.files.length})
+            {t("proposals.modifiedFilesLabel", "Danh Sách Tệp Đã Sửa Đổi")} ({formatNumber(proposal.files.length)})
           </span>
           {proposal.files.map((f) => (
             <ProposalFileItem key={f.path} file={f} />
