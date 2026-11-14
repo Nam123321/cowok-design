@@ -23,7 +23,7 @@ export { useWorkbenchProjectsAndSessions, useWorkbenchSettings };
 function seedVirginDefaultGraph(
   resolvedProjectId: string,
   store: ReturnType<typeof createNewFlowWorkbenchStore>
-): void {
+): Promise<unknown> {
   const isDefaultProj = resolvedProjectId === DEFAULT_FLOW_PROJECT_ID;
   const genId = () =>
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -60,42 +60,58 @@ function seedVirginDefaultGraph(
   }
   store.selectTransition(null);
   store.selectNode(null);
-  void store.syncDeployDraft(resolvedProjectId);
+  return store.syncDeployDraft(resolvedProjectId);
 }
 
 function useRemoteProjectHydration(
   resolvedProjectId: string,
   store: ReturnType<typeof createNewFlowWorkbenchStore>
-): void {
+): boolean {
   const hydratedProjectRef = useRef<string | null>(null);
+  const [isFlowHydrated, setIsFlowHydrated] = useState(false);
+
   useEffect(() => {
-    if (typeof window === "undefined" || typeof fetch !== "function") return;
-    if (hydratedProjectRef.current === resolvedProjectId) return;
+    if (typeof window === "undefined" || typeof fetch !== "function") {
+      setIsFlowHydrated(true);
+      return;
+    }
+    if (hydratedProjectRef.current === resolvedProjectId) {
+      setIsFlowHydrated(true);
+      return;
+    }
 
     let cancelled = false;
+    setIsFlowHydrated(false);
     void apiFlowWorkbench
       .getSnapshot(resolvedProjectId)
-      .then((remoteSnap) => {
+      .then(async (remoteSnap) => {
         if (cancelled) return;
         hydratedProjectRef.current = resolvedProjectId;
         store.setNetworkSyncEnabled(true, resolvedProjectId);
         if (remoteSnap.nodes.length > 0 || remoteSnap.transitions.length > 0 || remoteSnap.graphVersion > 1) {
           store.hydrateFromSnapshot(remoteSnap, true);
+          if (!cancelled) setIsFlowHydrated(true);
           return;
         }
         if (store.getState().nodes.length > 0) {
           store.hydrateFromSnapshot(remoteSnap, false);
-          seedVirginDefaultGraph(resolvedProjectId, store);
+          await seedVirginDefaultGraph(resolvedProjectId, store);
         }
+        if (!cancelled) setIsFlowHydrated(true);
       })
       .catch(() => {
         // Keep hydratedProjectRef unset when cancelled; mark attempted on non-cancelled offline fallback
-        if (!cancelled) hydratedProjectRef.current = resolvedProjectId;
+        if (!cancelled) {
+          hydratedProjectRef.current = resolvedProjectId;
+          setIsFlowHydrated(true);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [resolvedProjectId, store]);
+
+  return isFlowHydrated;
 }
 
 function useResponsiveSidebarCollapse(): [boolean, () => void] {
@@ -131,7 +147,7 @@ export function useWorkbenchShellState(
   const [isSidebarCollapsed, toggleSidebar] = useResponsiveSidebarCollapse();
   const [activeTabId, setActiveTabId] = useState("tab-userflow");
 
-  useRemoteProjectHydration(sessionManager.activeProjectId || initialProjectId, store);
+  const isFlowHydrated = useRemoteProjectHydration(sessionManager.activeProjectId || initialProjectId, store);
 
   const metrics = useMemo(
     () => calculateGraphMetrics(state.nodes.map((n) => ({ id: n.id })), state.transitions.map((t) => ({ source: t.sourceNodeId, target: t.targetNodeId }))),
@@ -145,6 +161,6 @@ export function useWorkbenchShellState(
   return {
     store, state, settings, sessionManager, splitter, attachments, graphHandlers, metrics,
     activeSession, isSidebarCollapsed, toggleSidebar, isChatCollapsed: splitter.isChatShortened,
-    toggleChat: splitter.handleToggleShortenChat, activeTabId, setActiveTabId,
+    toggleChat: splitter.handleToggleShortenChat, activeTabId, setActiveTabId, isFlowHydrated,
   };
 }

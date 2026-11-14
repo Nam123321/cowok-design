@@ -42,14 +42,20 @@ jobs:
         with:
           node-version: '22'
 
-      - name: 🤖 Execute PR Babysitter Runner (3-Strike Circuit Breaker)
+      - name: 🦀 Setup Rust Formatter (rustfmt)
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+          components: rustfmt
+
+      - name: 🤖 Execute PR Babysitter Triage (Default Read-Only; 3-Strike Circuit Breaker)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
           IS_FORK: ${{ steps.fork-check.outputs.is_fork }}
+          IS_DRAFT: ${{ github.event.pull_request.draft || false }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          BABYSITTER_AUTO_PUSH: ${{ vars.BABYSITTER_AUTO_PUSH || 'false' }}
           CI: "true"
-        run: |
-          # Prevent accidental secret exposure in public runner logs
-          echo "::add-mask::${{ secrets.GEMINI_API_KEY }}"
-          node scripts/pr-babysitter-runner.js
+        run: node scripts/pr-babysitter-runner.js

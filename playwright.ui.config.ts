@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const targetPort = Number(process.env.TARGET_PORT || '4173');
+
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 60000,
@@ -7,14 +9,14 @@ export default defineConfig({
     timeout: 10000
   },
   use: {
-    baseURL: process.env.BASE_URL || `http://127.0.0.1:${process.env.TARGET_PORT || '4173'}`,
-    trace: 'off',
-    screenshot: 'off',
-    video: 'off',
+    baseURL: process.env.BASE_URL || `http://127.0.0.1:${targetPort}`,
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    video: process.env.CI ? 'retain-on-failure' : 'off',
   },
   webServer: {
-    command: 'pnpm run preview --port 4173 --host 127.0.0.1',
-    port: 4173,
+    command: `pnpm run preview --port ${targetPort} --host 127.0.0.1`,
+    port: targetPort,
     reuseExistingServer: !process.env.CI,
     timeout: 30000,
   },
