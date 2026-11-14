@@ -118,3 +118,23 @@ links_to:
 | [Story-06.1](./Story-06.1/story.md) | Khung trình chiếu 16:9 HTML Slide Engine (1920x1080) & 8 Layout Templates chuẩn Dự án | 03.2, 04.1 | refactored |
 | [Story-06.2](./Story-06.2/story.md) | Giao diện Dual-Pane Human CMS Texting Editor đồng bộ <16ms qua data-ff-id | 06.1, 03.3 | refactored |
 | [Story-06.3](./Story-06.3/story.md) | Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen Mode | 06.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-06.1](./Story-06.1/story.md) | Khung trình chiếu 16:9 HTML Slide Engine (1920x1080) & 8 Layout Templates chuẩn Dự án | 03.2, 04.1 | refactored |
+| [Story-06.2](./Story-06.2/story.md) | Giao diện Dual-Pane Human CMS Texting Editor đồng bộ <16ms qua data-ff-id | 06.1, 03.3 | refactored |
+| [Story-06.3](./Story-06.3/story.md) | Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen Mode | 06.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-06.1](./Story-06.1/story.md) | Khung trình chiếu 16:9 HTML Slide Engine (1920x1080) & 8 Layout Templates chuẩn Dự án | 03.2, 04.1 | refactored |
+| [Story-06.2](./Story-06.2/story.md) | Giao diện Dual-Pane Human CMS Texting Editor đồng bộ <16ms qua data-ff-id | 06.1, 03.3 | refactored |
+| [Story-06.3](./Story-06.3/story.md) | Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen Mode | 06.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-06.1](./Story-06.1/story.md) | Khung trình chiếu 16:9 HTML Slide Engine (1920x1080) & 8 Layout Templates chuẩn Dự án | 03.2, 04.1 | refactored |
+| [Story-06.2](./Story-06.2/story.md) | Giao diện Dual-Pane Human CMS Texting Editor đồng bộ <16ms qua data-ff-id | 06.1, 03.3 | refactored |
+| [Story-06.3](./Story-06.3/story.md) | Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen Mode | 06.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-06.1](./Story-06.1/story.md) | Khung trình chiếu 16:9 HTML Slide Engine (1920x1080) & 8 Layout Templates chuẩn Dự án | 03.2, 04.1 | refactored |
+| [Story-06.2](./Story-06.2/story.md) | Giao diện Dual-Pane Human CMS Texting Editor đồng bộ <16ms qua data-ff-id | 06.1, 03.3 | refactored |
+| [Story-06.3](./Story-06.3/story.md) | Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen Mode | 06.2 | refactored |

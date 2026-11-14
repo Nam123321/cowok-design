@@ -334,6 +334,13 @@ impl VisibilityPolicy {
                 | CanonicalSpecKey::UiUxSpec
                 | CanonicalSpecKey::Architecture
                 | CanonicalSpecKey::DataAndCopy => (true, ReasonCode::Success),
+                CanonicalSpecKey::EpicsAndStories
+                | CanonicalSpecKey::CrossDependencies
+                | CanonicalSpecKey::ApiGuidelines
+                    if matches!(portal, Portal::DeveloperPortal | Portal::SuperAdmin) =>
+                {
+                    (true, ReasonCode::Success)
+                }
                 _ => (false, ReasonCode::DepartmentExcluded),
             },
             Department::MarketingDeck => match key {

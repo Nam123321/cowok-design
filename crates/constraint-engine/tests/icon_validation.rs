@@ -314,3 +314,72 @@ export function Card() {
         .iter()
         .any(|v| v.rule_code == "ENFORCE_COMPONENT_REGISTRY"));
 }
+
+#[test]
+fn test_ast_linter_wcag_ternary_icon_and_allowed_props() {
+    let flagship = IconValidator::get_flagship_manifest();
+    let typo = TypographyContract::default();
+    let comp = ComponentRegistryContract {
+        components: vec![ComponentRegistryEntry {
+            name: "ActionButton".to_string(),
+            source_spec: Some("07_COMPONENT_REGISTRY".to_string()),
+            allowed_props: vec!["variant".to_string()],
+        }],
+        forbid_unregistered: true,
+    };
+    let rules = vec![ActiveConstraint {
+        rule_code: "ENFORCE_DESIGN_SYSTEM".to_string(),
+        severity: "BLOCKER".to_string(),
+        config_json: "{}".to_string(),
+    }];
+
+    // Low contrast (#999 on #aaa => ~1.26 < 4.5), ternary icon invalid branch, forbidden prop, and JSX inside if-statement
+    let tsx = r##"
+export function ConditionalView({ ok }: { ok: boolean }) {
+  if (ok) {
+    return (
+      <ActionButton variant="primary" rogueProp="1">
+        <CowokIcon name={ok ? "activity" : "missing-icon-branch"} />
+        <span style={{ fontFamily: "Geist", fontSize: "1em", color: "#999999", backgroundColor: "#aaaaaa" }}>LowContrast</span>
+      </ActionButton>
+    );
+  }
+  return null;
+}
+"##;
+    let v =
+        AstLinter::lint_source_with_context(tsx, &rules, Some(&flagship), Some(&typo), Some(&comp))
+            .expect("lint tsx");
+
+    assert!(v.iter().any(
+        |x| x.rule_code == "ENFORCE_ICON_MANIFEST" && x.message.contains("missing-icon-branch")
+    ));
+    assert!(v
+        .iter()
+        .any(|x| x.rule_code == "ENFORCE_TYPOGRAPHY" && x.message.contains("WCAG")));
+    assert!(v
+        .iter()
+        .any(|x| x.rule_code == "ENFORCE_COMPONENT_REGISTRY" && x.message.contains("rogueProp")));
+}
+
+#[test]
+fn test_component_registry_extract_stops_at_next_heading() {
+    let md = r#"
+# UI Spec
+## 07_COMPONENT_REGISTRY
+- `PrimaryButton` - Action CTA
+### Sub-section inside registry
+- `SubPanel` - Nested entry
+## 08_NEXT_SECTION
+- `OutsideHeadingComponent` - Must NOT be imported
+"#;
+    let contract = IconValidator::extract_component_registry_from_markdown(md, true);
+    let names: Vec<&str> = contract
+        .components
+        .iter()
+        .map(|c| c.name.as_str())
+        .collect();
+    assert!(names.contains(&"PrimaryButton"));
+    assert!(names.contains(&"SubPanel"));
+    assert!(!names.contains(&"OutsideHeadingComponent"));
+}

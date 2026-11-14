@@ -33,6 +33,26 @@ fn export_typescript_bindings() {
     ComponentRegistryContract::export().expect("Failed to export ComponentRegistryContract");
     ComponentValidationReport::export().expect("Failed to export ComponentValidationReport");
     ProjectDesignContracts::export().expect("Failed to export ProjectDesignContracts");
+    TaskHorizon::export().expect("Failed to export TaskHorizon");
+    Department::export().expect("Failed to export Department");
+    Portal::export().expect("Failed to export Portal");
+    ReasonCode::export().expect("Failed to export ReasonCode");
+    ContextSliceRequest::export().expect("Failed to export ContextSliceRequest");
+    ContextSliceDecision::export().expect("Failed to export ContextSliceDecision");
+    SpecSlice::export().expect("Failed to export SpecSlice");
+    AuthorizedContextSlice::export().expect("Failed to export AuthorizedContextSlice");
+    PriorityTier::export().expect("Failed to export PriorityTier");
+    PromptSection::export().expect("Failed to export PromptSection");
+    GovernedBudgetResult::export().expect("Failed to export GovernedBudgetResult");
+    CompilationInput::export().expect("Failed to export CompilationInput");
+    CompiledPromptPayload::export().expect("Failed to export CompiledPromptPayload");
+    ModelProfileTier::export().expect("Failed to export ModelProfileTier");
+    ReasoningEffort::export().expect("Failed to export ReasoningEffort");
+    ToolComplexity::export().expect("Failed to export ToolComplexity");
+    DegradationReason::export().expect("Failed to export DegradationReason");
+    ModelToolDefinition::export().expect("Failed to export ModelToolDefinition");
+    AdaptationRequest::export().expect("Failed to export AdaptationRequest");
+    AdaptationResponse::export().expect("Failed to export AdaptationResponse");
 
-    println!("All 17 domain types successfully exported to packages/shared-types/src/generated/");
+    println!("All 47 domain types successfully exported to packages/shared-types/src/generated/");
 }

@@ -1,17 +1,19 @@
 // @story 01.3
 
 use axum::{
-    extract::{Path as AxumPath, State},
+    extract::{Extension, Path as AxumPath, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
 use domain::{ContextSliceRequest, Department, HarnessError, Portal};
+use rusqlite::{params, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
-use spec_registry::retry_on_busy;
+use spec_registry::{map_sqlite_error, retry_on_busy};
 use uuid::Uuid;
 
 use super::*;
+use crate::daemon_auth::VerifiedLegacyIngress;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptCompileRequest {
@@ -25,6 +27,7 @@ pub struct PromptCompileRequest {
 
 pub(super) async fn handle_prompt_compile(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
     Json(req): Json<PromptCompileRequest>,
@@ -32,7 +35,7 @@ pub(super) async fn handle_prompt_compile(
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
 
     let (project_registry, _canon_project_root, is_superadmin) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     // F-01: Validate token_ceiling does not exceed mandatory ceiling
@@ -123,6 +126,7 @@ pub struct ModelAdapterRequestDto {
 
 pub(super) async fn handle_model_adapter(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
     Json(req): Json<ModelAdapterRequestDto>,
@@ -130,7 +134,7 @@ pub(super) async fn handle_model_adapter(
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
 
     let (project_registry, _canon_project_root, _is_superadmin) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let resp = tokio::task::spawn_blocking(move || {
@@ -180,13 +184,14 @@ pub struct LintSourceResponse {
 
 pub(super) async fn handle_lint_source(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
     Json(req): Json<LintSourceRequest>,
 ) -> Result<Json<LintSourceResponse>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let (project_registry, canon_project_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let resp = tokio::task::spawn_blocking(move || {
@@ -224,12 +229,13 @@ pub(super) async fn handle_lint_source(
 
 pub(super) async fn handle_get_constraint_profile(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Result<Json<domain::ConstraintProfile>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let (project_registry, _canon_project_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let resp = tokio::task::spawn_blocking(move || {
@@ -264,13 +270,14 @@ pub(super) async fn handle_get_constraint_profile(
 
 pub(super) async fn handle_put_constraint_profile(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
     Json(profile): Json<domain::ConstraintProfile>,
 ) -> Result<Json<Vec<constraint_engine::ActiveConstraint>>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let (project_registry, _canon_project_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let resp = tokio::task::spawn_blocking(move || {
@@ -361,12 +368,13 @@ pub struct ValidateComponentRequest {
 
 pub(super) async fn handle_get_icon_manifest(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Result<Json<constraint_engine::IconManifest>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let (project_registry, project_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let resp = tokio::task::spawn_blocking(move || {
@@ -391,13 +399,14 @@ pub(super) async fn handle_get_icon_manifest(
 
 pub(super) async fn handle_validate_icon(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
     Json(req): Json<ValidateIconRequest>,
 ) -> Result<Json<constraint_engine::IconValidationReport>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let (project_registry, project_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let resp = tokio::task::spawn_blocking(move || {
@@ -423,13 +432,14 @@ pub(super) async fn handle_validate_icon(
 
 pub(super) async fn handle_validate_typography(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
     Json(req): Json<ValidateTypographyRequest>,
 ) -> Result<Json<constraint_engine::TypographyValidationReport>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let (project_registry, project_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let resp = tokio::task::spawn_blocking(move || {
@@ -462,13 +472,14 @@ pub(super) async fn handle_validate_typography(
 
 pub(super) async fn handle_validate_component(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
     Json(req): Json<ValidateComponentRequest>,
 ) -> Result<Json<constraint_engine::ComponentValidationReport>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let (project_registry, project_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let resp = tokio::task::spawn_blocking(move || {
@@ -498,12 +509,13 @@ pub(super) async fn handle_validate_component(
 
 pub(super) async fn handle_get_design_contracts(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Result<Json<domain::ProjectDesignContracts>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let (project_registry, project_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let resp = tokio::task::spawn_blocking(move || {
@@ -527,13 +539,14 @@ pub(super) async fn handle_get_design_contracts(
 
 pub(super) async fn handle_put_design_contracts(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
     Json(contracts): Json<domain::ProjectDesignContracts>,
 ) -> Result<Json<domain::ProjectDesignContracts>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let (project_registry, project_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
     let resp = tokio::task::spawn_blocking(move || {
@@ -564,12 +577,13 @@ pub(super) async fn handle_put_design_contracts(
 
 pub(super) async fn handle_inject_ff_id(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
     Json(req): Json<constraint_engine::AstInjectionRequest>,
 ) -> Result<Json<constraint_engine::AstInjectionResponse>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let _ = verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+    let _ = verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
         .map_err(map_error_to_response)?;
 
     let resp = tokio::task::spawn_blocking(move || {
@@ -591,12 +605,13 @@ pub(super) async fn handle_inject_ff_id(
 
 pub(super) async fn handle_surgical_patch(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
     Json(req): Json<constraint_engine::SurgicalPatchRequest>,
 ) -> Result<Json<constraint_engine::SurgicalPatchResponse>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let _ = verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+    let _ = verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
         .map_err(map_error_to_response)?;
 
     let resp = tokio::task::spawn_blocking(move || {
@@ -658,10 +673,12 @@ pub struct SdiCompileResponse {
     pub target_scope: TargetScopeDto,
     pub ambiguity_score: f64,
     pub risk_score: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub clarification_variants: Option<Vec<ClarificationVariantDto>>,
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub design_intent_v1: Option<domain::DesignIntentV1>,
 }
 
@@ -674,22 +691,107 @@ pub struct SdiClarificationRequest {
     pub selected_variant_id: String,
 }
 
+fn resolve_sdi_tenant_id(
+    registry: &spec_registry::SpecRegistry,
+    project_id: Uuid,
+    caller: Option<&VerifiedLegacyIngress>,
+) -> String {
+    match caller {
+        Some(verified)
+            if matches!(
+                verified.kind,
+                crate::daemon_auth::LegacyAuthKind::HmacV2
+                    | crate::daemon_auth::LegacyAuthKind::SessionToken
+            ) && !verified.principal.tenant_id.trim().is_empty() =>
+        {
+            verified.principal.tenant_id.trim().to_string()
+        }
+        _ => registry
+            .pool()
+            .connection()
+            .ok()
+            .and_then(|conn| {
+                conn.query_row(
+                    "SELECT tenant_id FROM projects WHERE id = ?1",
+                    params![project_id.to_string()],
+                    |r| r.get::<_, String>(0),
+                )
+                .ok()
+            })
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| "local-default".to_string()),
+    }
+}
+
+fn map_sdi_intent_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SdiCompileResponse> {
+    let id_str: String = row.get(0)?;
+    let tenant_id: String = row.get(1)?;
+    let project_id_str: String = row.get(2)?;
+    let raw_prompt: String = row.get(3)?;
+    let intent_type: String = row.get(4)?;
+    let scope_json: String = row.get(5)?;
+    let ambiguity_score: f64 = row.get(6)?;
+    let risk_score: f64 = row.get(7)?;
+    let variants_json: Option<String> = row.get(8)?;
+    let status: String = row.get(9)?;
+    let design_intent_json: Option<String> = row.get(10)?;
+    let created_at: String = row.get(11)?;
+    let updated_at: String = row.get(12)?;
+
+    let target_scope = serde_json::from_str(&scope_json).unwrap_or(TargetScopeDto {
+        node_ids: vec![],
+        screen_keys: vec![],
+        components: vec![],
+    });
+    let clarification_variants = variants_json
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<Vec<ClarificationVariantDto>>(raw).ok());
+    let design_intent_v1 = design_intent_json
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<domain::DesignIntentV1>(raw).ok());
+
+    Ok(SdiCompileResponse {
+        id: Uuid::parse_str(&id_str).unwrap_or_else(|_| Uuid::nil()),
+        tenant_id,
+        project_id: Uuid::parse_str(&project_id_str).unwrap_or_else(|_| Uuid::nil()),
+        raw_prompt,
+        intent_type,
+        target_scope,
+        ambiguity_score,
+        risk_score,
+        clarification_variants,
+        status,
+        created_at,
+        updated_at,
+        design_intent_v1,
+    })
+}
+
+fn intent_not_found(id: Uuid) -> Response {
+    (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::json!({
+            "code": "INTENT_NOT_FOUND",
+            "error": "INTENT_NOT_FOUND",
+            "message": format!("SDI intent '{id}' was not found for this project/tenant"),
+        })),
+    )
+        .into_response()
+}
+
 pub(super) async fn handle_sdi_intent(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
     Json(req): Json<SdiCompileRequest>,
 ) -> Result<(StatusCode, Json<SdiCompileResponse>), Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let (_project_registry, _canon_project_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
-    let tenant_id = headers
-        .get("x-tenant-id")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "default-tenant".to_string());
+    let tenant_id = resolve_sdi_tenant_id(&state.registry, project_id, caller.as_deref());
 
     let slicer = spec_registry::context_slicer::ContextSlicer::new(&state.registry);
     let active_constraints = slicer
@@ -701,10 +803,18 @@ pub(super) async fn handle_sdi_intent(
         || lower.contains("fix")
         || lower.contains("sửa")
         || lower.contains("change")
-        || lower.contains("update");
+        || lower.contains("update")
+        || lower.contains("tối ưu")
+        || lower.contains("cải tiến")
+        || lower.contains("giao diện");
     let has_specific = lower.contains("node")
         || lower.contains("screen")
         || lower.contains("button")
+        || lower.contains("header")
+        || lower.contains("table")
+        || lower.contains("drawer")
+        || lower.contains("input")
+        || lower.contains("auth")
         || req.target_node_id.is_some();
 
     let ambiguity_score = if has_vague && !has_specific {
@@ -784,9 +894,15 @@ pub(super) async fn handle_sdi_intent(
         components: vec![],
     };
 
+    let status = if is_ambiguous {
+        "clarifying".to_string()
+    } else {
+        "ready".to_string()
+    };
+
     let resp = SdiCompileResponse {
         id: intent_id,
-        tenant_id,
+        tenant_id: tenant_id.clone(),
         project_id,
         raw_prompt: req.raw_prompt,
         intent_type: "create_screen".to_string(),
@@ -794,77 +910,247 @@ pub(super) async fn handle_sdi_intent(
         ambiguity_score,
         risk_score,
         clarification_variants: variants,
-        status: if is_ambiguous {
-            "clarifying".to_string()
-        } else {
-            "ready".to_string()
-        },
+        status,
         created_at: now.clone(),
         updated_at: now,
         design_intent_v1: Some(design_intent),
     };
 
+    let resp_to_store = resp.clone();
+    tokio::task::spawn_blocking(move || {
+        let scope_json =
+            serde_json::to_string(&resp_to_store.target_scope).unwrap_or_else(|_| "{}".to_string());
+        let variants_json = resp_to_store
+            .clarification_variants
+            .as_ref()
+            .and_then(|v| serde_json::to_string(v).ok());
+        let design_intent_json = resp_to_store
+            .design_intent_v1
+            .as_ref()
+            .and_then(|d| serde_json::to_string(d).ok());
+
+        let mut conn = project_registry.pool().connection()?;
+        retry_on_busy("insert_sdi_intent", || {
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            tx.execute(
+                "INSERT INTO sdi_intents (
+                    id, tenant_id, project_id, raw_prompt, intent_type, target_scope_json,
+                    ambiguity_score, risk_score, variants_json, selected_variant_id,
+                    status, design_intent_json, created_at, updated_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL, ?10, ?11, ?12, ?13)",
+                params![
+                    resp_to_store.id.to_string(),
+                    resp_to_store.tenant_id,
+                    resp_to_store.project_id.to_string(),
+                    resp_to_store.raw_prompt,
+                    resp_to_store.intent_type,
+                    scope_json,
+                    resp_to_store.ambiguity_score,
+                    resp_to_store.risk_score,
+                    variants_json,
+                    resp_to_store.status,
+                    design_intent_json,
+                    resp_to_store.created_at,
+                    resp_to_store.updated_at,
+                ],
+            )?;
+            tx.commit()
+        })
+    })
+    .await
+    .map_err(|e| {
+        map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("BLOCKING_TASK_FAILED: {e}"),
+        })
+    })?
+    .map_err(map_error_to_response)?;
+
     Ok((StatusCode::CREATED, Json(resp)))
+}
+
+pub(super) async fn handle_list_sdi_intents(
+    State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
+    AxumPath(id): AxumPath<String>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<SdiCompileResponse>>, Response> {
+    let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
+    let tenant_id = resolve_sdi_tenant_id(&state.registry, project_id, caller.as_deref());
+
+    let items = tokio::task::spawn_blocking(move || {
+        let conn = project_registry.pool().connection()?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, tenant_id, project_id, raw_prompt, intent_type, target_scope_json,
+                        ambiguity_score, risk_score, variants_json, status, design_intent_json,
+                        created_at, updated_at
+                 FROM sdi_intents
+                 WHERE project_id = ?1 AND tenant_id = ?2
+                 ORDER BY updated_at DESC",
+            )
+            .map_err(|e| map_sqlite_error(e, "prepare_list_sdi_intents"))?;
+        let rows = stmt
+            .query_map(
+                params![project_id.to_string(), tenant_id],
+                map_sdi_intent_row,
+            )
+            .map_err(|e| map_sqlite_error(e, "query_list_sdi_intents"))?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r.map_err(|e| map_sqlite_error(e, "row_list_sdi_intents"))?);
+        }
+        Ok::<_, HarnessError>(out)
+    })
+    .await
+    .map_err(|e| {
+        map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("BLOCKING_TASK_FAILED: {e}"),
+        })
+    })?
+    .map_err(map_error_to_response)?;
+
+    Ok(Json(items))
+}
+
+pub(super) async fn handle_get_sdi_intent(
+    State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
+    AxumPath((id, intent_id_raw)): AxumPath<(String, String)>,
+    headers: HeaderMap,
+) -> Result<Json<SdiCompileResponse>, Response> {
+    let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
+    let intent_id = parse_project_uuid(&intent_id_raw).map_err(map_error_to_response)?;
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
+            .map_err(map_error_to_response)?;
+    let tenant_id = resolve_sdi_tenant_id(&state.registry, project_id, caller.as_deref());
+
+    let found = tokio::task::spawn_blocking(move || {
+        let conn = project_registry.pool().connection()?;
+        conn.query_row(
+            "SELECT id, tenant_id, project_id, raw_prompt, intent_type, target_scope_json,
+                    ambiguity_score, risk_score, variants_json, status, design_intent_json,
+                    created_at, updated_at
+             FROM sdi_intents
+             WHERE id = ?1 AND project_id = ?2 AND tenant_id = ?3",
+            params![intent_id.to_string(), project_id.to_string(), tenant_id],
+            map_sdi_intent_row,
+        )
+        .optional()
+        .map_err(|e| map_sqlite_error(e, "get_sdi_intent"))
+    })
+    .await
+    .map_err(|e| {
+        map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("BLOCKING_TASK_FAILED: {e}"),
+        })
+    })?
+    .map_err(map_error_to_response)?;
+
+    match found {
+        Some(item) => Ok(Json(item)),
+        None => Err(intent_not_found(intent_id)),
+    }
 }
 
 pub(super) async fn handle_sdi_clarification(
     State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
     AxumPath(id): AxumPath<String>,
     headers: HeaderMap,
     Json(req): Json<SdiClarificationRequest>,
 ) -> Result<Json<SdiCompileResponse>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let (_project_registry, _canon_project_root, _) =
-        verify_anti_idor_and_resolve_registry(&state.registry, project_id, &headers)
+    let (project_registry, _canon_project_root, _) =
+        verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
+    let tenant_id = resolve_sdi_tenant_id(&state.registry, project_id, caller.as_deref());
 
-    let valid_variants = ["var-1-minimal", "var-2-balanced", "var-3-modular"];
-    if !valid_variants.contains(&req.selected_variant_id.as_str()) {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({
-                "error": "INVALID_VARIANT_ID",
-                "message": format!("Variant '{}' is not recognized", req.selected_variant_id),
-            })),
-        )
-            .into_response());
-    }
-
-    let tenant_id = headers
-        .get("x-tenant-id")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "default-tenant".to_string());
-
-    let target_scope = TargetScopeDto {
-        node_ids: vec![],
-        screen_keys: vec![],
-        components: vec![],
-    };
-
+    let intent_id = req.intent_id;
+    let selected_variant_id = req.selected_variant_id.trim().to_string();
     let now = chrono::Utc::now().to_rfc3339();
-    let resp = SdiCompileResponse {
-        id: req.intent_id,
-        tenant_id,
-        project_id,
-        raw_prompt: "Clarified intent".to_string(),
-        intent_type: "create_screen".to_string(),
-        target_scope,
-        ambiguity_score: 0.20,
-        risk_score: 0.25,
-        clarification_variants: None,
-        status: "ready".to_string(),
-        created_at: now.clone(),
-        updated_at: now,
-        design_intent_v1: Some(domain::DesignIntentV1 {
-            id: req.intent_id,
-            project_id,
-            visual_style: "clean-modern".to_string(),
-            color_palette: vec!["#3B82F6".to_string(), "#10B981".to_string()],
-            typography: vec!["Inter".to_string()],
-            key_principles: vec![format!("Selected Variant: {}", req.selected_variant_id)],
-        }),
-    };
 
-    Ok(Json(resp))
+    let result = tokio::task::spawn_blocking(move || {
+        let mut conn = project_registry.pool().connection()?;
+        let existing = conn
+            .query_row(
+                "SELECT id, tenant_id, project_id, raw_prompt, intent_type, target_scope_json,
+                        ambiguity_score, risk_score, variants_json, status, design_intent_json,
+                        created_at, updated_at
+                 FROM sdi_intents
+                 WHERE id = ?1 AND project_id = ?2 AND tenant_id = ?3",
+                params![intent_id.to_string(), project_id.to_string(), tenant_id],
+                map_sdi_intent_row,
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "select_sdi_clarification"))?;
+
+        let Some(mut intent) = existing else {
+            return Ok::<_, HarnessError>(Err(intent_not_found(intent_id)));
+        };
+
+        let valid_variant = intent
+            .clarification_variants
+            .as_ref()
+            .is_some_and(|list| list.iter().any(|v| v.id == selected_variant_id));
+        if !valid_variant {
+            return Ok(Err((
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "code": "INVALID_VARIANT_ID",
+                    "error": "INVALID_VARIANT_ID",
+                    "message": format!("Variant '{selected_variant_id}' is not valid for intent '{intent_id}'"),
+                })),
+            )
+                .into_response()));
+        }
+
+        intent.status = "ready".to_string();
+        intent.updated_at = now.clone();
+        if let Some(ref mut di) = intent.design_intent_v1 {
+            let marker = format!("Selected Variant: {selected_variant_id}");
+            if !di.key_principles.contains(&marker) {
+                di.key_principles.push(marker);
+            }
+        }
+        let updated_di_json = intent
+            .design_intent_v1
+            .as_ref()
+            .and_then(|d| serde_json::to_string(d).ok());
+
+        retry_on_busy("update_sdi_clarification", || {
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            tx.execute(
+                "UPDATE sdi_intents
+                 SET selected_variant_id = ?1,
+                     status = 'ready',
+                     design_intent_json = COALESCE(?2, design_intent_json),
+                     updated_at = ?3
+                 WHERE id = ?4 AND project_id = ?5 AND tenant_id = ?6",
+                params![
+                    selected_variant_id,
+                    updated_di_json,
+                    now,
+                    intent_id.to_string(),
+                    project_id.to_string(),
+                    tenant_id,
+                ],
+            )?;
+            tx.commit()
+        })?;
+
+        Ok(Ok(intent))
+    })
+    .await
+    .map_err(|e| {
+        map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("BLOCKING_TASK_FAILED: {e}"),
+        })
+    })?
+    .map_err(map_error_to_response)?;
+
+    result.map(Json)
 }

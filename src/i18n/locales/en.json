@@ -140,5 +140,18 @@
     "nodeCard": "Screen Node Card",
     "radarMinimap": "DAG Radar Minimap",
     "radarTitle": "RADAR MINIMAP"
+  },
+  "brand": {
+    "symbolAlt": "cowok brand symbol"
+  },
+  "common": {
+    "close": "Close"
+  },
+  "floatingChat": {
+    "reviewSummaryAria": "Node Job Summary",
+    "nodeSummaryTitle": "Node Summary",
+    "expandChatTitle": "Expand Chat Panel",
+    "contextHeader": "Contextual Conversation",
+    "emptyHint": "Enter a request for the Agent to edit or wire flows automatically"
   }
 }

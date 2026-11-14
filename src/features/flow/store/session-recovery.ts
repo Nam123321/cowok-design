@@ -23,15 +23,14 @@ export function generateDraftUuid(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") {
     return globalThis.crypto.randomUUID();
   }
-  const hex = "0123456789abcdef";
-  let out = "";
-  for (let i = 0; i < 36; i++) {
-    if (i === 8 || i === 13 || i === 18 || i === 23) out += "-";
-    else if (i === 14) out += "4";
-    else if (i === 19) out += hex[(Math.random() * 4) | 8];
-    else out += hex[(Math.random() * 16) | 0];
+  const bytes = new Uint8Array(16);
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    globalThis.crypto.getRandomValues(bytes);
   }
-  return out;
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 export function capUndoStack(stack: StructuralSnapshot[]): StructuralSnapshot[] {

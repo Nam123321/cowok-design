@@ -1,3 +1,5 @@
+// @story 04.2
+import { z } from "zod";
 import {
   CreateScreenFixture,
   CreateScreenFixtureSchema,
@@ -6,102 +8,83 @@ import {
   UpdateScreenFixture,
   UpdateScreenFixtureSchema,
   ViewportPreset,
+  ViewportPresetSchema,
 } from "../lib/validations/screen-fixture";
+import {
+  type HarnessDaemonClientConfig,
+  HarnessDaemonTransport,
+} from "./harness-daemon-transport";
 
-/**
- * Domain-Driven Client SDK for Screen State Fixtures & Live Preview (ADR-092 compliance)
- */
-
-export interface ApiClientConfig {
-  baseUrl?: string;
+export interface ApiClientConfig extends HarnessDaemonClientConfig {
   getAuthToken?: () => string | null;
 }
 
-export class ScreenFixtureClient {
-  private baseUrl: string;
-  private getAuthToken?: () => string | null;
+const ViewportPresetUpdateResponseSchema = z.object({
+  success: z.boolean(),
+  viewportPreset: ViewportPresetSchema,
+});
 
+export class ScreenFixtureClient extends HarnessDaemonTransport {
   constructor(config: ApiClientConfig = {}) {
-    this.baseUrl = config.baseUrl || "";
-    this.getAuthToken = config.getAuthToken;
-  }
-
-  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const headers = new Headers(options.headers || {});
-    headers.set("Content-Type", "application/json");
-
-    if (this.getAuthToken) {
-      const token = this.getAuthToken();
-      if (token) {
-        headers.set("Authorization", `Bearer ${token}`);
-      }
-    }
-
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      ...options,
-      headers,
+    super({
+      ...config,
+      getSessionToken: config.getSessionToken || config.getAuthToken,
     });
-
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      const error = new Error(errorBody.message || `HTTP ${response.status}: ${response.statusText}`);
-      (error as unknown as { status: number }).status = response.status;
-      throw error;
-    }
-
-    return response.json();
   }
 
-  async getFixtures(projectId: string, nodeId: string): Promise<ScreenFixtureResponse[]> {
-    const raw = await this.request<ScreenFixtureResponse[]>(
-      `/api/v1/projects/${projectId}/flow/nodes/${nodeId}/fixtures`
+  getFixtures(projectId: string, nodeId: string): Promise<ScreenFixtureResponse[]> {
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}/fixtures`,
+      z.array(ScreenFixtureResponseSchema),
+      { method: "GET" }
     );
-    return raw.map((item) => ScreenFixtureResponseSchema.parse(item));
   }
 
-  async saveFixture(
+  saveFixture(
     projectId: string,
     nodeId: string,
     input: CreateScreenFixture
   ): Promise<ScreenFixtureResponse> {
     const validated = CreateScreenFixtureSchema.parse(input);
-    const raw = await this.request<ScreenFixtureResponse>(
-      `/api/v1/projects/${projectId}/flow/nodes/${nodeId}/fixtures`,
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}/fixtures`,
+      ScreenFixtureResponseSchema,
       {
         method: "POST",
         body: JSON.stringify(validated),
       }
     );
-    return ScreenFixtureResponseSchema.parse(raw);
   }
 
-  async updateFixture(
+  updateFixture(
     projectId: string,
     nodeId: string,
     fixtureId: string,
     input: UpdateScreenFixture
   ): Promise<ScreenFixtureResponse> {
     const validated = UpdateScreenFixtureSchema.parse(input);
-    const raw = await this.request<ScreenFixtureResponse>(
-      `/api/v1/projects/${projectId}/flow/nodes/${nodeId}/fixtures/${fixtureId}`,
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}/fixtures/${encodeURIComponent(fixtureId)}`,
+      ScreenFixtureResponseSchema,
       {
         method: "PATCH",
         body: JSON.stringify(validated),
       }
     );
-    return ScreenFixtureResponseSchema.parse(raw);
   }
 
-  async setViewportPreset(
+  setViewportPreset(
     projectId: string,
     nodeId: string,
     viewportPreset: ViewportPreset
   ): Promise<{ success: boolean; viewportPreset: ViewportPreset }> {
-    return this.request<{ success: boolean; viewportPreset: ViewportPreset }>(
-      `/api/v1/projects/${projectId}/flow/nodes/${nodeId}/viewport`,
+    const validatedPreset = ViewportPresetSchema.parse(viewportPreset);
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}/viewport`,
+      ViewportPresetUpdateResponseSchema,
       {
         method: "PATCH",
-        body: JSON.stringify({ viewportPreset }),
+        body: JSON.stringify({ viewportPreset: validatedPreset }),
       }
     );
   }

@@ -47,3 +47,24 @@ links_to:
 - [x] **Tracer Bullet?** Yes
 - [x] **Deletion Testable?** Yes
 - [x] **Interface vs Implementation?** Yes
+
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-02.1](./Story-02.1/story.md) | Bộ định tuyến Task Horizon (short / mid / long) & Cross-Department Context Slicer | 01.2 | ready-for-dev |
+| [Story-02.2](./Story-02.2/story.md) | Token Budget Governor (<= 1,500 Input Tokens) & Deterministic Prompt Compiler | 02.1 | planned |
+| [Story-02.3](./Story-02.3/story.md) | Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter) | 02.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-02.1](./Story-02.1/story.md) | Bộ định tuyến Task Horizon (short / mid / long) & Cross-Department Context Slicer | 01.2 | ready-for-dev |
+| [Story-02.2](./Story-02.2/story.md) | Token Budget Governor (<= 1,500 Input Tokens) & Deterministic Prompt Compiler | 02.1 | planned |
+| [Story-02.3](./Story-02.3/story.md) | Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter) | 02.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-02.1](./Story-02.1/story.md) | Bộ định tuyến Task Horizon (short / mid / long) & Cross-Department Context Slicer | 01.2 | ready-for-dev |
+| [Story-02.2](./Story-02.2/story.md) | Token Budget Governor (<= 1,500 Input Tokens) & Deterministic Prompt Compiler | 02.1 | planned |
+| [Story-02.3](./Story-02.3/story.md) | Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter) | 02.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-02.1](./Story-02.1/story.md) | Bộ định tuyến Task Horizon (short / mid / long) & Cross-Department Context Slicer | 01.2 | ready-for-dev |
+| [Story-02.2](./Story-02.2/story.md) | Token Budget Governor (<= 1,500 Input Tokens) & Deterministic Prompt Compiler | 02.1 | planned |
+| [Story-02.3](./Story-02.3/story.md) | Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter) | 02.2 | planned |

@@ -24,8 +24,9 @@ pub use pool::{SqlitePool, SqliteWalConfig};
 pub use recovery::recover_pending_spec;
 pub use registry::{SpecRecord, SpecRegistry, SpecRevisionRecord, SyncOutcome, UpsertSpecInput};
 pub use sync::{
-    atomic_write_spec_file, compute_sha256_hex, compute_summary_digest, read_jailed_spec_bytes,
-    remove_jailed_temp_file, resolve_jailed_spec_path, validate_candidate_spec_path,
+    atomic_write_spec_file, compute_sha256_hex, compute_summary_digest, delete_jailed_spec_file,
+    read_jailed_spec_bytes, remove_jailed_temp_file, resolve_jailed_spec_path,
+    validate_candidate_spec_path,
 };
 pub use watcher::SpecWatcher;
 

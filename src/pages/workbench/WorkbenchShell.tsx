@@ -13,6 +13,7 @@ import { WorkbenchBodyLayout } from "./components/WorkbenchBodyLayout";
 import { useWorkbenchShellState } from "./hooks/useWorkbenchShellState";
 import { DEFAULT_FLOW_PROJECT_ID, DEFAULT_INITIAL_NODES, DEFAULT_INITIAL_TRANSITIONS } from "./constants";
 import { useTranslation } from "../../hooks/useTranslation";
+import { apiHarnessDaemon } from "../../api/harness-daemon";
 
 export type { ThemeMode };
 
@@ -56,16 +57,11 @@ async function pickAndLinkProjectFolder(
       const dirHandle = await (window as unknown as { showDirectoryPicker: () => Promise<{ name?: string }> }).showDirectoryPicker();
       if (dirHandle?.name) {
         try {
-          const res = await fetch(`/api/projects/${projId}/path-token`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ relative_path: dirHandle.name }),
+          const data = await apiHarnessDaemon.issuePathToken(projId, {
+            relative_path: dirHandle.name,
           });
-          if (res.ok) {
-            const data = await res.json();
-            onLink(projId, data.normalized_relative_path || `./projects/${dirHandle.name}`);
-            return;
-          }
+          onLink(projId, data.normalized_relative_path || `./projects/${dirHandle.name}`);
+          return;
         } catch {
           // Fallback to relative path
         }

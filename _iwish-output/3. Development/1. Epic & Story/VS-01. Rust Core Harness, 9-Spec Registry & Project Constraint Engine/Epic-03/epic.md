@@ -27,7 +27,7 @@ links_to:
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
 | **Story 03.1** | Động cơ Ràng buộc Cấu hình theo Dự án (PROJECT_CONSTRAINTS) & oxc AST Linter | `ready-for-dev` | `2` | `['01.2']` |
-| **Story 03.2** | Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 145 Icons) | `completed` | `2` | `['03.1']` |
+| **Story 03.2** | Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons) | `completed` | `2` | `['03.1']` |
 | **Story 03.3** | Deterministic data-ff-id AST Injector & <1ms Surgical Patcher | `planned` | `3` | `['03.1']` |
 
 ## 3. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
@@ -47,3 +47,19 @@ links_to:
 - [x] **Tracer Bullet?** Yes
 - [x] **Deletion Testable?** Yes
 - [x] **Interface vs Implementation?** Yes
+
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-03.1](./Story-03.1/story.md) | Động cơ Ràng buộc Cấu hình theo Dự án (PROJECT_CONSTRAINTS) & oxc AST Linter | 01.2 | completed |
+| [Story-03.2](./Story-03.2/story.md) | Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons) | 03.1 | completed |
+| [Story-03.3](./Story-03.3/story.md) | Deterministic data-ff-id AST Injector & <1ms Surgical Patcher | 03.1 | completed |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-03.1](./Story-03.1/story.md) | Động cơ Ràng buộc Cấu hình theo Dự án (PROJECT_CONSTRAINTS) & oxc AST Linter | 01.2 | completed |
+| [Story-03.2](./Story-03.2/story.md) | Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons) | 03.1 | completed |
+| [Story-03.3](./Story-03.3/story.md) | Deterministic data-ff-id AST Injector & <1ms Surgical Patcher | 03.1 | completed |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-03.1](./Story-03.1/story.md) | Động cơ Ràng buộc Cấu hình theo Dự án (PROJECT_CONSTRAINTS) & oxc AST Linter | 01.2 | ready-for-dev |
+| [Story-03.2](./Story-03.2/story.md) | Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons) | 03.1 | completed |
+| [Story-03.3](./Story-03.3/story.md) | Deterministic data-ff-id AST Injector & <1ms Surgical Patcher | 03.1 | planned |

@@ -10,7 +10,10 @@ export interface LoopbackSessionRecord {
   expiresAt: number;
 }
 
-const sessionRegistry = new Map<string, LoopbackSessionRecord>();
+const globalSessionRegistryKey = Symbol.for("cowok.loopback.sessionRegistry");
+const sessionRegistry: Map<string, LoopbackSessionRecord> =
+  ((globalThis as unknown as Record<symbol, Map<string, LoopbackSessionRecord>>)[globalSessionRegistryKey] ??=
+    new Map<string, LoopbackSessionRecord>());
 const SESSION_TTL_MS = 8 * 60 * 60 * 1_000;
 
 export function issueBffLoopbackSession(input?: {
@@ -102,20 +105,30 @@ type RouteHandler<B, Q> = (
   data: { body?: B; query?: Q }
 ) => Promise<Response> | Response;
 
+function resolveFallbackRole(userRoles: string[]): "viewer" | "editor" | "admin" {
+  if (userRoles.includes("admin")) return "admin";
+  if (userRoles.includes("editor")) return "editor";
+  return "viewer";
+}
+
 function resolveAuthIdentity<B, Q>(
   req: Request,
   url: URL,
   options: GuardedRouteOptions<B, Q>,
   context: { tenantId?: string }
 ): { ok: true; tenantId: string; userId: string; role: "viewer" | "editor" | "admin" } | { ok: false; response: Response } {
-  if (options.authMode === "strict-loopback") {
+  // Always enforce strict loopback token verification in non-test runtime or when opted in.
+  const isVitestHarness = typeof process !== "undefined" && process.env?.VITEST === "true";
+  if (options.authMode === "strict-loopback" || !isVitestHarness) {
     const verified = verifyStrictLoopback(req, url);
     if (!verified.ok) return verified;
     return { ok: true, ...verified.session };
   }
+  const rawRoles = req.headers.get("x-user-roles") || "";
+  const userRoles = rawRoles
+    ? rawRoles.split(",").map((r) => r.trim().toLowerCase()).filter(Boolean)
+    : ["viewer"];
   if (options.roles && options.roles.length > 0) {
-    const raw = req.headers.get("x-user-roles") || "";
-    const userRoles = raw ? raw.split(",").map((r) => r.trim().toLowerCase()) : ["editor", "admin"];
     const allowed = options.roles.map((r) => r.toLowerCase());
     if (!allowed.some((r) => userRoles.includes(r) || userRoles.includes("admin"))) {
       return { ok: false, response: jsonResp(403, { error: "FORBIDDEN", message: "Insufficient permissions" }) };
@@ -125,7 +138,7 @@ function resolveAuthIdentity<B, Q>(
     ok: true,
     tenantId: context.tenantId || req.headers.get("x-tenant-id") || "default-tenant",
     userId: req.headers.get("x-user-id") || "anonymous",
-    role: "editor",
+    role: resolveFallbackRole(userRoles),
   };
 }
 

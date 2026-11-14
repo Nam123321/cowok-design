@@ -35,11 +35,13 @@ import {
   XIcon,
 } from "./icons/navigation-icons";
 import { WORKFLOW_ICON_COMPONENTS, WorkflowIcon, WorkspaceIcon } from "./icons/workflow-icons";
+import { FLAGSHIP_DOMAIN_ICON_COMPONENTS } from "./icons/flagship-domain-icons";
 
 export type { CowokIconProps };
 export const useIconTranslation = useTranslation;
 
 export const COWOK_ICON_REGISTRY: Record<string, React.ComponentType<CowokIconProps>> = {
+  ...FLAGSHIP_DOMAIN_ICON_COMPONENTS,
   ...CORE_ICON_COMPONENTS,
   ...NAV_ICON_COMPONENTS,
   ...WORKFLOW_ICON_COMPONENTS,

@@ -118,3 +118,23 @@ links_to:
 | [Story-09.1](./Story-09.1/story.md) | Xây dựng crates/design-rea-forge (Trích xuất Design DNA & Ranh giới Design-Only) | 03.1, 08.2 | planned |
 | [Story-09.2](./Story-09.2/story.md) | Tích hợp Jev Choice (<2ms Routing), Jev Noul (<1ms Pre-Filter) & Speculative Multi-Head (crates/jev-engine) | 03.2, 08.1 | planned |
 | [Story-09.3](./Story-09.3/story.md) | Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile OCC & 3-Strike Breaker | 09.2 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-09.1](./Story-09.1/story.md) | Xây dựng crates/design-rea-forge (Trích xuất Design DNA & Ranh giới Design-Only) | 03.1, 08.2 | refactored |
+| [Story-09.2](./Story-09.2/story.md) | Tích hợp Jev Choice (<2ms Routing), Jev Noul (<1ms Pre-Filter) & Speculative Multi-Head (crates/jev-engine) | 03.2, 08.1 | refactored |
+| [Story-09.3](./Story-09.3/story.md) | Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile OCC & 3-Strike Breaker | 09.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-09.1](./Story-09.1/story.md) | Xây dựng crates/design-rea-forge (Trích xuất Design DNA & Ranh giới Design-Only) | 03.1, 08.2 | refactored |
+| [Story-09.2](./Story-09.2/story.md) | Tích hợp Jev Choice (<2ms Routing), Jev Noul (<1ms Pre-Filter) & Speculative Multi-Head (crates/jev-engine) | 03.2, 08.1 | refactored |
+| [Story-09.3](./Story-09.3/story.md) | Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile OCC & 3-Strike Breaker | 09.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-09.1](./Story-09.1/story.md) | Xây dựng crates/design-rea-forge (Trích xuất Design DNA & Ranh giới Design-Only) | 03.1, 08.2 | refactored |
+| [Story-09.2](./Story-09.2/story.md) | Tích hợp Jev Choice (<2ms Routing), Jev Noul (<1ms Pre-Filter) & Speculative Multi-Head (crates/jev-engine) | 03.2, 08.1 | refactored |
+| [Story-09.3](./Story-09.3/story.md) | Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile OCC & 3-Strike Breaker | 09.2 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-09.1](./Story-09.1/story.md) | Xây dựng crates/design-rea-forge (Trích xuất Design DNA & Ranh giới Design-Only) | 03.1, 08.2 | refactored |
+| [Story-09.2](./Story-09.2/story.md) | Tích hợp Jev Choice (<2ms Routing), Jev Noul (<1ms Pre-Filter) & Speculative Multi-Head (crates/jev-engine) | 03.2, 08.1 | refactored |
+| [Story-09.3](./Story-09.3/story.md) | Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile OCC & 3-Strike Breaker | 09.2 | refactored |

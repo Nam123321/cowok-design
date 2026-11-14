@@ -49,6 +49,11 @@ jobs:
       - name: Build Rust Backend Daemon
         run: cargo build --bin harness-daemon
 
+      - name: Start Rust Backend Daemon
+        run: |
+          ./target/debug/harness-daemon &
+          sleep 2
+
       - name: Build Production Frontend
         run: pnpm run build
 

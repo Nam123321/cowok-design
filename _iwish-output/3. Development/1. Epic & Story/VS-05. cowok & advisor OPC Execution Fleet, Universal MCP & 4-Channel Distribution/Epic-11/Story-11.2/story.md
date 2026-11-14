@@ -2,7 +2,7 @@
 type: I-Wish Story
 id: "11.2"
 title: "Story 11.2: Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging)"
-description: "Cho phép mô hình Tier-1 hoặc advisor tạo script phụ trợ dùng một lần trong thư mục .uiux-os/ephemeral-tools/, quét AST/capabilities trước khi chạy với giới hạn thời gian <= 5s và đề xuất thăng cấp thành SKILL.md nếu tái sử dụng >= 3 lần."
+description: "Cho phép mô hình Tier-1 hoặc advisor tạo script phụ trợ dùng một lần trong thư mục .cowok-design/ephemeral-tools/, quét AST/capabilities trước khi chạy với giới hạn thời gian <= 5s và đề xuất thăng cấp thành SKILL.md nếu tái sử dụng >= 3 lần."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-11/Story-11.2/story.md"
 status: refactored
 risk_tier: 3
@@ -31,7 +31,7 @@ consumes_apis: []
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context
-Cho phép mô hình Tier-1 hoặc advisor tạo script phụ trợ dùng một lần trong thư mục .uiux-os/ephemeral-tools/, quét AST/capabilities trước khi chạy với giới hạn thời gian <= 5s và đề xuất thăng cấp thành SKILL.md nếu tái sử dụng >= 3 lần.
+Cho phép mô hình Tier-1 hoặc advisor tạo script phụ trợ dùng một lần trong thư mục .cowok-design/ephemeral-tools/, quét AST/capabilities trước khi chạy với giới hạn thời gian <= 5s và đề xuất thăng cấp thành SKILL.md nếu tái sử dụng >= 3 lần.
 
 ## 2. Plan-Tune Heuristic & Complexity Score
 - **Complexity Score (CS):** `CS = 4` (Scope=1, Data=1, Integration=1, UI=0.5, Security=0.5, Unknowns=0 $\rightarrow$ `CS = 4 < 7`, đạt ngưỡng an toàn, không cần tách nhỏ Story).

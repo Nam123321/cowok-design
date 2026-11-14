@@ -144,6 +144,20 @@ pub fn ensure_project_token(proj_canon_root: &Path) -> Result<String, HarnessErr
     }
 
     let token_file = token_dir.join("project.token");
+    if let Ok(meta) = fs::symlink_metadata(&token_dir) {
+        if meta.file_type().is_symlink() {
+            return Err(HarnessError::PathTraversalDenied {
+                path: token_dir.display().to_string(),
+            });
+        }
+    }
+    if let Ok(meta) = fs::symlink_metadata(&token_file) {
+        if meta.file_type().is_symlink() {
+            return Err(HarnessError::PathTraversalDenied {
+                path: token_file.display().to_string(),
+            });
+        }
+    }
     if !token_file.exists() {
         let secret = format!("tok_{}", Uuid::new_v4().simple());
         #[cfg(unix)]
@@ -151,44 +165,86 @@ pub fn ensure_project_token(proj_canon_root: &Path) -> Result<String, HarnessErr
             use std::io::Write;
             use std::os::unix::fs::OpenOptionsExt;
             let mut opts = fs::OpenOptions::new();
-            opts.write(true).create_new(true).mode(0o600);
-            if let Ok(mut f) = opts.open(&token_file) {
-                f.write_all(secret.as_bytes())
-                    .map_err(|e| HarnessError::ValidationFailed {
-                        reason: format!(
-                            "Failed to write token file '{}': {e}",
-                            token_file.display()
-                        ),
-                    })?;
-            } else {
-                fs::write(&token_file, &secret).map_err(|e| HarnessError::ValidationFailed {
+            opts.write(true)
+                .create_new(true)
+                .custom_flags(libc::O_NOFOLLOW)
+                .mode(0o600);
+            let mut f = opts
+                .open(&token_file)
+                .map_err(|e| HarnessError::ValidationFailed {
+                    reason: format!(
+                        "Failed to create token file '{}': {e}",
+                        token_file.display()
+                    ),
+                })?;
+            f.write_all(secret.as_bytes())
+                .map_err(|e| HarnessError::ValidationFailed {
                     reason: format!("Failed to write token file '{}': {e}", token_file.display()),
                 })?;
-            }
+            f.sync_all().map_err(|e| HarnessError::ValidationFailed {
+                reason: format!("Failed to sync token file '{}': {e}", token_file.display()),
+            })?;
         }
         #[cfg(not(unix))]
         {
-            fs::write(&token_file, &secret).map_err(|e| HarnessError::ValidationFailed {
-                reason: format!("Failed to write token file '{}': {e}", token_file.display()),
-            })?;
+            let mut opts = fs::OpenOptions::new();
+            opts.write(true).create_new(true);
+            use std::io::Write;
+            let mut f = opts
+                .open(&token_file)
+                .map_err(|e| HarnessError::ValidationFailed {
+                    reason: format!(
+                        "Failed to create token file '{}': {e}",
+                        token_file.display()
+                    ),
+                })?;
+            f.write_all(secret.as_bytes())
+                .map_err(|e| HarnessError::ValidationFailed {
+                    reason: format!("Failed to write token file '{}': {e}", token_file.display()),
+                })?;
         }
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(&token_file, fs::Permissions::from_mode(0o600));
+            fs::set_permissions(&token_file, fs::Permissions::from_mode(0o600)).map_err(|e| {
+                HarnessError::ValidationFailed {
+                    reason: format!("Failed to set 0600 permissions on project.token: {e}"),
+                }
+            })?;
         }
         Ok(secret)
     } else {
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(&token_file, fs::Permissions::from_mode(0o600));
+            use std::io::Read;
+            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+            fs::set_permissions(&token_file, fs::Permissions::from_mode(0o600)).map_err(|e| {
+                HarnessError::ValidationFailed {
+                    reason: format!("Failed to enforce 0600 permissions on project.token: {e}"),
+                }
+            })?;
+            let mut f = fs::OpenOptions::new()
+                .read(true)
+                .custom_flags(libc::O_NOFOLLOW)
+                .open(&token_file)
+                .map_err(|e| HarnessError::PathTraversalDenied {
+                    path: format!("{} ({e})", token_file.display()),
+                })?;
+            let mut s = String::new();
+            f.read_to_string(&mut s)
+                .map_err(|e| HarnessError::ValidationFailed {
+                    reason: format!("Failed to read project.token: {e}"),
+                })?;
+            Ok(s.trim().to_string())
         }
-        fs::read_to_string(&token_file)
-            .map(|s| s.trim().to_string())
-            .map_err(|e| HarnessError::ValidationFailed {
-                reason: format!("Failed to read project.token: {e}"),
-            })
+        #[cfg(not(unix))]
+        {
+            fs::read_to_string(&token_file)
+                .map(|s| s.trim().to_string())
+                .map_err(|e| HarnessError::ValidationFailed {
+                    reason: format!("Failed to read project.token: {e}"),
+                })
+        }
     }
 }
 
@@ -358,7 +414,7 @@ pub fn synthesize_nine_specs(
     for spec_key in CanonicalSpecKey::ALL {
         let is_brand_inheritable = matches!(
             spec_key,
-            CanonicalSpecKey::Architecture | CanonicalSpecKey::SecurityTenancy
+            CanonicalSpecKey::UiUxSpec | CanonicalSpecKey::DataAndCopy
         );
 
         let (markdown, src_proj_id, src_rev_sha, status_override) =
@@ -484,18 +540,75 @@ pub fn synthesize_nine_specs(
 
 fn render_spec_template(spec_key: CanonicalSpecKey, brief: &str, is_sparse: bool) -> String {
     let title = spec_key.as_str();
+    let domain_section = match spec_key {
+        CanonicalSpecKey::ProductOverview => (
+            "Product Scope, Personas & Value Proposition",
+            "- User Personas, Core Jobs-to-be-Done, and Success Metrics",
+            "Primary target personas and measurable north-star KPIs require product confirmation.",
+        ),
+        CanonicalSpecKey::DatabaseSpec => (
+            "Database Schema, WAL Persistence & Sync Contracts",
+            "- Relational Tables, Foreign Keys, Indexes & Optimistic Concurrency",
+            "Entity retention policies and tenant isolation indices need schema verification.",
+        ),
+        CanonicalSpecKey::UiUxSpec => (
+            "Visual Design System, Palette & Typography Tokens",
+            "- Accessible WCAG 2.2 AA contrast tokens, typography scale & Flagship Preset",
+            "Brand accent palette, typography family selection, and motion preferences are not locked.",
+        ),
+        CanonicalSpecKey::Architecture => (
+            "System Architecture & Storage Boundaries",
+            "- Loopback Rust Daemon + SQLite WAL + React/Vite BFF Isolation",
+            "Project-specific deployment topology, scaling limits, and sync cadence need sign-off.",
+        ),
+        CanonicalSpecKey::EpicsAndStories => (
+            "Execution Backlog, Epics & Vertical Story Slices",
+            "- Prioritized Vertical Slice Backlog & Traceable Acceptance Criteria",
+            "Sprint capacity ordering and non-MVP deferrals need PM prioritization.",
+        ),
+        CanonicalSpecKey::CrossDependencies => (
+            "Cross-Surface Dependencies & Integration Matrix",
+            "- Shared Package Contracts, Portals & External MCP/API Consumers",
+            "External webhook SLAs and third-party dependency fallbacks are not yet specified.",
+        ),
+        CanonicalSpecKey::ApiGuidelines => (
+            "API Contracts, Zod Schemas & BFF Routing Standards",
+            "- Typed Request/Response DTOs, Idempotency Keys & RFC Problem Details",
+            "Endpoint rate limits, pagination cursors, and deprecation headers need review.",
+        ),
+        CanonicalSpecKey::SecurityTenancy => (
+            "Security Controls, Authentication & Tenant Isolation",
+            "- Fail-Closed Loopback HMAC-SHA256 v2, Per-Project Token & Path Jail",
+            "Project-specific RBAC matrix, secret rotation cadence, and compliance scope need review.",
+        ),
+        CanonicalSpecKey::DataAndCopy => (
+            "Data Entities, Wording Slots & Locale Catalog",
+            "- Zod Runtime Validation Schemas, Error Codes & Bilingual UI Copy",
+            "Canonical brand terminology, tone guidelines, and i18n locale coverage are incomplete.",
+        ),
+    };
+
     if is_sparse {
         format!(
-            "# {title}\n\n\
-             - [INFERRED] Default workspace scaffolding synthesized from sparse brief: \"{brief}\"\n\
-             - [MISSING] Explicit domain constraints and brand tokens require clarification from advisor (Dr. Eggbot).\n"
+            "# {title}: {heading}\n\n\
+             ## Domain Summary\n\
+             - [INFERRED] Default `{title}` baseline synthesized from sparse brief: \"{brief}\"\n\
+             - [INFERRED] Baseline scope covers: {inferred_item}\n\
+             - [MISSING] {missing_item}\n",
+            heading = domain_section.0,
+            inferred_item = domain_section.1,
+            missing_item = domain_section.2
         )
     } else {
         format!(
-            "# {title}\n\n\
+            "# {title}: {heading}\n\n\
+             ## Verified Domain Contract\n\
              - [CONFIRMED] Product Brief Mandate: {brief}\n\
              - [CONFIRMED] Canonical Spec Key: `{title}`\n\
-             - [INFERRED] Standard cowok-design quality gates and WCAG 2.2 AA contrast thresholds enabled.\n"
+             - [INFERRED] Enforced focus area: {inferred_item}\n\
+             - [INFERRED] Quality gates enabled: zero-trust boundary validation and WCAG 2.2 AA compliance.\n",
+            heading = domain_section.0,
+            inferred_item = domain_section.1
         )
     }
 }

@@ -1,6 +1,7 @@
 // @story 04.1
 // cowok-design — Canonical Agent Chat Panel (PD-02=A 40px Rail + Seamless 6-Line Rolling Composer)
 import React, { useEffect, useRef, useState } from "react";
+import { apiSdiEngine } from "../../../api/sdi-engine";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useFormatter } from "../../../hooks/useFormatter";
 import { useTranslation } from "../../../hooks/useTranslation";
@@ -10,6 +11,7 @@ import { AgentChatStream, type ChatMessage } from "./AgentChatStream";
 export type { ChatMessage };
 
 export interface AgentChatPanelProps {
+  projectId?: string;
   isShortened: boolean;
   onToggleShorten: () => void;
   width: number;
@@ -50,7 +52,8 @@ const ChatCollapsedRail: React.FC<{ onToggleShorten: () => void }> = ({ onToggle
 
 function useAgentChatConversation(
   attachmentChips: string[],
-  onSendMessage?: (text: string) => void
+  onSendMessage?: (text: string) => void,
+  projectId?: string
 ) {
   const { formatTime } = useFormatter();
   const [messages, setMessages] = useState<ChatMessage[]>(DEFAULT_MESSAGES);
@@ -70,17 +73,32 @@ function useAgentChatConversation(
   };
   const handleSend = () => {
     if (!inputValue.trim() && attachmentChips.length === 0) return;
-    const humanMsg: ChatMessage = { id: `msg-${Date.now()}`, sender: "human", text: inputValue, timestamp: formatTime(new Date()) };
+    const sentPrompt = inputValue.trim() || attachmentChips.join(", ") || "Đính kèm";
+    const humanMsg: ChatMessage = { id: `msg-${Date.now()}`, sender: "human", text: inputValue || sentPrompt, timestamp: formatTime(new Date()) };
     setMessages((prev) => [...prev, humanMsg]);
     onSendMessage?.(inputValue);
-    const sentPrompt = inputValue || "Đính kèm";
     setInputValue("");
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        { id: `msg-agent-${Date.now()}`, sender: "agent", text: `Đã ghi nhận yêu cầu: "${sentPrompt}". Tôi đang phân tích đồ thị 2D DAG và cập nhật trực tiếp lên khung Live HTML Preview bên phải.`, timestamp: formatTime(new Date()) },
-      ]);
-    }, 450);
+
+    if (!projectId) return;
+    void apiSdiEngine
+      .compileIntent(projectId, { rawPrompt: sentPrompt })
+      .then((intent) => {
+        const replyText =
+          intent.status === "clarifying"
+            ? `Cần làm rõ yêu cầu (${intent.intentType}, ambiguity ${Math.round(intent.ambiguityScore * 100)}%): ${intent.clarificationVariants?.map((v) => v.title).join(" / ") || "Vui lòng chọn phương án"}`
+            : `Đã biên dịch intent ${intent.intentType} (${intent.status}) cho phạm vi: ${intent.targetScope.screenKeys.join(", ") || "project"}.`;
+        setMessages((prev) => [
+          ...prev,
+          { id: `msg-agent-${intent.id}`, sender: "agent", text: replyText, timestamp: formatTime(new Date()) },
+        ]);
+      })
+      .catch((err) => {
+        const errText = err instanceof Error ? err.message : "Không thể kết nối Rust daemon";
+        setMessages((prev) => [
+          ...prev,
+          { id: `msg-err-${Date.now()}`, sender: "agent", text: `Lỗi đồng bộ SDI daemon: ${errText}`, timestamp: formatTime(new Date()) },
+        ]);
+      });
   };
 
   return { messages, inputValue, setInputValue, showScrollBottom, messagesEndRef, handleScrollMessages, scrollToBottom, handleSend };
@@ -88,7 +106,7 @@ function useAgentChatConversation(
 
 export const AgentChatPanel: React.FC<AgentChatPanelProps> = (props) => {
   const { t } = useTranslation();
-  const chat = useAgentChatConversation(props.attachmentChips || [], props.onSendMessage);
+  const chat = useAgentChatConversation(props.attachmentChips || [], props.onSendMessage, props.projectId);
 
   if (props.isShortened) return <ChatCollapsedRail onToggleShorten={props.onToggleShorten} />;
   const shortenLabel = t("chat.shortenChat", "Thu gọn khung Chat");

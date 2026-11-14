@@ -159,3 +159,24 @@ flowchart TD
 - [Layer-Epic-DB](./layer-epic-db.md)
 - [Layer-Epic-API](./layer-epic-api.md)
 - [Contract Claims](./contract_claims.yaml)
+
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-01.1](./Story-01.1/story.md) | Khởi tạo Hybrid Monorepo (11 Rust Crates + pnpm) & crates/domain Type Sync |  | ready-for-dev |
+| [Story-01.2](./Story-01.2/story.md) | Xây dựng crates/spec-registry với rusqlite SQLite WAL (16 Bảng) & 2-Way File Sync |  | planned |
+| [Story-01.3](./Story-01.3/story.md) | Xây dựng crates/harness-daemon (Axum + Tokio) & 9-Spec Synthesis Pipeline |  | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-01.1](./Story-01.1/story.md) | Khởi tạo Hybrid Monorepo (11 Rust Crates + pnpm) & crates/domain Type Sync |  | completed |
+| [Story-01.2](./Story-01.2/story.md) | Xây dựng crates/spec-registry với rusqlite SQLite WAL (16 Bảng) & 2-Way File Sync |  | completed |
+| [Story-01.3](./Story-01.3/story.md) | Xây dựng crates/harness-daemon (Axum + Tokio) & 9-Spec Synthesis Pipeline |  | completed |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-01.1](./Story-01.1/story.md) | Khởi tạo Hybrid Monorepo (11 Rust Crates + pnpm) & crates/domain Type Sync |  | completed |
+| [Story-01.2](./Story-01.2/story.md) | Xây dựng crates/spec-registry với rusqlite SQLite WAL (16 Bảng) & 2-Way File Sync |  | completed |
+| [Story-01.3](./Story-01.3/story.md) | Xây dựng crates/harness-daemon (Axum + Tokio) & 9-Spec Synthesis Pipeline |  | completed |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-01.1](./Story-01.1/story.md) | Khởi tạo Hybrid Monorepo (11 Rust Crates + pnpm) & crates/domain Type Sync |  | completed |
+| [Story-01.2](./Story-01.2/story.md) | Xây dựng crates/spec-registry với rusqlite SQLite WAL (16 Bảng) & 2-Way File Sync |  | completed |
+| [Story-01.3](./Story-01.3/story.md) | Xây dựng crates/harness-daemon (Axum + Tokio) & 9-Spec Synthesis Pipeline |  | completed |

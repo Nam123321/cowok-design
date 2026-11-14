@@ -1,7 +1,7 @@
 version: '1.0'
-compiled_at: '2026-11-09T02:03:23.190988+00:00'
+compiled_at: '2026-11-13T06:58:14.347928+00:00'
 sources_used:
-  story_frontmatter: 36
+  story_frontmatter: 38
   epic_tables: 12
   cross_dependencies_md: true
   data_specs: 15
@@ -355,15 +355,10 @@ stories:
     conflicts: []
   Story-10.3:
     declared_deps:
-    - '04.1'
-    - '05.1'
+    - '10.2'
     analyzed_deps: []
     merged_deps:
-    - id: '04.1'
-      confidence: 0.5
-      evidence:
-      - frontmatter
-    - id: '05.1'
+    - id: '10.2'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -418,6 +413,21 @@ stories:
       evidence:
       - frontmatter
     conflicts: []
+  Story-04.5:
+    declared_deps:
+    - '04.4'
+    - '03.3'
+    analyzed_deps: []
+    merged_deps:
+    - id: '04.4'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '03.3'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    conflicts: []
   Story-04.2:
     declared_deps:
     - '04.1'
@@ -431,14 +441,19 @@ stories:
   Story-04.3:
     declared_deps:
     - '04.2'
-    - '03.3'
     analyzed_deps: []
     merged_deps:
     - id: '04.2'
       confidence: 0.5
       evidence:
       - frontmatter
-    - id: '03.3'
+    conflicts: []
+  Story-04.4:
+    declared_deps:
+    - '04.2'
+    analyzed_deps: []
+    merged_deps:
+    - id: '04.2'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -466,14 +481,14 @@ stories:
   Story-05.1:
     declared_deps:
     - '02.2'
-    - '04.3'
+    - '04.5'
     analyzed_deps: []
     merged_deps:
     - id: '02.2'
       confidence: 0.5
       evidence:
       - frontmatter
-    - id: '04.3'
+    - id: '04.5'
       confidence: 0.5
       evidence:
       - frontmatter

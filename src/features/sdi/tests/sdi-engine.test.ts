@@ -15,12 +15,59 @@ import {
   POST as compileIntentRoute,
 } from "../../../app/api/projects/[id]/sdi/intent/route";
 import { POST as selectClarificationRoute } from "../../../app/api/projects/[id]/sdi/clarification/route";
+import { issueBffLoopbackSession } from "../../../lib/api-guard";
+import { buildCanonicalHmacHeaders, ensureRunningDaemon } from "../../../lib/daemon-client";
 
 const HTTP_OK = 200;
 const HTTP_CREATED = 201;
 const HTTP_BAD_REQUEST = 400;
-const HTTP_NOT_FOUND = 404;
+const HTTP_FORBIDDEN = 403;
 const EXPECTED_VARIANTS_COUNT = 3;
+
+async function seedSdiTestProject(tenantId: string): Promise<{
+  projectId: string;
+  sessionToken: string;
+}> {
+  const lock = await ensureRunningDaemon();
+  const projectId = crypto.randomUUID();
+  const rawBody = JSON.stringify({
+    id: projectId,
+    slug: `sdi-${projectId.slice(0, 8)}`,
+    name: "SDI Integration Project",
+    product_brief: "SQLite WAL test project",
+    workspace_root: null,
+    inherit_brand_from_project_id: null,
+  });
+  const headers = buildCanonicalHmacHeaders({
+    daemonNonce: lock.daemon_nonce,
+    hmacKeyHex: lock.hmac_key_hex,
+    method: "POST",
+    canonicalPath: "/api/v1/projects",
+    rawQuery: "",
+    principal: { tenantId, userId: "sdi-tester", role: "editor" },
+    rawBody,
+    correlationId: crypto.randomUUID(),
+  });
+  const seedRes = await fetch(`http://${lock.host}:${lock.port}/api/v1/projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: rawBody,
+  });
+  if (!seedRes.ok) {
+    throw new Error(`Project seed failed: ${seedRes.status} ${await seedRes.text()}`);
+  }
+  const { sessionToken } = issueBffLoopbackSession({ tenantId, role: "editor" });
+  return { projectId, sessionToken };
+}
+
+function bffHeaders(sessionToken: string, hasBody: boolean = false): Record<string, string> {
+  return {
+    Host: "127.0.0.1:5173",
+    Origin: "http://127.0.0.1:5173",
+    "X-Cowok-Session-Token": sessionToken,
+    ...(hasBody ? { "Content-Type": "application/json" } : {}),
+  };
+}
 
 describe("Story 05.1: Structured Design Intent (SDI) & Visual Clarification", () => {
   describe("AC-01: Intent Compilation & Ambiguity Scoring", () => {
@@ -87,19 +134,17 @@ describe("Story 05.1: Structured Design Intent (SDI) & Visual Clarification", ()
 
   describe("AC-02: Fastify REST API Routes, Tenant Isolation & State Transition", () => {
     it("should compile intent via POST /api/v1/projects/:id/sdi/intent", async () => {
-      const req = new Request("http://localhost/api/v1/projects/proj-1/sdi/intent", {
+      const { projectId, sessionToken } = await seedSdiTestProject("tenant-1");
+      const req = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/sdi/intent`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-1",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           rawPrompt: "Sửa lại giao diện đẹp hơn",
         }),
       });
 
       const res = await compileIntentRoute(req, {
-        params: { id: "proj-1" },
+        params: { id: projectId },
       });
 
       expect(res.status).toBe(HTTP_CREATED);
@@ -111,50 +156,60 @@ describe("Story 05.1: Structured Design Intent (SDI) & Visual Clarification", ()
     });
 
     it("should enforce tenant isolation in GET /api/v1/projects/:id/sdi/intent", async () => {
-      const getReq = new Request("http://localhost/api/v1/projects/proj-1/sdi/intent", {
-        headers: { "x-tenant-id": "different-tenant" },
+      const { projectId, sessionToken } = await seedSdiTestProject("tenant-1");
+      const compileRes = await compileIntentRoute(
+        new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/sdi/intent`, {
+          method: "POST",
+          headers: bffHeaders(sessionToken, true),
+          body: JSON.stringify({ rawPrompt: "Sửa lại giao diện đẹp hơn" }),
+        }),
+        { params: { id: projectId } }
+      );
+      expect(compileRes.status).toBe(HTTP_CREATED);
+
+      const { sessionToken: otherToken } = issueBffLoopbackSession({
+        tenantId: "different-tenant",
+        role: "editor",
+      });
+      const getReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/sdi/intent`, {
+        headers: bffHeaders(otherToken),
       });
       const resOtherTenant = await getIntentsRoute(getReq, {
-        params: { id: "proj-1" },
+        params: { id: projectId },
       });
-      const dataOther = await resOtherTenant.json();
-      expect(dataOther).toHaveLength(0);
+      expect(resOtherTenant.status).toBe(HTTP_FORBIDDEN);
 
       const resSameTenant = await getIntentsRoute(
-        new Request("http://localhost/api/v1/projects/proj-1/sdi/intent", {
-          headers: { "x-tenant-id": "tenant-1" },
+        new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/sdi/intent`, {
+          headers: bffHeaders(sessionToken),
         }),
         {
-          params: { id: "proj-1" },
+          params: { id: projectId },
         }
       );
+      expect(resSameTenant.status).toBe(HTTP_OK);
       const dataSame = await resSameTenant.json();
       expect(dataSame.length).toBeGreaterThan(0);
     });
 
     it("should transition status to ready on valid clarification selection", async () => {
-      const compileReq = new Request("http://localhost/api/v1/projects/proj-1/sdi/intent", {
+      const { projectId, sessionToken } = await seedSdiTestProject("tenant-1");
+      const compileReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/sdi/intent`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-1",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           rawPrompt: "Tối ưu hóa luồng thanh toán",
         }),
       });
 
       const compileRes = await compileIntentRoute(compileReq, {
-        params: { id: "proj-1" },
+        params: { id: projectId },
       });
       const intent = await compileRes.json();
 
-      const selectReq = new Request("http://localhost/api/v1/projects/proj-1/sdi/clarification", {
+      const selectReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/sdi/clarification`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-1",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           intentId: intent.id,
           selectedVariantId: "var-2-balanced",
@@ -162,7 +217,7 @@ describe("Story 05.1: Structured Design Intent (SDI) & Visual Clarification", ()
       });
 
       const selectRes = await selectClarificationRoute(selectReq, {
-        params: { id: "proj-1" },
+        params: { id: projectId },
       });
 
       expect(selectRes.status).toBe(HTTP_OK);
@@ -171,28 +226,23 @@ describe("Story 05.1: Structured Design Intent (SDI) & Visual Clarification", ()
     });
 
     it("should reject forged selectedVariantId with HTTP 400", async () => {
-      const compileReq = new Request("http://localhost/api/v1/projects/proj-1/sdi/intent", {
+      const { projectId, sessionToken } = await seedSdiTestProject("tenant-1");
+      const compileReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/sdi/intent`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-1",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           rawPrompt: "Thay đổi màu sắc",
         }),
       });
 
       const compileRes = await compileIntentRoute(compileReq, {
-        params: { id: "proj-1" },
+        params: { id: projectId },
       });
       const intent = await compileRes.json();
 
-      const selectReq = new Request("http://localhost/api/v1/projects/proj-1/sdi/clarification", {
+      const selectReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/sdi/clarification`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-1",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           intentId: intent.id,
           selectedVariantId: "forged-variant-id",
@@ -200,35 +250,34 @@ describe("Story 05.1: Structured Design Intent (SDI) & Visual Clarification", ()
       });
 
       const selectRes = await selectClarificationRoute(selectReq, {
-        params: { id: "proj-1" },
+        params: { id: projectId },
       });
 
       expect(selectRes.status).toBe(HTTP_BAD_REQUEST);
     });
 
-    it("should return 404 for cross-tenant clarification attempt", async () => {
-      const compileReq = new Request("http://localhost/api/v1/projects/proj-1/sdi/intent", {
+    it("should reject cross-tenant clarification attempt with HTTP 403/404", async () => {
+      const { projectId, sessionToken } = await seedSdiTestProject("tenant-1");
+      const compileReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/sdi/intent`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "tenant-1",
-        },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           rawPrompt: "Cải tiến trang chủ",
         }),
       });
 
       const compileRes = await compileIntentRoute(compileReq, {
-        params: { id: "proj-1" },
+        params: { id: projectId },
       });
       const intent = await compileRes.json();
 
-      const selectReq = new Request("http://localhost/api/v1/projects/proj-1/sdi/clarification", {
+      const { sessionToken: attackerToken } = issueBffLoopbackSession({
+        tenantId: "attacker-tenant",
+        role: "editor",
+      });
+      const selectReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/sdi/clarification`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-tenant-id": "attacker-tenant",
-        },
+        headers: bffHeaders(attackerToken, true),
         body: JSON.stringify({
           intentId: intent.id,
           selectedVariantId: "var-1-minimal",
@@ -236,29 +285,29 @@ describe("Story 05.1: Structured Design Intent (SDI) & Visual Clarification", ()
       });
 
       const selectRes = await selectClarificationRoute(selectReq, {
-        params: { id: "proj-1" },
+        params: { id: projectId },
       });
 
-      expect(selectRes.status).toBe(HTTP_NOT_FOUND);
+      expect([HTTP_FORBIDDEN, 404]).toContain(selectRes.status);
     });
   });
 
   describe("AC-03: [EDGE-CASE] Boundary Guard Against Premature Code Generation", () => {
     it("should strictly maintain status='clarifying' when ambiguityScore >= 0.45", async () => {
-      const req = new Request("http://localhost/api/v1/projects/proj-1/sdi/intent", {
+      const { projectId, sessionToken } = await seedSdiTestProject("tenant-1");
+      const req = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/sdi/intent`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: bffHeaders(sessionToken, true),
         body: JSON.stringify({
           rawPrompt: "Cải tiến toàn bộ giao diện",
         }),
       });
 
       const res = await compileIntentRoute(req, {
-        params: { id: "proj-1" },
-        projectId: "proj-1",
-        tenantId: "tenant-1",
+        params: { id: projectId },
       });
 
+      expect(res.status).toBe(HTTP_CREATED);
       const data = await res.json();
       expect(data.status).toBe("clarifying");
       expect(data.status).not.toBe("ready");

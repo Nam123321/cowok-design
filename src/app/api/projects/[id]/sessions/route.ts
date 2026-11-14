@@ -1,7 +1,8 @@
-// @story 04.2
+// @story 04.2, 01.3
 // @implements AC-01, AC-03, AC-05
-import { guardedRoute } from "../../../../../lib/api-guard";
-import { forwardToDaemonFlow } from "../../../../../lib/daemon-client";
+import { guardedRoute } from "@/lib/api-guard";
+import { forwardToDaemonFlow } from "@/lib/daemon-client";
+import { CreateChatSessionInputSchema } from "@/lib/validations/harness-daemon";
 
 export const GET = guardedRoute(
   async (req, ctx) => {
@@ -9,11 +10,12 @@ export const GET = guardedRoute(
     return forwardToDaemonFlow({
       method: "GET",
       daemonPath: `/api/v1/projects/${projectId}/sessions`,
+      rawQuery: new URL(req.url).search.slice(1),
       inboundHeaders: req.headers,
       principal: {
         tenantId: ctx.tenantId || "local-default",
         userId: ctx.userId || "local-operator",
-        role: ctx.role || "editor",
+        role: ctx.role || "viewer",
       },
       correlationId: ctx.correlationId,
     });
@@ -37,5 +39,5 @@ export const POST = guardedRoute(
       correlationId: ctx.correlationId,
     });
   },
-  { authMode: "strict-loopback" }
+  { authMode: "strict-loopback", body: CreateChatSessionInputSchema }
 );

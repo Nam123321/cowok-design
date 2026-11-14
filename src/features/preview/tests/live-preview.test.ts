@@ -9,7 +9,45 @@ import {
 import { FIXTURE_VARIANTS } from "../components/FixtureVariantSelector";
 import { VIEWPORT_PRESETS } from "../components/ViewportSwitcher";
 import { apiScreenFixture } from "../../../api/screen-fixture";
+import { issueBffLoopbackSession } from "../../../lib/api-guard";
+import { buildCanonicalHmacHeaders, ensureRunningDaemon } from "../../../lib/daemon-client";
 import { GET, POST } from "../../../app/api/projects/[id]/flow/nodes/[nodeId]/fixtures/route";
+
+async function seedFixtureTestProject(tenantId: string): Promise<{
+  projectId: string;
+  sessionToken: string;
+}> {
+  const lock = await ensureRunningDaemon();
+  const projectId = crypto.randomUUID();
+  const rawBody = JSON.stringify({
+    id: projectId,
+    slug: `fixtures-${projectId.slice(0, 8)}`,
+    name: "Fixtures Integration Project",
+    product_brief: "SQLite WAL test project",
+    workspace_root: null,
+    inherit_brand_from_project_id: null,
+  });
+  const headers = buildCanonicalHmacHeaders({
+    daemonNonce: lock.daemon_nonce,
+    hmacKeyHex: lock.hmac_key_hex,
+    method: "POST",
+    canonicalPath: "/api/v1/projects",
+    rawQuery: "",
+    principal: { tenantId, userId: "fixture-tester", role: "editor" },
+    rawBody,
+    correlationId: crypto.randomUUID(),
+  });
+  const seedRes = await fetch(`http://${lock.host}:${lock.port}/api/v1/projects`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: rawBody,
+  });
+  if (!seedRes.ok) {
+    throw new Error(`Project seed failed: ${seedRes.status} ${await seedRes.text()}`);
+  }
+  const { sessionToken } = issueBffLoopbackSession({ tenantId, role: "editor" });
+  return { projectId, sessionToken };
+}
 
 describe("Story 04.2: State-Hydrated Sandboxed Live Preview & Viewport Switcher", () => {
   describe("AC-01: Multi-Viewport Switcher & Presets", () => {
@@ -103,9 +141,15 @@ describe("Story 04.2: State-Hydrated Sandboxed Live Preview & Viewport Switcher"
     });
 
     it("should process REST API endpoints for fixtures", async () => {
-      const req = new Request("http://localhost/api/v1/projects/proj-1/flow/nodes/node-1/fixtures", {
+      const { projectId, sessionToken } = await seedFixtureTestProject("tenant-1");
+      const req = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/flow/nodes/node-1/fixtures`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Host: "127.0.0.1:5173",
+          Origin: "http://127.0.0.1:5173",
+          "X-Cowok-Session-Token": sessionToken,
+        },
         body: JSON.stringify({
           variant: "DEFAULT",
           payloadJson: JSON.stringify({ title: "Mock Data" }),
@@ -114,9 +158,7 @@ describe("Story 04.2: State-Hydrated Sandboxed Live Preview & Viewport Switcher"
       });
 
       const ctx = {
-        projectId: "proj-1",
-        tenantId: "tenant-1",
-        params: { id: "proj-1", nodeId: "node-1" },
+        params: { id: projectId, nodeId: "node-1" },
       };
 
       const postRes = await POST(req, ctx);
@@ -125,7 +167,13 @@ describe("Story 04.2: State-Hydrated Sandboxed Live Preview & Viewport Switcher"
       expect(createdFixture.variant).toBe("DEFAULT");
       expect(createdFixture.nodeId).toBe("node-1");
 
-      const getReq = new Request("http://localhost/api/v1/projects/proj-1/flow/nodes/node-1/fixtures");
+      const getReq = new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/flow/nodes/node-1/fixtures`, {
+        headers: {
+          Host: "127.0.0.1:5173",
+          Origin: "http://127.0.0.1:5173",
+          "X-Cowok-Session-Token": sessionToken,
+        },
+      });
       const getRes = await GET(getReq, ctx);
       expect(getRes.status).toBe(200);
       const fixtures = await getRes.json();

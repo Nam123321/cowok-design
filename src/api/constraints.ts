@@ -21,124 +21,106 @@ import {
   type ValidateTypographyInput,
   ValidateTypographyInputSchema,
 } from "../lib/validations/constraints";
+import {
+  type HarnessDaemonClientConfig,
+  HarnessDaemonTransport,
+} from "./harness-daemon-transport";
 
-export interface ConstraintsApiClientConfig {
-  baseUrl?: string;
+export interface ConstraintsApiClientConfig extends HarnessDaemonClientConfig {
   getAuthToken?: () => string | null;
 }
 
-export class ConstraintsClient {
-  private baseUrl: string;
-  private getAuthToken?: () => string | null;
-
+export class ConstraintsClient extends HarnessDaemonTransport {
   constructor(config: ConstraintsApiClientConfig = {}) {
-    this.baseUrl = config.baseUrl || "";
-    this.getAuthToken = config.getAuthToken;
-  }
-
-  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const headers = new Headers(options.headers || {});
-    headers.set("Content-Type", "application/json");
-
-    if (this.getAuthToken) {
-      const token = this.getAuthToken();
-      if (token) headers.set("Authorization", `Bearer ${token}`);
-    }
-
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      ...options,
-      headers,
+    super({
+      ...config,
+      getSessionToken: config.getSessionToken || config.getAuthToken,
     });
-
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      const error = new Error(errorBody.message || `HTTP ${response.status}: ${response.statusText}`);
-      (error as unknown as { status: number }).status = response.status;
-      throw error;
-    }
-
-    return response.json();
   }
 
-  async getIconManifest(projectId: string): Promise<IconManifest> {
-    const raw = await this.request<IconManifest>(`/api/v1/projects/${projectId}/icon-manifest`);
-    return IconManifestSchema.parse(raw);
+  getIconManifest(projectId: string): Promise<IconManifest> {
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/icon-manifest`,
+      IconManifestSchema,
+      { method: "GET" }
+    );
   }
 
-  async validateIcon(projectId: string, input: ValidateIconInput): Promise<IconValidationReport> {
+  validateIcon(projectId: string, input: ValidateIconInput): Promise<IconValidationReport> {
     const validated = ValidateIconInputSchema.parse(input);
-    const raw = await this.request<IconValidationReport>(
-      `/api/v1/projects/${projectId}/validate-icon`,
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/validate-icon`,
+      IconValidationReportSchema,
       {
         method: "POST",
         body: JSON.stringify(validated),
-      },
+      }
     );
-    return IconValidationReportSchema.parse(raw);
   }
 
-  async validateTypography(
+  validateTypography(
     projectId: string,
-    input: ValidateTypographyInput,
+    input: ValidateTypographyInput
   ): Promise<TypographyValidationReport> {
     const validated = ValidateTypographyInputSchema.parse(input);
-    const raw = await this.request<TypographyValidationReport>(
-      `/api/v1/projects/${projectId}/validate-typography`,
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/validate-typography`,
+      TypographyValidationReportSchema,
       {
         method: "POST",
         body: JSON.stringify(validated),
-      },
+      }
     );
-    return TypographyValidationReportSchema.parse(raw);
   }
 
-  async validateComponent(
+  validateComponent(
     projectId: string,
-    input: ValidateComponentInput,
+    input: ValidateComponentInput
   ): Promise<ComponentValidationReport> {
     const validated = ValidateComponentInputSchema.parse(input);
-    const raw = await this.request<ComponentValidationReport>(
-      `/api/v1/projects/${projectId}/validate-component`,
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/validate-component`,
+      ComponentValidationReportSchema,
       {
         method: "POST",
         body: JSON.stringify(validated),
-      },
+      }
     );
-    return ComponentValidationReportSchema.parse(raw);
   }
 
-  async getDesignContracts(projectId: string): Promise<ProjectDesignContracts> {
-    const raw = await this.request<ProjectDesignContracts>(
-      `/api/v1/projects/${projectId}/design-contracts`,
+  getDesignContracts(projectId: string): Promise<ProjectDesignContracts> {
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/design-contracts`,
+      ProjectDesignContractsSchema,
+      { method: "GET" }
     );
-    return ProjectDesignContractsSchema.parse(raw);
   }
 
-  async updateDesignContracts(
+  updateDesignContracts(
     projectId: string,
-    input: ProjectDesignContracts,
+    input: ProjectDesignContracts
   ): Promise<ProjectDesignContracts> {
     const validated = ProjectDesignContractsSchema.parse(input);
-    const raw = await this.request<ProjectDesignContracts>(
-      `/api/v1/projects/${projectId}/design-contracts`,
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/design-contracts`,
+      ProjectDesignContractsSchema,
       {
         method: "PUT",
         body: JSON.stringify(validated),
-      },
+      }
     );
-    return ProjectDesignContractsSchema.parse(raw);
   }
 
-  async lintSource(projectId: string, input: LintSourceInput): Promise<LintSourceResponse> {
+  lintSource(projectId: string, input: LintSourceInput): Promise<LintSourceResponse> {
     const validated = LintSourceInputSchema.parse(input);
-    const raw = await this.request<LintSourceResponse>(
-      `/api/v1/projects/${projectId}/lint`,
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/lint`,
+      LintSourceResponseSchema,
       {
         method: "POST",
         body: JSON.stringify(validated),
-      },
+      }
     );
-    return LintSourceResponseSchema.parse(raw);
   }
 }
 

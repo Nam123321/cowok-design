@@ -12,17 +12,18 @@ import {
   performTwoPhaseRevert,
   setLiveWorkspaceFile,
   clearLiveWorkspace,
+  collectWorkspaceFiles,
 } from "../utils/snapshot-engine";
 import {
   buildExportZipMetadata,
   buildGitHubPRPayload,
   checkExportCompleteness,
 } from "../utils/export-bundle";
+import { issueBffLoopbackSession } from "../../../lib/api-guard";
+import { buildCanonicalHmacHeaders, ensureRunningDaemon } from "../../../lib/daemon-client";
 import {
   GET as getSnapshotsRoute,
   POST as createSnapshotRoute,
-  snapshotsStore,
-  collectProjectFiles,
 } from "../../../app/api/projects/[id]/snapshots/route";
 import { POST as revertRoute } from "../../../app/api/projects/[id]/snapshots/[snapshotId]/revert/route";
 import { POST as exportRoute } from "../../../app/api/projects/[id]/snapshots/export/route";
@@ -104,10 +105,10 @@ describe("Story 05.3: VersionSnapshot Schema & Engine", () => {
   it("captures uncommitted workspace modifications into pre-revert safety backup (F-01)", () => {
     clearLiveWorkspace();
     setLiveWorkspaceFile("proj-test-workspace", "tenant-test", "src/features/UnsavedComponent.tsx", "export const Unsaved = () => null;");
-    const gathered = collectProjectFiles("proj-test-workspace", "tenant-test");
+    const gathered = collectWorkspaceFiles("proj-test-workspace", "tenant-test", []);
     expect(gathered.some((f) => f.path === "src/features/UnsavedComponent.tsx")).toBe(true);
 
-    const otherTenantFiles = collectProjectFiles("proj-test-workspace", "tenant-other");
+    const otherTenantFiles = collectWorkspaceFiles("proj-test-workspace", "tenant-other", []);
     expect(otherTenantFiles.some((f) => f.path === "src/features/UnsavedComponent.tsx")).toBe(false);
     clearLiveWorkspace();
   });
@@ -163,15 +164,59 @@ describe("Story 05.3: Export Bundle & Runnable Verification (AC-03)", () => {
 });
 
 describe("Story 05.3: REST API Routes & Tenant Jailing", () => {
-  const projectId = "project-alpha";
   const tenantId = "tenant-gamma";
+  let projectId = "";
+  let sessionToken = "";
+  let firstSnapshotId = "";
+
+  async function ensureSeededProject(): Promise<void> {
+    if (projectId && sessionToken) return;
+    const lock = await ensureRunningDaemon();
+    projectId = crypto.randomUUID();
+    const rawBody = JSON.stringify({
+      id: projectId,
+      slug: `snap-${projectId.slice(0, 8)}`,
+      name: "Snapshot Integration Project",
+      product_brief: "SQLite WAL test project",
+      workspace_root: null,
+      inherit_brand_from_project_id: null,
+    });
+    const headers = buildCanonicalHmacHeaders({
+      daemonNonce: lock.daemon_nonce,
+      hmacKeyHex: lock.hmac_key_hex,
+      method: "POST",
+      canonicalPath: "/api/v1/projects",
+      rawQuery: "",
+      principal: { tenantId, userId: "snapshot-tester", role: "editor" },
+      rawBody,
+      correlationId: crypto.randomUUID(),
+    });
+    const seedRes = await fetch(`http://${lock.host}:${lock.port}/api/v1/projects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: rawBody,
+    });
+    if (!seedRes.ok) {
+      throw new Error(`Project seed failed: ${seedRes.status} ${await seedRes.text()}`);
+    }
+    sessionToken = issueBffLoopbackSession({ tenantId, role: "editor" }).sessionToken;
+  }
+
+  function bffHeaders(token: string, hasBody: boolean = false): Record<string, string> {
+    return {
+      Host: "127.0.0.1:5173",
+      Origin: "http://127.0.0.1:5173",
+      "X-Cowok-Session-Token": token,
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
+    };
+  }
 
   it("handles GET /snapshots and POST /snapshots with tenant isolation", async () => {
-    snapshotsStore.clear();
+    await ensureSeededProject();
 
-    const postReq = new Request("http://localhost/api/projects/project-alpha/snapshots", {
+    const postReq = new Request(`http://127.0.0.1:5173/api/projects/${projectId}/snapshots`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-tenant-id": tenantId },
+      headers: bffHeaders(sessionToken, true),
       body: JSON.stringify({
         label: "Stable Milestone 1",
         description: "Milestone snapshot",
@@ -181,77 +226,83 @@ describe("Story 05.3: REST API Routes & Tenant Jailing", () => {
 
     const createRes = await createSnapshotRoute(postReq, {
       params: { id: projectId },
-      projectId,
-      tenantId,
     });
     expect(createRes.status).toBe(201);
     const created = await createRes.json();
+    firstSnapshotId = created.id;
     expect(created.tenantId).toBe(tenantId);
     expect(created.versionTag).toBe("v1.1.0");
 
-    const getReq = new Request("http://localhost/api/projects/project-alpha/snapshots", {
+    const getReq = new Request(`http://127.0.0.1:5173/api/projects/${projectId}/snapshots`, {
       method: "GET",
-      headers: { "x-tenant-id": tenantId },
+      headers: bffHeaders(sessionToken),
     });
 
     const listRes = await getSnapshotsRoute(getReq, {
       params: { id: projectId },
-      projectId,
-      tenantId,
     });
     expect(listRes.status).toBe(200);
     const list = await listRes.json();
     expect(list).toHaveLength(1);
 
-    const crossReq = new Request("http://localhost/api/projects/project-alpha/snapshots", {
+    const { sessionToken: otherToken } = issueBffLoopbackSession({
+      tenantId: "tenant-other",
+      role: "editor",
+    });
+    const crossReq = new Request(`http://127.0.0.1:5173/api/projects/${projectId}/snapshots`, {
       method: "GET",
-      headers: { "x-tenant-id": "tenant-other" },
+      headers: bffHeaders(otherToken),
     });
     const crossTenantGet = await getSnapshotsRoute(crossReq, {
       params: { id: projectId },
-      projectId,
-      tenantId: "tenant-other",
     });
-    const crossList = await crossTenantGet.json();
-    expect(crossList).toHaveLength(0);
+    expect(crossTenantGet.status).toBe(403);
   });
 
   it("handles POST /snapshots/:id/revert and records safety backup", async () => {
-    const list = Array.from(snapshotsStore.values());
-    const target = list[0];
+    await ensureSeededProject();
+    expect(firstSnapshotId).not.toBe("");
 
-    const revertReq = new Request(`http://localhost/api/projects/project-alpha/snapshots/${target.id}/revert`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-tenant-id": tenantId },
-      body: JSON.stringify({ safetyLabel: "Before testing rollback" }),
-    });
+    const revertReq = new Request(
+      `http://127.0.0.1:5173/api/projects/${projectId}/snapshots/${firstSnapshotId}/revert`,
+      {
+        method: "POST",
+        headers: bffHeaders(sessionToken, true),
+        body: JSON.stringify({ safetyLabel: "Before testing rollback" }),
+      }
+    );
 
     const res = await revertRoute(revertReq, {
-      params: { id: projectId, snapshotId: target.id },
-      projectId,
-      tenantId,
+      params: { id: projectId, snapshotId: firstSnapshotId },
     });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
-    expect(body.revertedToSnapshotId).toBe(target.id);
+    expect(body.revertedToSnapshotId).toBe(firstSnapshotId);
     expect(body.safetySnapshotId).toBeDefined();
 
-    const safety = snapshotsStore.get(body.safetySnapshotId);
+    const listRes = await getSnapshotsRoute(
+      new Request(`http://127.0.0.1:5173/api/projects/${projectId}/snapshots`, {
+        method: "GET",
+        headers: bffHeaders(sessionToken),
+      }),
+      { params: { id: projectId } }
+    );
+    const list = (await listRes.json()) as Array<{ id: string; trigger: string }>;
+    const safety = list.find((s) => s.id === body.safetySnapshotId);
     expect(safety?.trigger).toBe("pre_revert_safety");
   });
 
   it("rejects invalid export exclusions violating AC-03 (F-02)", async () => {
-    const invalidReq = new Request("http://localhost/api/projects/project-alpha/snapshots/export", {
+    await ensureSeededProject();
+    const invalidReq = new Request(`http://127.0.0.1:5173/api/projects/${projectId}/snapshots/export`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-tenant-id": tenantId },
+      headers: bffHeaders(sessionToken, true),
       body: JSON.stringify({ includeTokens: false }),
     });
 
     const res = await exportRoute(invalidReq, {
       params: { id: projectId },
-      projectId,
-      tenantId,
     });
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -259,33 +310,31 @@ describe("Story 05.3: REST API Routes & Tenant Jailing", () => {
   });
 
   it("handles POST /snapshots/export returning AC-03 verified bundle metadata", async () => {
-    const exportReq = new Request("http://localhost/api/projects/project-alpha/snapshots/export", {
+    await ensureSeededProject();
+    const exportReq = new Request(`http://127.0.0.1:5173/api/projects/${projectId}/snapshots/export`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-tenant-id": tenantId },
+      headers: bffHeaders(sessionToken, true),
       body: JSON.stringify({ includeFixtures: true, includeTokens: true, includeIcons: true, format: "zip" }),
     });
 
     const res = await exportRoute(exportReq, {
       params: { id: projectId },
-      projectId,
-      tenantId,
     });
     expect(res.status).toBe(200);
     const meta = await res.json();
     expect(meta.readyToRun).toBe(true);
-    expect(meta.fileName).toContain("project-alpha-tenant-gamma-bundle-");
+    expect(meta.fileName).toContain(`${projectId}-${tenantId}-bundle-`);
   });
 
   it("streams binary zip on GET /snapshots/export/download and verifies PKZIP magic (F-03, F-04)", async () => {
-    const downloadReq = new Request("http://localhost/api/projects/project-alpha/snapshots/export/download", {
+    await ensureSeededProject();
+    const downloadReq = new Request(`http://127.0.0.1:5173/api/projects/${projectId}/snapshots/export/download`, {
       method: "GET",
-      headers: { "x-tenant-id": tenantId },
+      headers: bffHeaders(sessionToken),
     });
 
     const res = await downloadExportRoute(downloadReq, {
       params: { id: projectId },
-      projectId,
-      tenantId,
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("application/zip");
@@ -298,10 +347,11 @@ describe("Story 05.3: REST API Routes & Tenant Jailing", () => {
     expect(buf[3]).toBe(0x04);
   });
 
-  it("creates GitHub PR via POST /snapshots/pr route (F-05)", async () => {
-    const prReq = new Request("http://localhost/api/projects/project-alpha/snapshots/pr", {
+  it("rejects mock GitHub PR fabrication with 501 GITHUB_INTEGRATION_NOT_CONFIGURED on POST /snapshots/pr (F-05)", async () => {
+    await ensureSeededProject();
+    const prReq = new Request(`http://127.0.0.1:5173/api/projects/${projectId}/snapshots/pr`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-tenant-id": tenantId },
+      headers: bffHeaders(sessionToken, true),
       body: JSON.stringify({
         branchName: "feature/export-sdi",
         prTitle: "Export design intent v1",
@@ -311,13 +361,9 @@ describe("Story 05.3: REST API Routes & Tenant Jailing", () => {
 
     const res = await createPRRoute(prReq, {
       params: { id: projectId },
-      projectId,
-      tenantId,
     });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(501);
     const body = await res.json();
-    expect(body.status).toBe("created");
-    expect(body.prNumber).toBeGreaterThan(100);
-    expect(body.prUrl).toContain("https://github.com/cowok-ai/project-alpha/pull/");
+    expect(body.error).toBe("GITHUB_INTEGRATION_NOT_CONFIGURED");
   });
 });

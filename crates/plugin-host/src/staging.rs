@@ -37,17 +37,36 @@ impl PerRunStager {
         format!("{:x}", hasher.finalize())
     }
 
+    fn validate_safe_segment(kind: &str, segment: &str) -> std::io::Result<()> {
+        if segment.is_empty()
+            || segment == "."
+            || segment == ".."
+            || segment.contains('/')
+            || segment.contains('\\')
+            || segment.contains('\0')
+            || segment.chars().any(|c| c.is_control())
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Invalid {kind} segment '{segment}': path separators and traversal segments are forbidden"),
+            ));
+        }
+        Ok(())
+    }
+
     /// Stages skills into `.cowok-skills/<run_id>/` and writes a staging receipt
     pub fn stage_run(
         &self,
         run_id: &str,
         skills: &[SkillManifest],
     ) -> std::io::Result<StagingRunReceipt> {
+        Self::validate_safe_segment("run_id", run_id)?;
         let run_dir = self.base_staging_dir.join(run_id);
         std::fs::create_dir_all(&run_dir)?;
 
         let mut staged_names = Vec::new();
         for skill in skills {
+            Self::validate_safe_segment("skill.name", &skill.name)?;
             let skill_dir = run_dir.join(&skill.name);
             std::fs::create_dir_all(&skill_dir)?;
 
@@ -142,5 +161,26 @@ mod tests {
 
         let staged_file = temp.path().join("run-42/test-skill/plugin.json");
         assert!(staged_file.exists());
+    }
+
+    #[test]
+    fn test_stage_run_blocks_path_traversal() {
+        let temp = tempfile::tempdir().unwrap();
+        let stager = PerRunStager::new(temp.path());
+        let bad_skill = SkillManifest {
+            name: "../escaped".to_string(),
+            version: "0.1.0".to_string(),
+            description: "Bad skill".to_string(),
+            entry_point: "main.js".to_string(),
+            capabilities_required: vec![],
+            risk_tier: 1,
+            parameters: None,
+            tags: vec![],
+            prompt_overview: None,
+        };
+        assert!(stager
+            .stage_run("../bad-run", std::slice::from_ref(&bad_skill))
+            .is_err());
+        assert!(stager.stage_run("ok-run", &[bad_skill]).is_err());
     }
 }

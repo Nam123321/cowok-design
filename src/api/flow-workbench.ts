@@ -49,7 +49,11 @@ function nextCorrelationId(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") {
     return globalThis.crypto.randomUUID();
   }
-  return `corr-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+  const bytes = new Uint8Array(8);
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    globalThis.crypto.getRandomValues(bytes);
+  }
+  return `corr-${Date.now()}-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
 export class FlowWorkbenchClient {

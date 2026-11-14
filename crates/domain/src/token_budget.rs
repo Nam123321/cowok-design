@@ -145,17 +145,34 @@ pub fn truncate_utf8_to_tokens(text: &str, max_tokens: usize, suffix: &str) -> S
     }
 
     let suffix_tokens = estimate_tokens(suffix);
-    let target_body_tokens = max_tokens.saturating_sub(suffix_tokens);
-    let approx_max_chars = target_body_tokens * 7 / 2; // ~ 3.5 chars per token
+    if suffix_tokens > max_tokens {
+        return String::new();
+    }
+    let body_budget = max_tokens - suffix_tokens;
 
-    let mut truncated: String = text.chars().take(approx_max_chars).collect();
-    // Ensure final estimate with suffix does not exceed max_tokens
-    while !truncated.is_empty() && estimate_tokens(&format!("{}{}", truncated, suffix)) > max_tokens
-    {
-        truncated.pop();
+    // Binary search over UTF-8 char boundaries for O(log N) deterministic prefix selection.
+    let mut boundaries: Vec<usize> = text.char_indices().map(|(idx, _)| idx).collect();
+    boundaries.push(text.len());
+
+    let mut lo = 0usize;
+    let mut hi = boundaries.len() - 1;
+    let mut best = 0usize;
+    while lo <= hi {
+        let mid = lo + (hi - lo) / 2;
+        let candidate = &text[..boundaries[mid]];
+        if estimate_tokens(candidate) <= body_budget
+            && estimate_tokens(&format!("{}{}", candidate, suffix)) <= max_tokens
+        {
+            best = boundaries[mid];
+            lo = mid + 1;
+        } else if mid == 0 {
+            break;
+        } else {
+            hi = mid - 1;
+        }
     }
 
-    format!("{}{}", truncated, suffix)
+    format!("{}{}", &text[..best], suffix)
 }
 
 /// 4-Tier Priority Classification for Deterministic Pruning

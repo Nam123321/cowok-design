@@ -82,10 +82,10 @@ async fn sec_daemon_01_to_05_dual_ingress_hmac_v2_replay_roles_and_redacted_heal
     assert_eq!(dir_mode, 0o700);
     assert_eq!(lock_mode, 0o600);
 
-    // SEC-DAEMON-02: /api/v1/health exposes daemon_nonce & schema_version=3, NEVER hmac_key_hex
+    // SEC-DAEMON-02: /api/v1/health exposes daemon_nonce & schema_version=6, NEVER hmac_key_hex
     let (h_st, h_json) = send_req(&router, "GET", "/api/v1/health", &[], vec![]).await;
     assert_eq!(h_st, StatusCode::OK);
-    assert_eq!(h_json["schema_version"], 3);
+    assert_eq!(h_json["schema_version"], 6);
     assert!(h_json.get("hmac_key_hex").is_none());
     let lock = read_daemon_lock(&canon_root).expect("lock");
     assert_eq!(h_json["daemon_nonce"], lock.daemon_nonce);

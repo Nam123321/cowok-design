@@ -36,6 +36,32 @@ import {
   SurgicalPatchResponseSchema,
   TransitionSchema,
   TypographyContractSchema,
+  ChangeProposalV1Schema,
+  ComponentRegistryEntrySchema,
+  ComponentRegistryContractSchema,
+  ComponentValidationReportSchema,
+  TypographyValidationReportSchema,
+  ProjectDesignContractsSchema,
+  TaskHorizonSchema,
+  DepartmentSchema,
+  PortalSchema,
+  ReasonCodeSchema,
+  ContextSliceRequestSchema,
+  ContextSliceDecisionSchema,
+  SpecSliceSchema,
+  AuthorizedContextSliceSchema,
+  PriorityTierSchema,
+  PromptSectionSchema,
+  GovernedBudgetResultSchema,
+  CompilationInputSchema,
+  CompiledPromptPayloadSchema,
+  ModelProfileTierSchema,
+  ReasoningEffortSchema,
+  ToolComplexitySchema,
+  DegradationReasonSchema,
+  ModelToolDefinitionSchema,
+  AdaptationRequestSchema,
+  AdaptationResponseSchema,
 } from "./index.js";
 
 describe("SafeJsInteger Invariants (KU-01.1 & AC-04)", () => {
@@ -462,13 +488,13 @@ describe("Contract-V1 Fixture Parity (E2E-PARITY-01 & 02)", () => {
 });
 
 describe("Epic-03: Constraint Engine & AST Linter Schemas", () => {
-  it("ConstraintSeveritySchema: accepts Info, Warn, Blocker (and uppercase) and rejects others", () => {
-    expect(ConstraintSeveritySchema.parse("Info")).toBe("Info");
-    expect(ConstraintSeveritySchema.parse("Warn")).toBe("Warn");
-    expect(ConstraintSeveritySchema.parse("Blocker")).toBe("Blocker");
+  it("ConstraintSeveritySchema: accepts INFO, WARN, BLOCKER strictly and rejects lowercase/legacy variants", () => {
     expect(ConstraintSeveritySchema.parse("INFO")).toBe("INFO");
     expect(ConstraintSeveritySchema.parse("WARN")).toBe("WARN");
     expect(ConstraintSeveritySchema.parse("BLOCKER")).toBe("BLOCKER");
+    expect(() => ConstraintSeveritySchema.parse("Info")).toThrow();
+    expect(() => ConstraintSeveritySchema.parse("Warn")).toThrow();
+    expect(() => ConstraintSeveritySchema.parse("Blocker")).toThrow();
     expect(() => ConstraintSeveritySchema.parse("Fatal")).toThrow();
   });
 
@@ -498,7 +524,7 @@ describe("Epic-03: Constraint Engine & AST Linter Schemas", () => {
   it("ActiveConstraintSchema: parses valid payload and rejects extra fields", () => {
     const valid = {
       rule_code: "BAN_INLINE_HEX",
-      severity: "Blocker",
+      severity: "BLOCKER",
       config_json: '{"allowed": []}',
     };
     expect(ActiveConstraintSchema.parse(valid)).toEqual(valid);
@@ -514,7 +540,7 @@ describe("Epic-03: Constraint Engine & AST Linter Schemas", () => {
   it("ConstraintViolationSchema: handles line and column nullable/optional", () => {
     const violation = {
       rule_code: "BAN_TAILWIND",
-      severity: "Warn",
+      severity: "WARN",
       message: "Tailwind utility not allowed",
       line: 42,
       column: 15,
@@ -523,7 +549,7 @@ describe("Epic-03: Constraint Engine & AST Linter Schemas", () => {
 
     const withoutCoords = {
       rule_code: "BAN_TAILWIND",
-      severity: "Warn",
+      severity: "WARN",
       message: "Tailwind utility not allowed",
     };
     expect(ConstraintViolationSchema.parse(withoutCoords).line).toBeUndefined();
@@ -623,5 +649,170 @@ describe("Epic-03: Constraint Engine & AST Linter Schemas", () => {
       generated_ids: ["ff-1", "ff-2"],
     };
     expect(AstInjectionResponseSchema.parse(res).total_elements_tagged).toBe(2);
+  });
+
+  it("SpecRevisionSchema: accepts both sha256: and sha256- content_hash formats", () => {
+    const sampleUuid = "123e4567-e89b-12d3-a456-426614174000";
+    const hex64 = "a".repeat(64);
+    expect(
+      SpecRevisionSchema.parse({
+        id: sampleUuid,
+        spec_id: sampleUuid,
+        revision_number: 1,
+        content_hash: `sha256:${hex64}`,
+        created_at: 1730500000,
+      }).content_hash
+    ).toBe(`sha256:${hex64}`);
+    expect(
+      SpecRevisionSchema.parse({
+        id: sampleUuid,
+        spec_id: sampleUuid,
+        revision_number: 2,
+        content_hash: `sha256-${hex64}`,
+        created_at: 1730500001,
+      }).content_hash
+    ).toBe(`sha256-${hex64}`);
+  });
+
+  it("Full ts-rs Parity: validates ChangeProposalV1, DesignContracts, Slicing, Prompt & Adaptation schemas", () => {
+    const sampleUuid = "123e4567-e89b-12d3-a456-426614174000";
+    const digest = "b".repeat(64);
+
+    const proposal = ChangeProposalV1Schema.parse({
+      id: "prop-1",
+      tenant_id: "tenant-1",
+      project_id: sampleUuid,
+      intent_id: null,
+      title: "Add Header",
+      description: "Update global header",
+      validation_status: "PENDING",
+      status: "OPEN",
+      created_at: "2026-11-13T00:00:00Z",
+      updated_at: "2026-11-13T00:00:00Z",
+    });
+    expect(proposal.title).toBe("Add Header");
+
+    const contracts = ProjectDesignContractsSchema.parse({
+      icon_manifest_path: ".cowok-design/icons.json",
+      allowed_icon_set: ["ChevronRight"],
+      typography_contract: {
+        allowed_font_families: ["Inter"],
+        allowed_font_weights: [400, 700],
+        allowed_font_sizes: ["14px"],
+        min_wcag_contrast: 4.5,
+      },
+      component_registry: {
+        components: [
+          ComponentRegistryEntrySchema.parse({
+            name: "DataTableView",
+            source_spec: "03-ui-ux-spec.md",
+            allowed_props: ["rows", "columns"],
+          }),
+        ],
+        forbid_unregistered: true,
+      },
+    });
+    expect(ComponentRegistryContractSchema.parse(contracts.component_registry).forbid_unregistered).toBe(true);
+    expect(ComponentValidationReportSchema.parse({ requested_component: "Card", is_valid: true, suggestions: [] }).is_valid).toBe(true);
+    expect(TypographyValidationReportSchema.parse({ is_valid: true, errors: [] }).is_valid).toBe(true);
+
+    const req = ContextSliceRequestSchema.parse({
+      task_input: "Update dashboard metric",
+      override_horizon: TaskHorizonSchema.parse("short"),
+      department: DepartmentSchema.parse("product_ui"),
+      portal: PortalSchema.parse("tenant_admin"),
+      affected_artifacts: ["src/App.jsx"],
+    });
+    const sliceDecision = ContextSliceDecisionSchema.parse({
+      horizon: req.override_horizon,
+      department: req.department,
+      portal: req.portal,
+      allowed_spec_keys: ["03-ui-ux-spec.md"],
+      denied_spec_keys: [["08-security-tenancy.md", ReasonCodeSchema.parse("redacted_security_boundary")]],
+      token_ceiling: 12000,
+      primary_reason: "success",
+    });
+    const slice = AuthorizedContextSliceSchema.parse({
+      project_id: sampleUuid,
+      decision: sliceDecision,
+      slices: [
+        SpecSliceSchema.parse({
+          spec_key: "03-ui-ux-spec.md",
+          title: "UI UX Spec",
+          content: "# UI UX",
+          estimated_tokens: 120,
+          priority_rank: 1,
+        }),
+      ],
+      total_estimated_tokens: 120,
+      atomic_complete: true,
+    });
+    const budget = GovernedBudgetResultSchema.parse({
+      sections: [
+        PromptSectionSchema.parse({
+          id: "sec-1",
+          priority: PriorityTierSchema.parse("P0_INVARIANT"),
+          title: "Core",
+          content: "Invariant rule",
+        }),
+      ],
+      total_tokens: 20,
+      token_ceiling: 4000,
+      pruned_section_ids: [],
+      compressed_section_ids: [],
+    });
+    expect(budget.total_tokens).toBe(20);
+
+    const compIn = CompilationInputSchema.parse({
+      project_id: sampleUuid,
+      system_instruction: "Follow SSOT",
+      project_constraints: ["NO_TAILWIND"],
+      context_slice: slice,
+      task_instructions: "Build panel",
+      optional_components: ["MetricLine"],
+    });
+    expect(compIn.project_constraints).toHaveLength(1);
+    expect(
+      CompiledPromptPayloadSchema.parse({
+        compiled_prompt: "prompt text",
+        token_count: 50,
+        token_ceiling: 4000,
+        sha256_digest: digest,
+        pruned_sections: [],
+        compressed_sections: [],
+      }).token_count
+    ).toBe(50);
+
+    const adaptReq = AdaptationRequestSchema.parse({
+      project_id: sampleUuid,
+      requested_profile: ModelProfileTierSchema.parse("frontier_reasoning"),
+      raw_system_prompt: "System",
+      tools: [
+        ModelToolDefinitionSchema.parse({
+          name: "read_spec",
+          description: "Read canonical spec",
+          parameters: { type: "object" },
+          is_micro_tool: false,
+        }),
+      ],
+      disallowed_profiles: [],
+      syntax_error_reported: false,
+      max_budget_override: null,
+    });
+    expect(adaptReq.requested_profile).toBe("frontier_reasoning");
+    expect(ToolComplexitySchema.parse("micro_tools")).toBe("micro_tools");
+    expect(
+      AdaptationResponseSchema.parse({
+        active_profile: "fast_coding",
+        reasoning_effort: ReasoningEffortSchema.parse("medium"),
+        system_prompt: "System",
+        tools: adaptReq.tools,
+        token_budget: 8000,
+        estimated_tokens: 100,
+        degraded: true,
+        degradation_reason: DegradationReasonSchema.parse("token_ceiling_exceeded"),
+        sha256_digest: digest,
+      }).degraded
+    ).toBe(true);
   });
 });

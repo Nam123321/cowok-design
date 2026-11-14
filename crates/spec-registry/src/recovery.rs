@@ -113,7 +113,18 @@ pub fn recover_pending_spec(
                 } else if Some(db_sha.as_str()) == intent.old_sha256.as_deref() || db_sha.is_empty()
                 {
                     // Finalize CAS + append revision + mark COMMITTED atomically
-                    let new_ver = if db_sha.is_empty() { 1 } else { *db_ver + 1 };
+                    let max_rev: i64 = conn
+                        .query_row(
+                            "SELECT COALESCE(MAX(revision_number), 0) FROM spec_revisions WHERE spec_id = ?1",
+                            params![intent.spec_id],
+                            |r| r.get(0),
+                        )
+                        .unwrap_or(0);
+                    let new_ver = if max_rev == 0 && db_sha.is_empty() {
+                        1
+                    } else {
+                        (*db_ver).max(max_rev) + 1
+                    };
                     let src_proj_uuid = intent
                         .source_project_id
                         .as_deref()
@@ -128,7 +139,7 @@ pub fn recover_pending_spec(
                     );
                     let rev_id = Uuid::new_v4().to_string();
 
-                    retry_on_busy("recovery_finalize_cas", || {
+                    let recovered = retry_on_busy("recovery_finalize_cas", || {
                         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
                         let updated = tx.execute(
                             "UPDATE project_specs
@@ -153,38 +164,52 @@ pub fn recover_pending_spec(
                                 db_sha,
                             ],
                         )?;
-                        if updated == 1 {
+                        if updated != 1 {
                             tx.execute(
-                                "INSERT OR IGNORE INTO spec_revisions (
-                                    id, spec_id, project_id, spec_key, revision_number,
-                                    operation_id, previous_sha256, content_hash,
-                                    actor_kind, actor_id, change_summary,
-                                    source_project_id, source_revision_sha256, created_at
-                                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
-                                params![
-                                    rev_id,
-                                    intent.spec_id,
-                                    intent.project_id,
-                                    intent.spec_key,
-                                    new_ver,
-                                    intent.operation_id,
-                                    intent.old_sha256,
-                                    intent.new_sha256,
-                                    intent.actor_kind,
-                                    intent.actor_id,
-                                    intent.change_summary,
-                                    intent.source_project_id,
-                                    intent.source_revision_sha256,
-                                    now_ms,
-                                ],
+                                "UPDATE spec_write_intents SET state = 'ABORTED', updated_at = ?1 WHERE operation_id = ?2",
+                                params![now_ms, intent.operation_id],
                             )?;
+                            tx.commit()?;
+                            return Ok(false);
                         }
+                        tx.execute(
+                            "INSERT INTO spec_revisions (
+                                id, spec_id, project_id, spec_key, revision_number,
+                                operation_id, previous_sha256, content_hash,
+                                actor_kind, actor_id, change_summary,
+                                source_project_id, source_revision_sha256, created_at
+                            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                            params![
+                                rev_id,
+                                intent.spec_id,
+                                intent.project_id,
+                                intent.spec_key,
+                                new_ver,
+                                intent.operation_id,
+                                intent.old_sha256,
+                                intent.new_sha256,
+                                intent.actor_kind,
+                                intent.actor_id,
+                                intent.change_summary,
+                                intent.source_project_id,
+                                intent.source_revision_sha256,
+                                now_ms,
+                            ],
+                        )?;
                         tx.execute(
                             "UPDATE spec_write_intents SET state = 'COMMITTED', updated_at = ?1 WHERE operation_id = ?2",
                             params![now_ms, intent.operation_id],
                         )?;
-                        tx.commit()
+                        tx.commit()?;
+                        Ok(true)
                     })?;
+                    if !recovered {
+                        return Err(HarnessError::StaleFile {
+                            path: format!("product/specs/{}", spec_key.as_str()),
+                            expected_hash: db_sha.clone(),
+                            actual_hash: "RECOVERY_CAS_CONFLICT".to_string(),
+                        });
+                    }
                 } else {
                     return Err(HarnessError::ValidationFailed {
                         reason: format!(

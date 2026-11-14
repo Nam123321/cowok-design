@@ -48,11 +48,27 @@ const CSS_STYLES = `
   }
 `;
 
+function escapeHtmlText(raw: string): string {
+  return raw
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+const SANDBOX_CSP =
+  "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data: blob:; font-src data:;";
+
 export function buildSandboxSrcDoc(
   screenKey: string,
   title: string,
   variant: FixtureVariant,
   payloadStr: string
 ): string {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><style>${CSS_STYLES}</style></head><body><div class="card"><span class="badge" id="variant-badge">${variant}</span><h2>${title}</h2><p>Key: <code>${screenKey}</code></p><pre id="payload-view">${payloadStr}</pre></div><script>window.addEventListener("message",function(e){if(!e.data||e.data.type!=="${MESSAGE_TYPE}")return;var b=document.getElementById("variant-badge");if(b)b.textContent=e.data.variant;var pv=document.getElementById("payload-view");if(pv)pv.textContent=JSON.stringify(e.data.payload,null,2);});</script></body></html>`;
+  const safeVariant = escapeHtmlText(variant);
+  const safeTitle = escapeHtmlText(title);
+  const safeKey = escapeHtmlText(screenKey);
+  const safePayload = escapeHtmlText(payloadStr);
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta http-equiv="Content-Security-Policy" content="${SANDBOX_CSP}"/><style>${CSS_STYLES}</style></head><body><div class="card"><span class="badge" id="variant-badge">${safeVariant}</span><h2>${safeTitle}</h2><p>Key: <code>${safeKey}</code></p><pre id="payload-view">${safePayload}</pre></div><script>window.addEventListener("message",function(e){if(e.source!==window.parent||!e.data||e.data.type!=="${MESSAGE_TYPE}")return;var b=document.getElementById("variant-badge");if(b)b.textContent=String(e.data.variant||"");var pv=document.getElementById("payload-view");if(pv)pv.textContent=JSON.stringify(e.data.payload,null,2);});</script></body></html>`;
 }

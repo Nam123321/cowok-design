@@ -14,10 +14,10 @@ use domain::{CanonicalSpecKey, ProvenanceStatus};
 use harness_daemon::{
     build_router, map_error_to_response, read_daemon_lock, resolve_project_scoped_registry,
     validate_loopback_host, validate_seed_repo_path, ChatSessionDto, CreateProjectRequest,
-    DaemonAppState, DaemonConfig, DaemonHttpClient, DaemonServer, GitHubPRResponseDto,
-    HealthResponse, HttpErrorBody, ModelAdapterRequestDto, PathTokenResponse, ProjectBoundaryDto,
-    ProjectDto, ProjectSpecsListResponse, PromptCompileRequest, SpecItemWithDriftDto,
-    SynthesizeSpecsRequest, SynthesizeSpecsResponse,
+    DaemonAppState, DaemonConfig, DaemonHttpClient, DaemonServer, HealthResponse, HttpErrorBody,
+    ModelAdapterRequestDto, PathTokenResponse, ProjectBoundaryDto, ProjectDto,
+    ProjectSpecsListResponse, PromptCompileRequest, SpecItemWithDriftDto, SynthesizeSpecsRequest,
+    SynthesizeSpecsResponse,
 };
 use http_body_util::BodyExt;
 use rusqlite::params;
@@ -33,18 +33,18 @@ fn setup_daemon_router(tmp: &TempDir) -> (Arc<SpecRegistry>, axum::Router) {
     let pool =
         SqlitePool::open_wal(SqliteWalConfig::new(&db_path, tmp.path())).expect("open sqlite wal");
     let registry = Arc::new(SpecRegistry::new(pool));
-    let state = DaemonAppState {
-        registry: Arc::clone(&registry),
-        host: "127.0.0.1".to_string(),
-        port: 4170,
-    };
+    let state = DaemonAppState::new(Arc::clone(&registry), "127.0.0.1".to_string(), 4170);
+    let auth_for_layer = Arc::clone(&state.auth);
     let reg_for_layer = Arc::clone(&registry);
     let router =
         build_router(state).layer(middleware::from_fn(move |mut req: Request, next: Next| {
             let ws_default = ws_path.clone();
             let reg = Arc::clone(&reg_for_layer);
+            let auth = Arc::clone(&auth_for_layer);
             async move {
                 let path = req.uri().path().to_string();
+                let query = req.uri().query().unwrap_or("").to_string();
+                let is_projects_root = path == "/api/v1/projects";
                 let is_project_route = path.starts_with("/api/v1/projects/");
                 let no_auth_requested = req.headers().contains_key("x-cowok-test-no-auth");
 
@@ -71,11 +71,14 @@ fn setup_daemon_router(tmp: &TempDir) -> (Arc<SpecRegistry>, axum::Router) {
                     }
                 }
 
-                // If not explicitly testing unauthorized, auto-inject valid Bearer auth for test convenience
-                if is_project_route
+                // If not explicitly testing unauthorized, auto-inject valid auth for test convenience
+                if (is_project_route || is_projects_root)
                     && !no_auth_requested
                     && !req.headers().contains_key("authorization")
+                    && !req.headers().contains_key("x-cowok-hmac-sig")
+                    && !req.headers().contains_key("x-cowok-session-token")
                 {
+                    let mut injected_bearer = false;
                     if let Some(rest) = path.strip_prefix("/api/v1/projects/") {
                         let seg = rest.split('/').next().unwrap_or("");
                         if let Ok(pid) = Uuid::parse_str(seg) {
@@ -86,10 +89,47 @@ fn setup_daemon_router(tmp: &TempDir) -> (Arc<SpecRegistry>, axum::Router) {
                                         HeaderValue::from_str(&format!("Bearer {}", tok.trim()))
                                     {
                                         req.headers_mut().insert("authorization", val);
+                                        injected_bearer = true;
                                     }
                                 }
                             }
                         }
+                    }
+
+                    // For root `/api/v1/projects` or nonexistent UUID lookup tests, sign with real HMAC-SHA256 v2
+                    let should_sign_hmac = if is_projects_root {
+                        true
+                    } else if let Some(rest) = path.strip_prefix("/api/v1/projects/") {
+                        let seg = rest.split('/').next().unwrap_or("");
+                        Uuid::parse_str(seg).is_ok() && !injected_bearer
+                    } else {
+                        false
+                    };
+                    if should_sign_hmac {
+                        let (mut parts, body) = req.into_parts();
+                        let raw_bytes = axum::body::to_bytes(body, 2 * 1024 * 1024)
+                            .await
+                            .unwrap_or_default();
+                        let signed = auth.sign_hmac_v2_headers(
+                            &parts.method,
+                            &path,
+                            &query,
+                            &harness_daemon::daemon_auth::FlowPrincipal {
+                                tenant_id: "local-default".into(),
+                                user_id: "test-harness".into(),
+                                role: "editor".into(),
+                            },
+                            &raw_bytes,
+                        );
+                        for (k, v) in signed {
+                            if let (Ok(hn), Ok(hv)) = (
+                                axum::http::header::HeaderName::from_bytes(k.as_bytes()),
+                                HeaderValue::from_str(&v),
+                            ) {
+                                parts.headers.insert(hn, hv);
+                            }
+                        }
+                        req = Request::from_parts(parts, Body::from(raw_bytes));
                     }
                 }
 
@@ -254,13 +294,27 @@ async fn api_01_to_05_and_syn_01_to_04_rest_endpoints_provenance_and_idempotency
     assert_eq!(status, StatusCode::OK);
     let child_syn: SynthesizeSpecsResponse =
         serde_json::from_value(child_syn_val).expect("parse child syn");
-    let inherited_sec = child_syn
+    let inherited_ux = child_syn
+        .specs
+        .iter()
+        .find(|s| s.spec_key == CanonicalSpecKey::UiUxSpec)
+        .expect("03-ui-ux-spec.md");
+    assert_eq!(inherited_ux.source_project_id, Some(upstream_proj.id));
+    assert!(inherited_ux.source_revision_sha256.is_some());
+
+    // Brand reuse must NEVER leak Architecture or SecurityTenancy across projects
+    let non_inherited_arch = child_syn
+        .specs
+        .iter()
+        .find(|s| s.spec_key == CanonicalSpecKey::Architecture)
+        .expect("07-architecture.md");
+    assert_eq!(non_inherited_arch.source_project_id, None);
+    let non_inherited_sec = child_syn
         .specs
         .iter()
         .find(|s| s.spec_key == CanonicalSpecKey::SecurityTenancy)
         .expect("08-security-tenancy.md");
-    assert_eq!(inherited_sec.source_project_id, Some(upstream_proj.id));
-    assert!(inherited_sec.source_revision_sha256.is_some());
+    assert_eq!(non_inherited_sec.source_project_id, None);
 
     // API-03: GET /api/v1/projects/:id/specs before upstream change -> upstream_brand_drift_detected == false
     let (status, list_before_val) = send_json_request(
@@ -277,18 +331,18 @@ async fn api_01_to_05_and_syn_01_to_04_rest_endpoints_provenance_and_idempotency
     assert!(!list_before.upstream_brand_drift_detected);
     assert_eq!(list_before.specs.len(), 9);
 
-    // API-04: PUT /api/v1/projects/:id/specs/:spec_key on upstream project to trigger brand drift
+    // API-04: PUT /api/v1/projects/:id/specs/:spec_key on upstream UI/UX spec to trigger brand drift
     let (upstream_reg, _) =
         resolve_project_scoped_registry(&registry, upstream_proj.id).expect("upstream reg");
-    let upstream_sec = upstream_reg
-        .get_spec(upstream_proj.id, CanonicalSpecKey::SecurityTenancy)
-        .expect("get upstream sec")
-        .expect("upstream sec exists");
+    let upstream_ux = upstream_reg
+        .get_spec(upstream_proj.id, CanonicalSpecKey::UiUxSpec)
+        .expect("get upstream ux")
+        .expect("upstream ux exists");
     let put_upstream_req = serde_json::json!({
-        "markdown_content": "# 08-security-tenancy.md\n\n- [CONFIRMED] Updated v2 Brand & Security Tenancy Guidelines.\n",
-        "expected_sha256": upstream_sec.content_sha256,
+        "markdown_content": "# 03-ui-ux-spec.md\n\n- [CONFIRMED] Updated v2 Brand Visual Palette & Typography Tokens.\n",
+        "expected_sha256": upstream_ux.content_sha256,
         "status": "CONFIRMED",
-        "change_summary": "Upgrade brand security tokens to v2",
+        "change_summary": "Upgrade brand visual tokens to v2",
         "source_project_id": null,
         "source_revision_sha256": null
     });
@@ -296,7 +350,7 @@ async fn api_01_to_05_and_syn_01_to_04_rest_endpoints_provenance_and_idempotency
         &router,
         "PUT",
         &format!(
-            "/api/v1/projects/{}/specs/08-security-tenancy.md",
+            "/api/v1/projects/{}/specs/03-ui-ux-spec.md",
             upstream_proj.id
         ),
         &[("x-cowok-actor-id", "brand-admin")],
@@ -1452,16 +1506,16 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
     assert_eq!(status, StatusCode::OK);
     let boundary: ProjectBoundaryDto = serde_json::from_value(boundary_val).expect("boundary dto");
     assert_eq!(boundary.boundary_type, "managed_scratch");
-    assert_eq!(boundary.config_dir, ".opendesign");
+    assert_eq!(boundary.config_dir, ".cowok-design");
     assert!(!boundary.is_git_repository);
     assert!(boundary.promoted_at.is_none());
 
-    // Verify .opendesign/project.json was created on disk in the scratch workspace
+    // Verify .cowok-design/project.json was created on disk in the scratch workspace
     let scratch_ws = std::path::PathBuf::from(&boundary.workspace_path);
-    let opendesign_proj = scratch_ws.join(".opendesign").join("project.json");
+    let cowok_proj = scratch_ws.join(".cowok-design").join("project.json");
     assert!(
-        opendesign_proj.exists(),
-        ".opendesign/project.json must exist in scratch workspace"
+        cowok_proj.exists(),
+        ".cowok-design/project.json must exist in scratch workspace"
     );
 
     // Create a dummy spec file in scratch workspace to verify it gets copied on promotion
@@ -1606,8 +1660,11 @@ async fn test_hybrid_project_boundary_chat_sessions_and_hmac_path_token() {
         "demo.txt must be copied to target"
     );
     assert!(
-        target_dir.join(".opendesign").join("project.json").exists(),
-        ".opendesign/project.json must be created in target"
+        target_dir
+            .join(".cowok-design")
+            .join("project.json")
+            .exists(),
+        ".cowok-design/project.json must be created in target"
     );
 
     // Subsequent promote should fail with 409 Conflict
@@ -1804,7 +1861,7 @@ async fn test_ac07_ac08_ac09_ac10_hardening() {
         "Folder-backed external project must resolve specs successfully (AC-07)"
     );
 
-    // AC-10: Test offline mock flag on GitHub PR response
+    // AC-10: Creating a GitHub PR without configured integration returns honest 501 NOT_IMPLEMENTED (no fake mock PR fabrication)
     let (status, pr_val) = send_json_request(
         &router,
         "POST",
@@ -1816,12 +1873,8 @@ async fn test_ac07_ac08_ac09_ac10_hardening() {
         })),
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
-    let pr_dto: GitHubPRResponseDto = serde_json::from_value(pr_val).expect("pr dto");
-    assert!(
-        pr_dto.is_offline_mock,
-        "GitHub PR response must include isOfflineMock: true (AC-10)"
-    );
+    assert_eq!(status, StatusCode::NOT_IMPLEMENTED);
+    assert_eq!(pr_val["code"], "GITHUB_INTEGRATION_NOT_CONFIGURED");
 }
 
 #[tokio::test]
@@ -2046,4 +2099,223 @@ async fn test_design_contracts_fail_closed_and_runtime_ast_enforcement() {
         status.is_client_error() || status.is_server_error(),
         "Deleted configured custom manifest must fail closed, got {status}"
     );
+}
+
+#[tokio::test]
+async fn test_epic01_security_hardening_delete_spec_and_sqlite_proposals_zip_export() {
+    let tmp = TempDir::new().expect("tempdir");
+    let (_registry, router) = setup_daemon_router(&tmp);
+
+    let now_ts = chrono::Utc::now().timestamp().to_string();
+    // 1. Spoofed HMAC header with fresh timestamp MUST return 401 UNAUTHENTICATED
+    let (status, _) = send_json_request(
+        &router,
+        "GET",
+        "/api/v1/projects",
+        &[
+            ("x-cowok-test-no-auth", "1"),
+            ("x-cowok-hmac-sig", "deadbeef-spoofed-signature"),
+            ("x-cowok-timestamp", &now_ts),
+        ],
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    // 2. Unauthenticated local-session escalation to role=admin MUST be denied (403 INSUFFICIENT_ROLE)
+    let (status, sess_err) = send_json_request(
+        &router,
+        "POST",
+        "/api/v1/auth/local-session",
+        &[("host", "127.0.0.1:4170")],
+        Some(serde_json::json!({ "role": "admin" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(sess_err["code"], "INSUFFICIENT_ROLE");
+
+    // 3. Create project -> synthesize -> DELETE a spec -> verify tombstoned & removed
+    let (status, proj_val) = send_json_request(
+        &router,
+        "POST",
+        "/api/v1/projects",
+        &[],
+        Some(serde_json::json!({
+            "slug": "epic01-full-persistence",
+            "name": "Epic 01 Full Persistence",
+            "product_brief": "Comprehensive test for DELETE spec, SQLite proposals, AST checks, and real PKZIP export."
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let proj: ProjectDto = serde_json::from_value(proj_val).expect("project dto");
+
+    let (status, _) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/specs/synthesize", proj.id),
+        &[],
+        Some(serde_json::json!({ "actor_id": "tester" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, del_val) = send_json_request(
+        &router,
+        "DELETE",
+        &format!("/api/v1/projects/{}/specs/09-data-and-copy.md", proj.id),
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(del_val["deleted"], true);
+
+    let (status, list_val) = send_json_request(
+        &router,
+        "GET",
+        &format!("/api/v1/projects/{}/specs", proj.id),
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let specs_list: ProjectSpecsListResponse =
+        serde_json::from_value(list_val).expect("parse list specs");
+    assert_eq!(specs_list.specs.len(), 8);
+
+    // 4. Proposal lifecycle: nonexistent ID -> 404; forbidden eval() -> failed AST lint; clean patch -> SQLite persisted + applied
+    let missing_prop = Uuid::new_v4();
+    let (status, _) = send_json_request(
+        &router,
+        "GET",
+        &format!("/api/v1/projects/{}/proposals/{missing_prop}", proj.id),
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let (status, bad_prop) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/proposals", proj.id),
+        &[],
+        Some(serde_json::json!({
+            "title": "Unsafe Eval",
+            "description": "Contains eval",
+            "files": [{
+                "path": "src/Bad.tsx",
+                "status": "modified",
+                "additions": 1,
+                "deletions": 0,
+                "patch": "export const x = eval('1+1');"
+            }]
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(bad_prop["validationStatus"], "failed");
+    assert_eq!(bad_prop["status"], "draft");
+
+    let (status, good_prop) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/proposals", proj.id),
+        &[],
+        Some(serde_json::json!({
+            "title": "Clean UI Component",
+            "description": "Adds HeroSection",
+            "files": [{
+                "path": "src/HeroSection.tsx",
+                "status": "added",
+                "additions": 1,
+                "deletions": 0,
+                "patch": "export function HeroSection() { return <section>Hello</section>; }"
+            }]
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(good_prop["validationStatus"], "passed");
+    assert_eq!(good_prop["status"], "ready");
+    let good_prop_id = good_prop["id"].as_str().expect("prop id");
+
+    let (status, fetched_prop) = send_json_request(
+        &router,
+        "GET",
+        &format!("/api/v1/projects/{}/proposals/{good_prop_id}", proj.id),
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(fetched_prop["title"], "Clean UI Component");
+
+    let (status, applied_prop) = send_json_request(
+        &router,
+        "POST",
+        &format!(
+            "/api/v1/projects/{}/proposals/{good_prop_id}/apply",
+            proj.id
+        ),
+        &[],
+        Some(serde_json::json!({})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(applied_prop["status"], "applied");
+
+    // 5. Real PKZIP Export + matching SHA-256 + 404 on missing snapshot revert
+    let (status, _) = send_json_request(
+        &router,
+        "POST",
+        &format!(
+            "/api/v1/projects/{}/snapshots/{}/revert",
+            proj.id,
+            Uuid::new_v4()
+        ),
+        &[],
+        Some(serde_json::json!({})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let (status, export_meta) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/snapshots/export", proj.id),
+        &[],
+        Some(serde_json::json!({})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let expected_len = export_meta["byteLength"].as_u64().expect("byteLength") as usize;
+    let expected_sha = export_meta["sha256"].as_str().expect("sha256");
+    assert!(
+        expected_len > 22,
+        "Real PKZIP archive must not be 22-byte empty stub"
+    );
+    assert_ne!(expected_sha, "export_bundle_sha256_verified");
+
+    let dl_req = Request::builder()
+        .method("GET")
+        .uri(format!(
+            "/api/v1/projects/{}/snapshots/export/download",
+            proj.id
+        ))
+        .body(Body::empty())
+        .expect("build download req");
+    let dl_resp = router.clone().oneshot(dl_req).await.expect("oneshot dl");
+    assert_eq!(dl_resp.status(), StatusCode::OK);
+    assert!(dl_resp.headers().get("x-cowok-offline-mock").is_none());
+    let dl_bytes = dl_resp
+        .into_body()
+        .collect()
+        .await
+        .expect("dl bytes")
+        .to_bytes();
+    assert_eq!(dl_bytes.len(), expected_len);
+    assert_eq!(&dl_bytes[..4], b"PK\x03\x04");
+    assert_eq!(format!("{:x}", Sha256::digest(&dl_bytes)), expected_sha);
 }

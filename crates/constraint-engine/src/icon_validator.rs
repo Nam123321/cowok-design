@@ -611,15 +611,29 @@ impl IconValidator {
         let mut seen = HashSet::new();
         let mut components = Vec::new();
 
-        // Scope primarily to 07_COMPONENT_REGISTRY / Component Registry section if present,
-        // otherwise scan whole document for backticked PascalCase component identifiers.
-        let target_slice = if let Some(idx) = spec_md.find("07_COMPONENT_REGISTRY") {
+        // Scope strictly to 07_COMPONENT_REGISTRY / Component Registry section if present,
+        // terminating at the next top/second-level heading (`# ` or `## `).
+        let after_start = if let Some(idx) = spec_md.find("07_COMPONENT_REGISTRY") {
             &spec_md[idx..]
         } else if let Some(idx) = spec_md.find("Component Registry") {
             &spec_md[idx..]
         } else {
             spec_md
         };
+
+        let mut section_end = after_start.len();
+        let mut cursor = 0usize;
+        for (line_idx, line) in after_start.lines().enumerate() {
+            if line_idx > 0 {
+                let trimmed_line = line.trim_start();
+                if trimmed_line.starts_with("# ") || trimmed_line.starts_with("## ") {
+                    section_end = cursor;
+                    break;
+                }
+            }
+            cursor += line.len() + 1;
+        }
+        let target_slice = &after_start[..section_end.min(after_start.len())];
 
         for seg in target_slice.split('`').skip(1).step_by(2) {
             let trimmed = seg
@@ -761,6 +775,10 @@ impl IconValidator {
             num.trim().parse::<f64>().ok()
         } else if let Some(num) = s.strip_suffix("rem") {
             num.trim().parse::<f64>().ok().map(|v| v * 16.0)
+        } else if let Some(num) = s.strip_suffix("em") {
+            num.trim().parse::<f64>().ok().map(|v| v * 16.0)
+        } else if let Some(num) = s.strip_suffix("pt") {
+            num.trim().parse::<f64>().ok().map(|v| v * (96.0 / 72.0))
         } else {
             None
         }

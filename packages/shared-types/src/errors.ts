@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_SAFE_INTEGER, MIN_SAFE_INTEGER } from "./primitives.js";
+import { MAX_SAFE_INTEGER, MIN_SAFE_INTEGER, SafeJsIntegerSchema } from "./primitives.js";
 
 export const HarnessErrorSchema = z.discriminatedUnion("kind", [
   z
@@ -69,8 +69,8 @@ export const HarnessErrorSchema = z.discriminatedUnion("kind", [
       kind: z.literal("PROMPT_BUDGET_EXCEEDED"),
       payload: z
         .object({
-          tokens: z.number().int().nonnegative(),
-          ceiling: z.number().int().nonnegative(),
+          tokens: SafeJsIntegerSchema.min(0),
+          ceiling: SafeJsIntegerSchema.min(0),
         })
         .strict(),
     })

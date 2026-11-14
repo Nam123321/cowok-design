@@ -27,6 +27,7 @@ pub fn version() -> &'static str {
 
 /// Represents the severity level of a constraint violation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[cfg_attr(feature = "ts", derive(TS))]
 #[cfg_attr(
     feature = "ts",
@@ -405,6 +406,8 @@ struct AstTypographySample<'a> {
     font_family: Option<&'a str>,
     font_weight: Option<u32>,
     font_size: Option<&'a str>,
+    color: Option<&'a str>,
+    background_color: Option<&'a str>,
     span: oxc_span::Span,
 }
 
@@ -413,6 +416,7 @@ struct AstCollectedNodes<'a> {
     classes: Vec<(&'a str, oxc_span::Span)>,
     styles: Vec<(&'a str, oxc_span::Span)>,
     components: Vec<(String, oxc_span::Span)>,
+    component_props: Vec<(String, Vec<(String, oxc_span::Span)>)>,
     icons: Vec<(&'a str, oxc_span::Span)>,
     typography_samples: Vec<AstTypographySample<'a>>,
 }
@@ -511,6 +515,70 @@ impl AstLinter {
                     Self::walk_expression(arg, nodes, content);
                 }
             }
+            oxc_ast::ast::Statement::IfStatement(i) => {
+                Self::walk_expression(&i.test, nodes, content);
+                Self::walk_statement(&i.consequent, nodes, content);
+                if let Some(alt) = &i.alternate {
+                    Self::walk_statement(alt, nodes, content);
+                }
+            }
+            oxc_ast::ast::Statement::SwitchStatement(sw) => {
+                Self::walk_expression(&sw.discriminant, nodes, content);
+                for case in &sw.cases {
+                    if let Some(test) = &case.test {
+                        Self::walk_expression(test, nodes, content);
+                    }
+                    for s in &case.consequent {
+                        Self::walk_statement(s, nodes, content);
+                    }
+                }
+            }
+            oxc_ast::ast::Statement::ForStatement(f) => {
+                if let Some(test) = &f.test {
+                    Self::walk_expression(test, nodes, content);
+                }
+                if let Some(update) = &f.update {
+                    Self::walk_expression(update, nodes, content);
+                }
+                Self::walk_statement(&f.body, nodes, content);
+            }
+            oxc_ast::ast::Statement::ForOfStatement(f) => {
+                Self::walk_expression(&f.right, nodes, content);
+                Self::walk_statement(&f.body, nodes, content);
+            }
+            oxc_ast::ast::Statement::ForInStatement(f) => {
+                Self::walk_expression(&f.right, nodes, content);
+                Self::walk_statement(&f.body, nodes, content);
+            }
+            oxc_ast::ast::Statement::WhileStatement(w) => {
+                Self::walk_expression(&w.test, nodes, content);
+                Self::walk_statement(&w.body, nodes, content);
+            }
+            oxc_ast::ast::Statement::DoWhileStatement(d) => {
+                Self::walk_statement(&d.body, nodes, content);
+                Self::walk_expression(&d.test, nodes, content);
+            }
+            oxc_ast::ast::Statement::TryStatement(t) => {
+                for s in &t.block.body {
+                    Self::walk_statement(s, nodes, content);
+                }
+                if let Some(handler) = &t.handler {
+                    for s in &handler.body.body {
+                        Self::walk_statement(s, nodes, content);
+                    }
+                }
+                if let Some(fin) = &t.finalizer {
+                    for s in &fin.body {
+                        Self::walk_statement(s, nodes, content);
+                    }
+                }
+            }
+            oxc_ast::ast::Statement::LabeledStatement(l) => {
+                Self::walk_statement(&l.body, nodes, content);
+            }
+            oxc_ast::ast::Statement::ThrowStatement(th) => {
+                Self::walk_expression(&th.argument, nodes, content);
+            }
             _ => {}
         }
     }
@@ -566,6 +634,84 @@ impl AstLinter {
                         Self::walk_expression(expr, nodes, content);
                     }
                 }
+            }
+            oxc_ast::ast::Expression::ArrayExpression(arr) => {
+                for el in &arr.elements {
+                    if let Some(el_expr) = el.as_expression() {
+                        Self::walk_expression(el_expr, nodes, content);
+                    } else if let oxc_ast::ast::ArrayExpressionElement::SpreadElement(sp) = el {
+                        Self::walk_expression(&sp.argument, nodes, content);
+                    }
+                }
+            }
+            oxc_ast::ast::Expression::ObjectExpression(obj) => {
+                for prop_kind in &obj.properties {
+                    match prop_kind {
+                        oxc_ast::ast::ObjectPropertyKind::ObjectProperty(prop) => {
+                            Self::walk_expression(&prop.value, nodes, content);
+                        }
+                        oxc_ast::ast::ObjectPropertyKind::SpreadProperty(sp) => {
+                            Self::walk_expression(&sp.argument, nodes, content);
+                        }
+                    }
+                }
+            }
+            oxc_ast::ast::Expression::SequenceExpression(seq) => {
+                for sub in &seq.expressions {
+                    Self::walk_expression(sub, nodes, content);
+                }
+            }
+            oxc_ast::ast::Expression::AssignmentExpression(a) => {
+                Self::walk_expression(&a.right, nodes, content);
+            }
+            oxc_ast::ast::Expression::AwaitExpression(a) => {
+                Self::walk_expression(&a.argument, nodes, content);
+            }
+            oxc_ast::ast::Expression::UnaryExpression(u) => {
+                Self::walk_expression(&u.argument, nodes, content);
+            }
+            oxc_ast::ast::Expression::BinaryExpression(b) => {
+                Self::walk_expression(&b.left, nodes, content);
+                Self::walk_expression(&b.right, nodes, content);
+            }
+            oxc_ast::ast::Expression::ChainExpression(ch) => match &ch.expression {
+                oxc_ast::ast::ChainElement::CallExpression(c) => {
+                    Self::walk_expression(&c.callee, nodes, content);
+                    for arg in &c.arguments {
+                        if let Some(expr) = arg.as_expression() {
+                            Self::walk_expression(expr, nodes, content);
+                        }
+                    }
+                }
+                oxc_ast::ast::ChainElement::TSNonNullExpression(ts) => {
+                    Self::walk_expression(&ts.expression, nodes, content);
+                }
+                _ => {}
+            },
+            oxc_ast::ast::Expression::TemplateLiteral(t) => {
+                for sub in &t.expressions {
+                    Self::walk_expression(sub, nodes, content);
+                }
+            }
+            oxc_ast::ast::Expression::NewExpression(n) => {
+                Self::walk_expression(&n.callee, nodes, content);
+                for arg in &n.arguments {
+                    if let Some(expr) = arg.as_expression() {
+                        Self::walk_expression(expr, nodes, content);
+                    }
+                }
+            }
+            oxc_ast::ast::Expression::TSAsExpression(ts) => {
+                Self::walk_expression(&ts.expression, nodes, content);
+            }
+            oxc_ast::ast::Expression::TSSatisfiesExpression(ts) => {
+                Self::walk_expression(&ts.expression, nodes, content);
+            }
+            oxc_ast::ast::Expression::TSTypeAssertion(ts) => {
+                Self::walk_expression(&ts.expression, nodes, content);
+            }
+            oxc_ast::ast::Expression::TSNonNullExpression(ts) => {
+                Self::walk_expression(&ts.expression, nodes, content);
             }
             _ => {}
         }
@@ -630,20 +776,59 @@ impl AstLinter {
         }
     }
 
-    fn extract_string_attr_value<'a>(
+    fn collect_string_expr_values<'a>(
+        expr: &'a oxc_ast::ast::Expression<'a>,
+        out: &mut Vec<(&'a str, oxc_span::Span)>,
+    ) {
+        match expr {
+            oxc_ast::ast::Expression::StringLiteral(lit) => {
+                if let Some(s) = lit.value.as_str() {
+                    out.push((s, lit.span));
+                }
+            }
+            oxc_ast::ast::Expression::ConditionalExpression(cond) => {
+                Self::collect_string_expr_values(&cond.consequent, out);
+                Self::collect_string_expr_values(&cond.alternate, out);
+            }
+            oxc_ast::ast::Expression::LogicalExpression(l) => {
+                Self::collect_string_expr_values(&l.right, out);
+            }
+            oxc_ast::ast::Expression::ParenthesizedExpression(p) => {
+                Self::collect_string_expr_values(&p.expression, out);
+            }
+            oxc_ast::ast::Expression::TSAsExpression(ts) => {
+                Self::collect_string_expr_values(&ts.expression, out);
+            }
+            oxc_ast::ast::Expression::TSSatisfiesExpression(ts) => {
+                Self::collect_string_expr_values(&ts.expression, out);
+            }
+            _ => {}
+        }
+    }
+
+    fn collect_string_attr_values<'a>(
         val: &'a oxc_ast::ast::JSXAttributeValue<'a>,
-    ) -> Option<(&'a str, oxc_span::Span)> {
+        out: &mut Vec<(&'a str, oxc_span::Span)>,
+    ) {
         match val {
             oxc_ast::ast::JSXAttributeValue::StringLiteral(lit) => {
-                lit.value.as_str().map(|s| (s, lit.span))
+                if let Some(s) = lit.value.as_str() {
+                    out.push((s, lit.span));
+                }
             }
             oxc_ast::ast::JSXAttributeValue::ExpressionContainer(c) => match &c.expression {
                 oxc_ast::ast::JSXExpression::StringLiteral(lit) => {
-                    lit.value.as_str().map(|s| (s, lit.span))
+                    if let Some(s) = lit.value.as_str() {
+                        out.push((s, lit.span));
+                    }
                 }
-                _ => None,
+                _ => {
+                    if let Some(expr) = c.expression.as_expression() {
+                        Self::collect_string_expr_values(expr, out);
+                    }
+                }
             },
-            _ => None,
+            _ => {}
         }
     }
 
@@ -658,6 +843,8 @@ impl AstLinter {
             font_family: None,
             font_weight: None,
             font_size: None,
+            color: None,
+            background_color: None,
             span: fallback_span,
         };
         let mut found_any = false;
@@ -706,10 +893,20 @@ impl AstLinter {
                         found_any = true;
                     }
                 }
+                "color" => {
+                    if let oxc_ast::ast::Expression::StringLiteral(lit) = &prop.value {
+                        sample.color = lit.value.as_str();
+                    }
+                }
+                "backgroundColor" | "background-color" => {
+                    if let oxc_ast::ast::Expression::StringLiteral(lit) = &prop.value {
+                        sample.background_color = lit.value.as_str();
+                    }
+                }
                 _ => {}
             }
         }
-        if found_any {
+        if found_any || (sample.color.is_some() && sample.background_color.is_some()) {
             Some(sample)
         } else {
             None
@@ -723,6 +920,7 @@ impl AstLinter {
     ) {
         use oxc_span::GetSpan;
         let tag_name = Self::extract_jsx_tag_name(&el.opening_element.name, content);
+        let mut props_collected: Vec<(String, oxc_span::Span)> = Vec::new();
         if !tag_name.is_empty() {
             nodes
                 .components
@@ -739,6 +937,9 @@ impl AstLinter {
                     oxc_ast::ast::JSXAttributeName::Identifier(id) => id.name.as_str(),
                     oxc_ast::ast::JSXAttributeName::NamespacedName(ns) => ns.name.name.as_str(),
                 };
+                if !tag_name.is_empty() {
+                    props_collected.push((name.to_string(), a.name.span()));
+                }
                 if name == "className" || name == "class" {
                     if let Some(ref val) = a.value {
                         match val {
@@ -789,12 +990,13 @@ impl AstLinter {
                     || name == "icon"
                 {
                     if let Some(ref val) = a.value {
-                        if let Some((icon_str, icon_span)) = Self::extract_string_attr_value(val) {
-                            nodes.icons.push((icon_str, icon_span));
-                        }
+                        Self::collect_string_attr_values(val, &mut nodes.icons);
                     }
                 }
             }
+        }
+        if !tag_name.is_empty() && !props_collected.is_empty() {
+            nodes.component_props.push((tag_name, props_collected));
         }
         for child in &el.children {
             Self::walk_jsx_child(child, nodes, content);
@@ -1131,12 +1333,21 @@ impl AstLinter {
             for sample in &nodes.typography_samples {
                 let check_family = sample.font_family.unwrap_or(fallback_family);
                 let check_weight = sample.font_weight.unwrap_or(fallback_weight);
+                let computed_contrast = match (
+                    sample.color.and_then(Self::parse_static_css_color),
+                    sample
+                        .background_color
+                        .and_then(Self::parse_static_css_color),
+                ) {
+                    (Some(fg), Some(bg)) => Self::wcag_contrast_ratio(fg, bg),
+                    _ => contract.min_wcag_contrast,
+                };
                 if let Err(errs) = IconValidator::validate_typography(
                     contract,
                     check_family,
                     check_weight,
                     sample.font_size,
-                    contract.min_wcag_contrast,
+                    computed_contrast,
                 ) {
                     let (line, col) = byte_to_line_col(sample.span.start as usize);
                     for err_msg in errs {
@@ -1152,11 +1363,19 @@ impl AstLinter {
             }
         }
 
-        // 5. Enforce ComponentRegistryContract (`07_COMPONENT_REGISTRY`) on PascalCase JSX tags
+        // 5. Enforce ComponentRegistryContract (`07_COMPONENT_REGISTRY`) on PascalCase JSX tags & allowed_props
         if let Some(comp_contract) = component_registry {
             if comp_contract.forbid_unregistered {
                 for (comp_name, span) in &nodes.components {
-                    if matches!(comp_name.as_str(), "BrandIcon" | "Fragment") {
+                    if matches!(
+                        comp_name.as_str(),
+                        "BrandIcon"
+                            | "CowokIcon"
+                            | "Icon"
+                            | "AgentMktBrandIcon"
+                            | "Fragment"
+                            | "React.Fragment"
+                    ) {
                         continue;
                     }
                     let report = IconValidator::validate_component(comp_contract, comp_name);
@@ -1175,6 +1394,41 @@ impl AstLinter {
                     }
                 }
             }
+
+            for (comp_name, used_props) in &nodes.component_props {
+                if let Some(entry) = comp_contract
+                    .components
+                    .iter()
+                    .find(|c| c.name.eq_ignore_ascii_case(comp_name))
+                {
+                    if !entry.allowed_props.is_empty() {
+                        for (prop_name, prop_span) in used_props {
+                            let is_react_builtin = matches!(
+                                prop_name.as_str(),
+                                "key" | "ref" | "children" | "className" | "style"
+                            ) || prop_name.starts_with("data-")
+                                || prop_name.starts_with("aria-");
+                            let is_allowed = entry
+                                .allowed_props
+                                .iter()
+                                .any(|allowed| allowed == prop_name);
+                            if !is_react_builtin && !is_allowed {
+                                let (line, col) = byte_to_line_col(prop_span.start as usize);
+                                violations.push(ConstraintViolation {
+                                    rule_code: "ENFORCE_COMPONENT_REGISTRY".to_string(),
+                                    severity: comp_rule_sev.clone(),
+                                    message: format!(
+                                        "COMPONENT_PROP_VIOLATION: Prop '{}' on '<{} />' is not listed in allowed_props: {:?}",
+                                        prop_name, comp_name, entry.allowed_props
+                                    ),
+                                    line: Some(line),
+                                    column: Some(col),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // SLA Check: execution must complete within 5ms under CPU stress, ideally <1ms
@@ -1188,6 +1442,60 @@ impl AstLinter {
         }
 
         Ok(violations)
+    }
+
+    fn parse_static_css_color(raw: &str) -> Option<(u8, u8, u8)> {
+        let s = raw.trim().to_ascii_lowercase();
+        if let Some(hex) = s.strip_prefix('#') {
+            match hex.len() {
+                3 | 4 => {
+                    let bytes = hex.as_bytes();
+                    let expand = |b: u8| -> Option<u8> {
+                        let d = (b as char).to_digit(16)? as u8;
+                        Some(d * 17)
+                    };
+                    return Some((expand(bytes[0])?, expand(bytes[1])?, expand(bytes[2])?));
+                }
+                6 | 8 => {
+                    let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+                    let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+                    let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+                    return Some((r, g, b));
+                }
+                _ => return None,
+            }
+        }
+        let inner = s
+            .strip_prefix("rgb(")
+            .or_else(|| s.strip_prefix("rgba("))?
+            .strip_suffix(')')?;
+        let parts: Vec<&str> = inner.split([',', '/']).take(3).collect();
+        if parts.len() < 3 {
+            return None;
+        }
+        let r = parts[0].trim().parse::<u8>().ok()?;
+        let g = parts[1].trim().parse::<u8>().ok()?;
+        let b = parts[2].trim().parse::<u8>().ok()?;
+        Some((r, g, b))
+    }
+
+    fn relative_luminance(rgb: (u8, u8, u8)) -> f64 {
+        let channel = |c: u8| -> f64 {
+            let srgb = (c as f64) / 255.0;
+            if srgb <= 0.03928 {
+                srgb / 12.92
+            } else {
+                ((srgb + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * channel(rgb.0) + 0.7152 * channel(rgb.1) + 0.0722 * channel(rgb.2)
+    }
+
+    fn wcag_contrast_ratio(fg: (u8, u8, u8), bg: (u8, u8, u8)) -> f64 {
+        let l1 = Self::relative_luminance(fg);
+        let l2 = Self::relative_luminance(bg);
+        let (lighter, darker) = if l1 >= l2 { (l1, l2) } else { (l2, l1) };
+        (lighter + 0.05) / (darker + 0.05)
     }
 
     fn is_tailwind_token(token: &str) -> bool {

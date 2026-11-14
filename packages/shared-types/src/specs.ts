@@ -46,7 +46,7 @@ export const SpecRevisionSchema = z
     revision_number: U32Schema.refine((v) => v > 0, "revision_number must be > 0"),
     content_hash: z
       .string()
-      .regex(/^(sha256-)?[a-fA-F0-9]{64}$/, "content_hash must be a valid 64-character lowercase hex SHA-256 string"),
+      .regex(/^(sha256[-:])?[a-fA-F0-9]{64}$/, "content_hash must be a valid 64-character hex SHA-256 string"),
     created_at: SafeJsIntegerSchema,
   })
   .strict();
@@ -162,3 +162,18 @@ export const GateReportSchema = z
 
 export const ProjectConstraintProfileSchema = ConstraintProfileSchema;
 export const FleetTaskSchema = BotJobSchema;
+
+export const ChangeProposalV1Schema = z
+  .object({
+    id: z.string().min(1),
+    tenant_id: z.string().min(1),
+    project_id: z.string().min(1),
+    intent_id: z.string().nullable(),
+    title: z.string().min(1),
+    description: z.string(),
+    validation_status: z.string(),
+    status: z.string(),
+    created_at: z.string().min(1),
+    updated_at: z.string().min(1),
+  })
+  .strict();

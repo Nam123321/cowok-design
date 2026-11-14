@@ -3,7 +3,7 @@
 import crypto from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { issueBffLoopbackSession } from "../../src/lib/api-guard";
-import { ensureRunningDaemon } from "../../src/lib/daemon-client";
+import { buildCanonicalHmacHeaders, ensureRunningDaemon } from "../../src/lib/daemon-client";
 import * as snapshotRoute from "../../src/app/api/projects/[id]/flow/snapshot/route";
 import * as nodesRoute from "../../src/app/api/projects/[id]/flow/nodes/route";
 import * as positionsRoute from "../../src/app/api/projects/[id]/flow/nodes/positions/route";
@@ -14,17 +14,32 @@ import * as deployDraftRoute from "../../src/app/api/projects/[id]/flow/deploy-d
 async function seedIsolatedProject(slug: string): Promise<string> {
   const lock = await ensureRunningDaemon();
   const projectId = crypto.randomUUID();
+  const rawBody = JSON.stringify({
+    id: projectId,
+    slug,
+    name: `Project ${slug}`,
+    product_brief: "Integration test project for Flow Workbench.",
+    workspace_root: null,
+    inherit_brand_from_project_id: null,
+  });
+  const headers = buildCanonicalHmacHeaders({
+    daemonNonce: lock.daemon_nonce,
+    hmacKeyHex: lock.hmac_key_hex,
+    method: "POST",
+    canonicalPath: "/api/v1/projects",
+    rawQuery: "",
+    principal: {
+      tenantId: "local-default",
+      userId: "integration-test",
+      role: "editor",
+    },
+    rawBody,
+    correlationId: crypto.randomUUID(),
+  });
   const res = await fetch(`http://127.0.0.1:${lock.port}/api/v1/projects`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      id: projectId,
-      slug,
-      name: `Project ${slug}`,
-      product_brief: "Integration test project for Flow Workbench.",
-      workspace_root: null,
-      inherit_brand_from_project_id: null,
-    }),
+    headers,
+    body: rawBody,
   });
   expect(res.status).toBe(201);
   return projectId;

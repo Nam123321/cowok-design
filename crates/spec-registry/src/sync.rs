@@ -665,3 +665,89 @@ pub fn remove_jailed_temp_file(
         })
     }
 }
+
+/// Atomically deletes `<workspace_root>/product/specs/<spec_key>.md` using
+/// `openat(O_DIRECTORY | O_NOFOLLOW)` + `unlinkat` (zero symlink race).
+/// Returns `Ok(true)` if removed, `Ok(false)` if already absent (`ENOENT`).
+pub fn delete_jailed_spec_file(
+    workspace_root: &Path,
+    spec_key: CanonicalSpecKey,
+) -> Result<bool, HarnessError> {
+    let _target_path = resolve_jailed_spec_path(workspace_root, spec_key)?;
+
+    #[cfg(unix)]
+    {
+        let root_cstr = CString::new(workspace_root.as_os_str().as_bytes()).map_err(|_| {
+            HarnessError::PathTraversalDenied {
+                path: workspace_root.display().to_string(),
+            }
+        })?;
+        let root_fd = unsafe {
+            libc::open(
+                root_cstr.as_ptr(),
+                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        };
+        if root_fd < 0 {
+            return Err(HarnessError::PathTraversalDenied {
+                path: workspace_root.display().to_string(),
+            });
+        }
+        let root_guard = OwnedFdGuard(root_fd);
+
+        let product_cstr = CString::new("product").unwrap();
+        let product_guard = open_dir_nofollow(
+            root_guard.0,
+            &product_cstr,
+            &workspace_root.join("product").display().to_string(),
+        )?;
+
+        let specs_cstr = CString::new("specs").unwrap();
+        let specs_guard = open_dir_nofollow(
+            product_guard.0,
+            &specs_cstr,
+            &workspace_root.join("product/specs").display().to_string(),
+        )?;
+
+        let target_cstr =
+            CString::new(spec_key.as_str()).map_err(|_| HarnessError::InvalidSpecKey {
+                key: spec_key.as_str().to_string(),
+            })?;
+
+        let rc = unsafe { libc::unlinkat(specs_guard.0, target_cstr.as_ptr(), 0) };
+        if rc != 0 {
+            let err = std::io::Error::last_os_error();
+            if err.raw_os_error() == Some(libc::ENOENT) {
+                return Ok(false);
+            }
+            return Err(HarnessError::ValidationFailed {
+                reason: format!("JAILED_DELETE_FAILED [{}]: {err}", spec_key.as_str()),
+            });
+        }
+
+        unsafe {
+            libc::fsync(specs_guard.0);
+        }
+        Ok(true)
+    }
+
+    #[cfg(not(unix))]
+    {
+        if !target_path.exists() {
+            return Ok(false);
+        }
+        let meta =
+            fs::symlink_metadata(&target_path).map_err(|e| HarnessError::ValidationFailed {
+                reason: format!("JAILED_DELETE_STAT_FAILED [{}]: {e}", spec_key.as_str()),
+            })?;
+        if meta.file_type().is_symlink() || !meta.file_type().is_file() {
+            return Err(HarnessError::PathTraversalDenied {
+                path: target_path.display().to_string(),
+            });
+        }
+        fs::remove_file(&target_path).map_err(|e| HarnessError::ValidationFailed {
+            reason: format!("JAILED_DELETE_FAILED [{}]: {e}", spec_key.as_str()),
+        })?;
+        Ok(true)
+    }
+}

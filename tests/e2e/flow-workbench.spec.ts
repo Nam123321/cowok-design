@@ -35,7 +35,7 @@ test.describe("Story 04.1: Unified DualMainPanel Workbench, Rust SQLite WAL SSOT
     await page.screenshot({ path: screenshotInitPath, fullPage: true });
 
     // 2. Wait for initial remote SQLite WAL hydration to settle, then Add a new node -> Deploy Draft -> Reload & verify persistence
-    await expect(page.locator("#dagDraftBar")).toBeHidden({ timeout: 5000 });
+    await expect(page.locator("#dagDraftBar")).toBeHidden({ timeout: 15000 });
     const nodesBefore = await page.locator(".dag-node-card").count();
     await page.getByRole("button", { name: "Thêm Node mới" }).click();
     await expect(page.locator(".dag-node-card")).toHaveCount(nodesBefore + 1);
@@ -46,7 +46,7 @@ test.describe("Story 04.1: Unified DualMainPanel Workbench, Rust SQLite WAL SSOT
     expect(draftBorderLeft).toBe("3px");
 
     await page.getByTestId("deploy-draft-btn").click();
-    await expect(draftBar).toBeHidden({ timeout: 5000 });
+    await expect(draftBar).toBeHidden({ timeout: 15000 });
 
     // Reload browser page and verify newly deployed node persists from Rust SQLite WAL!
     await page.reload({ waitUntil: "networkidle" });

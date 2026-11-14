@@ -1,130 +1,108 @@
 ---
 type: I-Wish Story
 id: "04.2"
-title: "Story 04.2: Day-0 Onboarding Doctor, SQLite V4 Multi-Project SSOT & Unified Dual-Ingress BFF"
-description: "Triển khai lát cắt dọc hạ tầng dùng chung: (1) SQLite V4 DDL migration, (2) Xóa sạch 100% new Map() trong BFF và kết nối Rust SQLite V4 qua X-Cowok-Session-Token, (3) Day-0 First-Run Onboarding Wizard (<60s) tự động dò 16+ Local Coding CLI, (4) Live BYOK Verifier (<3s), OS Keychain / Daemon 0600 Vault và 3-mode permission approval, (5) HMAC-Signed Folder Picker chống path traversal."
+title: "Story 04.2: SQLite V5 Schema Convergence, Streaming Dual-Ingress Vite BFF & Fail-Closed FS Folder Picker"
+description: "Triển khai lát cắt hạ tầng SSOT dùng chung (FR-02, FR-03, FR-06 SSOT Enabler): nâng cấp SQLite bằng migration V5__epic04_complete_contracts.sql với PRAGMA table_info guards vá V2->V4 và thêm bảng chuẩn hóa (agent_settings, mcp_servers, storyboards, node_chat_sessions, element_comments, screen_fixtures, execution_events), nâng lockfile CURRENT_SCHEMA_VERSION = 5; xóa 100% new Map() trong src/app/api/**; sửa vite-bff-plugin.ts#sendWebResponse sang streaming Readable cho SSE; Multi-Project CRUD/Trash Journal; và thay showDirectoryPicker bằng Daemon FS Browser jail + PathTokenResponse fail-closed."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-04/Story-04.2/story.md"
 status: refactored
 risk_tier: 3
 delivery: core
-timestamp: "2026-11-12T14:15:00+07:00"
+timestamp: "2026-11-13T12:10:00+07:00"
 tags:
   - "story-04.2"
   - "epic-04"
   - "uxui-os"
-  - "sqlite-v4"
-  - "day-0-onboarding"
-  - "byos-doctor"
-  - "unified-bff"
-  - "hmac-folder-picker"
+  - "sqlite-v5"
+  - "streaming-bff"
+  - "fs-jail"
 links_to:
-  - "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/2. Product Planning/2.1. product-brief-or-prd.md"
-  - "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/2. Product Planning/2.2. database-spec.md"
-  - "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/2. Product Planning/2.5. architecture.md"
-  - "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/DESIGN.md"
+  - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md"
+  - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.5.%20architecture.md"
+  - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.2.%20database-spec.md"
+  - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/epic-evaluations/Epic-04/evaluation-report.md"
 dependencies: ["04.1"]
 provides_apis:
   - "internal:epic-04/story-04.2"
-consumes_apis: []
+  - "GET /api/v1/projects"
+  - "POST /api/v1/projects"
+  - "DELETE /api/v1/projects/:id"
+  - "POST /api/v1/projects/:id/restore"
+  - "GET /api/v1/fs/browse"
+  - "POST /api/v1/fs/path-token"
+  - "POST /api/v1/fs/promote"
+consumes_apis:
+  - "GET /api/v1/health"
+  - "GET /api/v1/projects/:id/flow"
 ---
 
-# Story 04.2: Day-0 Onboarding Doctor, SQLite V4 Multi-Project SSOT & Unified Dual-Ingress BFF
+# Story 04.2: SQLite V5 Schema Convergence, Streaming Dual-Ingress Vite BFF & Fail-Closed FS Folder Picker
 
-- **FR Covered:** [FR-01: Day-0 First-Run Setup & Local Coding CLI Integration](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md), [FR-03: Multi-Project & Multi-Session Boundary Isolation](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md), [FR-05: Local Storage & SSOT Data Persistence](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
-- **Epic:** [Epic 04: Flow-First 2D Storyboard, SQLite V4 Multi-Project SSOT, Keyed Parallel Engine & Contextual Node Chat](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/3.%20Development/1.%20Epic%20&%20Story/VS-02.%20Flow-First%20Executable%20Design%20Workbench%20&%20SDI%20Engine/Epic-04/epic.md)
+- **FR Covered:** [FR-02: Interactive Multi-Portal Flow Graph, FR-03: State-Hydrated Live Preview, FR-06: Element-Anchored Comments (SSOT Persistence & Dual-Ingress BFF Enabler)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
+- **Epic:** [Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/3.%20Development/1.%20Epic%20&%20Story/VS-02.%20Flow-First%20Executable%20Design%20Workbench%20&%20SDI%20Engine/Epic-04/epic.md)
 - **Status:** `refactored`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context
-Story 04.2 là **Lát Cắt Dọc Hạ Tầng Dùng Chung (Tier A Shared Infrastructure Slice 1)** giải quyết dứt điểm 3 khoảng trống E2E cốt lõi:
-1. **Chặng 0 (Day-0 First-Run Onboarding Wizard & Local Coding CLI Doctor — GAP-01):** Giúp người dùng mở ứng dụng lần đầu kết nối AI trong `<60s`, tự động dò tìm các Coding CLI có sẵn trên máy (`claude`, `codex`, `agy`, `gemini`, `cursor`, `opencode`, `omp`...), báo trạng thái online/đăng nhập, hỗ trợ fallback script nếu CLI không hỗ trợ cờ MCP.
-2. **Quản lý Khóa API & Quyền Thực thi (Live BYOK Verifier & 3-Mode Approval — GAP-02):** Kiểm tra kết nối API Key trong `<3s`, hỗ trợ lưu trữ mã hóa an toàn (OS Keychain / Daemon `0600` Vault), cấu hình 3 chế độ phê duyệt quyền (`Tự động trong Sandbox / Chỉ hỏi thao tác rủi ro cao / Hỏi mọi thao tác`).
-3. **Móng Dữ Liệu SQLite V4 & Unified Dual-Ingress BFF (GAP-05):** Thực thi migration `V4__storyboard_chat_and_execution_engine.sql` bổ sung `project_code`, Trash Journal, Lịch sử Chat đa tầng, Sub-Session theo Node `${projectId}::${sessionId}::${nodeId}`, Hàng đợi thực thi song song, và tách đôi Artifact Workspace vs Snapshot. Xóa sạch 100% `new Map()` trong BFF, thay thế mock folder picker bằng HMAC-Signed Folder Picker chống path traversal.
+Trong đợt tái cấu trúc từ đánh giá Epic 04 (CS ban đầu quá tải khi gộp cả Onboarding CLI Doctor + BYOK Vault lẫn SQLite & BFF), Story 04.2 được cô đọng thành lát cắt **Persistence & Dual-Ingress Kernel (`CS = 5.5`)**, đồng thời thay thế các giả định sai của bản V4 trước đó:
+1. **Nâng cấp từ V4 lỗi thời lên V5 Idempotent (`V5__epic04_complete_contracts.sql`):** Migration V2 đã tạo bảng `chat_sessions` thiếu cột `archived_at`, khiến `CREATE TABLE IF NOT EXISTS` ở V4 âm thầm bỏ qua cột này khi upgrade; đồng thời `lockfile.rs` vẫn ghim `CURRENT_SCHEMA_VERSION = 3`. V5 dùng `PRAGMA table_info` trong `pool.rs` để vá cột thiếu (`chat_sessions.archived_at`, `tenant_id`), nâng `CURRENT_SCHEMA_VERSION = 5`, và chuẩn hóa thêm 7 bảng (`agent_settings`, `mcp_servers`, `storyboards`, `node_chat_sessions`, `element_comments`, `screen_fixtures`, `execution_events`).
+2. **Sửa lỗi SSE buffering trong Vite BFF:** `src/lib/vite-bff-plugin.ts#sendWebResponse` hiện gọi `await webRes.text()`, làm treo toàn bộ SSE stream. Story 04.2 thay bằng `Readable` pass-through thực cho `text/event-stream`, xóa 100% `new Map()` trong `src/app/api/**`, và gắn `X-Cowok-Session-Token` qua `strict-loopback`.
+3. **Thay thế `showDirectoryPicker` mù đường dẫn:** Trình duyệt không cấp absolute OS path qua `showDirectoryPicker()`, và `WorkbenchShell.tsx` từng làm rơi `data.token`. Story 04.2 thay bằng Daemon FS Browser (`/api/v1/fs/browse`) kèm `is_system_or_root_path` jail -> `POST /path-token` -> `POST /promote` giữ token đầy đủ và **fail closed** (tuyệt đối không fallback `./projects/*`).
 
-## 2. Plan-Tune Heuristic & Complexity Score (CS)
+*(Lưu ý: Day-0 Onboarding CLI Doctor & BYOK Vault được tách gọn sang `Story 04.3`, còn State-Hydrated Live Preview UI thuộc `Story 04.5`.)*
 
-| Chiều Đánh Giá | Điểm | Lý Do Phân Tích |
-| :--- | :---: | :--- |
-| **1. Phạm vi Tác động (Scope)** | `1.5` | Chạm vào DB schema V4, Rust daemon, Vite BFF plugin, và UI Settings / Onboarding |
-| **2. Kiến trúc Dữ liệu (Data)** | `1.5` | Nâng cấp từ V3 lên V4 SQLite (thêm bảng chat_sessions, chat_messages, node_execution_jobs) |
-| **3. Tích hợp Hệ thống (Integration)** | `1.0` | Tích hợp dò tìm 16+ Local CLI qua stdin/stdout và kiểm tra kết nối Live BYOK |
-| **4. Độ phức tạp Giao diện (UI)** | `1.0` | Wizard Onboarding <60s + Nâng cấp Settings Pane + Sidebar Project CRUD |
-| **5. Rủi ro An ninh (Security)** | `1.0` | Xóa bỏ fake folder picker, áp dụng HMAC token path validation và mã hóa vault 0600 |
-| **6. Điểm mù Nhận thức (Unknowns)** | `0.0` | Đã hóa giải toàn bộ trong UNK-MVP-01..05 qua quy trình /plan-proven-safe |
-| **TỔNG ĐIỂM CS** | **6.0** | **SAFE (CS < 7.0)** |
+## 2. Plan-Tune Heuristic & Complexity Score
+- **Complexity Score (CS):** `CS = 5.5` (Scope=1.0, Data=1.5, Integration=1.0, UI=0.5, Security=1.0, Unknowns=0.5 $\rightarrow$ `CS = 5.5 < 7`, đạt ngưỡng an toàn).
 
 ## 3. Acceptance Criteria (AC)
-
-- **AC-01 (SQLite V4 Migration & Single RUNTIME_DATA_DIR Contract):** Thực thi migration `V4__storyboard_chat_and_execution_engine.sql` tạo/nâng cấp đầy đủ:
-  - `projects` (`project_code` ngắn kiểu `CWK`, `provenance`, `trash_deleted_at` cho `Trash Journal`),
-  - `chat_sessions` & `chat_messages` (`role`, `prose_markdown`, `parent_message_id` hỗ trợ Fork, `turn_receipt_json`),
-  - `chat_message_node_scopes` (khóa kép đa dự án **`${projectId}::${sessionId}::${nodeId}`**),
-  - `node_execution_jobs` (hàng đợi thực thi với monotonic `fencing_token`),
-  - Tách đôi **`workspace_artifacts` (bản sống trên ổ đĩa)** và **`chat_artifact_snapshots` (bản chụp bất biến theo từng lượt chat dùng `content_hash` SHA-256)**,
-  - Khóa cứng 1 đường dẫn dữ liệu gốc duy nhất `RUNTIME_DATA_DIR` (`0700`).
-
-- **AC-02 (Zero In-Memory Map BFF & Unified X-Cowok-Session-Token):** Mở rộng `src/lib/vite-bff-plugin.ts` và `crates/harness-daemon/src/daemon_auth.rs` ủy quyền 100% các route `/api/projects/**` xuống Rust SQLite V4 bằng `X-Cowok-Session-Token`; xóa bỏ hoàn toàn mọi `new Map()` trong `src/app/api/**`; nối `MainSidebar` (`Create / Rename / Duplicate / Archive / Trash Restore / Scratch-to-Git Link`) xuống thẳng DB thật.
-
-- **AC-03 (Day-0 First-Run Onboarding Wizard & 16+ Local Coding CLI Doctor — GAP-01):** Khi mở ứng dụng lần đầu (hoặc bấm nút `Chẩn đoán AI` trong Settings), hiển thị **Wizard Sẵn sàng Làm việc (`< 60s`)** tự động dò tìm các Coding CLI trên máy (`claude`, `codex`, `agy` [Antigravity], `gemini`, `cursor`, `opencode`, `omp`, `qwen`, `ollama`...), báo trạng thái đăng nhập (`Online` / `Cần đăng nhập 1-click`), khả năng nhìn ảnh (`vision`), và hỗ trợ chế độ **MCP Fallback qua CLI script** nếu Agent không nhận cờ MCP.
-
-- **AC-04 (Live BYOK Verifier, Encrypted Vault Option & 3-Mode Approval — GAP-02):** Nâng cấp `SettingsGeneralModelsPane.tsx`:
-  - Tải danh sách model động từ `RuntimeAgentDef` (bỏ danh sách gán cứng cũ),
-  - Bổ sung nút **`Kiểm tra kết nối ngay (<3s)`** ngay tại ô nhập API Key / BYOS Endpoint,
-  - Cho phép chọn giữa **`Chỉ giữ trong RAM phiên này`** hoặc **`Lưu mã hóa vào OS Keychain / Daemon 0600 Vault`** (F5 không mất),
-  - Cấu hình **3 Chế độ Phê duyệt Quyền**: `Tự động trong Sandbox` / **`Chỉ hỏi thao tác rủi ro cao (Mặc định)`** / `Hỏi mọi thao tác`.
-
-- **AC-05 (`[EDGE-CASE]` EC-PATH-HMAC-002 & EC-DB-F5-001: HMAC-Signed Folder Picker & F5 Session Recovery):** Thay thế hàm giả lập `./projects/${dirHandle.name}` trong `WorkbenchShell.tsx#L49-L65` bằng **HMAC-Signed Folder Picker** qua Rust Daemon (chặn tuyệt đối path traversal `../` và symlink); đảm bảo F5 trình duyệt giữ nguyên 100% dự án, phiên chat và cấu hình đã lưu.
+- **AC-01 (SQLite `V5__epic04_complete_contracts.sql` Additive Migration & `CURRENT_SCHEMA_VERSION = 5`):** Thực thi migration V5 an toàn qua `PRAGMA table_info` guards trong `crates/spec-registry/src/pool.rs` để vá các cột thiếu khi upgrade từ V2/V3/V4 (`chat_sessions.archived_at`, `tenant_id` trên mọi bảng V4) và tạo 7 bảng chuẩn (`agent_settings`, `mcp_servers`, `storyboards`, `node_chat_sessions`, `element_comments`, `screen_fixtures`, `execution_events`) bảo đảm mọi cột nghiệp vụ đầy đủ không dùng blob JSON; đồng bộ nâng `crates/harness-daemon/src/lockfile.rs` `CURRENT_SCHEMA_VERSION = 5` với hàng đợi ghi đơn (Single-Writer MPSC) + `busy_timeout = 5000ms` và retry có jitter.
+- **AC-02 (Zero `new Map()` Destruction in `src/app/api/**` & Streaming SSE Vite BFF):** Xóa 100% biến lưu trạng thái bằng `new Map()` khỏi `src/app/api/**` (`comments`, `fixtures`, `sdi/intent`, `proposals`); định tuyến mọi request qua Dual-Ingress (`Next/Vite BFF -> Axum Rust Daemon`) sử dụng `strict-loopback` + `X-Cowok-Session-Token`; và nâng cấp `src/lib/vite-bff-plugin.ts#sendWebResponse` + `daemon-client.ts` phát hiện `text/event-stream` để pipe luồng `Readable` không buffer `webRes.text()`.
+- **AC-03 (Multi-Project CRUD, Workspace Switching, Trash Journal & F5 Hydration):** Hỗ trợ tạo, đổi dự án (`project_code`), xóa mềm vào Trash Journal, khôi phục (`POST /restore`), và tự động nạp lại đúng dự án/phiên hoạt động sau khi nhấn `F5` (reload trình duyệt) trực tiếp từ SQLite V5 qua `src/api/projects.ts` (zero `localStorage` primary state).
+- **AC-04 (`[EDGE-CASE]` `EC-PATH-HMAC-002`: Daemon-Assisted FS Folder Picker, System-Root Jail & Retained `PathTokenResponse`):** Xóa bỏ giả định trình duyệt `window.showDirectoryPicker()` (vốn chỉ trả tên thư mục, mất đường dẫn tuyệt đối) và thay bằng hộp thoại chọn thư mục được Daemon duyệt qua `/api/v1/fs/browse` bị khóa chặt bởi `is_system_or_root_path` jail; khi chọn thư mục ngoài sandbox mặc định, client lấy và truyền giữ nguyên HMAC-signed `PathTokenResponse` vào `POST /api/v1/fs/promote`, **fail closed** (trả `400/403` tường minh) nếu thiếu chữ ký hoặc đường dẫn nguy hiểm — cấm tuyệt đối fallback im lặng về `./projects/*`.
 
 ## 4. Tasks
-
-- [ ] **Task 04.2.1**: Soạn thảo và thực thi migration `V4__storyboard_chat_and_execution_engine.sql` trong `crates/spec-registry/migrations/`, cấu hình single `RUNTIME_DATA_DIR` (thỏa mãn `AC-01`).
-- [ ] **Task 04.2.2**: Cập nhật `crates/harness-daemon` và `src/lib/vite-bff-plugin.ts`, xóa bỏ 5 `new Map()` trong `src/app/api/**`, nối các endpoint dự án xuống Rust SQLite V4 (thỏa mãn `AC-02`).
-- [ ] **Task 04.2.3**: Xây dựng UI Day-0 Onboarding Wizard và backend CLI Doctor dò 16+ Local Coding CLI với timeout $\le 1.5$s (thỏa mãn `AC-03`).
-- [ ] **Task 04.2.4**: Nâng cấp `SettingsGeneralModelsPane.tsx` với Live BYOK Verifier `<3s`, cấu hình lưu Vault `0600` và 3 chế độ phê duyệt quyền (thỏa mãn `AC-04`).
-- [ ] **Task 04.2.5**: Thay thế folder picker giả lập bằng Preload/Daemon HMAC-Signed Folder Picker và cơ chế F5 Session Recovery (thỏa mãn `AC-05`).
+- [ ] **Task 04.2.1**: Viết `crates/spec-registry/migrations/V5__epic04_complete_contracts.sql`, cập nhật `pool.rs` với `PRAGMA table_info` idempotent column guards cho V2→V5, nâng `lockfile.rs` `CURRENT_SCHEMA_VERSION = 5` và bổ sung test nâng cấp từ DB V2/V3/V4 (thỏa mãn `AC-01`).
+- [ ] **Task 04.2.2**: Xóa sạch `new Map()` trong `src/app/api/**`; sửa `vite-bff-plugin.ts#sendWebResponse` và `daemon-client.ts` hỗ trợ streaming `Readable` SSE pass-through kèm `strict-loopback` + `X-Cowok-Session-Token` (thỏa mãn `AC-02`).
+- [ ] **Task 04.2.3**: Xây dựng CRUD Multi-Project, Trash Journal (`delete/restore`), và `src/api/projects.ts` phục hồi ngữ cảnh sau F5 từ SQLite V5 (thỏa mãn `AC-03`).
+- [ ] **Task 04.2.4**: Cài đặt Daemon FS Browser (`/fs/browse` + `is_system_or_root_path` jail), sửa `WorkbenchShell.tsx` để giữ HMAC `PathTokenResponse` gửi qua `POST /fs/promote` fail-closed không fallback `./projects/*` (thỏa mãn `AC-04`).
 
 ## 5. AC-to-Task Traceability Matrix
-
-| Acceptance Criteria | Mapped Implementation Tasks | Verification Method |
-| :--- | :--- | :--- |
-| **AC-01** | `Task 04.2.1` | SQLite V4 DDL Migration & Integrity Test |
-| **AC-02** | `Task 04.2.2` | Zero Map BFF Forwarding & Persistence Integration Test |
-| **AC-03** | `Task 04.2.3` | Local CLI Doctor Discovery & Wizard E2E Test |
-| **AC-04** | `Task 04.2.4` | Live BYOK Verifier & Vault Encryption Test |
-| **AC-05 (`[EDGE-CASE]`)** | `Task 04.2.5` | HMAC Path Traversal Security & F5 Recovery Test |
+| AC ID | Description | Mapped Implementation Tasks | Verification Method | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **AC-01** | SQLite V5 Additive Upgrade & Lockfile Schema v5 | `Task 04.2.1` | V2→V3→V4→V5 Upgrade Migration & Lockfile Test | pending |
+| **AC-02** | Zero `new Map()` & Streaming SSE Vite BFF | `Task 04.2.2` | BFF SSE Streaming & Zero-Map AST Test | pending |
+| **AC-03** | Multi-Project CRUD, Trash Journal & F5 Hydration | `Task 04.2.3` | Project Switch & F5 State Persistence Test | pending |
+| **AC-04** | [EDGE-CASE] Daemon FS Browser & Fail-Closed PathToken | `Task 04.2.4` | Traversal / System-Root Jail & HMAC Token Test | pending |
 
 ## 6. Cross-Feature Dependencies
-
 - **Story Dependencies:** `["04.1"]`
 
 ### Impacts
-- Mở khóa nền tảng lưu trữ SQLite V4, phiên chat và hàng đợi thực thi cho `Story 04.3`, `Story 05.1`, `Story 05.3` và `Epic 10`.
+- Cung cấp tầng lưu trữ SQLite `V5`, Dual-Ingress Streaming BFF và Multi-Project Workspace/FS Boundary SSOT cho `Story 04.3`, `Story 04.4`, `Story 04.5` và toàn bộ `Epic 05..12`.
 
 ### Consumes
-- Kế thừa `crates/harness-daemon` và `crates/spec-registry` từ `Story 04.1`.
+- Tiêu thụ cấu trúc Workbench (`WorkbenchShell`, `MainSidebar`) và lớp bảo mật `daemon_auth::verify_hmac_v2` đã vá ở `Story 04.1`.
 
 ### Shared Entities
-- `PROJECTS`, `PROJECT_CONSTRAINTS`, `CHAT_SESSIONS`, `CHAT_MESSAGES`, `NODE_EXECUTION_JOBS`, `WORKSPACE_ARTIFACTS`, `CHAT_ARTIFACT_SNAPSHOTS`.
+- Sở hữu schema upgrade `V5`: `AgentSetting` (`agent_settings`), `McpServer` (`mcp_servers`), `Storyboard` (`storyboards`), `NodeChatSession` (`node_chat_sessions`), `ScreenFixture` (`screen_fixtures`), `ExecutionEvent` (`execution_events`), cùng mở rộng `Project`, `ChatSession`, `ChatMessage`, `ChatMessageNodeScope`, `NodeExecutionJob`, `ChatArtifactSnapshot`, `ElementComment`.
 
 ### Cross-Portal
-- Áp dụng thống nhất cho toàn bộ các Portal của dự án (`SuperAdmin`, `TenantAdmin`, `SalesApp`, `MarketingWeb`, `DeveloperPortal`) và chế độ Presentation Studio 16:9.
+- Cô lập dữ liệu multi-project và multi-tenant (`tenant_id`) xuyên suốt mọi Portal Group, bảo đảm không rò rỉ ngữ cảnh khi chuyển dự án.
 
 ## 7. QA Simulator Guardian Scorecard
-
 | Evaluation Axis | Score | Notes |
 | :--- | :---: | :--- |
-| **1. Functional Correctness** | `9.8/10` | Đáp ứng hoàn hảo GAP-01, GAP-02, GAP-05 và lộ trình SQLite V4 |
-| **2. Data Integrity & State** | `9.8/10` | Triệt tiêu hoàn toàn split-brain in-memory maps, lưu trữ bất biến SHA-256 |
-| **3. Security & Validation** | `9.9/10` | HMAC folder picker + Daemon 0600 vault ngăn ngừa triệt để path traversal |
-| **4. Performance & Scalability** | `9.6/10` | CLI Doctor non-blocking timeout $\le 1.5$s, Live Verifier $\le 3$s |
-| **5. Error Handling & Recovery** | `9.7/10` | F5 phục hồi 100% session, MPSC writer retry chống `sqlite3_busy` |
-| **6. Architectural Depth & Leverage** | `9.8/10` | Tái sử dụng unified `X-Cowok-Session-Token` xuyên suốt Web và Desktop |
-| **7. UX Empathy** | `9.8/10` | Non-tech onboarding <60s, không bắt người dùng tự cấu hình biến môi trường |
-| **TOTAL AVERAGE** | **9.77/10** | **PASSED (>= 8.5/10)** |
+| **1. Functional Correctness** | `9.6/10` | Giải quyết đúng nút thắt schema V2→V5, SSE BFF streaming & multi-project hydration |
+| **2. Data Integrity & State** | `9.7/10` | `PRAGMA table_info` idempotent migration + `CURRENT_SCHEMA_VERSION = 5` fail-closed |
+| **3. Security & Validation** | `9.7/10` | Xóa bỏ `showDirectoryPicker` mù đường dẫn & `./projects/*` fallback, ép FS jail + HMAC |
+| **4. Performance & Scalability** | `9.5/10` | Pass-through `Readable` stream `0`-buffering cho SSE và Single-Writer MPSC 5000ms |
+| **5. Error Handling & Recovery** | `9.5/10` | Trash Journal soft-delete/restore và retry jitter khi `sqlite3_busy` |
+| **6. Architectural Depth & Leverage** | `9.6/10` | Hợp nhất hoàn toàn về Rust SQLite WAL, dẹp 100% RAM `new Map()` trong `app/api/**` |
+| **7. UX Empathy** | `9.5/10` | Đổi dự án tức thì không mất dấu sau F5, chọn thư mục thật minh bạch |
+| **TOTAL AVERAGE** | **9.59/10** | **PASSED (>= 8.5/10)** |
 
 ## 8. Change Log
-
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
-| 2026-11-02 | 1.0.0 | Khởi tạo Story 04.2 bản nháp cũ | cowok Orchestrator |
-| 2026-11-12 | 3.0.0 | Tái cấu trúc thành Vertical Hạ tầng Số 1: Day-0 Onboarding Doctor, SQLite V4 Multi-Project SSOT & Unified Dual-Ingress BFF (GAP-01, GAP-02, GAP-05) theo Master Vertical Plan được duyệt | cowok Orchestrator |
+| 2026-11-02 | 1.0.0 | Khởi tạo Story 04.2 (State-Hydrated Preview nguyên thủy) | cowok Orchestrator |
+| 2026-11-12 | 2.0.0 | Tái cấu trúc thành SQLite V4 SSOT + Day-0 Doctor + Multi-Project BFF | /refactor-story |
+| 2026-11-13 | 3.0.0 | [evaluate-epic Deep Mode] Tách Onboarding/BYOK sang 04.3 (CS 5.5 < 7); thay V4 bằng `V5__epic04_complete_contracts.sql` (`CURRENT_SCHEMA_VERSION=5`, vá `archived_at`), sửa SSE buffering `vite-bff-plugin`, thay `showDirectoryPicker` bằng Daemon FS Browser jail; sửa FR IDs về `FR-02/03/06` | Party Mode Council & Architect |

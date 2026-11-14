@@ -185,6 +185,7 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
       />
       <div className="dual-main-panel" style={{ display: "flex", flex: 1, minWidth: "650px", overflow: "hidden", position: "relative" }}>
         <AgentChatPanel
+          projectId={resolvedProjectId}
           width={p.splitter.chatWidth} isShortened={p.splitter.isChatShortened}
           onToggleShorten={p.splitter.handleToggleShortenChat} attachmentChips={p.attachments.attachmentChips}
           onRemoveAttachmentChip={p.attachments.handleRemoveAttachmentChip} onOpenSettings={p.onOpenSettings}

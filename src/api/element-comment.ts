@@ -1,3 +1,5 @@
+// @story 04.3
+import { z } from "zod";
 import {
   CreateElementCommentInput,
   CreateElementCommentSchema,
@@ -6,88 +8,65 @@ import {
   UpdateElementCommentInput,
   UpdateElementCommentSchema,
 } from "../lib/validations/element-comment";
+import {
+  type HarnessDaemonClientConfig,
+  HarnessDaemonTransport,
+} from "./harness-daemon-transport";
 
-export interface ApiClientConfig {
-  baseUrl?: string;
+export interface ApiClientConfig extends HarnessDaemonClientConfig {
   getAuthToken?: () => string | null;
 }
 
-export class ElementCommentClient {
-  private baseUrl: string;
-  private getAuthToken?: () => string | null;
-
+export class ElementCommentClient extends HarnessDaemonTransport {
   constructor(config: ApiClientConfig = {}) {
-    this.baseUrl = config.baseUrl || "";
-    this.getAuthToken = config.getAuthToken;
-  }
-
-  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const headers = new Headers(options.headers || {});
-    headers.set("Content-Type", "application/json");
-
-    if (this.getAuthToken) {
-      const token = this.getAuthToken();
-      if (token) {
-        headers.set("Authorization", `Bearer ${token}`);
-      }
-    }
-
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      ...options,
-      headers,
+    super({
+      ...config,
+      getSessionToken: config.getSessionToken || config.getAuthToken,
     });
-
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      const error = new Error(errorBody.message || `HTTP ${response.status}: ${response.statusText}`);
-      (error as unknown as { status: number }).status = response.status;
-      throw error;
-    }
-
-    return response.json();
   }
 
-  async getComments(projectId: string, nodeId: string): Promise<ElementCommentResponse[]> {
-    const raw = await this.request<ElementCommentResponse[]>(
-      `/api/v1/projects/${projectId}/flow/nodes/${nodeId}/comments`
+  getComments(projectId: string, nodeId: string): Promise<ElementCommentResponse[]> {
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}/comments`,
+      z.array(ElementCommentResponseSchema),
+      { method: "GET" }
     );
-    return raw.map((item) => ElementCommentResponseSchema.parse(item));
   }
 
-  async createComment(
+  createComment(
     projectId: string,
     nodeId: string,
     input: CreateElementCommentInput
   ): Promise<ElementCommentResponse> {
     const validated = CreateElementCommentSchema.parse(input);
-    const raw = await this.request<ElementCommentResponse>(
-      `/api/v1/projects/${projectId}/flow/nodes/${nodeId}/comments`,
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}/comments`,
+      ElementCommentResponseSchema,
       {
         method: "POST",
         body: JSON.stringify(validated),
       }
     );
-    return ElementCommentResponseSchema.parse(raw);
   }
 
-  async updateComment(
+  updateComment(
     projectId: string,
     nodeId: string,
     commentId: string,
     input: UpdateElementCommentInput
   ): Promise<ElementCommentResponse> {
     const validated = UpdateElementCommentSchema.parse(input);
-    const raw = await this.request<ElementCommentResponse>(
-      `/api/v1/projects/${projectId}/flow/nodes/${nodeId}/comments/${commentId}`,
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}/comments/${encodeURIComponent(commentId)}`,
+      ElementCommentResponseSchema,
       {
         method: "PATCH",
         body: JSON.stringify(validated),
       }
     );
-    return ElementCommentResponseSchema.parse(raw);
   }
 
-  async resolveComment(
+  resolveComment(
     projectId: string,
     nodeId: string,
     commentId: string

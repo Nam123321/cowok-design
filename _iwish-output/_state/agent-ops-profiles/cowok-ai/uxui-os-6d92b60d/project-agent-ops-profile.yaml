@@ -3,41 +3,41 @@ profile_kind: DERIVED_EVIDENCE_PROFILE
 repo_id: cowok-ai
 worktree_id: uxui-os-6d92b60d
 worktree_root: /Users/hatrang20061988/Desktop/AI Project/uxui-os
-git_head: f8af51941f4b54151fae280dc0413f8bdff3926f
+git_head: 8f9f7b0fd0e59e3d0a1c6d9c48ca10872a54d39a
 policy_version: 2.1.0
 probe_version: 2.1.0
-generated_at: '2026-11-09T05:35:09.743079+00:00'
-sha256_digest: sha256:431b25e7abc33e654920d0b0901d98a8dba9dc5be365be3baf014a56ddf3fd5e
+generated_at: '2026-11-13T04:32:10.987791+00:00'
+sha256_digest: sha256:75c7b3610287b851f5abf236038911c4711d4f430d5aa7e0aa0af74056b39b94
 overall_status: NOT_READY
 delta_summary:
   previous_digest: sha256:431b25e7abc33e654920d0b0901d98a8dba9dc5be365be3baf014a56ddf3fd5e
-  digest_changed: false
-  changed_probes: []
+  digest_changed: true
+  changed_probes:
+  - M1
 source_manifest:
 - path: _iwish-output/2. Product Planning/2.5. architecture.md
   present: true
-  sha256: sha256:637dc3d039138753fbaac49d11878b76ae8be49ed2abb2925c7fb350c3621a1b
+  sha256: sha256:114c667c662f0490a3dcff97178c71e096b6f6319741a35b569d7436f671eb4e
 - path: _iwish-output/3. Development/development-roadmap.md
   present: true
-  sha256: sha256:1db0f4d4dc55aff8723b07ac59d561b65ca23c2732fdbb826f724dfbf0749749
+  sha256: sha256:5c8d02f176ba537207bacb627803ae516d6d2f9d3a5e237f1b0f84bf9368dde1
 - path: prisma/schema.prisma
   present: true
-  sha256: sha256:79bf3ff0a6bd8c73cbb334ab8f97b6d9b743f4505390fc4063d618c515c19328
+  sha256: sha256:c5c66b706daef9b3d7a4788a38919a95e283915c8eb47849c8c1a3a9b6443825
 - path: src/lib/api-guard.ts
   present: true
-  sha256: sha256:64210dfa421076b61171e7772ebcedef28f0563126ed5a3b0f3cdcd2d46289be
+  sha256: sha256:f0ec70ee200e1433aabceb54a6aced2e5771665f05e58091edcf566de53194d3
 probes:
   M1:
     title: Auth, Tenant RLS & GuardedRoute Enforcement
     critical: true
-    spec_status: FAIL
+    spec_status: PASS
     physical_status: PASS
     evidence:
     - path: src/lib/api-guard.ts
-      sha256: sha256:64210dfa421076b61171e7772ebcedef28f0563126ed5a3b0f3cdcd2d46289be
+      sha256: sha256:f0ec70ee200e1433aabceb54a6aced2e5771665f05e58091edcf566de53194d3
       assertion: guardedRoute & createCrossTenantHandler exported
-    blockers:
-    - Missing guardedRoute or RLS spec
+    blockers: []
   M2:
     title: Single Core Port & Typed Client SDK
     critical: true
@@ -56,7 +56,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: _iwish-output/3. Development/development-roadmap.md
-      sha256: sha256:1db0f4d4dc55aff8723b07ac59d561b65ca23c2732fdbb826f724dfbf0749749
+      sha256: sha256:5c8d02f176ba537207bacb627803ae516d6d2f9d3a5e237f1b0f84bf9368dde1
       assertion: Intent Router & Discovery service verified
     blockers:
     - Missing Intent Router / Discovery service
@@ -79,7 +79,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: _iwish-output/2. Product Planning/2.5. architecture.md
-      sha256: sha256:637dc3d039138753fbaac49d11878b76ae8be49ed2abb2925c7fb350c3621a1b
+      sha256: sha256:114c667c662f0490a3dcff97178c71e096b6f6319741a35b569d7436f671eb4e
       assertion: Execution services verified in src/
     blockers:
     - Missing plugin/tool execution service in src/
@@ -90,7 +90,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: prisma/schema.prisma
-      sha256: sha256:79bf3ff0a6bd8c73cbb334ab8f97b6d9b743f4505390fc4063d618c515c19328
+      sha256: sha256:c5c66b706daef9b3d7a4788a38919a95e283915c8eb47849c8c1a3a9b6443825
       assertion: Physical Prisma models verified
     blockers:
     - Missing required domain/registry models in Prisma schema
@@ -101,7 +101,7 @@ probes:
     physical_status: PASS
     evidence:
     - path: _iwish-output/3. Development/development-roadmap.md
-      sha256: sha256:1db0f4d4dc55aff8723b07ac59d561b65ca23c2732fdbb826f724dfbf0749749
+      sha256: sha256:5c8d02f176ba537207bacb627803ae516d6d2f9d3a5e237f1b0f84bf9368dde1
       assertion: Feature surface verified
     blockers: []
   M8:
@@ -111,7 +111,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: prisma/schema.prisma
-      sha256: sha256:79bf3ff0a6bd8c73cbb334ab8f97b6d9b743f4505390fc4063d618c515c19328
+      sha256: sha256:c5c66b706daef9b3d7a4788a38919a95e283915c8eb47849c8c1a3a9b6443825
       assertion: PluginRegistry & CuratedPluginImportJob/CapabilityPackageVersion
         present
     blockers:

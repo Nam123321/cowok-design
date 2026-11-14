@@ -118,3 +118,23 @@ links_to:
 | [Story-07.1](./Story-07.1/story.md) | Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9 | 05.2, 06.2 | planned |
 | [Story-07.2](./Story-07.2/story.md) | Lớp phủ Visual QC Overlay & Vòng lặp Auto-Fix 1-Click trên Workbench | 07.1 | planned |
 | [Story-07.3](./Story-07.3/story.md) | Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080) | 07.1, 06.3 | planned |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-07.1](./Story-07.1/story.md) | Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9 | 05.2, 06.2 | refactored |
+| [Story-07.2](./Story-07.2/story.md) | Lớp phủ Visual QC Overlay & Vòng lặp Auto-Fix 1-Click trên Workbench | 07.1 | refactored |
+| [Story-07.3](./Story-07.3/story.md) | Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080) | 07.1, 06.3 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-07.1](./Story-07.1/story.md) | Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9 | 05.2, 06.2 | refactored |
+| [Story-07.2](./Story-07.2/story.md) | Lớp phủ Visual QC Overlay & Vòng lặp Auto-Fix 1-Click trên Workbench | 07.1 | refactored |
+| [Story-07.3](./Story-07.3/story.md) | Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080) | 07.1, 06.3 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-07.1](./Story-07.1/story.md) | Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9 | 05.2, 06.2 | refactored |
+| [Story-07.2](./Story-07.2/story.md) | Lớp phủ Visual QC Overlay & Vòng lặp Auto-Fix 1-Click trên Workbench | 07.1 | refactored |
+| [Story-07.3](./Story-07.3/story.md) | Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080) | 07.1, 06.3 | refactored |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-07.1](./Story-07.1/story.md) | Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9 | 05.2, 06.2 | refactored |
+| [Story-07.2](./Story-07.2/story.md) | Lớp phủ Visual QC Overlay & Vòng lặp Auto-Fix 1-Click trên Workbench | 07.1 | refactored |
+| [Story-07.3](./Story-07.3/story.md) | Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080) | 07.1, 06.3 | refactored |

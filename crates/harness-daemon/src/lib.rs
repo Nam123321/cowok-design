@@ -54,11 +54,9 @@ impl DaemonServer {
         registry: Arc<SpecRegistry>,
     ) -> Result<Self, HarnessError> {
         let (listener, lock_info, lock_path) = bind_loopback_with_lockfile(config)?;
-        let state = DaemonAppState {
-            registry,
-            host: lock_info.host.clone(),
-            port: lock_info.port,
-        };
+        let auth = crate::daemon_auth::DaemonAuthState::from_lock_info(&lock_info)?;
+        let state =
+            DaemonAppState::with_auth(registry, lock_info.host.clone(), lock_info.port, auth);
         let router = build_router(state);
         Ok(Self {
             listener,
@@ -109,11 +107,7 @@ pub struct DaemonHttpClient {
 impl DaemonHttpClient {
     pub fn new(registry: Arc<SpecRegistry>, host: String, port: u16) -> Self {
         Self {
-            state: DaemonAppState {
-                registry,
-                host,
-                port,
-            },
+            state: DaemonAppState::new(registry, host, port),
         }
     }
 
@@ -353,7 +347,7 @@ impl DaemonHttpClient {
             ).unwrap_or_else(|_| prof_id_str.clone());
 
             tx.execute(
-                "DELETE FROM constraint_rules WHERE profile_id = ?1",
+                "DELETE FROM constraint_rules WHERE profile_id = ?1 AND UPPER(rule_code) != 'ENFORCE_COMPONENT_REGISTRY'",
                 rusqlite::params![effective_prof_id],
             )?;
 
@@ -637,6 +631,45 @@ pub fn extract_disallowed_profiles(
     disallowed
 }
 
+/// Reconciles live filesystem watchers for all active projects under `registry`, draining
+/// pending `notify` events so external markdown edits/deletions stay synced with SQLite WAL.
+pub fn reconcile_project_watchers(
+    registry: &Arc<SpecRegistry>,
+    watchers: &mut std::collections::HashMap<uuid::Uuid, spec_registry::SpecWatcher>,
+) {
+    let Ok(conn) = registry.pool().connection() else {
+        return;
+    };
+    let Ok(mut stmt) = conn.prepare("SELECT id FROM projects WHERE trash_deleted_at IS NULL")
+    else {
+        return;
+    };
+    let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) else {
+        return;
+    };
+    let mut active_ids = std::collections::HashSet::new();
+    for id_str in rows.flatten() {
+        if let Ok(pid) = uuid::Uuid::parse_str(&id_str) {
+            active_ids.insert(pid);
+            if let std::collections::hash_map::Entry::Vacant(e) = watchers.entry(pid) {
+                if let Ok((proj_reg, proj_root)) =
+                    crate::synthesis::resolve_project_scoped_registry(registry, pid)
+                {
+                    if proj_root.join("product").join("specs").is_dir() {
+                        if let Ok(w) = spec_registry::SpecWatcher::start(proj_reg, pid) {
+                            e.insert(w);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    watchers.retain(|pid, _| active_ids.contains(pid));
+    for watcher in watchers.values() {
+        let _ = watcher.drain_events();
+    }
+}
+
 /// Opens the embedded SQLite WAL registry inside `config.workspace_root`, binds the loopback
 /// Axum server, atomically writes `.cowok-design/daemon.lock`, and serves incoming HTTP requests.
 pub async fn serve_daemon_with_config(config: DaemonConfig) -> Result<(), HarnessError> {
@@ -644,8 +677,30 @@ pub async fn serve_daemon_with_config(config: DaemonConfig) -> Result<(), Harnes
     let db_path = canonical_root.join(".cowok-design/cowok-design.sqlite3");
     let pool = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, &canonical_root))?;
     let registry = Arc::new(SpecRegistry::new(pool));
-    let server = DaemonServer::bind_loopback(&config, registry)?;
-    server.serve().await
+    let server = DaemonServer::bind_loopback(&config, Arc::clone(&registry))?;
+
+    let watcher_registry = Arc::clone(&registry);
+    let watcher_handle = tokio::spawn(async move {
+        let mut watchers = std::collections::HashMap::new();
+        let mut ticker = tokio::time::interval(std::time::Duration::from_millis(500));
+        loop {
+            ticker.tick().await;
+            let reg = Arc::clone(&watcher_registry);
+            let updated = tokio::task::spawn_blocking(move || {
+                reconcile_project_watchers(&reg, &mut watchers);
+                watchers
+            })
+            .await;
+            match updated {
+                Ok(w) => watchers = w,
+                Err(_) => break,
+            }
+        }
+    });
+
+    let serve_result = server.serve().await;
+    watcher_handle.abort();
+    serve_result
 }
 
 /// Starts and serves the `cowok-design` loopback Axum harness daemon on the target workspace.

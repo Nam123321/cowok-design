@@ -5,7 +5,7 @@ use axum::{
     http::StatusCode,
     middleware,
     response::{IntoResponse, Response},
-    routing::{get, patch, post},
+    routing::{delete, get, patch, post},
     Json, Router,
 };
 use flow_graph::{
@@ -18,6 +18,13 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::daemon_auth::{flow_dual_ingress_auth_middleware, FlowPrincipal};
+use crate::routes::legacy_workbench_v6::{
+    handle_create_comment, handle_create_fixture, handle_delete_mcp_server,
+    handle_list_agent_settings, handle_list_comments, handle_list_fixtures,
+    handle_list_mcp_servers, handle_post_job_event, handle_stream_job_events,
+    handle_update_comment, handle_update_fixture, handle_update_viewport,
+    handle_upsert_agent_setting, handle_upsert_mcp_server, handle_verify_provider_key,
+};
 use crate::routes::{DaemonAppState, HttpErrorBody};
 
 #[derive(Debug, Default, Deserialize)]
@@ -62,6 +69,50 @@ pub fn build_flow_subrouter(state: DaemonAppState) -> Router<DaemonAppState> {
         .route(
             "/api/v1/projects/:id/flow/deploy-draft",
             post(handle_deploy_draft),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/nodes/:node_id/comments",
+            get(handle_list_comments).post(handle_create_comment),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/nodes/:node_id/comments/:comment_id",
+            patch(handle_update_comment),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/nodes/:node_id/fixtures",
+            get(handle_list_fixtures).post(handle_create_fixture),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/nodes/:node_id/fixtures/:fixture_id",
+            patch(handle_update_fixture),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/nodes/:node_id/viewport",
+            patch(handle_update_viewport),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/jobs/events",
+            post(handle_post_job_event),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/jobs/stream",
+            get(handle_stream_job_events),
+        )
+        .route(
+            "/api/v1/agent-settings",
+            get(handle_list_agent_settings).put(handle_upsert_agent_setting),
+        )
+        .route(
+            "/api/v1/mcp-servers",
+            get(handle_list_mcp_servers).post(handle_upsert_mcp_server),
+        )
+        .route(
+            "/api/v1/mcp-servers/:server_id",
+            delete(handle_delete_mcp_server),
+        )
+        .route(
+            "/api/v1/doctor/verify-key",
+            post(handle_verify_provider_key),
         )
         .layer(DefaultBodyLimit::max(1_048_576))
         .route_layer(middleware::from_fn_with_state(
