@@ -79,8 +79,8 @@ const ReviewSummaryPopover: React.FC<{
 
 const PILL_CONTAINER_STYLE: React.CSSProperties = {
   position: "fixed",
-  height: "38px",
-  padding: "0 10px",
+  height: "42px",
+  padding: "0 12px",
   borderRadius: "var(--radius-pill)",
   backgroundColor: "var(--bg-elevated)",
   border: "1px solid var(--border-default)",
@@ -105,6 +105,37 @@ const PILL_ACTION_BTN_STYLE: React.CSSProperties = {
   gap: "4px",
 };
 
+const PillStatusBadge: React.FC<{
+  status?: NodeJobStatus;
+  queuePosition?: number;
+}> = ({ status, queuePosition }) => {
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
+  if (status === "running") {
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "10px", fontWeight: 600, color: "var(--action-primary)", backgroundColor: "var(--bg-selected)", padding: "2px 6px", borderRadius: "var(--radius-xs)" }}>
+        <BrandIcon name="execution-pipeline" size={10} color="currentColor" />
+        <span>{t("floatingChat.processing", "Đang xử lý")}</span>
+      </span>
+    );
+  }
+  if (status === "queued") {
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "10px", fontWeight: 600, color: "var(--state-warning)", backgroundColor: "var(--bg-subtle)", padding: "2px 6px", borderRadius: "var(--radius-xs)" }}>
+        <BrandIcon name="clock" size={10} color="currentColor" />
+        <span>{t("floatingChat.queueLabel", "Hàng đợi")} #{formatNumber(queuePosition ?? 1)}</span>
+      </span>
+    );
+  }
+  if (status === "paused") {
+    return <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "10px", fontWeight: 600, color: "var(--text-secondary)", backgroundColor: "var(--bg-subtle)", padding: "2px 6px", borderRadius: "var(--radius-xs)" }}>{t("flow.pausedBadge", "PAUSED")}</span>;
+  }
+  if (status === "interrupted") {
+    return <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "10px", fontWeight: 700, color: "var(--state-danger)", backgroundColor: "var(--bg-subtle)", padding: "2px 6px", borderRadius: "var(--radius-xs)" }}>{t("flow.interruptedBadge", "INTERRUPTED")}</span>;
+  }
+  return null;
+};
+
 const PillNodeBadge: React.FC<{
   isMulti: boolean;
   selectedCount: number;
@@ -114,24 +145,11 @@ const PillNodeBadge: React.FC<{
 }> = ({ isMulti, selectedCount, primaryNode, primaryNodeStatus, onExpand }) => {
   const { t, locale } = useTranslation();
   const { formatNumber } = useFormatter({ locale });
-  const isRunning = primaryNodeStatus?.status === "running";
-  const isQueued = primaryNodeStatus?.status === "queued";
   const openTitle = t("floatingChat.openContextChat", "Mở khung chat ngữ cảnh");
   return (
     <button
-      type="button"
-      data-testid="floating-chat-open-trigger"
-      onClick={onExpand}
-      title={openTitle}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "6px",
-        border: "none",
-        background: "transparent",
-        padding: "2px 4px",
-        cursor: "pointer",
-      }}
+      type="button" data-testid="floating-chat-open-trigger" onClick={onExpand} title={openTitle}
+      style={{ display: "inline-flex", alignItems: "center", gap: "6px", border: "none", background: "transparent", padding: "2px 4px", cursor: "pointer" }}
     >
       <BrandIcon name="crosshair" size={13} color="var(--action-primary)" />
       <span style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-primary)" }}>
@@ -141,18 +159,7 @@ const PillNodeBadge: React.FC<{
         <BrandIcon name="message-square" size={11} color="var(--text-secondary)" />
         <span>{t("floatingChat.chatShortLabel", "Chat")}</span>
       </span>
-      {isRunning && (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "10px", fontWeight: 600, color: "var(--action-primary)", backgroundColor: "var(--bg-selected)", padding: "2px 6px", borderRadius: "var(--radius-xs)" }}>
-          <BrandIcon name="execution-pipeline" size={10} color="currentColor" />
-          <span>{t("floatingChat.processing", "Đang xử lý")}</span>
-        </span>
-      )}
-      {isQueued && (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "10px", fontWeight: 600, color: "var(--state-warning)", backgroundColor: "var(--bg-subtle)", padding: "2px 6px", borderRadius: "var(--radius-xs)" }}>
-          <BrandIcon name="clock" size={10} color="currentColor" />
-          <span>{t("floatingChat.queueLabel", "Hàng đợi")} #{formatNumber(primaryNodeStatus?.queuePosition ?? 0)}</span>
-        </span>
-      )}
+      <PillStatusBadge status={primaryNodeStatus?.status} queuePosition={primaryNodeStatus?.queuePosition} />
     </button>
   );
 };

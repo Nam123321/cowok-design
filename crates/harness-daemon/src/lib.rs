@@ -44,6 +44,7 @@ pub struct DaemonServer {
     lock_info: DaemonLockInfo,
     lock_path: PathBuf,
     router: Router,
+    sse_tx: tokio::sync::broadcast::Sender<String>,
 }
 
 impl DaemonServer {
@@ -57,13 +58,19 @@ impl DaemonServer {
         let auth = crate::daemon_auth::DaemonAuthState::from_lock_info(&lock_info)?;
         let state =
             DaemonAppState::with_auth(registry, lock_info.host.clone(), lock_info.port, auth);
+        let sse_tx = state.sse_tx.clone();
         let router = build_router(state);
         Ok(Self {
             listener,
             lock_info,
             lock_path,
             router,
+            sse_tx,
         })
+    }
+
+    pub fn sse_sender(&self) -> tokio::sync::broadcast::Sender<String> {
+        self.sse_tx.clone()
     }
 
     pub fn lock_info(&self) -> &DaemonLockInfo {
@@ -678,6 +685,25 @@ pub async fn serve_daemon_with_config(config: DaemonConfig) -> Result<(), Harnes
     let pool = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, &canonical_root))?;
     let registry = Arc::new(SpecRegistry::new(pool));
     let server = DaemonServer::bind_loopback(&config, Arc::clone(&registry))?;
+    let _ = crate::routes::execution_reaper::reap_orphan_jobs_on_startup(
+        registry.pool(),
+        &server.lock_info().daemon_nonce,
+    )
+    .await;
+
+    let sweeper_registry = Arc::clone(&registry);
+    let sweeper_sse_tx = server.sse_sender();
+    let sweeper_handle = tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(5));
+        loop {
+            ticker.tick().await;
+            let _ = crate::routes::execution_reaper::sweep_expired_leases(
+                sweeper_registry.pool(),
+                &sweeper_sse_tx,
+            )
+            .await;
+        }
+    });
 
     let watcher_registry = Arc::clone(&registry);
     let watcher_handle = tokio::spawn(async move {
@@ -700,6 +726,7 @@ pub async fn serve_daemon_with_config(config: DaemonConfig) -> Result<(), Harnes
 
     let serve_result = server.serve().await;
     watcher_handle.abort();
+    sweeper_handle.abort();
     serve_result
 }
 

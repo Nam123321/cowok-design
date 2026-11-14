@@ -1,14 +1,10 @@
-// @story 04.1
+// @story 04.1, 04.4
 import React from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "../../../hooks/useTranslation";
+import { ChatStreamItem, type ChatMessage } from "@/components/workbench/ChatPrimitivesBridge";
 
-export interface ChatMessage {
-  id: string;
-  sender: "human" | "agent";
-  text: string;
-  timestamp: string;
-}
+export { ChatStreamItem, type ChatMessage };
 
 interface AgentChatStreamProps {
   messages: ChatMessage[];
@@ -28,43 +24,6 @@ const SCROLL_BTN_STYLE: React.CSSProperties = {
   borderRadius: "50%", backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-subtle)",
   color: "var(--text-primary)", boxShadow: "var(--shadow-md)", display: "flex", alignItems: "center",
   justifyContent: "center", cursor: "pointer", zIndex: 10, transition: "all var(--duration-fast)",
-};
-
-export const ChatStreamItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
-  const { t } = useTranslation();
-  if (msg.sender === "human") {
-    return (
-      <div
-        className="chat-human-bubble"
-        data-testid="chat-human-bubble"
-        style={{
-          alignSelf: "flex-end",
-          maxWidth: "86%",
-          backgroundColor: "var(--human-soft)",
-          color: "var(--text-primary)",
-          border: "1px solid var(--human-border)",
-          padding: "8px 12px",
-          borderRadius: "12px 12px 2px 12px",
-          fontSize: "12.5px",
-          lineHeight: "1.5",
-          wordBreak: "break-word",
-        }}
-      >
-        {msg.text}
-      </div>
-    );
-  }
-  return (
-    <div className="chat-agent-prose" data-quotable="true" style={{ alignSelf: "stretch", width: "100%", color: "var(--text-primary)", fontSize: "13px", lineHeight: "1.6", padding: "4px 0", wordBreak: "break-word" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px", fontSize: "11px", color: "var(--text-muted)" }}>
-        <BrandIcon name="sparkles" size={12} color="var(--agent-accent)" />
-        <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>{t("chat.agentTitle", "cowok Agent")}</span>
-        <span>•</span>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px" }}>{msg.timestamp}</span>
-      </div>
-      <div style={{ paddingLeft: "2px" }}>{msg.text}</div>
-    </div>
-  );
 };
 
 export const AgentChatStream: React.FC<AgentChatStreamProps> = ({

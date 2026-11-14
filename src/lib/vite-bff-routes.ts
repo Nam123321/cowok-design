@@ -19,11 +19,11 @@ import {
   ValidateTypographyInputSchema,
 } from "./validations/constraints";
 import {
-  PostJobEventInputSchema,
   UpsertAgentSettingInputSchema,
   UpsertMcpServerInputSchema,
   VerifyProviderKeyInputSchema,
 } from "./validations/workbench-settings";
+import { PostJobEventV2InputSchema } from "./validations/flow-execution";
 import { UpdateElementCommentSchema } from "./validations/element-comment";
 import {
   UpdateScreenFixtureSchema,
@@ -50,6 +50,12 @@ import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
 import * as commentsRoute from "../app/api/projects/[id]/flow/nodes/[nodeId]/comments/route";
 import * as fixturesRoute from "../app/api/projects/[id]/flow/nodes/[nodeId]/fixtures/route";
+import * as flowEnqueueRoute from "../app/api/projects/[id]/flow/jobs/enqueue/route";
+import * as flowSteerRoute from "../app/api/projects/[id]/flow/jobs/steer/route";
+import * as flowPauseRoute from "../app/api/projects/[id]/flow/jobs/pause/route";
+import * as flowResumeRoute from "../app/api/projects/[id]/flow/jobs/resume/route";
+import * as flowCancelRoute from "../app/api/projects/[id]/flow/jobs/cancel/route";
+import * as flowNodeSessionsRoute from "../app/api/projects/[id]/flow/node-sessions/route";
 import * as doctorRoute from "../app/api/doctor/route";
 
 export type RouteFn = (req: Request, ctx: { params?: Record<string, string> }) => Promise<Response>;
@@ -196,8 +202,14 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/fixtures$/, extractParams: (m) => ({ id: m[1], nodeId: m[2] }), resolveHandler: () => fixturesRoute.POST },
   proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/fixtures\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/nodes/${safeEncodeSegment(m[2])}/fixtures/${safeEncodeSegment(m[3])}`, UpdateScreenFixtureSchema),
   proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/viewport$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/nodes/${safeEncodeSegment(m[2])}/viewport`, ViewportPatchSchema),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/flow\/jobs\/events$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/jobs/events`, PostJobEventInputSchema),
+  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/flow\/jobs\/events$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/jobs/events`, PostJobEventV2InputSchema),
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/flow\/jobs\/stream$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/jobs/stream`),
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/jobs\/enqueue$/, extractParams: idOnly, resolveHandler: () => flowEnqueueRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/jobs\/steer$/, extractParams: idOnly, resolveHandler: () => flowSteerRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/jobs\/pause$/, extractParams: idOnly, resolveHandler: () => flowPauseRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/jobs\/resume$/, extractParams: idOnly, resolveHandler: () => flowResumeRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/jobs\/cancel$/, extractParams: idOnly, resolveHandler: () => flowCancelRoute.POST },
+  { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/flow\/node-sessions$/, extractParams: idOnly, resolveHandler: () => flowNodeSessionsRoute.GET },
 
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/icon-manifest$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/icon-manifest`),
   proxyRoute("POST", /^\/api\/projects\/([^/]+)\/validate-icon$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/validate-icon`, ValidateIconInputSchema),

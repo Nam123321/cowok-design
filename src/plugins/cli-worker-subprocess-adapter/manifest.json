@@ -1,0 +1,22 @@
+{
+  "id": "cli-worker-subprocess-adapter",
+  "slug": "cli-worker-subprocess-adapter",
+  "name": "CLI Worker Subprocess Adapter",
+  "version": "1.0.0",
+  "description": "Manages isolated local CLI worker subprocesses with -PGID process-group reaping, shadow directory buffering, and monotonic fencing CAS.",
+  "entrySkill": "skills/cli-worker/SKILL.md",
+  "skills": [
+    "skills/cli-worker/SKILL.md"
+  ],
+  "runtime": {
+    "isolation": "pgid-shadow-jail",
+    "shadowRoot": ".cowok-design/shadow",
+    "reapSignalGraceMs": 250,
+    "maxConcurrentSlots": 4
+  },
+  "permissions": [
+    "process:pgid_reap",
+    "fs:shadow_buffer"
+  ],
+  "riskTier": 2
+}

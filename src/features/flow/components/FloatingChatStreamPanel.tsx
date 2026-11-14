@@ -1,19 +1,14 @@
-// @story 04.3
-// @implements AC-02, AC-01 (Scope Strip, Unified Sidebar Stream & Mid-turn Execution Controls)
+// @story 04.3, 04.4
+// @implements AC-02, AC-01 (Scope Strip, Bridge Stream, Live Fencing Token & Project Seq Controls)
 import React from "react";
 import { BrandIcon } from "@/components/ui/BrandIcon";
-import { ChatStreamItem, type ChatMessage } from "@/pages/workbench/components/AgentChatStream";
-import { useTranslation } from "../../../hooks/useTranslation";
-import { useFormatter } from "../../../hooks/useFormatter";
+import { ChatStreamItem, type ChatMessage } from "@/components/workbench/ChatPrimitivesBridge";
+import { useTranslation } from "@/hooks/useTranslation";
+import { useFormatter } from "@/hooks/useFormatter";
 import { WorkbenchNode } from "../store/flow-workbench-store";
+import type { FloatingChatMessage } from "../hooks/useFloatingChatSync";
 
-export interface FloatingChatMessage {
-  id: string;
-  nodeId: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: number;
-}
+export type { FloatingChatMessage };
 
 export interface FloatingChatStreamPanelProps {
   projectId: string;
@@ -26,7 +21,10 @@ export interface FloatingChatStreamPanelProps {
   isRunning: boolean;
   isQueued: boolean;
   isPaused: boolean;
+  isInterrupted?: boolean;
   activeJobId?: string;
+  fencingToken?: number;
+  projectSeq?: number;
   isSteering: boolean;
   steerDraft: string;
   onDeselectNode: (nodeId: string) => void;
@@ -48,10 +46,7 @@ const ScopeChipStrip: React.FC<{
 }> = ({ projectId, sessionId, selectedNodes, onDeselectNode, onFocusNode }) => {
   const { t } = useTranslation();
   return (
-    <div
-      className="fc-scope-strip"
-      style={{ padding: "5px 10px", backgroundColor: "var(--bg-workspace)", borderBottom: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap", flexShrink: 0 }}
-    >
+    <div className="fc-scope-strip" style={{ padding: "5px 10px", backgroundColor: "var(--bg-workspace)", borderBottom: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap", flexShrink: 0 }}>
       {selectedNodes.map((n) => (
         <span
           key={n.id}
@@ -63,12 +58,7 @@ const ScopeChipStrip: React.FC<{
             {n.screenKey}
           </span>
           {selectedNodes.length > 1 && (
-            <button
-              type="button"
-              onClick={() => onDeselectNode(n.id)}
-              aria-label={`${t("floatingChat.deselectNode", "Bỏ chọn")} ${n.screenKey}`}
-              style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center" }}
-            >
+            <button type="button" onClick={() => onDeselectNode(n.id)} aria-label={`${t("floatingChat.deselectNode", "Bỏ chọn")} ${n.screenKey}`} style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center" }}>
               <BrandIcon name="close" size={10} color="currentColor" />
             </button>
           )}
@@ -89,10 +79,7 @@ const MessageHistoryList: React.FC<{
   const { formatTime, formatNumber } = useFormatter({ locale });
   if (messages.length === 0) {
     return (
-      <div
-        className="fc-history"
-        style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: "6px", backgroundColor: "var(--bg-canvas)", fontSize: "11.5px", color: "var(--text-muted)", flexShrink: 0 }}
-      >
+      <div className="fc-history" style={{ flex: 1, padding: "12px", display: "flex", alignItems: "flex-start", gap: "6px", backgroundColor: "var(--bg-canvas)", fontSize: "11.5px", color: "var(--text-muted)" }}>
         <BrandIcon name="sparkles" size={12} color="var(--agent-accent)" />
         <span>
           {t("floatingChat.emptyHint", "Nhập yêu cầu cho")} {isMulti ? `${formatNumber(selectedCount)} ${t("floatingChat.screensUnit", "màn hình")}` : primaryTitle || t("floatingChat.singleScreenFallback", "màn hình")}
@@ -101,17 +88,9 @@ const MessageHistoryList: React.FC<{
     );
   }
   return (
-    <div
-      className="fc-history"
-      style={{ flex: "0 1 auto", minHeight: 0, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: "10px", backgroundColor: "var(--bg-canvas)" }}
-    >
+    <div className="fc-history" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: "10px", backgroundColor: "var(--bg-canvas)" }}>
       {messages.map((m) => {
-        const mapped: ChatMessage = {
-          id: m.id,
-          sender: m.role === "user" ? "human" : "agent",
-          text: m.content,
-          timestamp: formatTime(m.timestamp),
-        };
+        const mapped: ChatMessage = { id: m.id, sender: m.role === "user" ? "human" : "agent", text: m.content, timestamp: formatTime(m.timestamp) };
         return <ChatStreamItem key={m.id} msg={mapped} />;
       })}
       <div ref={historyEndRef} />
@@ -122,27 +101,40 @@ const MessageHistoryList: React.FC<{
 const JobControlBar: React.FC<{
   activeJobId: string;
   isPaused: boolean;
+  isInterrupted?: boolean;
+  fencingToken?: number;
+  projectSeq?: number;
   onPauseJob: (jobId: string) => void;
   onResumeJob: (jobId: string) => void;
   onToggleSteer: () => void;
   onCancelJob: (jobId: string) => void;
-}> = ({ activeJobId, isPaused, onPauseJob, onResumeJob, onToggleSteer, onCancelJob }) => {
+}> = ({ activeJobId, isPaused, isInterrupted, fencingToken, projectSeq, onPauseJob, onResumeJob, onToggleSteer, onCancelJob }) => {
   const { t } = useTranslation();
+  const canResume = isPaused || isInterrupted;
+  const label = isInterrupted
+    ? t("floatingChat.jobInterrupted", "Bị gián đoạn")
+    : isPaused
+    ? t("floatingChat.jobPaused", "Đã tạm dừng")
+    : t("floatingChat.jobRunning", "Đang xử lý...");
   return (
-    <div style={{ padding: "5px 10px", backgroundColor: "var(--bg-subtle)", borderTop: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "10.5px", flexShrink: 0 }}>
-      <span style={{ fontWeight: 600, color: "var(--action-primary)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-        <BrandIcon name={isPaused ? "clock" : "execution-pipeline"} size={11} color="currentColor" />
-        <span>{isPaused ? t("floatingChat.jobPaused", "Đã tạm dừng") : t("floatingChat.jobRunning", "Đang xử lý...")}</span>
+    <div style={{ padding: "5px 10px", backgroundColor: "var(--bg-subtle)", borderTop: "1px solid var(--border-subtle)", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "10.5px", flexShrink: 0, gap: "6px" }}>
+      <span style={{ fontWeight: 600, color: isInterrupted ? "var(--state-danger)" : "var(--action-primary)", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+        <BrandIcon name={canResume ? "clock" : "execution-pipeline"} size={11} color="currentColor" />
+        <span>{label}</span>
+        {fencingToken ? <span style={{ fontFamily: "var(--font-mono)", fontSize: "9.5px", color: "var(--text-muted)" }}>fence:{fencingToken}</span> : null}
+        {projectSeq ? <span style={{ fontFamily: "var(--font-mono)", fontSize: "9.5px", color: "var(--text-muted)" }}>seq:{projectSeq}</span> : null}
       </span>
       <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-        <button type="button" onClick={() => (isPaused ? onResumeJob(activeJobId) : onPauseJob(activeJobId))} style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px" }}>
-          <BrandIcon name={isPaused ? "play" : "clock"} size={10} color="currentColor" />
-          <span>{isPaused ? t("floatingChat.resumeBtn", "Tiếp tục") : t("floatingChat.pauseBtn", "Tạm dừng")}</span>
+        <button type="button" onClick={() => (canResume ? onResumeJob(activeJobId) : onPauseJob(activeJobId))} style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+          <BrandIcon name={canResume ? "play" : "clock"} size={10} color="currentColor" />
+          <span>{canResume ? t("floatingChat.resumeBtn", "Tiếp tục") : t("floatingChat.pauseBtn", "Tạm dừng")}</span>
         </button>
-        <button type="button" onClick={onToggleSteer} style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px" }}>
-          <BrandIcon name="switch" size={10} color="currentColor" />
-          <span>{t("floatingChat.steerBtn", "Steer")}</span>
-        </button>
+        {!isInterrupted && (
+          <button type="button" onClick={onToggleSteer} style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+            <BrandIcon name="switch" size={10} color="currentColor" />
+            <span>{t("floatingChat.steerBtn", "Steer")}</span>
+          </button>
+        )}
         <button type="button" onClick={() => onCancelJob(activeJobId)} style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--state-danger)", color: "var(--state-danger)", backgroundColor: "var(--bg-surface)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px" }}>
           <BrandIcon name="close" size={10} color="currentColor" />
           <span>{t("workbench.cancelBtn", "Hủy")}</span>
@@ -165,9 +157,7 @@ const SteerInputBar: React.FC<{
         placeholder={t("floatingChat.steerPlaceholder", "Chỉ dẫn điều hướng giữa phiên (Steer)...")}
         value={steerDraft}
         onChange={(e) => onSteerDraftChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") onSteerSubmit();
-        }}
+        onKeyDown={(e) => { if (e.key === "Enter") onSteerSubmit(); }}
         style={{ flex: 1, fontSize: "11px", padding: "4px 8px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)" }}
       />
       <button type="button" onClick={onSteerSubmit} style={{ fontSize: "10.5px", padding: "3px 8px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)", border: "none", cursor: "pointer" }}>
@@ -178,40 +168,19 @@ const SteerInputBar: React.FC<{
 };
 
 export const FloatingChatStreamPanel: React.FC<FloatingChatStreamPanelProps> = (props) => {
-  const showJobBar = (props.isRunning || props.isQueued || props.isPaused) && Boolean(props.activeJobId);
+  const showJobBar = (props.isRunning || props.isQueued || props.isPaused || props.isInterrupted) && Boolean(props.activeJobId);
   return (
     <>
-      <ScopeChipStrip
-        projectId={props.projectId}
-        sessionId={props.sessionId}
-        selectedNodes={props.selectedNodes}
-        onDeselectNode={props.onDeselectNode}
-        onFocusNode={props.onFocusNode}
-      />
-      <MessageHistoryList
-        messages={props.messages}
-        isMulti={props.isMulti}
-        selectedCount={props.selectedNodes.length}
-        primaryTitle={props.primaryNode?.title}
-        historyEndRef={props.historyEndRef}
-      />
+      <ScopeChipStrip projectId={props.projectId} sessionId={props.sessionId} selectedNodes={props.selectedNodes} onDeselectNode={props.onDeselectNode} onFocusNode={props.onFocusNode} />
+      <MessageHistoryList messages={props.messages} isMulti={props.isMulti} selectedCount={props.selectedNodes.length} primaryTitle={props.primaryNode?.title} historyEndRef={props.historyEndRef} />
       {showJobBar && props.activeJobId && (
         <JobControlBar
-          activeJobId={props.activeJobId}
-          isPaused={props.isPaused}
-          onPauseJob={props.onPauseJob}
-          onResumeJob={props.onResumeJob}
-          onToggleSteer={props.onToggleSteer}
-          onCancelJob={props.onCancelJob}
+          activeJobId={props.activeJobId} isPaused={props.isPaused} isInterrupted={props.isInterrupted}
+          fencingToken={props.fencingToken} projectSeq={props.projectSeq}
+          onPauseJob={props.onPauseJob} onResumeJob={props.onResumeJob} onToggleSteer={props.onToggleSteer} onCancelJob={props.onCancelJob}
         />
       )}
-      {props.isSteering && (
-        <SteerInputBar
-          steerDraft={props.steerDraft}
-          onSteerDraftChange={props.onSteerDraftChange}
-          onSteerSubmit={props.onSteerSubmit}
-        />
-      )}
+      {props.isSteering && <SteerInputBar steerDraft={props.steerDraft} onSteerDraftChange={props.onSteerDraftChange} onSteerSubmit={props.onSteerSubmit} />}
     </>
   );
 };

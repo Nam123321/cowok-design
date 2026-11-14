@@ -12,7 +12,7 @@ import {
   NodeSubState,
 } from "../store/flow-workbench-store";
 import { useKeyedParallelCoordinator } from "../hooks/useKeyedParallelCoordinator";
-import { NodeExecutionJob, NodeQueueSummary } from "../store/keyed-parallel-coordinator";
+import { NodeExecutionJob, NodeQueueSummary, NodeJobStatus } from "../store/keyed-parallel-coordinator";
 import { DagSvgEdges } from "./DagSvgEdges";
 import { DagNodeCard, PortMouseDownArgs } from "./DagNodeCard";
 import { DagRightVerticalDock } from "./DagRightVerticalDock";
@@ -65,7 +65,7 @@ const DagNodesList: React.FC<{
   onNodeMouseDown: (e: React.MouseEvent, node: WorkbenchNode) => void;
   onPortMouseDown: (args: PortMouseDownArgs) => void;
   props: DagCanvas2DProps;
-  getNodeStatus: (nodeId: string) => { status: "running" | "queued" | "paused" | "completed" | "error" | "cancelled"; queuePosition: number } | null;
+  getNodeStatus: (nodeId: string) => { status: NodeJobStatus; queuePosition: number } | null;
 }> = ({ nodes, orphanNodeIds, selectedNodeId, onNodeMouseDown, onPortMouseDown, props, getNodeStatus }) => (
   <div style={{ position: "relative", width: "100%", height: "100%", pointerEvents: "none" }}>
     {nodes.map((node) => (

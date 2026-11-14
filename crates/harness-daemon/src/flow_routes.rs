@@ -18,6 +18,10 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::daemon_auth::{flow_dual_ingress_auth_middleware, FlowPrincipal};
+use crate::routes::execution_coordinator::{
+    handle_cancel_node_job, handle_enqueue_node_job, handle_list_node_chat_sessions,
+    handle_pause_node_job, handle_resume_node_job, handle_steer_node_job,
+};
 use crate::routes::legacy_workbench_v6::{
     handle_create_comment, handle_create_fixture, handle_delete_mcp_server,
     handle_list_agent_settings, handle_list_comments, handle_list_fixtures,
@@ -97,6 +101,30 @@ pub fn build_flow_subrouter(state: DaemonAppState) -> Router<DaemonAppState> {
         .route(
             "/api/v1/projects/:id/flow/jobs/stream",
             get(handle_stream_job_events),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/jobs/enqueue",
+            post(handle_enqueue_node_job),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/jobs/steer",
+            post(handle_steer_node_job),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/jobs/pause",
+            post(handle_pause_node_job),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/jobs/resume",
+            post(handle_resume_node_job),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/jobs/cancel",
+            post(handle_cancel_node_job),
+        )
+        .route(
+            "/api/v1/projects/:id/flow/node-sessions",
+            get(handle_list_node_chat_sessions),
         )
         .route(
             "/api/v1/agent-settings",

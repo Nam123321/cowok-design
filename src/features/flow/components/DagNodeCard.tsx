@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "@/hooks/useTranslation";
 import { WorkbenchNode, NodeSubState } from "../store/flow-workbench-store";
+import type { NodeJobStatus } from "../store/keyed-parallel-coordinator";
 import { FIXTURE_VARIANTS, normalizeFixtureRef } from "../../../lib/validations/screen-fixture";
 import { DagNodeHeader, DagNodePorts, PortMouseDownArgs } from "./DagNodeHeaderAndPorts";
 
@@ -24,7 +25,7 @@ export interface DagNodeCardProps {
   nodeWidth: number;
   nodeHeight: number;
   executionStatus?: {
-    status: "running" | "queued" | "paused" | "completed" | "error" | "cancelled";
+    status: NodeJobStatus;
     queuePosition?: number;
   };
 }

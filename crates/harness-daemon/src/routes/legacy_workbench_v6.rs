@@ -1304,6 +1304,8 @@ pub struct PostJobEventInput {
     #[serde(default)]
     pub payload_text: String,
     pub job_status: Option<String>,
+    #[serde(default)]
+    pub expected_fencing_token: Option<i64>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1344,6 +1346,8 @@ pub async fn handle_post_job_event(
         .unwrap_or_else(|| format!("sess-{pid}"));
     let scope_key = format!("{pid}::{session_id_req}::{node_id}");
     let pool = state.registry.pool().clone();
+    let daemon_nonce = state.auth.daemon_nonce.clone();
+    let sse_tx = state.sse_tx.clone();
 
     let created = run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
@@ -1388,16 +1392,16 @@ pub async fn handle_post_job_event(
                 }
             }
 
-            let cur_job: Option<(String, String, String)> = tx
+            let cur_job: Option<(String, String, String, i64)> = tx
                 .query_row(
-                    "SELECT project_id, tenant_id, status FROM node_execution_jobs WHERE id = ?1",
+                    "SELECT project_id, tenant_id, status, fencing_token FROM node_execution_jobs WHERE id = ?1",
                     params![job_id],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
                 )
                 .optional()?;
 
             let eff_status = match cur_job {
-                Some((_, job_tid, _)) if job_tid != principal.tenant_id => {
+                Some((_, job_tid, _, _)) if job_tid != principal.tenant_id => {
                     cross_scope_err = Some((
                         StatusCode::FORBIDDEN,
                         "TENANT_ISOLATION_BREACH",
@@ -1405,7 +1409,7 @@ pub async fn handle_post_job_event(
                     ));
                     return Ok(None);
                 }
-                Some((job_pid, _, _)) if job_pid != pid => {
+                Some((job_pid, _, _, _)) if job_pid != pid => {
                     cross_scope_err = Some((
                         StatusCode::NOT_FOUND,
                         "PROJECT_NOT_FOUND",
@@ -1413,30 +1417,75 @@ pub async fn handle_post_job_event(
                     ));
                     return Ok(None);
                 }
-                Some((_, _, cur)) => {
+                Some((_, _, cur, cur_fence)) => {
+                    if req.expected_fencing_token != Some(cur_fence) {
+                        cross_scope_err = Some((
+                            StatusCode::CONFLICT,
+                            "STALE_FENCING_TOKEN",
+                            format!("Expected fencingToken {cur_fence}, got {:?}", req.expected_fencing_token),
+                        ));
+                        return Ok(None);
+                    }
                     let target = next_status.clone().unwrap_or(cur);
-                    tx.execute(
+                    let updated = tx.execute(
                         "UPDATE node_execution_jobs
                          SET status = ?1,
-                             composite_scope_key = CASE WHEN composite_scope_key = '' THEN ?2 ELSE composite_scope_key END,
-                             started_at = COALESCE(started_at, ?3),
-                             completed_at = CASE WHEN ?1 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?3 ELSE completed_at END,
-                             updated_at = ?3
-                         WHERE id = ?4 AND project_id = ?5 AND tenant_id = ?6",
-                        params![target, scope_key, now_ms, job_id, pid, principal.tenant_id],
+                             fencing_token = fencing_token + 1,
+                             daemon_nonce = ?2,
+                             composite_scope_key = CASE WHEN composite_scope_key = '' THEN ?3 ELSE composite_scope_key END,
+                             started_at = COALESCE(started_at, ?4),
+                             stale_after_timestamp = CASE WHEN ?1 IN ('RUNNING') THEN ?5 ELSE NULL END,
+                             completed_at = CASE WHEN ?1 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?4 ELSE completed_at END,
+                             updated_at = ?4
+                         WHERE id = ?6 AND project_id = ?7 AND tenant_id = ?8 AND fencing_token = ?9",
+                        params![
+                            target,
+                            daemon_nonce,
+                            scope_key,
+                            now_ms,
+                            now_ms + 15_000,
+                            job_id,
+                            pid,
+                            principal.tenant_id,
+                            cur_fence
+                        ],
                     )?;
+                    if updated == 0 {
+                        cross_scope_err = Some((
+                            StatusCode::CONFLICT,
+                            "STALE_FENCING_TOKEN",
+                            "Concurrent fencing token update detected".to_string(),
+                        ));
+                        return Ok(None);
+                    }
                     target
                 }
                 None => {
+                    let next_fence: i64 = tx.query_row(
+                        "SELECT COALESCE(MAX(fencing_token), 0) + 1 FROM node_execution_jobs WHERE composite_scope_key = ?1",
+                        params![scope_key],
+                        |r| r.get(0),
+                    )?;
+                    if let Some(exp) = req.expected_fencing_token {
+                        if exp != next_fence {
+                            cross_scope_err = Some((
+                                StatusCode::CONFLICT,
+                                "STALE_FENCING_TOKEN",
+                                format!("Expected initial fencingToken {next_fence}, got {exp}"),
+                            ));
+                            return Ok(None);
+                        }
+                    }
                     let target = next_status
                         .clone()
                         .unwrap_or_else(|| "RUNNING".to_string());
+                    let lease_ts = (target == "RUNNING").then_some(now_ms + 15_000);
                     tx.execute(
                         "INSERT INTO node_execution_jobs (
                             id, tenant_id, project_id, session_id, node_id, composite_scope_key,
-                            daemon_nonce, status, fencing_token, priority,
+                            daemon_nonce, status, fencing_token, priority, stale_after_timestamp,
                             created_at, started_at, completed_at, updated_at
-                         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, '', ?7, 1, 10, ?8, ?8, CASE WHEN ?7 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?8 ELSE NULL END, ?8)",
+                         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 10, ?10, ?11, ?11, CASE WHEN ?8 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?11 ELSE NULL END, ?11)",
                         params![
                             job_id,
                             principal.tenant_id,
@@ -1444,7 +1493,10 @@ pub async fn handle_post_job_event(
                             session_id_req,
                             node_id,
                             scope_key,
+                            daemon_nonce,
                             target,
+                            next_fence,
+                            lease_ts,
                             now_ms
                         ],
                     )?;
@@ -1512,6 +1564,7 @@ pub async fn handle_post_job_event(
     })
     .await?;
 
+    let _ = sse_tx.send(created.project_id.clone());
     Ok((StatusCode::CREATED, Json(created)))
 }
 
@@ -1522,14 +1575,20 @@ struct SsePollState {
     job_id: Option<String>,
     node_id: Option<String>,
     last_seq: i64,
-    ticks: u32,
+    started: bool,
     closed: bool,
+    rx: tokio::sync::broadcast::Receiver<String>,
 }
 
-fn fetch_pending_events(
-    state: &SsePollState,
+fn fetch_pending_events_params(
+    pool: &SqlitePool,
+    tenant_id: &str,
+    project_id: &str,
+    job_id: Option<&str>,
+    node_id: Option<&str>,
+    last_seq: i64,
 ) -> Result<(Vec<ExecutionEventDto>, bool), HarnessError> {
-    let conn = state.pool.connection()?;
+    let conn = pool.connection()?;
     let mut sql = String::from(
         "SELECT e.id, e.job_id, e.project_id, e.node_id, e.event_kind, e.payload_text,
                 e.seq_no, COALESCE(e.project_seq, e.seq_no) AS eff_proj_seq,
@@ -1539,9 +1598,9 @@ fn fetch_pending_events(
          WHERE e.tenant_id = ?1 AND e.project_id = ?2
            AND COALESCE(e.project_seq, e.seq_no) > ?3",
     );
-    if state.job_id.is_some() {
+    if job_id.is_some() {
         sql.push_str(" AND e.job_id = ?4");
-    } else if state.node_id.is_some() {
+    } else if node_id.is_some() {
         sql.push_str(" AND e.node_id = ?4");
     }
     sql.push_str(" ORDER BY eff_proj_seq ASC, e.created_at ASC LIMIT 50");
@@ -1566,19 +1625,19 @@ fn fetch_pending_events(
         })
     };
 
-    let rows = if let Some(ref jid) = state.job_id {
+    let rows = if let Some(jid) = job_id {
         stmt.query_map(
-            params![state.tenant_id, state.project_id, state.last_seq, jid],
+            params![tenant_id, project_id, last_seq, jid],
             map_row,
         )
-    } else if let Some(ref nid) = state.node_id {
+    } else if let Some(nid) = node_id {
         stmt.query_map(
-            params![state.tenant_id, state.project_id, state.last_seq, nid],
+            params![tenant_id, project_id, last_seq, nid],
             map_row,
         )
     } else {
         stmt.query_map(
-            params![state.tenant_id, state.project_id, state.last_seq],
+            params![tenant_id, project_id, last_seq],
             map_row,
         )
     }
@@ -1589,10 +1648,10 @@ fn fetch_pending_events(
         events.push(r.map_err(|e| map_sqlite_error(e, "row_sse_events"))?);
     }
 
-    let is_terminal = if let Some(ref jid) = state.job_id {
+    let is_terminal = if let Some(jid) = job_id {
         conn.query_row(
             "SELECT status FROM node_execution_jobs WHERE id = ?1 AND project_id = ?2",
-            params![jid, state.project_id],
+            params![jid, project_id],
             |r| r.get::<_, String>(0),
         )
         .optional()
@@ -1635,31 +1694,43 @@ pub async fn handle_stream_job_events(
         job_id: q.job_id.filter(|s| !s.trim().is_empty()),
         node_id: q.node_id.filter(|s| !s.trim().is_empty()),
         last_seq: q.after_seq.or(last_event_id).unwrap_or(0),
-        ticks: 0,
+        started: false,
         closed: false,
+        rx: state.sse_tx.subscribe(),
     };
 
     let stream = futures_util::stream::unfold(init, |mut st| async move {
-        if st.closed || st.ticks >= 40 {
+        if st.closed {
             return None;
         }
         loop {
-            if st.ticks > 0 {
-                tokio::time::sleep(Duration::from_millis(120)).await;
+            if st.started {
+                let target_pid = st.project_id.clone();
+                tokio::select! {
+                    recv = st.rx.recv() => {
+                        match recv {
+                            Ok(msg_pid) if msg_pid != target_pid => continue,
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {}
+                            _ => {}
+                        }
+                    }
+                    _ = tokio::time::sleep(Duration::from_millis(1500)) => {}
+                }
             }
-            st.ticks += 1;
+            st.started = true;
 
-            let snapshot = SsePollState {
-                pool: st.pool.clone(),
-                tenant_id: st.tenant_id.clone(),
-                project_id: st.project_id.clone(),
-                job_id: st.job_id.clone(),
-                node_id: st.node_id.clone(),
-                last_seq: st.last_seq,
-                ticks: st.ticks,
-                closed: st.closed,
-            };
-            let res = tokio::task::spawn_blocking(move || fetch_pending_events(&snapshot)).await;
+            let (pool, tid, pid, jid, nid, last_seq) = (
+                st.pool.clone(),
+                st.tenant_id.clone(),
+                st.project_id.clone(),
+                st.job_id.clone(),
+                st.node_id.clone(),
+                st.last_seq,
+            );
+            let res = tokio::task::spawn_blocking(move || {
+                fetch_pending_events_params(&pool, &tid, &pid, jid.as_deref(), nid.as_deref(), last_seq)
+            })
+            .await;
             match res {
                 Ok(Ok((events, is_terminal))) => {
                     if let Some(last) = events.last() {
@@ -1677,7 +1748,7 @@ pub async fn handle_stream_job_events(
                             .data(payload);
                         return Some((Ok(ev), st));
                     }
-                    if is_terminal || st.ticks >= 40 {
+                    if is_terminal {
                         return None;
                     }
                 }

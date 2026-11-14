@@ -268,6 +268,9 @@ export async function forwardToDaemonFlow(opts: {
   if (safeInbound["if-match"]) {
     headers["If-Match"] = safeInbound["if-match"];
   }
+  if (safeInbound["last-event-id"]) {
+    headers["Last-Event-ID"] = safeInbound["last-event-id"];
+  }
   if (safeInbound.accept) {
     headers.Accept = safeInbound.accept;
   }

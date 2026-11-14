@@ -1,54 +1,32 @@
-// @story 04.3
-// @implements AC-01 (KeyedParallelCoordinator Engine)
-export type NodeJobStatus =
-  | "queued"
-  | "running"
-  | "paused"
-  | "completed"
-  | "error"
-  | "cancelled";
+// @story 04.3, 04.4
+// @implements AC-01, AC-02 (Persistent KeyedParallelCoordinator with Fencing Reconciliation)
+import type { NodeExecutionJobDto } from "@/lib/validations/flow-execution";
+import {
+  DAEMON_TO_LOCAL_STATUS,
+  buildQueueSummary,
+  mapDaemonDtoToJob,
+  toNodeStatusSnapshot,
+  type NodeExecutionJob,
+  type NodeJobStatus,
+  type NodeQueueSummary,
+  type NodeStatusSnapshot,
+  type QueueListener,
+} from "./keyed-parallel-types";
 
-export interface NodeExecutionJob {
-  id: string;
-  projectId: string;
-  sessionId: string;
-  nodeId: string;
-  compositeScopeKey: string; // `${projectId}::${sessionId}::${nodeId}`
-  prompt: string;
-  status: NodeJobStatus;
-  queuePosition: number; // 0 if running/idle, 1..N if queued
-  fencingToken: number;
-  progressPercent?: number;
-  outputArtifactSha256?: string;
-  createdAt: number;
-  startedAt?: number;
-  completedAt?: number;
-  errorMessage?: string;
-  steerHistory: Array<{ timestamp: number; instruction: string }>;
-}
-
-export interface NodeQueueSummary {
-  runningCount: number;
-  queuedCount: number;
-  totalActive: number;
-  nodeStatusMap: Record<
-    string,
-    { status: NodeJobStatus; queuePosition: number; jobId: string }
-  >;
-}
-
-export type QueueListener = (summary: NodeQueueSummary) => void;
+export type {
+  NodeExecutionJob,
+  NodeJobStatus,
+  NodeQueueSummary,
+  NodeStatusSnapshot,
+  QueueListener,
+};
 
 export class KeyedParallelCoordinator {
   private maxConcurrent: number;
-  // NodeId -> FIFO queue of jobs waiting or active for this node
-  private nodeQueues: Map<string, NodeExecutionJob[]> = new Map();
-  // Active running/paused jobs keyed by jobId
-  private activeJobs: Map<string, NodeExecutionJob> = new Map();
-  // Monotonic fencing token counter
-  private fencingCounter: number = 0;
-  // Subscribed listeners
-  private listeners: Set<QueueListener> = new Set();
+  private nodeQueues = new Map<string, NodeExecutionJob[]>();
+  private activeJobs = new Map<string, NodeExecutionJob>();
+  private fencingCounter = 0;
+  private listeners = new Set<QueueListener>();
 
   constructor(maxConcurrent = 4) {
     this.maxConcurrent = maxConcurrent;
@@ -57,246 +35,155 @@ export class KeyedParallelCoordinator {
   public subscribe(listener: QueueListener): () => void {
     this.listeners.add(listener);
     listener(this.getSummary());
-    return () => {
-      this.listeners.delete(listener);
-    };
+    return () => { this.listeners.delete(listener); };
   }
 
   private notify(): void {
     const summary = this.getSummary();
     for (const listener of this.listeners) {
-      try {
-        listener(summary);
-      } catch {
-        // Suppress listener errors
-      }
+      try { listener(summary); } catch { /* ignore listener errors */ }
     }
   }
 
   public getSummary(): NodeQueueSummary {
-    let runningCount = 0;
-    let queuedCount = 0;
-    const nodeStatusMap: Record<
-      string,
-      { status: NodeJobStatus; queuePosition: number; jobId: string }
-    > = {};
-
-    for (const [nodeId, queue] of this.nodeQueues.entries()) {
-      if (queue.length === 0) continue;
-      const head = queue[0];
-      if (head.status === "running" || head.status === "paused") {
-        runningCount++;
-        nodeStatusMap[nodeId] = {
-          status: head.status,
-          queuePosition: 0,
-          jobId: head.id,
-        };
-      }
-      for (let i = 1; i < queue.length; i++) {
-        queuedCount++;
-      }
-      // If head is queued (waiting for concurrent slot)
-      if (head.status === "queued") {
-        queuedCount++;
-        nodeStatusMap[nodeId] = {
-          status: "queued",
-          queuePosition: 1,
-          jobId: head.id,
-        };
-      }
-    }
-
-    return {
-      runningCount,
-      queuedCount,
-      totalActive: runningCount + queuedCount,
-      nodeStatusMap,
-    };
+    return buildQueueSummary(this.nodeQueues);
   }
 
-  public getNodeStatus(nodeId: string): { status: NodeJobStatus; queuePosition: number; jobId?: string } | null {
+  public getNodeStatus(nodeId: string): NodeStatusSnapshot | null {
     const queue = this.nodeQueues.get(nodeId);
-    if (!queue || queue.length === 0) {
-      return null;
-    }
-    const head = queue[0];
-    return {
-      status: head.status,
-      queuePosition: head.queuePosition,
-      jobId: head.id,
-    };
+    if (!queue || queue.length === 0) return null;
+    return toNodeStatusSnapshot(queue[0]);
   }
 
-  public enqueueJob(params: {
-    projectId: string;
-    sessionId: string;
-    nodeId: string;
-    prompt: string;
-  }): NodeExecutionJob {
-    this.fencingCounter++;
-    const compositeScopeKey = `${params.projectId}::${params.sessionId}::${params.nodeId}`;
-    const randomSuffix =
-      typeof globalThis.crypto?.randomUUID === "function"
-        ? globalThis.crypto.randomUUID().slice(0, 8)
-        : String(this.fencingCounter).padStart(8, "0");
-    const jobId = `job-${Date.now()}-${randomSuffix}`;
-
-    let queue = this.nodeQueues.get(params.nodeId);
-    if (!queue) {
-      queue = [];
-      this.nodeQueues.set(params.nodeId, queue);
-    }
-
-    const queuePosition = queue.length; // 0 if empty (will run), >0 if enqueued
+  public enqueueJob(params: { projectId: string; sessionId: string; nodeId: string; prompt: string }): NodeExecutionJob {
+    this.fencingCounter += 1;
+    const suffix = typeof globalThis.crypto?.randomUUID === "function"
+      ? globalThis.crypto.randomUUID().slice(0, 8)
+      : String(this.fencingCounter).padStart(8, "0");
     const job: NodeExecutionJob = {
-      id: jobId,
+      id: `job-${Date.now()}-${suffix}`,
       projectId: params.projectId,
       sessionId: params.sessionId,
       nodeId: params.nodeId,
-      compositeScopeKey,
+      compositeScopeKey: `${params.projectId}::${params.sessionId}::${params.nodeId}`,
       prompt: params.prompt,
-      status: queue.length === 0 ? "queued" : "queued",
-      queuePosition,
+      status: "queued",
+      queuePosition: this.nodeQueues.get(params.nodeId)?.length ?? 0,
       fencingToken: this.fencingCounter,
       createdAt: Date.now(),
       steerHistory: [],
     };
-
+    const queue = this.nodeQueues.get(params.nodeId) ?? [];
     queue.push(job);
+    this.nodeQueues.set(params.nodeId, queue);
     this.processNext();
     this.notify();
     return job;
   }
 
   private processNext(): void {
-    const currentRunning = Array.from(this.activeJobs.values()).filter(
-      (j) => j.status === "running"
-    ).length;
-
-    if (currentRunning >= this.maxConcurrent) {
-      return;
-    }
-
-    for (const [, queue] of this.nodeQueues.entries()) {
+    const occupied = Array.from(this.activeJobs.values()).filter((j) => j.status === "running" || j.status === "paused").length;
+    if (occupied >= this.maxConcurrent) return;
+    for (const queue of this.nodeQueues.values()) {
       if (queue.length === 0) continue;
       const head = queue[0];
       if (head.status === "queued") {
         head.status = "running";
-        head.startedAt = Date.now();
+        head.startedAt = head.startedAt ?? Date.now();
         head.queuePosition = 0;
         this.activeJobs.set(head.id, head);
-        this.processNext(); // Greedily schedule next distinct nodes
+        this.processNext();
         break;
       }
     }
   }
 
-  public steerJob(jobId: string, instruction: string): boolean {
-    const job = this.activeJobs.get(jobId);
-    if (!job || job.status !== "running") return false;
+  public reconcileFromDaemon(dtos: NodeExecutionJobDto[], projectSeq?: number): void {
+    this.activeJobs.clear();
+    this.nodeQueues.clear();
+    let queuedIdx = 0;
+    for (const dto of dtos) {
+      const status = DAEMON_TO_LOCAL_STATUS[dto.status] ?? "queued";
+      if (status === "completed" || status === "error" || status === "cancelled") continue;
+      this.fencingCounter = Math.max(this.fencingCounter, dto.fencingToken);
+      const q = this.nodeQueues.get(dto.nodeId) ?? [];
+      const job = mapDaemonDtoToJob(dto, status, status === "queued" ? ++queuedIdx : 0, projectSeq);
+      q.push(job);
+      this.nodeQueues.set(dto.nodeId, q);
+      if (status === "running" || status === "paused") this.activeJobs.set(job.id, job);
+    }
+    this.notify();
+  }
+
+  public updateProjectSeq(projectSeq: number): void {
+    for (const queue of this.nodeQueues.values()) {
+      for (const job of queue) job.projectSeq = Math.max(job.projectSeq ?? 0, projectSeq);
+    }
+    this.notify();
+  }
+
+  public steerJob(jobId: string, instruction: string, nextToken?: number): boolean {
+    const job = this.findJob(jobId);
+    if (!job || (job.status !== "running" && job.status !== "paused" && job.status !== "queued")) return false;
+    job.fencingToken = nextToken ?? ++this.fencingCounter;
     job.steerHistory.push({ timestamp: Date.now(), instruction });
     this.notify();
     return true;
   }
 
-  public pauseJob(jobId: string): boolean {
-    const job = this.activeJobs.get(jobId);
+  public pauseJob(jobId: string, nextToken?: number): boolean {
+    const job = this.findJob(jobId);
     if (!job || job.status !== "running") return false;
     job.status = "paused";
+    job.fencingToken = nextToken ?? ++this.fencingCounter;
     this.notify();
     return true;
   }
 
-  public resumeJob(jobId: string): boolean {
-    const job = this.activeJobs.get(jobId);
-    if (!job || job.status !== "paused") return false;
+  public resumeJob(jobId: string, nextToken?: number): boolean {
+    const job = this.findJob(jobId);
+    if (!job || (job.status !== "paused" && job.status !== "interrupted")) return false;
     job.status = "running";
+    job.fencingToken = nextToken ?? ++this.fencingCounter;
+    this.activeJobs.set(job.id, job);
     this.notify();
     return true;
   }
 
-  public completeJob(jobId: string, outputSha256?: string): void {
-    const job = this.activeJobs.get(jobId);
+  public completeJob(jobId: string, _outputSha256?: string): void { this.removeFromQueue(jobId, "completed"); }
+  public cancelJob(jobId: string, reason = "USER_CANCELLED"): void { this.removeFromQueue(jobId, "cancelled", reason); }
+  public failJob(jobId: string, reason = "EXECUTION_FAILED"): void { this.removeFromQueue(jobId, "error", reason); }
+
+  private findJob(jobId: string): NodeExecutionJob | undefined {
+    const active = this.activeJobs.get(jobId);
+    if (active) return active;
+    for (const q of this.nodeQueues.values()) {
+      const hit = q.find((j) => j.id === jobId);
+      if (hit) return hit;
+    }
+    return undefined;
+  }
+
+  private removeFromQueue(jobId: string, status: "completed" | "cancelled" | "error", reason?: string): void {
+    const job = this.findJob(jobId);
     if (!job) return;
-
-    job.status = "completed";
-    job.completedAt = Date.now();
-    job.outputArtifactSha256 = outputSha256;
     this.activeJobs.delete(jobId);
-
+    job.status = status;
+    job.completedAt = Date.now();
+    if (reason) job.errorMessage = reason;
     const queue = this.nodeQueues.get(job.nodeId);
     if (queue) {
       const idx = queue.findIndex((j) => j.id === jobId);
-      if (idx !== -1) {
-        queue.splice(idx, 1);
-      }
-      // Re-index remaining jobs in queue
-      queue.forEach((j, i) => {
-        j.queuePosition = i;
-      });
-      if (queue.length === 0) {
-        this.nodeQueues.delete(job.nodeId);
-      }
+      if (idx !== -1) queue.splice(idx, 1);
+      queue.forEach((j, i) => { j.queuePosition = i; });
+      if (queue.length === 0) this.nodeQueues.delete(job.nodeId);
     }
-
     this.processNext();
     this.notify();
-  }
-
-  private finalizeTerminalJob(jobId: string, status: "cancelled" | "error", reason: string): void {
-    let targetJob: NodeExecutionJob | undefined = this.activeJobs.get(jobId);
-    if (targetJob) {
-      this.activeJobs.delete(jobId);
-    } else {
-      for (const queue of this.nodeQueues.values()) {
-        const found = queue.find((j) => j.id === jobId);
-        if (found) {
-          targetJob = found;
-          break;
-        }
-      }
-    }
-
-    if (!targetJob) return;
-
-    targetJob.status = status;
-    targetJob.completedAt = Date.now();
-    targetJob.errorMessage = reason;
-
-    const queue = this.nodeQueues.get(targetJob.nodeId);
-    if (queue) {
-      const idx = queue.findIndex((j) => j.id === jobId);
-      if (idx !== -1) {
-        queue.splice(idx, 1);
-      }
-      queue.forEach((j, i) => {
-        j.queuePosition = i;
-      });
-      if (queue.length === 0) {
-        this.nodeQueues.delete(targetJob.nodeId);
-      }
-    }
-
-    this.processNext();
-    this.notify();
-  }
-
-  public cancelJob(jobId: string, reason = "USER_CANCELLED"): void {
-    this.finalizeTerminalJob(jobId, "cancelled", reason);
-  }
-
-  public failJob(jobId: string, reason = "EXECUTION_FAILED"): void {
-    this.finalizeTerminalJob(jobId, "error", reason);
   }
 
   public getActiveJobs(): NodeExecutionJob[] {
-    const list: NodeExecutionJob[] = [];
-    for (const queue of this.nodeQueues.values()) {
-      for (const job of queue) {
-        list.push(job);
-      }
-    }
-    return list;
+    return Array.from(this.nodeQueues.values()).flat();
   }
 
   public clearAll(): void {

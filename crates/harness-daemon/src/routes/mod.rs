@@ -1,5 +1,8 @@
 // @story 04.1
 // @implements AC-01, AC-03, AC-04, AC-06
+pub mod execution_coordinator;
+pub mod execution_coordinator_sql;
+pub mod execution_reaper;
 pub mod fs_jail;
 pub mod legacy_proposals;
 pub mod legacy_sdi;
@@ -64,11 +67,14 @@ use project_trash::handle_restore_project;
 impl DaemonAppState {
     pub fn new(registry: Arc<SpecRegistry>, host: String, port: u16) -> Self {
         let auth = DaemonAuthState::from_registry_root(registry.pool().workspace_root());
+        let (sse_tx, _) = tokio::sync::broadcast::channel(256);
         Self {
             registry,
             host,
             port,
             auth,
+            active_workers: execution_reaper::ActiveWorkerRegistry::new(),
+            sse_tx,
         }
     }
 
@@ -78,11 +84,14 @@ impl DaemonAppState {
         port: u16,
         auth: Arc<DaemonAuthState>,
     ) -> Self {
+        let (sse_tx, _) = tokio::sync::broadcast::channel(256);
         Self {
             registry,
             host,
             port,
             auth,
+            active_workers: execution_reaper::ActiveWorkerRegistry::new(),
+            sse_tx,
         }
     }
 }
@@ -93,6 +102,8 @@ pub struct DaemonAppState {
     pub host: String,
     pub port: u16,
     pub auth: Arc<DaemonAuthState>,
+    pub active_workers: execution_reaper::ActiveWorkerRegistry,
+    pub sse_tx: tokio::sync::broadcast::Sender<String>,
 }
 
 pub(crate) fn state_auth(state: &DaemonAppState) -> Arc<DaemonAuthState> {

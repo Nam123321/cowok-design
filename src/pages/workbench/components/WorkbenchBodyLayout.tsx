@@ -202,6 +202,10 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
     ? `${resolvedProjectId}::${p.activeSessionId}::${p.state.selectedNodeId}`
     : null;
 
+  const selectedScopeNodes = p.state.nodes.filter(
+    (n) => n.id === p.state.selectedNodeId || (p.state.selectedNodeIds && p.state.selectedNodeIds.includes(n.id))
+  );
+
   return (
     <div className="workbench-body-layout" aria-label={t("workbench.appName", "cowok-design")} style={{ display: "flex", flex: 1, overflowX: "auto", overflowY: "hidden", position: "relative", scrollBehavior: "smooth", width: "100%", height: "100%" }}>
       <MainSidebar
@@ -234,6 +238,14 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
         <AgentChatPanel
           projectId={resolvedProjectId}
           activeSessionId={p.activeSessionId}
+          selectedNodes={selectedScopeNodes}
+          onDeselectNode={(id) => p.store.selectNode(id, true)}
+          onFocusNode={(id) => {
+            const target = p.state.nodes.find((n) => n.id === id);
+            if (target) {
+              p.store.setViewport({ panX: -target.posX + 300, panY: -target.posY + 200, zoom: 1 });
+            }
+          }}
           width={p.splitter.chatWidth} isShortened={p.splitter.isChatShortened}
           onToggleShorten={p.splitter.handleToggleShortenChat} attachmentChips={p.attachments.attachmentChips}
           onRemoveAttachmentChip={p.attachments.handleRemoveAttachmentChip} onOpenSettings={p.onOpenSettings}

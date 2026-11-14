@@ -131,7 +131,7 @@ describe("Story 04.3: Keyed Parallel Engine, Contextual Multi-Node Floating Chat
 
       const chatWin = screen.getByTestId("contextual-node-floating-chat");
       expect(chatWin.style.height).toBe("auto");
-      expect(chatWin.style.maxHeight).toContain("560px");
+      expect(chatWin.style.maxHeight).toContain("850px");
       expect(screen.getByTestId("floating-chat-composer-wrapper")).toBeDefined();
 
       // Verify composite header tag and chips

@@ -322,7 +322,15 @@
     "nodesCountLabel": "Nodes",
     "draftBadge": "DRAFT",
     "runningBadge": "RUNNING",
+    "pausedBadge": "PAUSED",
+    "interruptedBadge": "INTERRUPTED",
     "queuedBadgePrefix": "QUEUED #",
+    "queue": {
+      "running": "RUNNING",
+      "paused": "PAUSED",
+      "interrupted": "INTERRUPTED",
+      "queuedPrefix": "QUEUED #"
+    },
     "transitionErrorPrefix": "Lỗi liên kết đồ thị"
   },
   "brand": {
@@ -353,6 +361,7 @@
     "enterHintSuffix": "(Enter gửi, Shift+Enter xuống dòng)",
     "fifoMode": "FIFO per-node",
     "focusNodeOnDag": "Focus Node trên DAG",
+    "jobInterrupted": "Bị gián đoạn",
     "jobPaused": "Đã tạm dừng",
     "jobRunning": "Đang xử lý...",
     "multiNodePlaceholder": "Yêu cầu Agent xử lý đồng loạt các màn hình đang chọn...",
@@ -473,5 +482,13 @@
     "wsSandboxedDesc": "Tự động phân vùng isolated trong .cowok-design/projects/ với HMAC token",
     "doctorError": "Không thể kết nối daemon CLI Doctor; đang dùng cấu hình mặc định.",
     "saveDaemonWarning": "Đã lưu cục bộ; chưa đồng bộ được cấu hình onboarding lên daemon."
+  },
+  "sidebar": {
+    "subsessions": {
+      "queued": "ĐANG CHỜ",
+      "running": "ĐANG CHẠY",
+      "paused": "TẠM DỪNG",
+      "interrupted": "GIÁN ĐOẠN"
+    }
   }
 }
