@@ -161,7 +161,8 @@ export function useWorkbenchProjectsAndSessions() {
           });
           setProjects(mappedProjs);
 
-          const targetProjId = mappedProjs[0].id;
+          const targetProj = mappedProjs.find((p) => p.id === DEFAULT_FLOW_PROJECT_ID) || mappedProjs[0];
+          const targetProjId = targetProj.id;
           const sessList = await apiHarnessDaemon.listSessions(targetProjId);
           if (Array.isArray(sessList) && sessList.length > 0 && !isCancelled) {
             const mappedSess: ChatSession[] = sessList.map((s) => ({

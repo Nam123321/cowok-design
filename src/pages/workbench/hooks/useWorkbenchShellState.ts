@@ -24,9 +24,18 @@ function seedVirginDefaultGraph(
   resolvedProjectId: string,
   store: ReturnType<typeof createNewFlowWorkbenchStore>
 ): void {
+  const isDefaultProj = resolvedProjectId === DEFAULT_FLOW_PROJECT_ID;
+  const genId = () =>
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `node-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+  const nodeIdMap = new Map<string, string>();
   for (const n of DEFAULT_INITIAL_NODES) {
+    const actualNodeId = isDefaultProj ? n.id : genId();
+    nodeIdMap.set(n.id, actualNodeId);
     store.addNode({
-      id: n.id,
+      id: actualNodeId,
       screenKey: n.screenKey,
       title: n.title,
       routePath: n.routePath,
@@ -37,10 +46,13 @@ function seedVirginDefaultGraph(
     });
   }
   for (const t of DEFAULT_INITIAL_TRANSITIONS) {
+    const actualEdgeId = isDefaultProj ? t.id : genId();
+    const sourceNodeId = nodeIdMap.get(t.sourceNodeId) || t.sourceNodeId;
+    const targetNodeId = nodeIdMap.get(t.targetNodeId) || t.targetNodeId;
     store.addTransition({
-      id: t.id,
-      sourceNodeId: t.sourceNodeId,
-      targetNodeId: t.targetNodeId,
+      id: actualEdgeId,
+      sourceNodeId,
+      targetNodeId,
       triggerEvent: t.triggerEvent,
       edgeType: t.edgeType,
       conditionLabel: t.conditionLabel,
