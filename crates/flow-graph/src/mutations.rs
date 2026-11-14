@@ -7,7 +7,8 @@ use uuid::Uuid;
 
 use crate::cycle_detection::normalize_coord;
 use crate::models::{
-    CreateFlowNodeInput, FlowNodeDto, FlowServiceError, UpdateFlowNodeInput, MAX_FIXTURE_JSON_BYTES,
+    normalize_fixture_ref, normalize_viewport_preset, CreateFlowNodeInput, FlowNodeDto,
+    FlowServiceError, UpdateFlowNodeInput, MAX_FIXTURE_JSON_BYTES,
 };
 use crate::queries::{
     ensure_project_and_graph, load_node_by_id_in_tx, validate_node_payload, validate_node_type,
@@ -34,6 +35,8 @@ pub(crate) fn insert_node_in_tx(
     };
     let pos_x = normalize_coord(input.pos_x, "posX")?;
     let pos_y = normalize_coord(input.pos_y, "posY")?;
+    let fixture_ref = normalize_fixture_ref(&input.fixture_ref)?;
+    let viewport_preset = normalize_viewport_preset(&input.viewport_preset)?;
     tx.execute(
         "INSERT INTO flow_nodes ( \
             id, graph_id, tenant_id, project_id, portal_id, screen_key, title, node_type, \
@@ -43,8 +46,8 @@ pub(crate) fn insert_node_in_tx(
         params![
             node_id, graph_id, tenant_id, project_id, input.portal_id.trim(),
             input.screen_key.trim(), input.title.trim(), input.node_type.trim(),
-            input.route_path.trim(), input.component_entry_path.trim(), input.fixture_ref.trim(),
-            input.fixture_json, input.note, input.viewport_preset.trim(), pos_x, pos_y, now_ms
+            input.route_path.trim(), input.component_entry_path.trim(), fixture_ref,
+            input.fixture_json, input.note, viewport_preset, pos_x, pos_y, now_ms
         ],
     )
     .map_err(|e| FlowServiceError::from_harness(map_sqlite_error(e, "insert_flow_node")))?;
@@ -184,6 +187,18 @@ fn apply_semantic_patch(
             "fixtureJson exceeds 32KB",
         ));
     }
+    let fixture_ref = normalize_fixture_ref(
+        input
+            .fixture_ref
+            .as_deref()
+            .unwrap_or(&existing.fixture_ref),
+    )?;
+    let viewport_preset = normalize_viewport_preset(
+        input
+            .viewport_preset
+            .as_deref()
+            .unwrap_or(&existing.viewport_preset),
+    )?;
     let px = normalize_coord(input.pos_x.unwrap_or(existing.pos_x), "posX")?;
     let py = normalize_coord(input.pos_y.unwrap_or(existing.pos_y), "posY")?;
     tx.execute(
@@ -209,18 +224,10 @@ fn apply_semantic_patch(
                 .as_deref()
                 .unwrap_or(&existing.component_entry_path)
                 .trim(),
-            input
-                .fixture_ref
-                .as_deref()
-                .unwrap_or(&existing.fixture_ref)
-                .trim(),
+            fixture_ref,
             fixture_json,
             input.note.as_deref().unwrap_or(&existing.note),
-            input
-                .viewport_preset
-                .as_deref()
-                .unwrap_or(&existing.viewport_preset)
-                .trim(),
+            viewport_preset,
             px,
             py,
             now_ms,

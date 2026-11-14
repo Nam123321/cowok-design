@@ -4,8 +4,9 @@ import { Readable } from "node:stream";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it, vi } from "vitest";
 import { logger } from "../../src/lib/logger";
-import { issueBffLoopbackSession } from "../../src/lib/api-guard";
-import { handleBootstrapSession } from "../../src/lib/vite-bff-plugin";
+import { issueBffLoopbackSession, setBoundBffPort } from "../../src/lib/api-guard";
+import { ensureRunningDaemon } from "../../src/lib/daemon-client";
+import { handleBootstrapSession, issueBootCapToken, revokeBootCapToken } from "../../src/lib/vite-bff-plugin";
 import { matchBffRoute } from "../../src/lib/vite-bff-routes";
 import { HarnessDaemonApiError, HarnessDaemonClient } from "../../src/api/harness-daemon";
 
@@ -85,7 +86,7 @@ describe("Epic 01 Hardening: Logger, BFF Routing & Typed HarnessDaemon SDK", () 
     }
   });
 
-  it("blocks admin role escalation & malformed JSON on /api/auth/local-session while issuing viewer/editor tokens", async () => {
+  it("blocks admin escalation, unverified editor minting, cross-port origin, and malformed JSON while issuing verified tokens", async () => {
     const badJson = makeMockIncomingMessage({ body: "{not-json" });
     const badRes = makeMockServerResponse();
     await handleBootstrapSession(badJson, badRes.res);
@@ -98,14 +99,77 @@ describe("Epic 01 Hardening: Logger, BFF Routing & Typed HarnessDaemon SDK", () 
     expect(adminRes.result().status).toBe(403);
     expect(JSON.parse(adminRes.result().body).code).toBe("INSUFFICIENT_ROLE");
 
-    const editorReq = makeMockIncomingMessage({ body: JSON.stringify({ role: "editor" }) });
-    const editorRes = makeMockServerResponse();
-    await handleBootstrapSession(editorReq, editorRes.res);
-    expect(editorRes.result().status).toBe(200);
-    const issued = JSON.parse(editorRes.result().body) as { sessionToken: string; role: string };
-    expect(issued.role).toBe("editor");
-    expect(typeof issued.sessionToken).toBe("string");
-    expect(issued.sessionToken.length).toBeGreaterThan(10);
+    const unverifiedEditorReq = makeMockIncomingMessage({ body: JSON.stringify({ role: "editor" }) });
+    const unverifiedEditorRes = makeMockServerResponse();
+    await handleBootstrapSession(unverifiedEditorReq, unverifiedEditorRes.res);
+    expect(unverifiedEditorRes.result().status).toBe(403);
+    expect(JSON.parse(unverifiedEditorRes.result().body).code).toBe("INSUFFICIENT_ROLE");
+
+    const viewerReq = makeMockIncomingMessage({ body: JSON.stringify({ role: "viewer" }) });
+    const viewerRes = makeMockServerResponse();
+    await handleBootstrapSession(viewerReq, viewerRes.res);
+    expect(viewerRes.result().status).toBe(200);
+    expect(JSON.parse(viewerRes.result().body).role).toBe("viewer");
+
+    const capToken = issueBootCapToken();
+    try {
+      const capEditorReq = makeMockIncomingMessage({
+        headers: { "x-cowok-boot-cap": capToken },
+        body: JSON.stringify({ role: "editor" }),
+      });
+      const capEditorRes = makeMockServerResponse();
+      await handleBootstrapSession(capEditorReq, capEditorRes.res);
+      expect(capEditorRes.result().status).toBe(200);
+      const issued = JSON.parse(capEditorRes.result().body) as { sessionToken: string; role: string };
+      expect(issued.role).toBe("editor");
+      expect(typeof issued.sessionToken).toBe("string");
+      expect(issued.sessionToken.length).toBeGreaterThan(10);
+    } finally {
+      revokeBootCapToken(capToken);
+    }
+
+    setBoundBffPort(5173);
+    try {
+      const sameOriginEditorReq = makeMockIncomingMessage({
+        headers: {
+          host: "127.0.0.1:5173",
+          origin: "http://127.0.0.1:5173",
+          "sec-fetch-site": "same-origin",
+        },
+        body: JSON.stringify({ role: "editor" }),
+      });
+      const sameOriginEditorRes = makeMockServerResponse();
+      await handleBootstrapSession(sameOriginEditorReq, sameOriginEditorRes.res);
+      expect(sameOriginEditorRes.result().status).toBe(200);
+      expect(JSON.parse(sameOriginEditorRes.result().body).role).toBe("editor");
+
+      const crossPortEditorReq = makeMockIncomingMessage({
+        headers: {
+          host: "127.0.0.1:5173",
+          origin: "http://127.0.0.1:9999",
+          "sec-fetch-site": "same-origin",
+        },
+        body: JSON.stringify({ role: "editor" }),
+      });
+      const crossPortEditorRes = makeMockServerResponse();
+      await handleBootstrapSession(crossPortEditorReq, crossPortEditorRes.res);
+      expect(crossPortEditorRes.result().status).toBe(403);
+      expect(JSON.parse(crossPortEditorRes.result().body).code).toBe("ORIGIN_REJECTED");
+    } finally {
+      setBoundBffPort(null);
+    }
+
+    const daemonLock = await ensureRunningDaemon();
+    if (daemonLock.daemon_nonce) {
+      const nonceReq = makeMockIncomingMessage({
+        headers: { "x-cowok-daemon-nonce": daemonLock.daemon_nonce },
+        body: JSON.stringify({ role: "editor" }),
+      });
+      const nonceRes = makeMockServerResponse();
+      await handleBootstrapSession(nonceReq, nonceRes.res);
+      expect(nonceRes.result().status).toBe(200);
+      expect(JSON.parse(nonceRes.result().body).role).toBe("editor");
+    }
   });
 
   it("requires authenticated strict-loopback session on matched proposals/snapshots/specs BFF routes", async () => {
@@ -219,5 +283,88 @@ describe("Epic 01 Hardening: Logger, BFF Routing & Typed HarnessDaemon SDK", () 
     expect(zipBytes.length).toBeGreaterThan(22);
     expect(zipBytes[0]).toBe(0x50); // 'P'
     expect(zipBytes[1]).toBe(0x4b); // 'K'
+  });
+
+  it("preserves JSON request bodies end-to-end on mutating proxyRoute endpoints", async () => {
+    const projectId = crypto.randomUUID();
+    const { sessionToken } = issueBffLoopbackSession({
+      tenantId: "local-default",
+      userId: "proxy-body-e2e",
+      role: "editor",
+    });
+
+    const invokeBff = async (method: string, pathname: string, body?: unknown) => {
+      const matched = matchBffRoute(method, pathname);
+      expect(matched).not.toBeNull();
+      const req = new Request(`http://127.0.0.1:5173${pathname}`, {
+        method,
+        headers: {
+          Host: "127.0.0.1:5173",
+          "Content-Type": "application/json",
+          "X-Cowok-Session-Token": sessionToken,
+        },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+      return matched!.handler(req, { params: matched!.params });
+    };
+
+    const createRes = await invokeBff("POST", "/api/projects", {
+      id: projectId,
+      slug: `proxy-body-${Date.now()}`,
+      name: "Proxy Body Preservation Project",
+      product_brief: "Verifies mutating BFF proxy routes preserve JSON bodies.",
+    });
+    expect(createRes.status).toBe(201);
+
+    const agentRes = await invokeBff("PUT", "/api/agent-settings", {
+      projectId,
+      providerId: "anthropic",
+      modelId: "claude-sonnet-4-5",
+      endpointUrl: "https://api.anthropic.com",
+      credentialRef: "env:ANTHROPIC_API_KEY",
+      isDefault: true,
+      status: "configured",
+    });
+    expect(agentRes.status).toBe(200);
+    const agentBody = (await agentRes.json()) as { providerId: string; modelId: string };
+    expect(agentBody.providerId).toBe("anthropic");
+    expect(agentBody.modelId).toBe("claude-sonnet-4-5");
+
+    const mcpRes = await invokeBff("POST", "/api/mcp-servers", {
+      projectId,
+      serverSlug: `playwright-${Date.now()}`,
+      displayName: "Playwright MCP",
+      transportKind: "stdio",
+      commandOrUrl: "npx @playwright/mcp@latest",
+      permissionTier: "read_only",
+      enabled: true,
+    });
+    expect([200, 201]).toContain(mcpRes.status);
+    const mcpBody = (await mcpRes.json()) as { displayName: string; commandOrUrl: string };
+    expect(mcpBody.displayName).toBe("Playwright MCP");
+    expect(mcpBody.commandOrUrl).toBe("npx @playwright/mcp@latest");
+
+    const verifyRes = await invokeBff("POST", "/api/doctor/verify-key", {
+      providerId: "anthropic",
+      apiKey: "sk-ant-test-12345678901234567890",
+      endpointUrl: "",
+    });
+    expect(verifyRes.status).toBe(200);
+    const verifyBody = (await verifyRes.json()) as { providerId: string; valid: boolean };
+    expect(verifyBody.providerId).toBe("anthropic");
+    expect(verifyBody.valid).toBe(true);
+
+    const jobEventRes = await invokeBff("POST", `/api/projects/${projectId}/flow/jobs/events`, {
+      jobId: `job-${Date.now()}`,
+      nodeId: "node-login",
+      eventKind: "STEP_COMPLETED",
+      payloadText: "Login screen synthesized",
+      jobStatus: "RUNNING",
+    });
+    expect([200, 201]).toContain(jobEventRes.status);
+    const jobEventBody = (await jobEventRes.json()) as { nodeId: string; eventKind: string; payloadText: string };
+    expect(jobEventBody.nodeId).toBe("node-login");
+    expect(jobEventBody.eventKind).toBe("STEP_COMPLETED");
+    expect(jobEventBody.payloadText).toBe("Login screen synthesized");
   });
 });

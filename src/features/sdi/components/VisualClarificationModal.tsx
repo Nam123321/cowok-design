@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { ClarificationVariant } from "../../../lib/validations/sdi";
+import { useFormatter } from "../../../hooks/useFormatter";
+import { useTranslation } from "../../../hooks/useTranslation";
+import { AMBIGUITY_THRESHOLD, ClarificationVariant } from "../../../lib/validations/sdi";
 import { ClarificationCard } from "./ClarificationCard";
 
 interface VisualClarificationModalProps {
@@ -9,14 +11,18 @@ interface VisualClarificationModalProps {
   onClose: () => void;
 }
 
-const ModalHeader: React.FC = () => (
-  <div>
-    <h2 className="text-base font-bold text-foreground">Làm Rõ Ý Định Thiết Kế (Visual Clarification)</h2>
-    <p className="text-xs text-muted-foreground mt-1">
-      Yêu cầu có độ mơ hồ cao (&ge; 0.45). Vui lòng chọn 1 phương án định hướng trước khi sinh mã.
-    </p>
-  </div>
-);
+const ModalHeader: React.FC = () => {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatter();
+  return (
+    <div>
+      <h2 className="text-base font-bold text-foreground">{t("sdi.clarificationTitle", "Làm Rõ Ý Định Thiết Kế (Visual Clarification)")}</h2>
+      <p className="text-xs text-muted-foreground mt-1">
+        {t("sdi.clarificationDescPrefix", "Yêu cầu có độ mơ hồ cao (≥")} {formatNumber(AMBIGUITY_THRESHOLD)}{t("sdi.clarificationDescSuffix", "). Vui lòng chọn 1 phương án định hướng trước khi sinh mã.")}
+      </p>
+    </div>
+  );
+};
 
 interface ModalFooterProps {
   selectedId: string | null;
@@ -24,21 +30,24 @@ interface ModalFooterProps {
   onConfirm: () => void;
 }
 
-const ModalFooter: React.FC<ModalFooterProps> = ({ selectedId, onCancel, onConfirm }) => (
-  <div className="flex justify-end gap-2 pt-2 border-t border-border">
-    <button type="button" onClick={onCancel} className="px-3 py-1.5 text-xs rounded-md border border-border">
-      Hủy Bỏ
-    </button>
-    <button
-      type="button"
-      disabled={!selectedId}
-      onClick={onConfirm}
-      className="px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
-    >
-      Xác Nhận &amp; Tiếp Tục
-    </button>
-  </div>
-);
+const ModalFooter: React.FC<ModalFooterProps> = ({ selectedId, onCancel, onConfirm }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex justify-end gap-2 pt-2 border-t border-border">
+      <button type="button" onClick={onCancel} className="px-3 py-1.5 text-xs rounded-md border border-border">
+        {t("common.cancel", "Hủy Bỏ")}
+      </button>
+      <button
+        type="button"
+        disabled={!selectedId}
+        onClick={onConfirm}
+        className="px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+      >
+        {t("sdi.confirmContinueBtn", "Xác Nhận & Tiếp Tục")}
+      </button>
+    </div>
+  );
+};
 
 export const VisualClarificationModal: React.FC<VisualClarificationModalProps> = ({
   isOpen,

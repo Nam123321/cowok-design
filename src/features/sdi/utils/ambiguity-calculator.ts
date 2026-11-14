@@ -34,8 +34,8 @@ export function computeAmbiguityAndRisk(rawPrompt: string, targetNodeId?: string
     risk += HIGH_RISK_PENALTY;
   }
 
-  const boundedAmbiguity = Number(Math.min(MAX_SCORE, Math.max(MIN_SCORE, ambiguity)).toFixed(2));
-  const boundedRisk = Number(Math.min(MAX_SCORE, Math.max(MIN_SCORE, risk)).toFixed(2));
+  const boundedAmbiguity = Math.round(Math.min(MAX_SCORE, Math.max(MIN_SCORE, ambiguity)) * 100) / 100;
+  const boundedRisk = Math.round(Math.min(MAX_SCORE, Math.max(MIN_SCORE, risk)) * 100) / 100;
 
   return {
     ambiguityScore: boundedAmbiguity,

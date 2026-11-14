@@ -63,6 +63,18 @@ function seedVirginDefaultGraph(
   return store.syncDeployDraft(resolvedProjectId);
 }
 
+const inFlightSnapshotRequests = new Map<string, ReturnType<typeof apiFlowWorkbench.getSnapshot>>();
+
+function fetchSnapshotSingleflight(projectId: string) {
+  const existing = inFlightSnapshotRequests.get(projectId);
+  if (existing) return existing;
+  const request = apiFlowWorkbench.getSnapshot(projectId).finally(() => {
+    inFlightSnapshotRequests.delete(projectId);
+  });
+  inFlightSnapshotRequests.set(projectId, request);
+  return request;
+}
+
 function useRemoteProjectHydration(
   resolvedProjectId: string,
   store: ReturnType<typeof createNewFlowWorkbenchStore>
@@ -82,8 +94,7 @@ function useRemoteProjectHydration(
 
     let cancelled = false;
     setIsFlowHydrated(false);
-    void apiFlowWorkbench
-      .getSnapshot(resolvedProjectId)
+    void fetchSnapshotSingleflight(resolvedProjectId)
       .then(async (remoteSnap) => {
         if (cancelled) return;
         hydratedProjectRef.current = resolvedProjectId;

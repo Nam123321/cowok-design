@@ -9,7 +9,7 @@ export const AVAILABLE_CHAT_MODELS = [
   { id: "gemini-25", label: "Gemini 2.5 Pro" },
 ];
 
-interface AgentChatComposerProps {
+export interface AgentChatComposerProps {
   inputValue: string;
   onInputChange: (val: string) => void;
   onSend: () => void;
@@ -17,6 +17,9 @@ interface AgentChatComposerProps {
   onRemoveAttachmentChip?: (chip: string) => void;
   onAttachClick?: () => void;
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
+  placeholder?: string;
+  testIdPrefix?: string;
+  compact?: boolean;
 }
 
 const TEXTAREA_STYLE: React.CSSProperties = {
@@ -118,13 +121,17 @@ export const AgentChatComposer: React.FC<AgentChatComposerProps> = (props) => {
   }, [props.inputValue]);
 
   const isSendDisabled = !props.inputValue.trim() && props.attachmentChips.length === 0;
-  const placeholder = t("chat.composerPlaceholder", "Hỏi cowok Agent hoặc gõ lệnh... (Shift+Enter để xuống dòng, bôi đen chữ để Quote)");
+  const placeholder =
+    props.placeholder ||
+    t("chat.composerPlaceholder", "Hỏi cowok Agent hoặc gõ lệnh... (Shift+Enter để xuống dòng, bôi đen chữ để Quote)");
+  const prefix = props.testIdPrefix || "chat-composer";
+  const wrapperPadding = props.compact ? "6px 10px 10px 10px" : "8px 12px 12px 12px";
 
   return (
-    <div data-testid="chat-composer-wrapper" style={{ padding: "8px 12px 12px 12px", backgroundColor: "var(--bg-canvas)", borderTop: "none" }}>
+    <div data-testid={`${prefix}-wrapper`} style={{ padding: wrapperPadding, backgroundColor: "var(--bg-canvas)", borderTop: "none" }}>
       <div className="chat-composer-capsule" style={{ backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", padding: "8px 10px", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column", gap: "6px" }}>
         <AttachmentChipList chips={props.attachmentChips} onRemove={props.onRemoveAttachmentChip} />
-        <textarea ref={textareaRef} data-testid="chat-composer-textarea" value={props.inputValue} onChange={(e) => props.onInputChange(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); props.onSend(); } }} placeholder={placeholder} rows={1} style={TEXTAREA_STYLE} />
+        <textarea ref={textareaRef} data-testid={`${prefix}-textarea`} value={props.inputValue} onChange={(e) => props.onInputChange(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); props.onSend(); } }} placeholder={placeholder} rows={1} style={TEXTAREA_STYLE} />
         <ComposerFooterBar selectedModel={selectedModel} onSelectModel={setSelectedModel} isSendDisabled={isSendDisabled} onSend={props.onSend} onAttachClick={props.onAttachClick} onOpenSettings={props.onOpenSettings} />
       </div>
     </div>

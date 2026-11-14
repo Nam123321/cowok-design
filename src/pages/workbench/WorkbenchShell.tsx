@@ -103,6 +103,8 @@ const WorkbenchConnectedBody: React.FC<{
   );
 };
 
+const DAEMON_WARNING_Z_INDEX = 9998;
+
 export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
   projectId = DEFAULT_FLOW_PROJECT_ID,
   projectName = "cowok-design",
@@ -123,6 +125,7 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
     if (typeof window === "undefined") return false;
     return !window.localStorage.getItem("cowok_first_run_completed");
   });
+  const [daemonWarning, setDaemonWarning] = React.useState<string | null>(null);
 
   return (
     <div
@@ -141,6 +144,7 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
       />
       <OnboardingWizardModal
         isOpen={isOnboardingOpen}
+        onDaemonSyncWarning={(msg) => setDaemonWarning(msg)}
         onClose={() => {
           if (typeof window !== "undefined") {
             window.localStorage.setItem("cowok_first_run_completed", "true");
@@ -154,6 +158,39 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
           setIsOnboardingOpen(false);
         }}
       />
+      {daemonWarning && (
+        <div
+          role="alert"
+          data-testid="workbench-daemon-warning"
+          style={{
+            position: "fixed",
+            right: "16px",
+            bottom: "16px",
+            zIndex: DAEMON_WARNING_Z_INDEX,
+            maxWidth: "380px",
+            padding: "8px 12px",
+            borderRadius: "var(--radius-sm)",
+            backgroundColor: "var(--bg-elevated)",
+            border: "1px solid var(--state-warning)",
+            boxShadow: "var(--shadow-lg)",
+            color: "var(--state-warning)",
+            fontSize: "12px",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+          }}
+        >
+          <span>{daemonWarning}</span>
+          <button
+            type="button"
+            onClick={() => setDaemonWarning(null)}
+            aria-label={t("common.close", "Đóng")}
+            style={{ border: "none", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <WorkbenchSettingsDialog settings={settings} />
     </div>
   );

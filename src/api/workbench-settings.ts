@@ -21,7 +21,7 @@ import {
   VerifyProviderKeyResponse,
   VerifyProviderKeyResponseSchema,
 } from "../lib/validations/workbench-settings";
-import { HarnessDaemonTransport } from "./harness-daemon-transport";
+import { HarnessDaemonTransport, readBootCapHeaders } from "./harness-daemon-transport";
 
 export class WorkbenchSettingsClient extends HarnessDaemonTransport {
   listAgentSettings(): Promise<AgentSettingDto[]> {
@@ -113,7 +113,7 @@ export class WorkbenchSettingsClient extends HarnessDaemonTransport {
 async function bootstrapLocalEditorToken(signal?: AbortSignal): Promise<string> {
   const sessRes = await fetch("/api/auth/local-session", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...readBootCapHeaders() },
     body: JSON.stringify({ role: "editor" }),
     signal,
   });

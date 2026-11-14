@@ -2,6 +2,7 @@
 // @implements AC-04, AC-07, AC-08
 import React, { useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useFormatter } from "@/hooks/useFormatter";
 import { BrandIcon } from "@/components/ui/BrandIcon";
 import { WorkbenchNode, SemanticNodeType } from "../store/flow-workbench-store";
 import { PortType } from "../utils/dag-algorithms";
@@ -45,7 +46,7 @@ const MENU_ITEM_STYLE: React.CSSProperties = {
 
 const BASE_PORT_STYLE: React.CSSProperties = {
   position: "absolute", width: `${PORT_SIZE}px`, height: `${PORT_SIZE}px`, borderRadius: "50%",
-  border: "2px solid var(--bg-surface)", boxShadow: "0 0 4px rgba(0,0,0,0.2)", pointerEvents: "auto",
+  border: "2px solid var(--bg-surface)", boxShadow: "var(--shadow-port)", pointerEvents: "auto",
 };
 
 const NodeContextMenu: React.FC<{
@@ -80,7 +81,8 @@ export const DagNodeHeader: React.FC<{
   onDeleteNode?: (nodeId: string) => void;
   executionStatus?: { status: "running" | "queued" | "paused" | "completed" | "error" | "cancelled"; queuePosition?: number };
 }> = ({ node, isDraft, onStartRename, onCommentOnNode, onDuplicateNode, onDeleteNode, executionStatus }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
   const [menuOpen, setMenuOpen] = useState(false);
   const nodeType: SemanticNodeType = node.nodeType || "screen";
 
@@ -92,7 +94,7 @@ export const DagNodeHeader: React.FC<{
           {NODE_TYPE_LABELS[nodeType]}
         </span>
         {isDraft && (
-          <span className="dag-node-draft-badge" style={{ fontFamily: "var(--font-mono)", fontSize: "9px", fontWeight: 700, backgroundColor: "var(--bg-elevated)", color: "var(--text-primary)", border: "1px dashed var(--action-primary)", padding: "1px 5px", borderRadius: "var(--radius-xs)" }}>DRAFT</span>
+          <span className="dag-node-draft-badge" style={{ fontFamily: "var(--font-mono)", fontSize: "9px", fontWeight: 700, backgroundColor: "var(--bg-elevated)", color: "var(--text-primary)", border: "1px dashed var(--action-primary)", padding: "1px 5px", borderRadius: "var(--radius-xs)" }}>{t("flow.draftBadge", "DRAFT")}</span>
         )}
         {executionStatus?.status === "running" && (
           <span
@@ -100,7 +102,7 @@ export const DagNodeHeader: React.FC<{
             style={{
               fontSize: "9px",
               fontWeight: 700,
-              backgroundColor: "rgba(59, 130, 246, 0.18)",
+              backgroundColor: "var(--running-badge-bg)",
               color: "var(--action-primary)",
               border: "1px solid var(--action-primary)",
               padding: "1px 5px",
@@ -111,7 +113,7 @@ export const DagNodeHeader: React.FC<{
             }}
           >
             <span style={{ display: "inline-block", width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "currentColor" }} />
-            RUNNING
+            {t("flow.runningBadge", "RUNNING")}
           </span>
         )}
         {executionStatus?.status === "queued" && (
@@ -120,14 +122,14 @@ export const DagNodeHeader: React.FC<{
             style={{
               fontSize: "9px",
               fontWeight: 600,
-              backgroundColor: "rgba(245, 158, 11, 0.15)",
-              color: "#f59e0b",
-              border: "1px solid rgba(245, 158, 11, 0.4)",
+              backgroundColor: "var(--state-warning-soft)",
+              color: "var(--state-warning)",
+              border: "1px solid var(--state-warning)",
               padding: "1px 5px",
               borderRadius: "var(--radius-xs)",
             }}
           >
-            QUEUED #{executionStatus.queuePosition ?? 1}
+            {`${t("flow.queuedBadgePrefix", "QUEUED #")}${formatNumber(executionStatus.queuePosition ?? 1)}`}
           </span>
         )}
       </div>
@@ -137,7 +139,7 @@ export const DagNodeHeader: React.FC<{
             <BrandIcon name="message-square" size={ICON_COMMENT_SIZE} color="currentColor" />
           </button>
         )}
-        <button type="button" className="dag-node-menu-trigger" aria-label={`Menu ngữ cảnh ${node.screenKey}`} onClick={(e) => { e.stopPropagation(); setMenuOpen((prev) => !prev); }} style={{ border: "none", background: "transparent", cursor: "pointer", padding: "2px 4px", fontSize: "11px", fontWeight: 700, color: "var(--text-muted)" }}>
+        <button type="button" className="dag-node-menu-trigger" aria-label={`${t("flow.nodeContextMenu", "Menu ngữ cảnh")} ${node.screenKey}`} onClick={(e) => { e.stopPropagation(); setMenuOpen((prev) => !prev); }} style={{ border: "none", background: "transparent", cursor: "pointer", padding: "2px 4px", fontSize: "11px", fontWeight: 700, color: "var(--text-muted)" }}>
           ...
         </button>
         {menuOpen && <NodeContextMenu nodeId={node.id} onStartRename={onStartRename} onDuplicateNode={onDuplicateNode} onDeleteNode={onDeleteNode} onClose={() => setMenuOpen(false)} />}
@@ -151,10 +153,13 @@ export const DagNodePorts: React.FC<{
   nodeWidth: number;
   nodeHeight: number;
   onPortMouseDown: (args: PortMouseDownArgs) => void;
-}> = ({ node, nodeWidth, nodeHeight, onPortMouseDown }) => (
-  <>
-    <div className="port-in" title="Cổng vào (Input)" style={{ ...BASE_PORT_STYLE, left: `-${PORT_HALF_SIZE}px`, top: "50%", transform: "translateY(-50%)", backgroundColor: "var(--human-accent)" }} />
-    <div className="port-out-main" title="Cổng ra nhánh chính (Kéo để nối dây)" onMouseDown={(e) => onPortMouseDown({ e, nodeId: node.id, portType: "out-main", startX: node.posX + nodeWidth, startY: node.posY + nodeHeight / 2 })} style={{ ...BASE_PORT_STYLE, right: `-${PORT_HALF_SIZE}px`, top: "50%", transform: "translateY(-50%)", backgroundColor: "var(--action-primary)", cursor: "crosshair" }} />
-    <div className="port-out-branch" title="Cổng ra rẽ nhánh / Fallback (Kéo để nối dây)" onMouseDown={(e) => onPortMouseDown({ e, nodeId: node.id, portType: "out-branch", startX: node.posX + nodeWidth / 2, startY: node.posY + nodeHeight })} style={{ ...BASE_PORT_STYLE, left: "50%", bottom: `-${PORT_HALF_SIZE}px`, transform: "translateX(-50%)", backgroundColor: "var(--agent-accent)", cursor: "crosshair" }} />
-  </>
-);
+}> = ({ node, nodeWidth, nodeHeight, onPortMouseDown }) => {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className="port-in" title={t("flow.portInputTitle", "Cổng vào (Input)")} style={{ ...BASE_PORT_STYLE, left: `-${PORT_HALF_SIZE}px`, top: "50%", transform: "translateY(-50%)", backgroundColor: "var(--human-accent)" }} />
+      <div className="port-out-main" title={t("flow.portOutMainTitle", "Cổng ra nhánh chính (Kéo để nối dây)")} onMouseDown={(e) => onPortMouseDown({ e, nodeId: node.id, portType: "out-main", startX: node.posX + nodeWidth, startY: node.posY + nodeHeight / 2 })} style={{ ...BASE_PORT_STYLE, right: `-${PORT_HALF_SIZE}px`, top: "50%", transform: "translateY(-50%)", backgroundColor: "var(--action-primary)", cursor: "crosshair" }} />
+      <div className="port-out-branch" title={t("flow.portOutBranchTitle", "Cổng ra rẽ nhánh / Fallback (Kéo để nối dây)")} onMouseDown={(e) => onPortMouseDown({ e, nodeId: node.id, portType: "out-branch", startX: node.posX + nodeWidth / 2, startY: node.posY + nodeHeight })} style={{ ...BASE_PORT_STYLE, left: "50%", bottom: `-${PORT_HALF_SIZE}px`, transform: "translateX(-50%)", backgroundColor: "var(--agent-accent)", cursor: "crosshair" }} />
+    </>
+  );
+};

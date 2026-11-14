@@ -1,6 +1,7 @@
 // @story 04.1
 import { useCallback, useEffect, useState } from "react";
-import { getGlobalLocale, setGlobalLocale } from "../../../hooks/useTranslation";
+import { getGlobalLocale, setGlobalLocale, useTranslation } from "../../../hooks/useTranslation";
+import { useFormatter } from "../../../hooks/useFormatter";
 import type { ThemeMode } from "../components/WorkbenchTopNav";
 import { DEFAULT_FLOW_PROJECT_ID, DEFAULT_PROJECTS, DEFAULT_SESSIONS, type WorkbenchProject } from "../constants";
 import type { ChatSession, PersistedWorkbenchSettings } from "../types";
@@ -62,18 +63,27 @@ export function useWorkbenchSettings() {
   };
 }
 
-function buildNewProjectObjects(
-  projectName: string,
-  initialTitle: string,
-  provenance: "folder-backed" | "scratch",
-  localPath?: string
-): { newProj: WorkbenchProject; newSession: ChatSession } {
+interface NewProjectBuildInput {
+  projectName: string;
+  initialTitle: string;
+  provenance: "folder-backed" | "scratch";
+  justNowText: string;
+  localPath?: string;
+}
+
+function buildNewProjectObjects({
+  projectName,
+  initialTitle,
+  provenance,
+  justNowText,
+  localPath,
+}: NewProjectBuildInput): { newProj: WorkbenchProject; newSession: ChatSession } {
   const newProjId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : DEFAULT_FLOW_PROJECT_ID;
   const slug = projectName.toLowerCase().replace(/\s+/g, "-");
   const resolvedPath = localPath || (provenance === "folder-backed" ? `./projects/${slug}` : `~/.cowok-design/projects/${slug}`);
   return {
     newProj: { id: newProjId, name: projectName, isExpanded: true, provenance, localPath: resolvedPath },
-    newSession: { id: `session-${Date.now()}`, title: initialTitle, projectId: newProjId, updatedAt: "Vừa xong" },
+    newSession: { id: `session-${Date.now()}`, title: initialTitle, projectId: newProjId, updatedAt: justNowText },
   };
 }
 
@@ -135,55 +145,84 @@ function useSessionCrudActions(
   return { handleTogglePinSession, handleRenameSession, handleDeleteSession, handleRenameProject, handleDeleteProject, handleLinkProjectFolder };
 }
 
+type SettledProjectSessions = PromiseSettledResult<{
+  projId: string;
+  sessList: { id: string; title: string; project_id?: string | null; updated_at?: number | null }[];
+}>;
+
+function collectFetchedProjectSessions(
+  settled: SettledProjectSessions[],
+  formatTime: (v: number) => string
+) {
+  const fetchedByProject = new Map<string, ChatSession[]>();
+  const allFetchedSessions: ChatSession[] = [];
+  const seenIds = new Set<string>();
+
+  for (const item of settled) {
+    if (item.status !== "fulfilled" || !Array.isArray(item.value.sessList) || item.value.sessList.length === 0) {
+      continue;
+    }
+    const mappedForProj: ChatSession[] = item.value.sessList.map((s) => ({
+      id: s.id,
+      title: s.title,
+      projectId: s.project_id || item.value.projId,
+      updatedAt: formatTime(s.updated_at || Date.now()),
+    }));
+    fetchedByProject.set(item.value.projId, mappedForProj);
+    for (const sess of mappedForProj) {
+      if (seenIds.has(sess.id)) continue;
+      seenIds.add(sess.id);
+      allFetchedSessions.push(sess);
+    }
+  }
+
+  return { fetchedByProject, allFetchedSessions, seenIds };
+}
+
 export function useWorkbenchProjectsAndSessions() {
+  const { t, locale } = useTranslation();
+  const { formatTime } = useFormatter({ locale });
+  const justNowText = t("workbench.justNow", "Vừa xong");
   const [projects, setProjects] = useState<WorkbenchProject[]>(DEFAULT_PROJECTS);
   const [sessions, setSessions] = useState<ChatSession[]>(DEFAULT_SESSIONS);
   const [activeSessionId, setActiveSessionId] = useState("session-2");
   const [activeProjectId, setActiveProjectId] = useState(DEFAULT_FLOW_PROJECT_ID);
   const [isNewConvoModalOpen, setIsNewConvoModalOpen] = useState(false);
 
+  async function runHydrateProjectsAndSessions(isCancelled: () => boolean) {
+    try {
+      const list = await apiHarnessDaemon.listProjects();
+      if (!Array.isArray(list) || list.length === 0 || isCancelled()) return;
+      const mappedProjs: WorkbenchProject[] = list.map((p) => {
+        const isScratchRoot = !p.workspace_root || p.workspace_root.includes("/.cowok-design/projects/");
+        return { id: p.id, name: p.name, isExpanded: true, provenance: isScratchRoot ? "scratch" : "folder-backed", localPath: p.workspace_root || `./projects/${p.slug || p.id}` };
+      });
+      setProjects(mappedProjs);
+      const targetProjId = (mappedProjs.find((p) => p.id === DEFAULT_FLOW_PROJECT_ID) || mappedProjs[0]).id;
+      const settled = await Promise.allSettled(mappedProjs.map(async (proj) => ({ projId: proj.id, sessList: await apiHarnessDaemon.listSessions(proj.id) })));
+      if (isCancelled()) return;
+      const { fetchedByProject, allFetchedSessions, seenIds } = collectFetchedProjectSessions(settled, formatTime);
+      if (allFetchedSessions.length === 0) return;
+      setSessions((prev) => {
+        const preserved = prev.filter((existing) => (!existing.projectId || !fetchedByProject.has(existing.projectId)) && !seenIds.has(existing.id));
+        return [...allFetchedSessions, ...preserved];
+      });
+      const targetSessions = fetchedByProject.get(targetProjId) || allFetchedSessions;
+      setActiveSessionId(targetSessions[0].id);
+      setActiveProjectId(targetProjId);
+    } catch {
+      // Fallback to static defaults
+    }
+  }
+
   // F5 Recovery: Hydrate projects and sessions from SQLite via loopback BFF
   useEffect(() => {
-    let isCancelled = false;
-    async function hydrateProjectsAndSessions() {
-      try {
-        const list = await apiHarnessDaemon.listProjects();
-        if (Array.isArray(list) && list.length > 0 && !isCancelled) {
-          const mappedProjs: WorkbenchProject[] = list.map((p) => {
-            const isScratchRoot = !p.workspace_root || p.workspace_root.includes("/.cowok-design/projects/");
-            return {
-              id: p.id,
-              name: p.name,
-              isExpanded: true,
-              provenance: isScratchRoot ? "scratch" : "folder-backed",
-              localPath: p.workspace_root || `./projects/${p.slug || p.id}`,
-            };
-          });
-          setProjects(mappedProjs);
-
-          const targetProj = mappedProjs.find((p) => p.id === DEFAULT_FLOW_PROJECT_ID) || mappedProjs[0];
-          const targetProjId = targetProj.id;
-          const sessList = await apiHarnessDaemon.listSessions(targetProjId);
-          if (Array.isArray(sessList) && sessList.length > 0 && !isCancelled) {
-            const mappedSess: ChatSession[] = sessList.map((s) => ({
-              id: s.id,
-              title: s.title,
-              projectId: s.project_id || targetProjId,
-              updatedAt: new Date(s.updated_at || Date.now()).toLocaleTimeString(),
-            }));
-            setSessions(mappedSess);
-            setActiveSessionId(mappedSess[0].id);
-            setActiveProjectId(targetProjId);
-          }
-        }
-      } catch {
-        // Fallback to static defaults
-      }
-    }
-    hydrateProjectsAndSessions();
+    let cancelled = false;
+    runHydrateProjectsAndSessions(() => cancelled);
     return () => {
-      isCancelled = true;
+      cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleProjectFolder = useCallback((id: string) => {
@@ -192,16 +231,16 @@ export function useWorkbenchProjectsAndSessions() {
 
   const handleCreateInProject = useCallback((targetProjectId: string, title: string) => {
     const sId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `session-${Date.now()}`;
-    const s: ChatSession = { id: sId, title, projectId: targetProjectId, updatedAt: "Vừa xong" };
+    const s: ChatSession = { id: sId, title, projectId: targetProjectId, updatedAt: justNowText };
     setSessions((prev) => [s, ...prev]);
     setActiveSessionId(s.id);
     setActiveProjectId(targetProjectId);
 
     apiHarnessDaemon.createSession(targetProjectId, { id: sId, title }).catch(() => undefined);
-  }, []);
+  }, [justNowText]);
 
   const handleCreateNewProject = useCallback((name: string, title: string, provenance: "folder-backed" | "scratch" = "folder-backed", localPath?: string) => {
-    const { newProj, newSession } = buildNewProjectObjects(name, title, provenance, localPath);
+    const { newProj, newSession } = buildNewProjectObjects({ projectName: name, initialTitle: title, provenance, justNowText, localPath });
     setProjects((prev) => [...prev, newProj]);
     setSessions((prev) => [newSession, ...prev]);
     setActiveSessionId(newSession.id);
@@ -221,13 +260,13 @@ export function useWorkbenchProjectsAndSessions() {
           .catch(() => undefined)
       )
       .catch(() => undefined);
-  }, []);
+  }, [justNowText]);
 
   const handleCreateStandalone = useCallback((title: string) => {
-    const s: ChatSession = { id: `session-${Date.now()}`, title, projectId: undefined, updatedAt: "Vừa xong" };
+    const s: ChatSession = { id: `session-${Date.now()}`, title, projectId: undefined, updatedAt: justNowText };
     setSessions((prev) => [s, ...prev]);
     setActiveSessionId(s.id);
-  }, []);
+  }, [justNowText]);
 
   const crud = useSessionCrudActions(activeSessionId, setActiveSessionId, setSessions, setProjects);
 

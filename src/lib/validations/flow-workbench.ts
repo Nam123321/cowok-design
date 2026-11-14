@@ -1,6 +1,15 @@
 // @story 04.1
 // @implements AC-03, AC-04, AC-05, AC-06, AC-07, AC-08
 import { z } from "zod";
+import {
+  FixtureRefSchema,
+  ViewportPresetSchema,
+  type FixtureRef,
+  type ViewportPreset,
+} from "./screen-fixture";
+
+export { FixtureRefSchema, ViewportPresetSchema };
+export type { FixtureRef, ViewportPreset };
 
 export const SemanticNodeTypeSchema = z.enum(["screen", "modal", "condition", "action"]);
 export type SemanticNodeType = z.infer<typeof SemanticNodeTypeSchema>;
@@ -8,7 +17,6 @@ export type SemanticNodeType = z.infer<typeof SemanticNodeTypeSchema>;
 export const EdgeFlowTypeSchema = z.enum(["main", "if_else", "if_not"]);
 export type EdgeFlowType = z.infer<typeof EdgeFlowTypeSchema>;
 
-export const ViewportPresetSchema = z.enum(["desktop-1440", "tablet-768", "mobile-390"]);
 export const TriggerEventSchema = z.enum(["onClick", "onSubmit", "onNavigate", "onTimeout", "custom"]);
 
 const FiniteCoordSchema = z
@@ -33,7 +41,7 @@ export const CreateFlowNodeSchema = z.object({
   nodeType: SemanticNodeTypeSchema.default("screen"),
   routePath: z.string().min(1).max(255).default("/"),
   componentEntryPath: z.string().max(500).default(""),
-  fixtureRef: z.string().max(120).default("Default"),
+  fixtureRef: FixtureRefSchema.default("DEFAULT"),
   fixtureJson: BoundedFixtureJsonSchema.default("{}"),
   note: z.string().max(4000).default(""),
   viewportPreset: ViewportPresetSchema.default("desktop-1440"),
@@ -50,7 +58,7 @@ export const UpdateFlowNodeSchema = z
     nodeType: SemanticNodeTypeSchema.optional(),
     routePath: z.string().min(1).max(255).optional(),
     componentEntryPath: z.string().max(500).optional(),
-    fixtureRef: z.string().max(120).optional(),
+    fixtureRef: FixtureRefSchema.optional(),
     fixtureJson: BoundedFixtureJsonSchema.optional(),
     note: z.string().max(4000).optional(),
     viewportPreset: ViewportPresetSchema.optional(),
@@ -76,10 +84,10 @@ export const FlowNodeResponseSchema = z.object({
   nodeType: SemanticNodeTypeSchema.default("screen"),
   routePath: z.string(),
   componentEntryPath: z.string(),
-  fixtureRef: z.string(),
+  fixtureRef: FixtureRefSchema.default("DEFAULT"),
   fixtureJson: z.string(),
   note: z.string().default(""),
-  viewportPreset: z.string(),
+  viewportPreset: ViewportPresetSchema.default("desktop-1440"),
   posX: FiniteCoordSchema,
   posY: FiniteCoordSchema,
   version: z.number().int().min(1).default(1),
@@ -225,6 +233,8 @@ export type IframeToHostMessage = z.infer<typeof IframeToHostMessageSchema>;
 export const CreateFlowNodePayloadSchema = CreateFlowNodeSchema;
 export const CreateFlowTransitionPayloadSchema = CreateFlowTransitionSchema;
 export const DeployFlowDraftPayloadSchema = DeployDraftSchema;
+export const BatchUpdateNodePositionsPayloadSchema = BatchUpdateNodePositionsSchema;
+export const FlowGraphSnapshotDTOSchema = FlowGraphSnapshotSchema;
 export const FlowNodeResponseDTOSchema = FlowNodeResponseSchema;
 export const FlowTransitionResponseDTOSchema = FlowTransitionResponseSchema;
 export const UpdateFlowNodePayloadSchema = UpdateFlowNodeSchema;

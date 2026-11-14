@@ -47,7 +47,12 @@ test.describe("Story 04.1: Unified DualMainPanel Workbench, Rust SQLite WAL SSOT
     expect(draftBorderLeft).toBe("3px");
 
     await page.getByTestId("deploy-draft-btn").click();
-    await expect(draftBar).toBeHidden({ timeout: 15000 });
+    await expect(page.getByTestId("orphan-deploy-confirm-bar")).toBeVisible({ timeout: 5000 });
+    await page.getByTestId("confirm-orphan-deploy-btn").click();
+    await expect(page.getByTestId("deploy-draft-btn")).toBeHidden({ timeout: 15000 });
+    await expect(draftBar.locator(".dag-draft-badge")).toBeHidden({ timeout: 15000 });
+    // Newly deployed standalone node is an orphan until linked; non-blocking warning remains visible
+    await expect(page.getByTestId("dag-draft-orphan-warning")).toBeVisible();
 
     // Reload browser page and verify newly deployed node persists from Rust SQLite WAL!
     await page.reload({ waitUntil: "networkidle" });

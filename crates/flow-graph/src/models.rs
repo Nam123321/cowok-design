@@ -256,6 +256,43 @@ impl FlowServiceError {
     }
 }
 
+pub fn normalize_fixture_ref(raw: &str) -> Result<String, FlowServiceError> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok("DEFAULT".to_string());
+    }
+    match trimmed.to_ascii_uppercase().as_str() {
+        "DEFAULT" => Ok("DEFAULT".to_string()),
+        "LOADING" => Ok("LOADING".to_string()),
+        "EMPTY" => Ok("EMPTY".to_string()),
+        "ERROR" => Ok("ERROR".to_string()),
+        other => Err(FlowServiceError::new(
+            400,
+            "VALIDATION_ERROR",
+            format!("Invalid fixtureRef '{other}' (expected DEFAULT|LOADING|EMPTY|ERROR)"),
+        )),
+    }
+}
+
+pub fn normalize_viewport_preset(raw: &str) -> Result<String, FlowServiceError> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok("desktop-1440".to_string());
+    }
+    match trimmed.to_ascii_lowercase().as_str() {
+        "desktop" | "desktop-1440" => Ok("desktop-1440".to_string()),
+        "tablet" | "tablet-768" => Ok("tablet-768".to_string()),
+        "mobile" | "mobile-390" => Ok("mobile-390".to_string()),
+        other => Err(FlowServiceError::new(
+            400,
+            "VALIDATION_ERROR",
+            format!(
+                "Invalid viewportPreset '{other}' (expected desktop-1440|tablet-768|mobile-390)"
+            ),
+        )),
+    }
+}
+
 fn default_portal() -> String {
     "default".to_string()
 }
@@ -266,7 +303,7 @@ fn default_route_path() -> String {
     "/".to_string()
 }
 fn default_fixture_ref() -> String {
-    "Default".to_string()
+    "DEFAULT".to_string()
 }
 fn default_fixture_json() -> String {
     "{}".to_string()

@@ -35,61 +35,67 @@ const SlideListItemCard: React.FC<{
   slide: SlidePhaseItem;
   isCurrent: boolean;
   onSelect: () => void;
-}> = ({ slide, isCurrent, onSelect }) => (
-  <div
-    role="button"
-    onClick={onSelect}
-    style={{
-      padding: "10px 12px",
-      borderRadius: "var(--radius-sm)",
-      backgroundColor: "var(--bg-surface)",
-      border: isCurrent ? "1.5px solid var(--action-primary)" : "1px solid var(--border-default)",
-      cursor: "pointer",
-      display: "flex",
-      flexDirection: "column",
-      gap: "4px",
-      boxShadow: isCurrent ? "var(--shadow-sm)" : "none",
-    }}
-  >
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--human-accent)" }}>
-        {slide.code}
-      </span>
-      <span style={{ fontSize: "10px", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-        <span>Sửa nội dung</span>
-        <BrandIcon name="edit" size={ICON_SIZE_XS} color="currentColor" />
-      </span>
+}> = ({ slide, isCurrent, onSelect }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      role="button"
+      onClick={onSelect}
+      style={{
+        padding: "10px 12px",
+        borderRadius: "var(--radius-sm)",
+        backgroundColor: "var(--bg-surface)",
+        border: isCurrent ? "1.5px solid var(--action-primary)" : "1px solid var(--border-default)",
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: "column",
+        gap: "4px",
+        boxShadow: isCurrent ? "var(--shadow-sm)" : "none",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--human-accent)" }}>
+          {slide.code}
+        </span>
+        <span style={{ fontSize: "10px", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+          <span>{t("canvas.editSlideContent", "Sửa nội dung")}</span>
+          <BrandIcon name="edit" size={ICON_SIZE_XS} color="currentColor" />
+        </span>
+      </div>
+      <div style={{ fontSize: "12.5px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--text-primary)" }}>{slide.title}</div>
+      <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{slide.subtitle}</div>
     </div>
-    <div style={{ fontSize: "12.5px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--text-primary)" }}>{slide.title}</div>
-    <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>{slide.subtitle}</div>
-  </div>
-);
+  );
+};
 
 const SlideCmsDrawerEditor: React.FC<{
   activeSlide: SlidePhaseItem;
   onCloseDrawer: () => void;
   onUpdateSlide: (patch: Partial<SlidePhaseItem>) => void;
-}> = ({ activeSlide, onCloseDrawer, onUpdateSlide }) => (
-  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <button type="button" onClick={onCloseDrawer} className="cowok-btn cowok-btn-secondary" style={{ height: "24px", padding: "0 8px", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
-        <BrandIcon name="arrow-left" size={ICON_SIZE_MD} color="currentColor" />
-        <span>Danh sách Slide</span>
-      </button>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: "10.5px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--human-accent)" }}>
-        {activeSlide.code} • Zero-Code CMS
-      </span>
+}> = ({ activeSlide, onCloseDrawer, onUpdateSlide }) => {
+  const { t } = useTranslation();
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <button type="button" onClick={onCloseDrawer} className="cowok-btn cowok-btn-secondary" style={{ height: "24px", padding: "0 8px", fontSize: "11px", display: "inline-flex", alignItems: "center", gap: "4px", cursor: "pointer" }}>
+          <BrandIcon name="arrow-left" size={ICON_SIZE_MD} color="currentColor" />
+          <span>{t("canvas.slideListBack", "Danh sách Slide")}</span>
+        </button>
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: "10.5px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--human-accent)" }}>
+          {activeSlide.code} • {t("canvas.zeroCodeCms", "Zero-Code CMS")}
+        </span>
+      </div>
+      <div style={{ padding: "10px", borderRadius: "var(--radius-sm)", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", display: "flex", flexDirection: "column", gap: "6px" }}>
+        <label style={{ fontSize: "10.5px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--text-muted)" }}>{t("canvas.slideHeadlineLabel", "Headline")}</label>
+        <input type="text" value={activeSlide.headline} onChange={(e) => onUpdateSlide({ headline: e.target.value })} style={{ width: "100%", padding: "6px 8px", fontSize: "12px", borderRadius: "4px", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", boxSizing: "border-box" }} />
+      </div>
+      <div style={{ padding: "10px", borderRadius: "var(--radius-sm)", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", display: "flex", flexDirection: "column", gap: "6px" }}>
+        <label style={{ fontSize: "10.5px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--text-muted)" }}>{t("canvas.slideSubtitleLabel", "Key Takeaway / Subtitle")}</label>
+        <textarea rows={TEXTAREA_ROWS} value={activeSlide.subtitle} onChange={(e) => onUpdateSlide({ subtitle: e.target.value })} style={{ width: "100%", padding: "6px 8px", fontSize: "12px", borderRadius: "4px", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", boxSizing: "border-box", resize: "vertical" }} />
+      </div>
     </div>
-    <div style={{ padding: "10px", borderRadius: "var(--radius-sm)", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", display: "flex", flexDirection: "column", gap: "6px" }}>
-      <label style={{ fontSize: "10.5px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--text-muted)" }}>Headline</label>
-      <input type="text" value={activeSlide.headline} onChange={(e) => onUpdateSlide({ headline: e.target.value })} style={{ width: "100%", padding: "6px 8px", fontSize: "12px", borderRadius: "4px", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", boxSizing: "border-box" }} />
-    </div>
-    <div style={{ padding: "10px", borderRadius: "var(--radius-sm)", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", display: "flex", flexDirection: "column", gap: "6px" }}>
-      <label style={{ fontSize: "10.5px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--text-muted)" }}>Key Takeaway / Subtitle</label>
-      <textarea rows={TEXTAREA_ROWS} value={activeSlide.subtitle} onChange={(e) => onUpdateSlide({ subtitle: e.target.value })} style={{ width: "100%", padding: "6px 8px", fontSize: "12px", borderRadius: "4px", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", boxSizing: "border-box", resize: "vertical" }} />
-    </div>
-  </div>
-);
+  );
+};
 
 const StructurePaneHeader: React.FC<{
   structureLens: "userflow" | "slide-cms";
@@ -135,6 +141,7 @@ export const CompanionStructureLeftPane: React.FC<{
   onSetLens: (lens: "userflow" | "slide-cms") => void;
   onToggleRightPreviewHidden: () => void;
   isDraftDirty: boolean;
+  orphanCount?: number;
   conflictState?: ConflictState | null;
   onDeployDraft?: () => void;
   onDiscardDraft?: () => void;
@@ -173,6 +180,7 @@ export const CompanionStructureLeftPane: React.FC<{
       />
       <DraftDeployBanner
         isDraftDirty={props.isDraftDirty}
+        orphanCount={props.orphanCount}
         conflictState={props.conflictState}
         onDeployDraft={props.onDeployDraft}
         onDiscardDraft={props.onDiscardDraft}

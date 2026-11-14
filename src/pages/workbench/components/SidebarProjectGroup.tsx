@@ -138,6 +138,26 @@ const SingleProjectFolderBlock: React.FC<{
   );
 };
 
+const ProjectFilterPopover: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const { t } = useTranslation();
+  return (
+    <div style={{ position: "absolute", top: "26px", right: "6px", width: "200px", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-strong)", borderRadius: "var(--radius-sm)", boxShadow: "var(--shadow-md)", padding: "6px", zIndex: 40, fontSize: "11.5px", color: "var(--text-primary)" }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ padding: "5px 8px", display: "flex", justifyContent: "space-between" }}>
+        <span>{t("workbench.groupByLabel", "Group By")}</span>
+        <span style={{ color: "var(--text-muted)" }}>{t("workbench.groupByProject", "Project ›")}</span>
+      </div>
+      <div style={{ padding: "5px 8px", display: "flex", justifyContent: "space-between" }}>
+        <span>{t("workbench.sortConversationsLabel", "Sort Conversations")}</span>
+        <span style={{ color: "var(--text-muted)" }}>{t("workbench.sortLastUpdated", "Last Updated ›")}</span>
+      </div>
+      <div style={{ height: "1px", backgroundColor: "var(--border-subtle)", margin: "4px 0" }} />
+      <div role="button" onClick={onClose} style={{ padding: "5px 8px", cursor: "pointer", color: "var(--action-primary)", fontWeight: 500 }}>
+        {t("workbench.markAllRead", "Mark All as Read")}
+      </div>
+    </div>
+  );
+};
+
 export const SidebarProjectGroup: React.FC<SidebarProjectGroupProps> = (p) => {
   const { t } = useTranslation();
   const [isGroupOpen, setIsGroupOpen] = useState(true);
@@ -161,14 +181,7 @@ export const SidebarProjectGroup: React.FC<SidebarProjectGroupProps> = (p) => {
           </button>
         </div>
       </div>
-      {isFilterOpen && (
-        <div style={{ position: "absolute", top: "26px", right: "6px", width: "200px", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-strong)", borderRadius: "var(--radius-sm)", boxShadow: "var(--shadow-md)", padding: "6px", zIndex: 40, fontSize: "11.5px", color: "var(--text-primary)" }} onClick={(e) => e.stopPropagation()}>
-          <div style={{ padding: "5px 8px", display: "flex", justifyContent: "space-between" }}><span>Group By</span><span style={{ color: "var(--text-muted)" }}>Project ›</span></div>
-          <div style={{ padding: "5px 8px", display: "flex", justifyContent: "space-between" }}><span>Sort Conversations</span><span style={{ color: "var(--text-muted)" }}>Last Updated ›</span></div>
-          <div style={{ height: "1px", backgroundColor: "var(--border-subtle)", margin: "4px 0" }} />
-          <div role="button" onClick={() => setIsFilterOpen(false)} style={{ padding: "5px 8px", cursor: "pointer", color: "var(--action-primary)", fontWeight: 500 }}>Mark All as Read</div>
-        </div>
-      )}
+      {isFilterOpen && <ProjectFilterPopover onClose={() => setIsFilterOpen(false)} />}
       {isGroupOpen && (
         <div style={{ marginTop: "2px" }}>
           {p.projects.map((proj) => (

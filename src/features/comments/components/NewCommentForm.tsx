@@ -1,10 +1,12 @@
 import React, { useState } from "react";
+import { useTranslation } from "../../../hooks/useTranslation";
 
 interface NewCommentFormProps {
   onAddComment?: (content: string, elementFfId: string) => void;
 }
 
 export const NewCommentForm: React.FC<NewCommentFormProps> = ({ onAddComment }) => {
+  const { t } = useTranslation();
   const [newContent, setNewContent] = useState("");
   const [selectedFfId, setSelectedFfId] = useState("ff-btn-submit");
 
@@ -29,7 +31,7 @@ export const NewCommentForm: React.FC<NewCommentFormProps> = ({ onAddComment }) 
     >
       <input
         type="text"
-        placeholder="Ghim bình luận tại data-ff-id..."
+        placeholder={t("comments.pinPlaceholder", "Ghim bình luận tại data-ff-id...")}
         value={newContent}
         onChange={(e) => setNewContent(e.target.value)}
         style={{
@@ -76,7 +78,7 @@ export const NewCommentForm: React.FC<NewCommentFormProps> = ({ onAddComment }) 
             transition: "opacity var(--duration-fast) var(--ease-standard)",
           }}
         >
-          Gửi
+          {t("common.send", "Gửi")}
         </button>
       </div>
     </form>

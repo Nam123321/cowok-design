@@ -114,7 +114,7 @@ export const NewConversationModal: React.FC<NewConversationModalProps> = (props)
       props.onCreateInProject(s.selectedProjectId, s.sessionTitle.trim() || t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới"));
     } else if (s.mode === "new-project") {
       const projName = s.newProjectName.trim() || t("workbench.defaultNewProjectName", "Dự án mới");
-      props.onCreateNewProject(projName, s.sessionTitle.trim() || `Khởi tạo ${projName}`, s.provenance, s.localFolderPath);
+      props.onCreateNewProject(projName, s.sessionTitle.trim() || `${t("workbench.initProjectPrefix", "Khởi tạo")} ${projName}`, s.provenance, s.localFolderPath);
     } else {
       props.onCreateStandalone(s.sessionTitle.trim() || t("workbench.defaultStandaloneTitle", "Hội thoại độc lập"));
     }
@@ -122,7 +122,7 @@ export const NewConversationModal: React.FC<NewConversationModalProps> = (props)
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="new-convo-title" style={{ position: "fixed", inset: 0, backgroundColor: "rgba(8, 14, 26, 0.65)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px" }} onClick={(e) => { if (e.target === e.currentTarget) props.onClose(); }}>
+    <div role="dialog" aria-modal="true" aria-labelledby="new-convo-title" style={{ position: "fixed", inset: 0, backgroundColor: "var(--bg-overlay)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px" }} onClick={(e) => { if (e.target === e.currentTarget) props.onClose(); }}>
       <div style={{ width: "100%", maxWidth: "520px", backgroundColor: "var(--bg-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--border-default)", boxShadow: "var(--shadow-lg)", overflow: "hidden", display: "flex", flexDirection: "column", fontFamily: "var(--font-sans)" }}>
         <div style={{ padding: "13px 18px", borderBottom: "1px solid var(--border-default)", display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "var(--bg-workspace)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

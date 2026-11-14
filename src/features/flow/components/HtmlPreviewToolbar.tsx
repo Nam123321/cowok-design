@@ -3,14 +3,17 @@
 import React from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "../../../hooks/useTranslation";
+import { normalizeViewportPreset, type ViewportPreset } from "../../../lib/validations/screen-fixture";
 
 const ICON_SIZE_SM = 12;
 const ICON_SIZE_MD = 13;
 
-const VIEWPORT_LABELS: Record<"desktop" | "tablet" | "mobile", string> = {
-  desktop: "1440",
-  tablet: "768",
-  mobile: "390",
+type ToolbarViewportPreset = ViewportPreset | "desktop" | "tablet" | "mobile";
+
+const VIEWPORT_LABELS: Record<ViewportPreset, string> = {
+  "desktop-1440": "1440",
+  "tablet-768": "768",
+  "mobile-390": "390",
 };
 
 export interface HtmlPreviewToolbarProps {
@@ -20,8 +23,8 @@ export interface HtmlPreviewToolbarProps {
   onToggleInlineCode: () => void;
   allowDesignCdn: boolean;
   onToggleDesignCdn: () => void;
-  viewportPreset: "desktop" | "tablet" | "mobile";
-  onSetViewportPreset: (vp: "desktop" | "tablet" | "mobile") => void;
+  viewportPreset: ToolbarViewportPreset;
+  onSetViewportPreset: (vp: ViewportPreset) => void;
   aspectRatio: "auto" | "16-9" | "16-10";
   onSetAspectRatio: (ar: "auto" | "16-9" | "16-10") => void;
   isPresenting: boolean;
@@ -53,25 +56,29 @@ const PointerModeGroup: React.FC<{
 
 const ViewportRightControls: React.FC<HtmlPreviewToolbarProps> = (p) => {
   const { t } = useTranslation();
+  const activePreset = normalizeViewportPreset(p.viewportPreset);
   const expandTitle = p.isLeftStructureHidden
     ? t("canvas.restoreSplitView", "Thu gọn về chế độ Chia đôi (Hiện lại khung Cấu trúc)")
     : t("canvas.expandHtmlPane", "Mở rộng toàn khung Live HTML Preview (Thu gọn khung Cấu trúc)");
+  const presentTitle = p.isPresenting
+    ? t("canvas.exitPresent", "Thoát trình chiếu (Present)")
+    : t("canvas.presentButton", "Trình chiếu (Present)");
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
       <div style={{ display: "inline-flex", alignItems: "center", backgroundColor: "var(--bg-workspace)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-xs)", padding: "2px", gap: "2px" }}>
-        {(["desktop", "tablet", "mobile"] as const).map((vp) => (
-          <button key={vp} type="button" onClick={() => p.onSetViewportPreset(vp)} title={`Viewport: ${vp}`} style={{ height: "20px", padding: "0 6px", border: "none", borderRadius: "4px", fontSize: "10px", fontFamily: "var(--font-mono)", backgroundColor: p.viewportPreset === vp ? "var(--bg-selected)" : "transparent", color: p.viewportPreset === vp ? "var(--text-primary)" : "var(--text-muted)", fontWeight: p.viewportPreset === vp ? 600 : 400, cursor: "pointer" }}>
+        {(["desktop-1440", "tablet-768", "mobile-390"] as const).map((vp) => (
+          <button key={vp} type="button" onClick={() => p.onSetViewportPreset(vp)} title={`Viewport: ${vp}`} style={{ height: "20px", padding: "0 6px", border: "none", borderRadius: "4px", fontSize: "10px", fontFamily: "var(--font-mono)", backgroundColor: activePreset === vp ? "var(--bg-selected)" : "transparent", color: activePreset === vp ? "var(--text-primary)" : "var(--text-muted)", fontWeight: activePreset === vp ? 600 : 400, cursor: "pointer" }}>
             {VIEWPORT_LABELS[vp]}
           </button>
         ))}
       </div>
-      <select value={p.aspectRatio} onChange={(e) => p.onSetAspectRatio(e.target.value as "auto" | "16-9" | "16-10")} aria-label="Aspect Ratio" style={{ height: "24px", padding: "0 6px", fontSize: "10.5px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-secondary)", cursor: "pointer" }}>
-        <option value="auto">Auto Fit</option>
-        <option value="16-9">16:9 Deck</option>
-        <option value="16-10">16:10 Studio</option>
+      <select value={p.aspectRatio} onChange={(e) => p.onSetAspectRatio(e.target.value as "auto" | "16-9" | "16-10")} aria-label={t("canvas.aspectRatio", "Tỷ lệ khung hình")} style={{ height: "24px", padding: "0 6px", fontSize: "10.5px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-secondary)", cursor: "pointer" }}>
+        <option value="auto">{t("canvas.aspectAutoFit", "Auto Fit")}</option>
+        <option value="16-9">{t("canvas.aspectDeck169", "16:9 Deck")}</option>
+        <option value="16-10">{t("canvas.aspectStudio1610", "16:10 Studio")}</option>
       </select>
-      <button type="button" onClick={p.onTogglePresenting} className="cowok-btn cowok-btn-primary" style={{ height: "24px", padding: "0 9px", fontSize: "11px", fontWeight: 600, borderRadius: "var(--radius-xs)", backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)", cursor: "pointer" }}>
-        <span>{p.isPresenting ? t("canvas.exitPresent", "✕ Thoát") : t("canvas.presentButton", "▶ Present")}</span>
+      <button type="button" data-testid="toggle-present-btn" onClick={p.onTogglePresenting} title={presentTitle} aria-label={presentTitle} aria-pressed={p.isPresenting} className="cowok-btn cowok-btn-primary" style={{ width: "28px", height: "28px", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-xs)", backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)", cursor: "pointer" }}>
+        <BrandIcon name={p.isPresenting ? "close" : "play"} size={ICON_SIZE_SM} color="currentColor" />
       </button>
       <button type="button" onClick={p.onToggleLeftStructureHidden} title={expandTitle} aria-label={t("canvas.toggleStructurePane", "Thu gọn / Mở rộng khung Live HTML Preview")} className="cowok-btn cowok-btn-ghost" style={{ width: "28px", height: "28px", padding: 0, borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: p.isLeftStructureHidden ? "var(--bg-selected)" : "var(--bg-workspace)", color: p.isLeftStructureHidden ? "var(--text-primary)" : "var(--text-secondary)" }}>
         <BrandIcon name={p.isLeftStructureHidden ? "minimize" : "maximize"} size={ICON_SIZE_MD} color="currentColor" />

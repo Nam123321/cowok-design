@@ -2,6 +2,7 @@
 // @implements AC-03, AC-04, AC-06, AC-08
 import { apiFlowWorkbench, FlowApiError } from "../../../api/flow-workbench";
 import type { FlowGraphSnapshot } from "../../../lib/validations/flow-workbench";
+import { normalizeFixtureRef, normalizeViewportPreset } from "../../../lib/validations/screen-fixture";
 import { classifyThreeWayConflict, computeDraftDelta } from "./draft-delta";
 import { cloneStructuralSnapshot, createDefaultClusters } from "./flow-workbench-mutations";
 import { clearSessionDraft, generateDraftUuid } from "./session-recovery";
@@ -19,12 +20,12 @@ export function snapshotDtoToStructural(dto: FlowGraphSnapshot): StructuralSnaps
     screenKey: n.screenKey,
     title: n.title,
     nodeType: n.nodeType,
-    activeSubState: (n.fixtureRef as "Default" | "Loading" | "Empty" | "Error") || "Default",
-    fixtureRef: n.fixtureRef,
+    activeSubState: normalizeFixtureRef(n.fixtureRef),
+    fixtureRef: normalizeFixtureRef(n.fixtureRef),
     fixtureJson: n.fixtureJson,
     routePath: n.routePath,
     componentEntryPath: n.componentEntryPath,
-    viewportPreset: n.viewportPreset,
+    viewportPreset: normalizeViewportPreset(n.viewportPreset),
     posX: n.posX,
     posY: n.posY,
     version: n.version,

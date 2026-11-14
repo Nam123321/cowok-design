@@ -1,8 +1,10 @@
 // @story 04.1
 // @implements AC-04, AC-07, AC-08
 import React, { useState } from "react";
+import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "@/hooks/useTranslation";
 import { WorkbenchNode, NodeSubState } from "../store/flow-workbench-store";
+import { FIXTURE_VARIANTS, normalizeFixtureRef } from "../../../lib/validations/screen-fixture";
 import { DagNodeHeader, DagNodePorts, PortMouseDownArgs } from "./DagNodeHeaderAndPorts";
 
 export type { PortMouseDownArgs };
@@ -10,6 +12,7 @@ export type { PortMouseDownArgs };
 export interface DagNodeCardProps {
   node: WorkbenchNode;
   isSelected: boolean;
+  isOrphan?: boolean;
   onNodeMouseDown: (e: React.MouseEvent, node: WorkbenchNode) => void;
   onPortMouseDown: (args: PortMouseDownArgs) => void;
   onUpdateNote: (nodeId: string, note: string) => void;
@@ -26,8 +29,6 @@ export interface DagNodeCardProps {
   };
 }
 
-const SUB_STATES: NodeSubState[] = ["Default", "Loading", "Empty", "Error"];
-
 const getNodeBorder = (isSelected: boolean, isDraft: boolean): string => {
   if (isSelected) return "2px solid var(--action-primary)";
   if (isDraft) return "1.5px dashed var(--action-primary)";
@@ -38,18 +39,21 @@ const DagNodeSubStatePills: React.FC<{
   nodeId: string;
   activeSubState: NodeSubState;
   onSelectSubState?: (nodeId: string, subState: NodeSubState) => void;
-}> = ({ nodeId, activeSubState, onSelectSubState }) => (
-  <div className="dag-node-substate-switcher" style={{ display: "flex", gap: "3px", marginBottom: "6px", flexWrap: "wrap" }}>
-    {SUB_STATES.map((st) => {
-      const isActive = st === activeSubState;
-      return (
-        <button key={st} type="button" className={`dag-substate-pill ${isActive ? "active" : ""}`} onClick={(e) => { e.stopPropagation(); onSelectSubState?.(nodeId, st); }} style={{ fontSize: "9px", padding: "1px 5px", borderRadius: "var(--radius-xs)", border: isActive ? "1px solid var(--action-primary)" : "1px solid var(--border-subtle)", backgroundColor: isActive ? "var(--bg-selected)" : "transparent", color: isActive ? "var(--text-primary)" : "var(--text-muted)", cursor: "pointer" }}>
-          {st}
-        </button>
-      );
-    })}
-  </div>
-);
+}> = ({ nodeId, activeSubState, onSelectSubState }) => {
+  const normalizedActive = normalizeFixtureRef(activeSubState);
+  return (
+    <div className="dag-node-substate-switcher" style={{ display: "flex", gap: "3px", marginBottom: "6px", flexWrap: "wrap" }}>
+      {FIXTURE_VARIANTS.map(({ variant, label }) => {
+        const isActive = variant === normalizedActive;
+        return (
+          <button key={variant} type="button" className={`dag-substate-pill ${isActive ? "active" : ""}`} onClick={(e) => { e.stopPropagation(); onSelectSubState?.(nodeId, variant); }} style={{ fontSize: "9px", padding: "1px 5px", borderRadius: "var(--radius-xs)", border: isActive ? "1px solid var(--action-primary)" : "1px solid var(--border-subtle)", backgroundColor: isActive ? "var(--bg-selected)" : "transparent", color: isActive ? "var(--text-primary)" : "var(--text-muted)", cursor: "pointer" }}>
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
 
 const DagNodeTitleEditor: React.FC<{
   node: WorkbenchNode;
@@ -76,6 +80,7 @@ const DagNodeTitleEditor: React.FC<{
 
 const DagNodeBody: React.FC<{
   node: WorkbenchNode;
+  isOrphan?: boolean;
   isRenaming: boolean;
   renameDraft: string;
   onChangeRenameDraft: (val: string) => void;
@@ -85,18 +90,41 @@ const DagNodeBody: React.FC<{
   onUpdateNote: (nodeId: string, note: string) => void;
   onSelectSubState?: (nodeId: string, subState: NodeSubState) => void;
 }> = (p) => {
-  const activeSubState: NodeSubState = p.node.activeSubState || "Default";
-  const fixtureRef = p.node.fixtureRef || activeSubState;
+  const { t } = useTranslation();
+  const activeSubState: NodeSubState = normalizeFixtureRef(p.node.activeSubState);
+  const fixtureRef = normalizeFixtureRef(p.node.fixtureRef || activeSubState);
   return (
     <div style={{ padding: "8px 10px", flex: 1 }}>
       <DagNodeTitleEditor node={p.node} isRenaming={p.isRenaming} renameDraft={p.renameDraft} onChangeRenameDraft={p.onChangeRenameDraft} onCommitRename={p.onCommitRename} onCancelRename={p.onCancelRename} onStartRename={p.onStartRename} />
+      {p.isOrphan && (
+        <div
+          data-testid={`dag-node-orphan-badge-${p.node.id}`}
+          title={t("flow.orphanNodeTooltip", "ScreenState chưa được nối vào luồng (Orphan Node)")}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            fontSize: "9px",
+            fontWeight: 600,
+            padding: "1px 6px",
+            marginBottom: "4px",
+            borderRadius: "var(--radius-xs)",
+            backgroundColor: "var(--state-warning-soft)",
+            color: "var(--state-warning)",
+            border: "1px solid var(--state-warning)",
+          }}
+        >
+          <BrandIcon name="warning" size={10} color="currentColor" />
+          <span>{t("flow.orphanNodeLabel", "Cô lập")}</span>
+        </div>
+      )}
       {p.node.routePath && <div style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--text-muted)", marginBottom: "6px" }}>{p.node.routePath}</div>}
       <div className="dag-node-wireframe-preview" data-substate={activeSubState} style={{ border: "1px dashed var(--border-subtle)", borderRadius: "var(--radius-xs)", padding: "5px 6px", marginBottom: "6px", backgroundColor: "var(--bg-canvas)", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>
-        <span>Wireframe: {activeSubState}</span>
+        <span>{t("flow.wireframePrefix", "Wireframe")}: {activeSubState}</span>
         <span className="dag-node-contract-badge" style={{ color: "var(--human-accent)" }}>{fixtureRef}</span>
       </div>
       <DagNodeSubStatePills nodeId={p.node.id} activeSubState={activeSubState} onSelectSubState={p.onSelectSubState} />
-      <input type="text" placeholder="Thêm ghi chú..." value={p.node.note || ""} onChange={(e) => p.onUpdateNote(p.node.id, e.target.value)} onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} style={{ width: "100%", marginTop: "4px", fontSize: "10px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-xs)", padding: "2px 6px", backgroundColor: "var(--bg-canvas)", color: "var(--text-secondary)", boxSizing: "border-box" }} />
+      <input type="text" placeholder={t("flow.addNotePlaceholder", "Thêm ghi chú...")} value={p.node.note || ""} onChange={(e) => p.onUpdateNote(p.node.id, e.target.value)} onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} style={{ width: "100%", marginTop: "4px", fontSize: "10px", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-xs)", padding: "2px 6px", backgroundColor: "var(--bg-canvas)", color: "var(--text-secondary)", boxSizing: "border-box" }} />
     </div>
   );
 };
@@ -131,7 +159,7 @@ export const DagNodeCard: React.FC<DagNodeCardProps> = (props) => {
         onDeleteNode={props.onDeleteNode}
         executionStatus={props.executionStatus}
       />
-      <DagNodeBody node={props.node} isRenaming={isRenaming} renameDraft={renameDraft} onChangeRenameDraft={setRenameDraft} onCommitRename={commitRename} onCancelRename={() => setIsRenaming(false)} onStartRename={startRename} onUpdateNote={props.onUpdateNote} onSelectSubState={props.onSelectSubState} />
+      <DagNodeBody node={props.node} isOrphan={props.isOrphan} isRenaming={isRenaming} renameDraft={renameDraft} onChangeRenameDraft={setRenameDraft} onCommitRename={commitRename} onCancelRename={() => setIsRenaming(false)} onStartRename={startRename} onUpdateNote={props.onUpdateNote} onSelectSubState={props.onSelectSubState} />
       <DagNodePorts node={props.node} nodeWidth={props.nodeWidth} nodeHeight={props.nodeHeight} onPortMouseDown={props.onPortMouseDown} />
     </div>
   );

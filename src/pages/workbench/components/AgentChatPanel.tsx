@@ -1,6 +1,6 @@
 // @story 04.1
 // cowok-design — Canonical Agent Chat Panel (PD-02=A 40px Rail + Seamless 6-Line Rolling Composer)
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiSdiEngine } from "../../../api/sdi-engine";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useFormatter } from "../../../hooks/useFormatter";
@@ -12,6 +12,7 @@ export type { ChatMessage };
 
 export interface AgentChatPanelProps {
   projectId?: string;
+  activeSessionId?: string;
   isShortened: boolean;
   onToggleShorten: () => void;
   width: number;
@@ -21,15 +22,6 @@ export interface AgentChatPanelProps {
   onAttachClick?: () => void;
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
 }
-
-const DEFAULT_MESSAGES: ChatMessage[] = [
-  {
-    id: "msg-1",
-    sender: "agent",
-    text: "Chào bạn! Tôi là cowok Agent. Tôi đã sẵn sàng đồng hành cùng bạn xây dựng hệ thống thiết kế và luồng người dùng 2D DAG. Bạn có thể kéo thả đỉnh trên đồ thị, kết nối các màn hình hoặc bôi đen chữ để Quote nhanh vào khung nhập liệu.",
-    timestamp: "10:00",
-  },
-];
 
 const ChatCollapsedRail: React.FC<{ onToggleShorten: () => void }> = ({ onToggleShorten }) => {
   const { t } = useTranslation();
@@ -50,18 +42,71 @@ const ChatCollapsedRail: React.FC<{ onToggleShorten: () => void }> = ({ onToggle
   );
 };
 
+function buildCompiledIntentReply(
+  intent: {
+    intentType: string;
+    status: string;
+    ambiguityScore: number;
+    clarificationVariants?: Array<{ title: string }>;
+    targetScope: { screenKeys: string[] };
+  },
+  formatNumber: (n: number) => string,
+  t: (k: string, defVal?: string) => string
+): string {
+  const ambiguityPct = formatNumber(Math.round(intent.ambiguityScore * 100));
+  const variants = intent.clarificationVariants?.map((v) => v.title).join(" / ") || t("chat.selectOptionPrompt", "Vui lòng chọn phương án");
+  const scopeKeys = intent.targetScope.screenKeys.join(", ") || "project";
+  if (intent.status === "clarifying") {
+    return `${t("chat.clarifyPrefix", "Cần làm rõ yêu cầu")} (${intent.intentType}, ${t("chat.ambiguityLabel", "ambiguity")} ${ambiguityPct}%): ${variants}`;
+  }
+  return `${t("chat.compiledIntentPrefix", "Đã biên dịch intent")} ${intent.intentType} (${intent.status}) — ${t("chat.scopeLabel", "phạm vi")}: ${scopeKeys}.`;
+}
+
 function useAgentChatConversation(
   attachmentChips: string[],
   onSendMessage?: (text: string) => void,
-  projectId?: string
+  projectId?: string,
+  activeSessionId?: string
 ) {
-  const { formatTime } = useFormatter();
-  const [messages, setMessages] = useState<ChatMessage[]>(DEFAULT_MESSAGES);
-  const [inputValue, setInputValue] = useState("");
+  const { t, locale } = useTranslation();
+  const { formatTime, formatNumber } = useFormatter({ locale });
+  const sessionKey = activeSessionId || (projectId ? `project:${projectId}` : "default");
+  const initialGreeting: ChatMessage = useMemo(
+    () => ({
+      id: "msg-1",
+      sender: "agent",
+      text: t(
+        "chat.welcomeGreeting",
+        "Chào bạn! Tôi là cowok Agent. Tôi đã sẵn sàng đồng hành cùng bạn xây dựng hệ thống thiết kế và luồng người dùng 2D DAG. Bạn có thể kéo thả đỉnh trên đồ thị, kết nối các màn hình hoặc bôi đen chữ để Quote nhanh vào khung nhập liệu."
+      ),
+      timestamp: formatTime(new Date().setHours(10, 0, 0, 0)),
+    }),
+    [t, formatTime]
+  );
+  const [messagesBySession, setMessagesBySession] = useState<Record<string, ChatMessage[]>>({});
+  const [draftBySession, setDraftBySession] = useState<Record<string, string>>({});
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" }); }, [messages]);
+  const messages = useMemo(
+    () => messagesBySession[sessionKey] ?? [initialGreeting],
+    [messagesBySession, sessionKey, initialGreeting]
+  );
+  const inputValue = draftBySession[sessionKey] ?? "";
+  const setInputValue = (val: string) => {
+    setDraftBySession((prev) => ({ ...prev, [sessionKey]: val }));
+  };
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
+  }, [messages, sessionKey]);
+
+  const appendMessageToSession = (targetKey: string, msg: ChatMessage) => {
+    setMessagesBySession((prev) => {
+      const base = prev[targetKey] ?? [initialGreeting];
+      return { ...prev, [targetKey]: [...base, msg] };
+    });
+  };
 
   const handleScrollMessages = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -73,31 +118,33 @@ function useAgentChatConversation(
   };
   const handleSend = () => {
     if (!inputValue.trim() && attachmentChips.length === 0) return;
-    const sentPrompt = inputValue.trim() || attachmentChips.join(", ") || "Đính kèm";
+    const targetSessionKey = sessionKey;
+    const sentPrompt = inputValue.trim() || attachmentChips.join(", ") || t("chat.attachedFallback", "Đính kèm");
     const humanMsg: ChatMessage = { id: `msg-${Date.now()}`, sender: "human", text: inputValue || sentPrompt, timestamp: formatTime(new Date()) };
-    setMessages((prev) => [...prev, humanMsg]);
+    appendMessageToSession(targetSessionKey, humanMsg);
     onSendMessage?.(inputValue);
-    setInputValue("");
+    setDraftBySession((prev) => ({ ...prev, [targetSessionKey]: "" }));
 
     if (!projectId) return;
     void apiSdiEngine
       .compileIntent(projectId, { rawPrompt: sentPrompt })
       .then((intent) => {
-        const replyText =
-          intent.status === "clarifying"
-            ? `Cần làm rõ yêu cầu (${intent.intentType}, ambiguity ${Math.round(intent.ambiguityScore * 100)}%): ${intent.clarificationVariants?.map((v) => v.title).join(" / ") || "Vui lòng chọn phương án"}`
-            : `Đã biên dịch intent ${intent.intentType} (${intent.status}) cho phạm vi: ${intent.targetScope.screenKeys.join(", ") || "project"}.`;
-        setMessages((prev) => [
-          ...prev,
-          { id: `msg-agent-${intent.id}`, sender: "agent", text: replyText, timestamp: formatTime(new Date()) },
-        ]);
+        const replyText = buildCompiledIntentReply(intent, formatNumber, t);
+        appendMessageToSession(targetSessionKey, {
+          id: `msg-agent-${intent.id}`,
+          sender: "agent",
+          text: replyText,
+          timestamp: formatTime(new Date()),
+        });
       })
       .catch((err) => {
-        const errText = err instanceof Error ? err.message : "Không thể kết nối Rust daemon";
-        setMessages((prev) => [
-          ...prev,
-          { id: `msg-err-${Date.now()}`, sender: "agent", text: `Lỗi đồng bộ SDI daemon: ${errText}`, timestamp: formatTime(new Date()) },
-        ]);
+        const errText = err instanceof Error ? err.message : t("chat.daemonConnectError", "Không thể kết nối Rust daemon");
+        appendMessageToSession(targetSessionKey, {
+          id: `msg-err-${Date.now()}`,
+          sender: "agent",
+          text: `${t("chat.daemonSyncError", "Lỗi đồng bộ SDI daemon")}: ${errText}`,
+          timestamp: formatTime(new Date()),
+        });
       });
   };
 
@@ -106,7 +153,7 @@ function useAgentChatConversation(
 
 export const AgentChatPanel: React.FC<AgentChatPanelProps> = (props) => {
   const { t } = useTranslation();
-  const chat = useAgentChatConversation(props.attachmentChips || [], props.onSendMessage, props.projectId);
+  const chat = useAgentChatConversation(props.attachmentChips || [], props.onSendMessage, props.projectId, props.activeSessionId);
 
   if (props.isShortened) return <ChatCollapsedRail onToggleShorten={props.onToggleShorten} />;
   const shortenLabel = t("chat.shortenChat", "Thu gọn khung Chat");

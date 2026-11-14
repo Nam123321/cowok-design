@@ -12,7 +12,8 @@ use crate::edge_mutations::{
     update_transition_in_tx,
 };
 use crate::models::{
-    DeployFlowDraftInput, FlowGraphSnapshotDto, FlowServiceError, MAX_BATCH_EDGES, MAX_BATCH_NODES,
+    normalize_fixture_ref, normalize_viewport_preset, DeployFlowDraftInput, FlowGraphSnapshotDto,
+    FlowServiceError, MAX_BATCH_EDGES, MAX_BATCH_NODES,
 };
 use crate::mutations::{
     apply_node_patch_in_tx, batch_positions_in_tx, delete_node_in_tx, insert_node_in_tx,
@@ -36,19 +37,45 @@ pub fn compute_canonical_draft_sha256(
         n.node_type = n.node_type.trim().to_string();
         n.route_path = n.route_path.trim().to_string();
         n.component_entry_path = n.component_entry_path.trim().to_string();
-        n.fixture_ref = n.fixture_ref.trim().to_string();
-        n.viewport_preset = n.viewport_preset.trim().to_string();
+        n.fixture_ref = normalize_fixture_ref(&n.fixture_ref)?;
+        n.viewport_preset = normalize_viewport_preset(&n.viewport_preset)?;
         n.pos_x = normalize_coord(n.pos_x, "posX")?;
         n.pos_y = normalize_coord(n.pos_y, "posY")?;
     }
     for u in &mut normalized.updated_nodes {
         u.node_id = u.node_id.trim().to_string();
+        u.patch.portal_id = u.patch.portal_id.as_ref().map(|v| v.trim().to_string());
+        u.patch.title = u.patch.title.as_ref().map(|v| v.trim().to_string());
+        u.patch.node_type = u.patch.node_type.as_ref().map(|v| v.trim().to_string());
+        u.patch.route_path = u.patch.route_path.as_ref().map(|v| v.trim().to_string());
+        u.patch.component_entry_path = u
+            .patch
+            .component_entry_path
+            .as_ref()
+            .map(|v| v.trim().to_string());
+        if let Some(ref vp) = u.patch.viewport_preset {
+            u.patch.viewport_preset = Some(normalize_viewport_preset(vp)?);
+        }
+        if let Some(ref fr) = u.patch.fixture_ref {
+            u.patch.fixture_ref = Some(normalize_fixture_ref(fr)?);
+        }
         if let Some(px) = u.patch.pos_x {
             u.patch.pos_x = Some(normalize_coord(px, "posX")?);
         }
         if let Some(py) = u.patch.pos_y {
             u.patch.pos_y = Some(normalize_coord(py, "posY")?);
         }
+    }
+    for d in &mut normalized.deleted_nodes {
+        d.node_id = d.node_id.trim().to_string();
+    }
+    for e in &mut normalized.updated_transitions {
+        e.transition_id = e.transition_id.trim().to_string();
+        e.patch.flow_type = e.patch.flow_type.as_ref().map(|v| v.trim().to_string());
+        e.patch.trigger_event = e.patch.trigger_event.as_ref().map(|v| v.trim().to_string());
+    }
+    for d in &mut normalized.deleted_transitions {
+        d.transition_id = d.transition_id.trim().to_string();
     }
     for p in &mut normalized.updated_node_positions {
         p.node_id = p.node_id.trim().to_string();

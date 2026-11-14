@@ -1,6 +1,6 @@
 // @story-04.1
 // @implements AC-3
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   DEFAULT_TABS,
   INITIAL_SLIDES,
@@ -8,6 +8,7 @@ import {
   createCanvasTabByKind,
 } from "../components/companion-canvas-data";
 import type { CanvasTabItem } from "../components/CompanionCanvasTab";
+import type { ViewportPreset } from "../../../lib/validations/screen-fixture";
 
 export const DEFAULT_LEFT_PANE_PCT = 48;
 export const MIN_LEFT_PANE_PCT = 26;
@@ -81,7 +82,7 @@ export function useDualPaneViewportState(activeTab: CanvasTabItem) {
   const [isRightPreviewHidden, setIsRightPreviewHidden] = useState(false);
   const [pointerMode, setPointerMode] = useState<"interact" | "click-dom" | "drag-box">("interact");
   const [isInlineCodeOpen, setIsInlineCodeOpen] = useState(false);
-  const [viewportPreset, setViewportPreset] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [viewportPreset, setViewportPreset] = useState<ViewportPreset>("desktop-1440");
   const [aspectRatio, setAspectRatio] = useState<"auto" | "16-9" | "16-10">("auto");
   const [isPresenting, setIsPresenting] = useState(false);
   const [highlightedRegionId, setHighlightedRegionId] = useState<string>("sec-biometric");
@@ -89,6 +90,11 @@ export function useDualPaneViewportState(activeTab: CanvasTabItem) {
   const [activeSlideIndex, setActiveSlideIndex] = useState<number>(0);
   const [isCmsDrawerOpen, setIsCmsDrawerOpen] = useState<boolean>(false);
   const [inlineCodeText, setInlineCodeText] = useState<string>(DEFAULT_INLINE_CODE);
+  const [htmlCodeText, setHtmlCodeText] = useState<string>("");
+  const [customHtmlByTarget, setCustomHtmlByTarget] = useState<Record<string, string>>({});
+  const setCustomHtmlForTarget = useCallback((targetKey: string, html: string) => {
+    setCustomHtmlByTarget((prev) => ({ ...prev, [targetKey]: html }));
+  }, []);
 
   useEffect(() => {
     if (activeTab.format === "slide-cms" || activeTab.defaultLens === "slide-cms") {
@@ -109,5 +115,7 @@ export function useDualPaneViewportState(activeTab: CanvasTabItem) {
     highlightedRegionId, setHighlightedRegionId, slides, setSlides,
     activeSlideIndex, setActiveSlideIndex, isCmsDrawerOpen, setIsCmsDrawerOpen,
     inlineCodeText, setInlineCodeText,
+    htmlCodeText, setHtmlCodeText,
+    customHtmlByTarget, setCustomHtmlForTarget,
   };
 }

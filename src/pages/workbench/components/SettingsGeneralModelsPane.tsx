@@ -181,6 +181,7 @@ const ModelsByosSection: React.FC<
     () => localStorage.getItem("cowok_permission_level") || "auto_sandbox"
   );
   const [verifyStates, setVerifyStates] = useState<Record<string, VerifyState>>({});
+  const [daemonNotice, setDaemonNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -188,6 +189,7 @@ const ModelsByosSection: React.FC<
       .listAgentSettings()
       .then((rows) => {
         if (!active || rows.length === 0) return;
+        setDaemonNotice(null);
         const def = rows.find((r) => r.isDefault) || rows[0];
         if (def.credentialRef === "vault_0600" || def.credentialRef === "ram_only") {
           setStorageMode(def.credentialRef);
@@ -196,13 +198,17 @@ const ModelsByosSection: React.FC<
           setPermissionLevel(def.status);
         }
       })
-      .catch(() => {
-        // Fallback to localStorage state when daemon is offline
+      .catch((err) => {
+        if (!active) return;
+        const detail = err instanceof Error ? `: ${err.message}` : "";
+        setDaemonNotice(
+          `${t("settings.daemonSyncWarning", "Daemon offline — đang dùng cài đặt cục bộ")}${detail}`
+        );
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [t]);
 
   const persistAgentPrefs = (nextStorage: string, nextPerm: string, modelId: string, endpoint: string) => {
     void apiWorkbenchSettings
@@ -214,7 +220,15 @@ const ModelsByosSection: React.FC<
         status: nextPerm === "ask_risky" || nextPerm === "ask_all" ? nextPerm : "auto_sandbox",
         isDefault: true,
       })
-      .catch(() => {});
+      .then(() => {
+        setDaemonNotice(null);
+      })
+      .catch((err) => {
+        const detail = err instanceof Error ? `: ${err.message}` : "";
+        setDaemonNotice(
+          `${t("settings.saveDaemonWarning", "Không thể lưu cấu hình lên daemon (đã lưu cục bộ)")}${detail}`
+        );
+      });
   };
 
   const handleStorageModeChange = (mode: string) => {
@@ -229,7 +243,11 @@ const ModelsByosSection: React.FC<
     persistAgentPrefs(storageMode, level, p.defaultModel, p.byosEndpoint);
   };
 
-  const verifyEndpoint = async (provider: "gemini" | "claude" | "openai" | "byos", endpointOrKey: string) => {
+  const verifyEndpoint = async (
+    provider: "gemini" | "claude" | "openai" | "byos",
+    endpointOrKey: string,
+    optionalToken?: string
+  ) => {
     if (!endpointOrKey.trim()) {
       setVerifyStates((prev) => ({
         ...prev,
@@ -246,7 +264,7 @@ const ModelsByosSection: React.FC<
     try {
       const result = await apiWorkbenchSettings.verifyProviderKey({
         providerId: provider,
-        apiKey: endpointOrKey.trim(),
+        apiKey: provider === "byos" ? (optionalToken ?? "").trim() : endpointOrKey.trim(),
         endpointUrl: provider === "byos" ? endpointOrKey.trim() : "",
       });
       setVerifyStates((prev) => ({
@@ -276,6 +294,23 @@ const ModelsByosSection: React.FC<
         <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", lineHeight: "1.4" }}>
           {t("settings.modelsDesc", "Cấu hình API Key và quyền hạn thực thi an toàn với Live Verifier <3s")}
         </div>
+        {daemonNotice && (
+          <div
+            role="status"
+            data-testid="settings-models-daemon-notice"
+            style={{
+              padding: "6px 10px",
+              marginBottom: "8px",
+              borderRadius: "var(--radius-xs)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--state-warning)",
+              color: "var(--state-warning)",
+              fontSize: "11px",
+            }}
+          >
+            {daemonNotice}
+          </div>
+        )}
       </div>
 
       {/* Model Selection */}
@@ -302,12 +337,12 @@ const ModelsByosSection: React.FC<
             border: "1px solid var(--border-default)",
           }}
         >
-          <option value="cowok-swarm">Cowok Swarm · Multi-Agent High Fidelity (Antigravity 2.0)</option>
-          <option value="claude-37">Claude 3.7 Sonnet (Anthropic)</option>
-          <option value="gemini-25">Gemini 2.5 Pro (Google DeepMind)</option>
-          <option value="openai-gpt4o">GPT-4o / o3-mini (OpenAI)</option>
-          <option value="deepseek-r1">DeepSeek R1 Reasoning (Ollama / Local)</option>
-          <option value="byos-custom">Custom BYOS Endpoint</option>
+          <option value="cowok-swarm">{t("settings.modelOptionCowokSwarm", "Cowok Swarm · Multi-Agent High Fidelity (Antigravity 2.0)")}</option>
+          <option value="claude-37">{t("settings.modelOptionClaude37", "Claude 3.7 Sonnet (Anthropic)")}</option>
+          <option value="gemini-25">{t("settings.modelOptionGemini25", "Gemini 2.5 Pro (Google DeepMind)")}</option>
+          <option value="openai-gpt4o">{t("settings.modelOptionOpenAi4o", "GPT-4o / o3-mini (OpenAI)")}</option>
+          <option value="deepseek-r1">{t("settings.modelOptionDeepseekR1", "DeepSeek R1 Reasoning (Ollama / Local)")}</option>
+          <option value="byos-custom">{t("settings.modelOptionByos", "Custom BYOS Endpoint")}</option>
         </select>
       </div>
 
@@ -318,10 +353,10 @@ const ModelsByosSection: React.FC<
         </label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
           <button type="button" onClick={() => handleStorageModeChange("vault_0600")} style={choiceBtnStyle(storageMode === "vault_0600")}>
-            OS Keychain / Daemon 0600 Vault
+            {t("settings.vaultStorageOsKeychain", "OS Keychain / Daemon 0600 Vault")}
           </button>
           <button type="button" onClick={() => handleStorageModeChange("ram_only")} style={choiceBtnStyle(storageMode === "ram_only")}>
-            RAM Only (Chỉ giữ trong phiên)
+            {t("settings.vaultStorageRamOnly", "RAM Only (Chỉ giữ trong phiên)")}
           </button>
         </div>
       </div>
@@ -333,9 +368,9 @@ const ModelsByosSection: React.FC<
         </label>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
           {[
-            { id: "auto_sandbox", label: "Auto in Sandbox" },
-            { id: "ask_risky", label: "Ask Risky Only" },
-            { id: "ask_all", label: "Ask All" },
+            { id: "auto_sandbox", label: t("settings.permAutoSandbox", "Auto in Sandbox") },
+            { id: "ask_risky", label: t("settings.permAskRisky", "Ask Risky Only") },
+            { id: "ask_all", label: t("settings.permAskAll", "Ask All") },
           ].map((lvl) => (
             <button key={lvl.id} type="button" onClick={() => handlePermissionLevelChange(lvl.id)} style={choiceBtnStyle(permissionLevel === lvl.id)}>
               {lvl.label}
@@ -413,7 +448,8 @@ const ModelsByosSection: React.FC<
           </div>
           <button
             type="button"
-            onClick={() => void verifyEndpoint("byos", p.byosEndpoint)}
+            data-testid="verify-byos-btn"
+            onClick={() => void verifyEndpoint("byos", p.byosEndpoint, p.ephemeralApiKeys.byosToken)}
             style={{
               border: "none",
               background: "transparent",

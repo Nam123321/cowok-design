@@ -26,6 +26,7 @@ use crate::routes::{
 const MAX_SKEW_SECS: i64 = 30;
 const NONCE_LRU_CAPACITY: usize = 10_000;
 const SESSION_TTL_SECS: i64 = 28_800;
+const MAX_SESSIONS_CAPACITY: usize = 4_096;
 const MAX_BODY_BYTES: usize = 1_048_576;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -183,32 +184,129 @@ impl DaemonAuthState {
         order.push_back(nonce.to_string());
         true
     }
+
+    pub fn insert_session(&self, token: String, principal: FlowPrincipal, expires_at: i64) {
+        self.insert_session_with_capacity(token, principal, expires_at, MAX_SESSIONS_CAPACITY);
+    }
+
+    pub fn insert_session_with_capacity(
+        &self,
+        token: String,
+        principal: FlowPrincipal,
+        expires_at: i64,
+        max_capacity: usize,
+    ) {
+        let mut sessions = self.sessions.lock().expect("sessions");
+        let now = Utc::now().timestamp();
+        sessions.retain(|_, entry| entry.expires_at >= now);
+        while sessions.len() >= max_capacity.max(1) {
+            let Some(oldest_key) = sessions
+                .iter()
+                .min_by_key(|(_, entry)| entry.expires_at)
+                .map(|(k, _)| k.clone())
+            else {
+                break;
+            };
+            sessions.remove(&oldest_key);
+        }
+        sessions.insert(
+            token,
+            SessionEntry {
+                principal,
+                expires_at,
+            },
+        );
+    }
+
+    pub fn get_valid_session(&self, token: &str) -> Option<FlowPrincipal> {
+        let trimmed = token.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let mut sessions = self.sessions.lock().expect("sessions");
+        let now = Utc::now().timestamp();
+        match sessions.get(trimmed).cloned() {
+            Some(entry) if entry.expires_at >= now => Some(entry.principal),
+            Some(_) => {
+                sessions.remove(trimmed);
+                None
+            }
+            None => None,
+        }
+    }
+
+    pub fn active_session_count(&self) -> usize {
+        self.sessions.lock().expect("sessions").len()
+    }
+}
+
+pub fn is_allowed_loopback_host_with_port(host: &str, expected_port: Option<u16>) -> bool {
+    let h = host.trim().to_ascii_lowercase();
+    let (hostname, port_opt) = match h.split_once(':') {
+        Some((name, port_str)) => {
+            if port_str.is_empty() || !port_str.bytes().all(|b| b.is_ascii_digit()) {
+                return false;
+            }
+            let Ok(port) = port_str.parse::<u16>() else {
+                return false;
+            };
+            if port == 0 {
+                return false;
+            }
+            (name, Some(port))
+        }
+        None => (h.as_str(), None),
+    };
+    if hostname != "127.0.0.1" && hostname != "localhost" {
+        return false;
+    }
+    match expected_port {
+        Some(pinned) if pinned > 0 => port_opt == Some(pinned),
+        _ => true,
+    }
 }
 
 pub fn is_allowed_loopback_host(host: &str) -> bool {
-    let h = host.trim().to_ascii_lowercase();
-    h == "127.0.0.1"
-        || h == "localhost"
-        || h.strip_prefix("127.0.0.1:")
-            .is_some_and(|p| p.parse::<u16>().is_ok())
-        || h.strip_prefix("localhost:")
-            .is_some_and(|p| p.parse::<u16>().is_ok())
+    is_allowed_loopback_host_with_port(host, None)
+}
+
+fn extract_loopback_origin_host(origin: &str) -> Option<&str> {
+    let trimmed = origin.trim();
+    let after_scheme = trimmed
+        .strip_prefix("http://")
+        .or_else(|| trimmed.strip_prefix("https://"))?;
+    let host_part = after_scheme.strip_suffix('/').unwrap_or(after_scheme);
+    if is_allowed_loopback_host(host_part) {
+        Some(host_part)
+    } else {
+        None
+    }
 }
 
 fn verify_loopback_headers(
     headers: &HeaderMap,
+    expected_port: Option<u16>,
 ) -> Result<(), (StatusCode, &'static str, &'static str)> {
-    if let Some(h) = headers.get("host").and_then(|v| v.to_str().ok()) {
-        if !is_allowed_loopback_host(h) {
-            return Err((
-                StatusCode::FORBIDDEN,
-                "ORIGIN_REJECTED",
-                "Non-loopback Host rejected",
-            ));
-        }
+    let host = headers
+        .get("host")
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or((
+            StatusCode::FORBIDDEN,
+            "ORIGIN_REJECTED",
+            "Missing Host header",
+        ))?;
+    if !is_allowed_loopback_host_with_port(host, expected_port) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "ORIGIN_REJECTED",
+            "Non-loopback or cross-port Host rejected",
+        ));
     }
     if let Some(sfs) = headers.get("sec-fetch-site").and_then(|v| v.to_str().ok()) {
-        if sfs != "same-origin" && sfs != "none" {
+        let sfs_trimmed = sfs.trim();
+        if sfs_trimmed != "same-origin" && sfs_trimmed != "none" {
             return Err((
                 StatusCode::FORBIDDEN,
                 "ORIGIN_REJECTED",
@@ -217,10 +315,7 @@ fn verify_loopback_headers(
         }
     }
     if let Some(orig) = headers.get("origin").and_then(|v| v.to_str().ok()) {
-        let trimmed = orig
-            .trim_start_matches("http://")
-            .trim_start_matches("https://");
-        if !is_allowed_loopback_host(trimmed) {
+        if extract_loopback_origin_host(orig).is_none() {
             return Err((
                 StatusCode::FORBIDDEN,
                 "ORIGIN_REJECTED",
@@ -236,18 +331,8 @@ pub async fn handle_issue_local_session(
     headers: HeaderMap,
     body_opt: Option<Json<LocalSessionRequest>>,
 ) -> Result<Json<LocalSessionResponse>, Response> {
-    let has_loopback_host = headers
-        .get("host")
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(is_allowed_loopback_host);
-    if !has_loopback_host {
-        return Err(auth_err_resp(
-            StatusCode::FORBIDDEN,
-            "ORIGIN_REJECTED",
-            "Session bootstrap requires an explicit loopback Host header",
-        ));
-    }
-    if let Err((st, code, msg)) = verify_loopback_headers(&headers) {
+    let expected_port = (state.port > 0).then_some(state.port);
+    if let Err((st, code, msg)) = verify_loopback_headers(&headers, expected_port) {
         return Err(auth_err_resp(st, code, msg));
     }
     let req = body_opt.map(|Json(v)| v).unwrap_or_default();
@@ -300,17 +385,7 @@ pub async fn handle_issue_local_session(
     };
     let token = format!("cwk_sess_{}", generate_csprng_hex_32());
     let expires_at = Utc::now().timestamp() + SESSION_TTL_SECS;
-    state_auth(&state)
-        .sessions
-        .lock()
-        .expect("sessions")
-        .insert(
-            token.clone(),
-            SessionEntry {
-                principal: principal.clone(),
-                expires_at,
-            },
-        );
+    auth.insert_session(token.clone(), principal.clone(), expires_at);
     Ok(Json(LocalSessionResponse {
         session_token: token,
         tenant_id: principal.tenant_id,
@@ -325,7 +400,8 @@ pub async fn flow_dual_ingress_auth_middleware(
     req: Request,
     next: Next,
 ) -> Response {
-    if let Err((st, code, msg)) = verify_loopback_headers(req.headers()) {
+    let expected_port = (state.port > 0).then_some(state.port);
+    if let Err((st, code, msg)) = verify_loopback_headers(req.headers(), expected_port) {
         return auth_err_resp(st, code, msg);
     }
     let (parts, body) = req.into_parts();
@@ -350,15 +426,9 @@ pub async fn flow_dual_ingress_auth_middleware(
         .get("x-cowok-session-token")
         .and_then(|v| v.to_str().ok())
     {
-        let found = auth
-            .sessions
-            .lock()
-            .expect("sessions")
-            .get(tok.trim())
-            .cloned();
-        match found {
-            Some(entry) if entry.expires_at >= Utc::now().timestamp() => entry.principal,
-            _ => {
+        match auth.get_valid_session(tok) {
+            Some(principal) => principal,
+            None => {
                 return auth_err_resp(
                     StatusCode::UNAUTHORIZED,
                     "UNAUTHENTICATED",
@@ -529,8 +599,13 @@ pub(crate) fn is_valid_superadmin_bearer(headers: &HeaderMap) -> bool {
     }
 }
 
-pub async fn cors_and_loopback_middleware(req: Request, next: Next) -> Response {
-    if let Err((st, code, msg)) = verify_loopback_headers(req.headers()) {
+pub async fn cors_and_loopback_middleware(
+    State(state): State<DaemonAppState>,
+    req: Request,
+    next: Next,
+) -> Response {
+    let expected_port = (state.port > 0).then_some(state.port);
+    if let Err((st, code, msg)) = verify_loopback_headers(req.headers(), expected_port) {
         return auth_err_resp(st, code, msg);
     }
     let origin_hdr = req
@@ -553,10 +628,7 @@ pub async fn cors_and_loopback_middleware(req: Request, next: Next) -> Response 
 fn attach_loopback_cors_headers(headers: &mut HeaderMap, origin: Option<&str>) {
     headers.insert(header::VARY, HeaderValue::from_static("Origin"));
     if let Some(orig) = origin {
-        let host_part = orig
-            .trim_start_matches("http://")
-            .trim_start_matches("https://");
-        if is_allowed_loopback_host(host_part) {
+        if extract_loopback_origin_host(orig).is_some() {
             if let Ok(val) = HeaderValue::from_str(orig) {
                 headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, val);
                 headers.insert(
@@ -579,7 +651,8 @@ pub async fn legacy_project_auth_middleware(
     req: Request,
     next: Next,
 ) -> Response {
-    if let Err((st, code, msg)) = verify_loopback_headers(req.headers()) {
+    let expected_port = (state.port > 0).then_some(state.port);
+    if let Err((st, code, msg)) = verify_loopback_headers(req.headers(), expected_port) {
         return auth_err_resp(st, code, msg);
     }
     let (parts, body) = req.into_parts();
@@ -609,21 +682,13 @@ pub async fn legacy_project_auth_middleware(
         .get("x-cowok-session-token")
         .and_then(|v| v.to_str().ok())
     {
-        let found = auth
-            .sessions
-            .lock()
-            .expect("sessions")
-            .get(tok.trim())
-            .cloned();
-        match found {
-            Some(entry) if entry.expires_at >= Utc::now().timestamp() => {
-                Some(VerifiedLegacyIngress {
-                    principal: entry.principal,
-                    kind: LegacyAuthKind::SessionToken,
-                    bearer_token: None,
-                })
-            }
-            _ => {
+        match auth.get_valid_session(tok) {
+            Some(principal) => Some(VerifiedLegacyIngress {
+                principal,
+                kind: LegacyAuthKind::SessionToken,
+                bearer_token: None,
+            }),
+            None => {
                 return auth_err_resp(
                     StatusCode::UNAUTHORIZED,
                     "UNAUTHENTICATED",
@@ -666,11 +731,11 @@ pub async fn legacy_project_auth_middleware(
                 "Viewer role cannot mutate project resources",
             );
         }
-    } else if parts.uri.path() == "/api/v1/projects" {
+    } else {
         return auth_err_resp(
             StatusCode::UNAUTHORIZED,
             "UNAUTHENTICATED",
-            "Missing authentication for projects endpoint",
+            "Missing authentication for legacy project endpoint",
         );
     }
 
@@ -692,4 +757,55 @@ pub async fn legacy_project_auth_middleware(
         rebuilt.extensions_mut().insert(caller);
     }
     next.run(rebuilt).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn loopback_host_pins_port_and_rejects_malformed_ports() {
+        assert!(is_allowed_loopback_host_with_port(
+            "127.0.0.1:4170",
+            Some(4170)
+        ));
+        assert!(is_allowed_loopback_host_with_port(
+            "localhost:4170",
+            Some(4170)
+        ));
+        assert!(!is_allowed_loopback_host_with_port("127.0.0.1", Some(4170)));
+        assert!(!is_allowed_loopback_host_with_port(
+            "127.0.0.1:9999",
+            Some(4170)
+        ));
+        assert!(!is_allowed_loopback_host_with_port("127.0.0.1:0", None));
+        assert!(!is_allowed_loopback_host_with_port("127.0.0.1:+80", None));
+        assert!(!is_allowed_loopback_host_with_port(
+            "evil.example:4170",
+            Some(4170)
+        ));
+    }
+
+    #[test]
+    fn session_store_evicts_expired_and_caps_capacity() {
+        let auth = DaemonAuthState::with_secrets("nonce".to_string(), vec![7u8; 32]);
+        let now = Utc::now().timestamp();
+        let principal = FlowPrincipal {
+            tenant_id: "local-default".into(),
+            user_id: "u1".into(),
+            role: "editor".into(),
+        };
+
+        auth.insert_session_with_capacity("expired".into(), principal.clone(), now - 10, 2);
+        assert!(auth.get_valid_session("expired").is_none());
+        assert_eq!(auth.active_session_count(), 0);
+
+        auth.insert_session_with_capacity("s1".into(), principal.clone(), now + 100, 2);
+        auth.insert_session_with_capacity("s2".into(), principal.clone(), now + 200, 2);
+        auth.insert_session_with_capacity("s3".into(), principal, now + 300, 2);
+        assert_eq!(auth.active_session_count(), 2);
+        assert!(auth.get_valid_session("s1").is_none());
+        assert!(auth.get_valid_session("s2").is_some());
+        assert!(auth.get_valid_session("s3").is_some());
+    }
 }

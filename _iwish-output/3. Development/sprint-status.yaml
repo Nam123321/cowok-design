@@ -22,7 +22,7 @@ start_date: '2026-07-24'
 "Epic 03 - Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher": completed
 "Story 03.1 - Động cơ Ràng buộc Cấu hình theo Dự án (PROJECT_CONSTRAINTS) & oxc AST Linter": ready-for-dev
 "Story 03.2 - Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons)": completed
-"Story 03.3 - Deterministic data-ff-id AST Injector & <1ms Surgical Patcher": planned
+"Story 03.3 - Deterministic data-ff-id AST Injector & <1ms Surgical Patcher": completed
 
 # ==================================================
 # Feature Group: VS-02. Flow-First Executable Design Workbench & SDI Engine
@@ -30,11 +30,11 @@ start_date: '2026-07-24'
 
 # Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution
 "Epic 04 - Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution": in_progress
-"Story 04.1 - Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation": refactored
-"Story 04.2 - SQLite V5 Schema Convergence, Streaming Dual-Ingress Vite BFF & Fail-Closed FS Folder Picker": refactored
-"Story 04.3 - Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier": refactored
-"Story 04.4 - Persistent KeyedParallelCoordinator, Monotonic Fencing, SSE Last-Event-ID, Multi-Node Chat v2 & 3-Level Sidebar": refactored
-"Story 04.5 - State-Hydrated Live Preview (CompanionLiveHtmlRightPane), Option CSP-B Epoch/Hash Bridge & Persistent Element Comments (`stale_mapping`)": refactored
+"Story 04.1 - Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation": completed
+"Story 04.2 - SQLite V7 Additive Convergence, Streaming Dual-Ingress Vite BFF, Managed Workspace & Symlink-Safe FS Jail": refactored
+"Story 04.3 - Day-0 Onboarding Wizard, Passive/Active 16+ CLI Doctor (Extension), Keychain->0600 Vault & Connect-Time SSRF Verifier": refactored
+"Story 04.4 - Persistent KeyedParallelCoordinator, Monotonic Fencing, project_seq SSE Last-Event-ID, -PGID CLI Reaper & 3-Level Sidebar": refactored
+"Story 04.5 - State-Hydrated Live Preview (CompanionLiveHtmlRightPane), DOMParser Zero-Network CSP-B, bootSecret Bridge, Interact/Inspect (C) & 409 STALE_MAPPING": refactored
 
 # Epic 05: Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR
 "Epic 05 - Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR": in-progress

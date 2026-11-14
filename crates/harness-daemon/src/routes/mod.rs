@@ -94,7 +94,7 @@ pub(crate) fn state_auth(state: &DaemonAppState) -> Arc<DaemonAuthState> {
     Arc::clone(&state.auth)
 }
 
-/// Health response returned by `GET /api/v1/health` (redacts `hmac_key_hex` unconditionally).
+/// Health response returned by `GET /api/v1/health` (redacts `hmac_key_hex` and `daemon_nonce` unconditionally).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HealthResponse {
     pub status: String,
@@ -103,21 +103,20 @@ pub struct HealthResponse {
     pub port: u16,
     #[serde(default)]
     pub pid: u32,
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub daemon_nonce: String,
     #[serde(default)]
     pub schema_version: u32,
 }
 
 async fn handle_health(State(state): State<DaemonAppState>) -> Json<HealthResponse> {
-    let auth = state_auth(&state);
     Json(HealthResponse {
         status: "ok".to_string(),
         service: "cowok-design-harness-daemon".to_string(),
         host: state.host,
         port: state.port,
         pid: std::process::id(),
-        daemon_nonce: auth.daemon_nonce.clone(),
+        daemon_nonce: String::new(),
         schema_version: CURRENT_SCHEMA_VERSION,
     })
 }
@@ -281,6 +280,7 @@ pub fn build_router(state: DaemonAppState) -> Router {
             legacy_project_auth_middleware,
         ));
 
+    let cors_state = state.clone();
     Router::new()
         .route("/api/v1/health", get(handle_health))
         .route(
@@ -289,6 +289,9 @@ pub fn build_router(state: DaemonAppState) -> Router {
         )
         .merge(protected_legacy_router)
         .merge(flow_router)
-        .layer(middleware::from_fn(cors_and_loopback_middleware))
+        .layer(middleware::from_fn_with_state(
+            cors_state,
+            cors_and_loopback_middleware,
+        ))
         .with_state(state)
 }

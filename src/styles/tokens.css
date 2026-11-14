@@ -137,6 +137,14 @@ html[data-theme="warm"],
   --shadow-md: 0 4px 12px rgba(8, 30, 58, 0.06);
   --shadow-lg: 0 8px 24px rgba(8, 30, 58, 0.08);
   --shadow: 0 8px 24px rgba(8, 30, 58, 0.08);
+  --shadow-radar: 0 4px 16px rgba(8, 30, 58, 0.08);
+  --shadow-port: 0 0 4px rgba(0, 0, 0, 0.2);
+  --bg-overlay: rgba(8, 14, 26, 0.65);
+  --bg-overlay-strong: rgba(0, 0, 0, 0.72);
+  --window-dot-border: rgba(0, 0, 0, 0.12);
+  --marquee-fill: rgba(0, 87, 255, 0.12);
+  --minimap-lens-bg: rgba(75, 127, 255, 0.12);
+  --running-badge-bg: rgba(59, 130, 246, 0.18);
 
   /* Semantic UI Bindings */
   --background: var(--bg-canvas);
@@ -231,6 +239,14 @@ html[data-theme="dim"],
   --shadow-md: 0 4px 12px rgba(24, 34, 48, 0.06);
   --shadow-lg: 0 8px 24px rgba(24, 34, 48, 0.07);
   --shadow: 0 8px 24px rgba(24, 34, 48, 0.07);
+  --shadow-radar: 0 4px 16px rgba(24, 34, 48, 0.08);
+  --shadow-port: 0 0 4px rgba(0, 0, 0, 0.2);
+  --bg-overlay: rgba(8, 14, 26, 0.65);
+  --bg-overlay-strong: rgba(0, 0, 0, 0.72);
+  --window-dot-border: rgba(0, 0, 0, 0.12);
+  --marquee-fill: rgba(49, 95, 182, 0.14);
+  --minimap-lens-bg: rgba(75, 127, 255, 0.12);
+  --running-badge-bg: rgba(59, 130, 246, 0.18);
 
   --background: var(--bg-canvas);
   --foreground: var(--text-primary);
@@ -323,6 +339,14 @@ html[data-theme="night"],
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.28);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.35);
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  --shadow-radar: 0 4px 16px rgba(0, 0, 0, 0.32);
+  --shadow-port: 0 0 4px rgba(0, 0, 0, 0.45);
+  --bg-overlay: rgba(4, 8, 16, 0.72);
+  --bg-overlay-strong: rgba(0, 0, 0, 0.78);
+  --window-dot-border: rgba(255, 255, 255, 0.14);
+  --marquee-fill: rgba(255, 154, 47, 0.15);
+  --minimap-lens-bg: rgba(255, 154, 47, 0.14);
+  --running-badge-bg: var(--state-info-soft);
 
   --background: var(--bg-canvas);
   --foreground: var(--text-primary);
@@ -383,6 +407,7 @@ html[data-theme="night"][data-focus="low"],
   --human-accent: #65789E;
   --agent-accent: #8F765E;
   --human-soft: rgba(101, 120, 158, 0.18);
+  --human-border: rgba(101, 120, 158, 0.35);
   --agent-soft: rgba(143, 118, 94, 0.18);
 
   --success: #72877A;
@@ -404,6 +429,14 @@ html[data-theme="night"][data-focus="low"],
   --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.28);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.35);
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  --shadow-radar: 0 4px 16px rgba(0, 0, 0, 0.32);
+  --shadow-port: 0 0 4px rgba(0, 0, 0, 0.45);
+  --bg-overlay: rgba(4, 8, 16, 0.72);
+  --bg-overlay-strong: rgba(0, 0, 0, 0.78);
+  --window-dot-border: rgba(255, 255, 255, 0.14);
+  --marquee-fill: rgba(241, 245, 249, 0.14);
+  --minimap-lens-bg: rgba(101, 120, 158, 0.18);
+  --running-badge-bg: var(--human-soft);
 
   --background: var(--bg-canvas);
   --foreground: var(--text-primary);

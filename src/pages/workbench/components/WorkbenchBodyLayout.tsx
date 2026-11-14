@@ -9,6 +9,7 @@ import { CompanionCanvasTab, CanvasTabItem } from "../../../features/flow/compon
 import { DagCanvas2D } from "../../../features/flow/components/DagCanvas2D";
 import { ContextualNodeFloatingChat } from "../../../features/flow/components/ContextualNodeFloatingChat";
 import { ErrorBoundary } from "../../../components/ui/ErrorBoundary";
+import { findOrphanNodes } from "../../../features/flow/utils/graph-analysis";
 import { useWorkbenchSplitter } from "../hooks/useWorkbenchSplitter";
 import { useWorkbenchAttachments } from "../hooks/useWorkbenchAttachments";
 import { useWorkbenchGraphHandlers } from "../hooks/useWorkbenchGraphHandlers";
@@ -35,6 +36,8 @@ export const WorkbenchCanvasTabArea: React.FC<{
   graphHandlers: ReturnType<typeof useWorkbenchGraphHandlers>;
   onCommentOnNode: (nodeKey: string) => void;
   onOpenLeftChat?: () => void;
+  isLeftChatCollapsed?: boolean;
+  onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
 }> = ({
   state,
   store,
@@ -45,7 +48,10 @@ export const WorkbenchCanvasTabArea: React.FC<{
   graphHandlers,
   onCommentOnNode,
   onOpenLeftChat,
+  isLeftChatCollapsed = false,
+  onOpenSettings,
 }) => {
+  const { t } = useTranslation();
   const [isDeploying, setIsDeploying] = useState(false);
   const handleDeployDraft = async () => {
     if (isDeploying) return;
@@ -56,17 +62,22 @@ export const WorkbenchCanvasTabArea: React.FC<{
   const selectedNodes = state.nodes.filter(
     (n) => n.id === state.selectedNodeId || (state.selectedNodeIds && state.selectedNodeIds.includes(n.id))
   );
+  const orphanCount = findOrphanNodes(
+    state.nodes.map((n) => ({ id: n.id })),
+    state.transitions.map((tr) => ({ source: tr.sourceNodeId, target: tr.targetNodeId }))
+  ).length;
 
   return (
     <main style={{ flex: 1, minWidth: "550px", height: "100%", overflow: "hidden", position: "relative", backgroundColor: "var(--bg-canvas)" }}>
       <CompanionCanvasTab
         activeTabId={activeTabId} onTabChange={onTabChange} selectedNodeId={state.selectedNodeId}
-        isDraftDirty={state.isDraftDirty} conflictState={state.conflictState}
+        nodes={state.nodes}
+        isDraftDirty={state.isDraftDirty} orphanCount={orphanCount} conflictState={state.conflictState}
         onResolveConflict={(c) => { void store.resolveConflict(c); }}
         onDeployDraft={() => { void handleDeployDraft(); }}
         onDiscardDraft={() => store.discardDraft()} onAttachRegionToChat={onCommentOnNode}
       >
-        <ErrorBoundary fallbackTitle="Lỗi hiển thị Canvas 2D DAG" onReset={() => store.discardDraft()}>
+        <ErrorBoundary fallbackTitle={t("errors.dagCanvasRender", "Lỗi hiển thị Canvas 2D DAG")} onReset={() => store.discardDraft()}>
           <DagCanvas2D
             state={state} onUpdatePosition={graphHandlers.handleUpdatePosition} onSetViewport={graphHandlers.handleSetViewport}
             onSelectNode={(id, multi) => store.selectNode(id, multi)} onSelectTransition={(id) => store.selectTransition(id)}
@@ -80,16 +91,17 @@ export const WorkbenchCanvasTabArea: React.FC<{
           />
         </ErrorBoundary>
       </CompanionCanvasTab>
-      {selectedNodes.length > 0 && (
+      {isLeftChatCollapsed && selectedNodes.length > 0 && (
         <ContextualNodeFloatingChat
           projectId={projectId}
           sessionId={sessionId}
           selectedNodes={selectedNodes}
           onDeselectNode={(id) => {
-            store.selectNode(state.selectedNodeId === id ? null : state.selectedNodeId);
+            store.selectNode(id, true);
           }}
           onClearSelection={() => store.selectNode(null)}
           onOpenLeftChat={onOpenLeftChat}
+          onOpenSettings={onOpenSettings}
           onFocusNode={(id) => {
             const target = state.nodes.find((n) => n.id === id);
             if (target) {
@@ -97,6 +109,41 @@ export const WorkbenchCanvasTabArea: React.FC<{
             }
           }}
         />
+      )}
+      {graphHandlers.graphError && (
+        <div
+          role="alert"
+          data-testid="graph-error-toast"
+          style={{
+            position: "absolute",
+            right: "16px",
+            bottom: "16px",
+            zIndex: 60,
+            maxWidth: "380px",
+            padding: "8px 12px",
+            borderRadius: "var(--radius-sm)",
+            backgroundColor: "var(--bg-elevated)",
+            border: "1px solid var(--state-error)",
+            boxShadow: "var(--shadow-lg)",
+            color: "var(--state-error)",
+            fontSize: "12px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "10px",
+          }}
+        >
+          <span>{graphHandlers.graphError}</span>
+          <button
+            type="button"
+            onClick={graphHandlers.clearGraphError}
+            aria-label={t("common.close", "Đóng")}
+            className="cowok-btn cowok-btn-ghost"
+            style={{ padding: "0 4px", fontSize: "12px", color: "var(--text-secondary)", cursor: "pointer" }}
+          >
+            ✕
+          </button>
+        </div>
       )}
     </main>
   );
@@ -186,6 +233,7 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
       <div className="dual-main-panel" style={{ display: "flex", flex: 1, minWidth: "650px", overflow: "hidden", position: "relative" }}>
         <AgentChatPanel
           projectId={resolvedProjectId}
+          activeSessionId={p.activeSessionId}
           width={p.splitter.chatWidth} isShortened={p.splitter.isChatShortened}
           onToggleShorten={p.splitter.handleToggleShortenChat} attachmentChips={p.attachments.attachmentChips}
           onRemoveAttachmentChip={p.attachments.handleRemoveAttachmentChip} onOpenSettings={p.onOpenSettings}
@@ -200,6 +248,8 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
           onTabChange={p.onTabChange}
           graphHandlers={p.graphHandlers}
           onCommentOnNode={p.attachments.handleCommentOnNode}
+          isLeftChatCollapsed={p.splitter.isChatShortened}
+          onOpenSettings={p.onOpenSettings}
           onOpenLeftChat={p.splitter.isChatShortened ? p.splitter.handleToggleShortenChat : undefined}
         />
       </div>
@@ -232,7 +282,7 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
             }
           }}
         >
-          <span>❝ Quote vào Chat</span>
+          <span>{t("chat.quoteToChat", "Quote vào Chat")}</span>
         </div>
       )}
     </div>

@@ -6,8 +6,10 @@ import {
   UpdateScreenFixtureSchema,
   ViewportPresetSchema,
 } from "../../../lib/validations/screen-fixture";
-import { FIXTURE_VARIANTS } from "../components/FixtureVariantSelector";
-import { VIEWPORT_PRESETS } from "../components/ViewportSwitcher";
+import {
+  FIXTURE_VARIANTS,
+  VIEWPORT_PRESETS,
+} from "../../../lib/validations/screen-fixture";
 import { apiScreenFixture } from "../../../api/screen-fixture";
 import { issueBffLoopbackSession } from "../../../lib/api-guard";
 import { buildCanonicalHmacHeaders, ensureRunningDaemon } from "../../../lib/daemon-client";

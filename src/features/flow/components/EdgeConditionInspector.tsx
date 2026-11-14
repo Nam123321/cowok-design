@@ -38,14 +38,14 @@ const EdgeFormFields: React.FC<{
       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
         <label style={FIELD_LABEL_STYLE}>{t("flow.edgeTypeLabel", "Loại luồng")}</label>
         <select value={transition.edgeType} onChange={(e) => onUpdate(transition.id, { edgeType: e.target.value as FlowEdgeType })} style={FIELD_INPUT_STYLE}>
-          <option value="main">Luồng chính (Main ───▶)</option>
-          <option value="branch">Luồng rẽ nhánh (IF / ELSE - - ▶)</option>
-          <option value="fallback">Luồng dự phòng (IF NOT ···▶)</option>
+          <option value="main">{t("flow.edgeOptionMain", "Luồng chính (Main ───▶)")}</option>
+          <option value="branch">{t("flow.edgeOptionBranch", "Luồng rẽ nhánh (IF / ELSE - - ▶)")}</option>
+          <option value="fallback">{t("flow.edgeOptionFallback", "Luồng dự phòng (IF NOT ···▶)")}</option>
         </select>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
         <label style={FIELD_LABEL_STYLE}>{t("flow.edgeConditionLabel", "Nhãn điều kiện (Condition Label)")}</label>
-        <input type="text" value={transition.conditionLabel || ""} placeholder="e.g. status == 'VERIFIED' hoặc onClick" onChange={(e) => onUpdate(transition.id, { conditionLabel: e.target.value, guardCondition: e.target.value || null })} style={FIELD_INPUT_STYLE} />
+        <input type="text" value={transition.conditionLabel || ""} placeholder={t("flow.edgeConditionPlaceholder", "e.g. status == 'VERIFIED' hoặc onClick")} onChange={(e) => onUpdate(transition.id, { conditionLabel: e.target.value, guardCondition: e.target.value || null })} style={FIELD_INPUT_STYLE} />
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
         <label style={FIELD_LABEL_STYLE}>{t("flow.edgeTriggerLabel", "Sự kiện kích hoạt (Trigger)")}</label>
@@ -74,7 +74,7 @@ export const EdgeConditionInspector: React.FC<EdgeConditionInspectorProps> = ({
             <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", fontWeight: 600, padding: "2px 6px", backgroundColor: "var(--bg-elevated)", color: "var(--text-primary)", border: "1px dashed var(--action-primary)", borderRadius: "var(--radius-xs)" }}>DRAFT</span>
           )}
         </div>
-        <button type="button" onClick={onClose} aria-label="Đóng" style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "16px", color: "var(--text-muted)" }}>×</button>
+        <button type="button" onClick={onClose} aria-label={t("common.close", "Đóng")} style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "16px", color: "var(--text-muted)" }}>×</button>
       </div>
       <div style={{ fontSize: "11px", color: "var(--text-secondary)", backgroundColor: "var(--bg-subtle)", padding: "6px 8px", borderRadius: "var(--radius-xs)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontFamily: "var(--font-mono)" }}>{transition.sourceNodeId.slice(0, 8)}</span>
@@ -83,8 +83,8 @@ export const EdgeConditionInspector: React.FC<EdgeConditionInspectorProps> = ({
       </div>
       <EdgeFormFields transition={transition} onUpdate={onUpdate} />
       <div style={{ display: "flex", gap: "8px", marginTop: "2px" }}>
-        <button type="button" data-testid="reverse-edge-btn" onClick={() => onReverse(transition.id)} style={{ flex: 1, padding: "6px 8px", fontSize: "12px", fontWeight: 600, border: "1px solid var(--border-default)", backgroundColor: "var(--bg-subtle)", color: "var(--text-primary)", borderRadius: "var(--radius-xs)", cursor: "pointer" }}>⇄ Đảo chiều</button>
-        <button type="button" data-testid="delete-edge-btn" onClick={() => onDelete(transition.id)} style={{ padding: "6px 10px", fontSize: "12px", fontWeight: 600, border: "1px solid var(--border-default)", backgroundColor: "transparent", color: "var(--state-danger)", borderRadius: "var(--radius-xs)", cursor: "pointer" }}>Xóa</button>
+        <button type="button" data-testid="reverse-edge-btn" onClick={() => onReverse(transition.id)} style={{ flex: 1, padding: "6px 8px", fontSize: "12px", fontWeight: 600, border: "1px solid var(--border-default)", backgroundColor: "var(--bg-subtle)", color: "var(--text-primary)", borderRadius: "var(--radius-xs)", cursor: "pointer" }}>{t("flow.reverseEdge", "⇄ Đảo chiều")}</button>
+        <button type="button" data-testid="delete-edge-btn" onClick={() => onDelete(transition.id)} style={{ padding: "6px 10px", fontSize: "12px", fontWeight: 600, border: "1px solid var(--border-default)", backgroundColor: "transparent", color: "var(--state-danger)", borderRadius: "var(--radius-xs)", cursor: "pointer" }}>{t("flow.deleteEdge", "Xóa")}</button>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import {
   IFRAME_SANDBOX_PERMISSIONS,
   IframeToHostMessageSchema,
   STRICT_OFFLINE_CSP,
+  validateUserHtmlPayload,
   wrapUserHtmlSrcDoc,
 } from "../../src/features/flow/utils/html-sandbox-wrapper";
 import { CompanionLiveHtmlRightPane, type CompanionLiveHtmlRightPaneProps } from "../../src/features/flow/components/CompanionLiveHtmlRightPane";
@@ -175,5 +176,71 @@ describe("Option CSP-B Sandboxed HTML Preview Security Gate (SEC-IFRAME-01..08)"
     } finally {
       vi.stubGlobal("MessageChannel", OrigMessageChannel);
     }
+  });
+
+  it("SEC-IFRAME-09: strips inline on* body attributes and rotates CSPRNG epoch nonce by default", () => {
+    const out1 = wrapUserHtmlSrcDoc('<body onload="alert(1)" onclick="steal()" data-ok="yes"><p>Hi</p></body>');
+    const out2 = wrapUserHtmlSrcDoc("<body><p>Hi</p></body>");
+    expect(out1).not.toContain("onload");
+    expect(out1).not.toContain("onclick");
+    expect(out1).toContain('data-ok="yes"');
+
+    const m1 = out1.match(/var EPOCH = (\d+);/);
+    const m2 = out2.match(/var EPOCH = (\d+);/);
+    expect(m1?.[1]).toBeTruthy();
+    expect(m2?.[1]).toBeTruthy();
+    expect(m1?.[1]).not.toBe(m2?.[1]);
+  });
+
+  it("SEC-IFRAME-10: validates inline HTML edits, applies valid HTML, and blocks self-navigation port transfer", () => {
+    expect(validateUserHtmlPayload("").valid).toBe(false);
+    expect(validateUserHtmlPayload("plain text without tags").valid).toBe(false);
+    expect(validateUserHtmlPayload("<section><h1>Valid</h1></section>").valid).toBe(true);
+
+    const onToggle = vi.fn();
+    let codeVal = "not html at all";
+    const baseProps = buildPaneProps("node-scr-01");
+    const { getByTestId, rerender } = render(
+      React.createElement(CompanionLiveHtmlRightPane, {
+        ...baseProps,
+        isInlineCodeOpen: true,
+        onToggleInlineCode: onToggle,
+        inlineCodeText: codeVal,
+        onChangeInlineCode: (v: string) => {
+          codeVal = v;
+        },
+      })
+    );
+
+    fireEvent.click(getByTestId("apply-inline-html-btn"));
+    expect(getByTestId("inline-html-error")).toBeTruthy();
+    expect(onToggle).not.toHaveBeenCalled();
+
+    rerender(
+      React.createElement(CompanionLiveHtmlRightPane, {
+        ...baseProps,
+        isInlineCodeOpen: true,
+        onToggleInlineCode: onToggle,
+        inlineCodeText: "<main data-custom='yes'>Updated Screen</main>",
+        onChangeInlineCode: (v: string) => {
+          codeVal = v;
+        },
+      })
+    );
+    fireEvent.click(getByTestId("apply-inline-html-btn"));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+
+    // Self-navigation / external href guard when iframe loads
+    const postSpy = vi.fn();
+    const { getByTestId: getById2 } = render(
+      React.createElement(CompanionLiveHtmlRightPane, buildPaneProps("node-scr-01"))
+    );
+    const iframe = getById2("sandboxed-html-iframe") as HTMLIFrameElement;
+    Object.defineProperty(iframe, "contentWindow", {
+      value: { postMessage: postSpy, location: { href: "https://evil.example/" } },
+      configurable: true,
+    });
+    fireEvent.load(iframe);
+    expect(postSpy).not.toHaveBeenCalled();
   });
 });

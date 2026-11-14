@@ -4,8 +4,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  BatchUpdateNodePositionsPayloadSchema,
+  BatchUpdateNodePositionsSchema,
   CreateFlowTransitionSchema,
   DeployDraftSchema,
+  FlowGraphSnapshotDTOSchema,
   FlowGraphSnapshotSchema,
   FlowNodeResponseSchema,
   FlowTransitionResponseSchema,
@@ -101,6 +104,8 @@ describe("Flow Contract Parity Gate (SQLite V3 <-> Prisma DDR <-> Zod)", () => {
       transitions: [parsedEdge],
     });
     expect(snap.nodes.length).toBe(1);
+    expect(BatchUpdateNodePositionsPayloadSchema).toBe(BatchUpdateNodePositionsSchema);
+    expect(FlowGraphSnapshotDTOSchema).toBe(FlowGraphSnapshotSchema);
 
     expect(HostToIframeMessageSchema.safeParse({ type: "APPLY_HTML", epoch: 1, html: "<p>Hi</p>" }).success).toBe(true);
     expect(IframeToHostMessageSchema.safeParse({ type: "APPLY_HTML", epoch: 1, html: "<script>evil()</script>" }).success).toBe(false);

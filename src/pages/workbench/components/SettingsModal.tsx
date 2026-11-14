@@ -23,7 +23,7 @@ export interface SettingsModalProps {
 }
 
 const OVERLAY_STYLE: React.CSSProperties = {
-  position: "fixed", inset: 0, backgroundColor: "rgba(8, 14, 26, 0.65)", backdropFilter: "blur(4px)",
+  position: "fixed", inset: 0, backgroundColor: "var(--bg-overlay)", backdropFilter: "blur(4px)",
   display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px",
 };
 

@@ -11,6 +11,7 @@ export interface OnboardingWizardModalProps {
   isOpen: boolean;
   onClose: () => void;
   onComplete: (config: OnboardingResult) => void;
+  onDaemonSyncWarning?: (message: string) => void;
 }
 
 export interface OnboardingResult {
@@ -26,10 +27,12 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
   isOpen,
   onClose,
   onComplete,
+  onDaemonSyncWarning,
 }) => {
   const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [loadingDoctor, setLoadingDoctor] = useState<boolean>(true);
+  const [doctorError, setDoctorError] = useState<string | null>(null);
   const [cliItems, setCliItems] = useState<CliDiagnosticItem[]>([]);
   const [selectedCli, setSelectedCli] = useState<string>("agy");
   const [storageMode, setStorageMode] = useState<"vault_0600" | "ram_only">("vault_0600");
@@ -38,6 +41,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
 
   const runDoctorScan = async () => {
     setLoadingDoctor(true);
+    setDoctorError(null);
     try {
       const data = await apiWorkbenchSettings.scanDoctor();
       setCliItems(data.clis || []);
@@ -45,8 +49,9 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
       if (firstReady) {
         setSelectedCli(firstReady.id);
       }
-    } catch {
-      // Fallback empty when daemon is starting
+    } catch (err) {
+      const detail = err instanceof Error ? `: ${err.message}` : "";
+      setDoctorError(`${t("onboarding.doctorError", "Không thể quét trạng thái CLI từ daemon")}${detail}`);
     } finally {
       setLoadingDoctor(false);
     }
@@ -74,8 +79,11 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
         status: permissionLevel,
         isDefault: true,
       })
-      .catch(() => {
-        // Optimistic persistence until daemon reconnects
+      .catch((err) => {
+        const detail = err instanceof Error ? `: ${err.message}` : "";
+        onDaemonSyncWarning?.(
+          `${t("settings.saveDaemonWarning", "Không thể lưu cấu hình lên daemon (đã lưu cục bộ)")}${detail}`
+        );
       });
     onComplete({
       preferredCli: selectedCli,
@@ -91,7 +99,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.72)",
+        backgroundColor: "var(--bg-overlay-strong)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -166,6 +174,23 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
 
         {/* Body Step Content */}
         <div style={{ padding: "24px", overflowY: "auto", flex: 1, minHeight: "320px" }}>
+          {doctorError && (
+            <div
+              role="alert"
+              data-testid="onboarding-daemon-warning"
+              style={{
+                marginBottom: "12px",
+                padding: "8px 12px",
+                borderRadius: "var(--radius-xs)",
+                backgroundColor: "var(--bg-subtle)",
+                border: "1px solid var(--state-warning)",
+                color: "var(--state-warning)",
+                fontSize: "11.5px",
+              }}
+            >
+              {doctorError}
+            </div>
+          )}
           <OnboardingStepsContent
             currentStep={currentStep}
             loadingDoctor={loadingDoctor}

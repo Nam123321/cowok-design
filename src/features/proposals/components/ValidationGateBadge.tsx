@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "../../../hooks/useTranslation";
 import { ValidationCheckResult } from "../../../lib/validations/change-proposal";
 
 interface ValidationGateBadgeProps {
@@ -25,9 +26,10 @@ function getStatusBadge(status: "passed" | "failed" | "skipped") {
 }
 
 export const ValidationGateBadge: React.FC<ValidationGateBadgeProps> = ({ checks }) => {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-1.5 p-3 rounded-lg border border-border bg-card">
-      <span className="text-xs font-semibold text-foreground">Cổng Kiểm Tra Tự Động (Validation Gate)</span>
+      <span className="text-xs font-semibold text-foreground">{t("proposals.validationGateTitle", "Cổng Kiểm Tra Tự Động (Validation Gate)")}</span>
       <div className="flex flex-col gap-1">
         {checks.map((c) => {
           const badge = getStatusBadge(c.status);

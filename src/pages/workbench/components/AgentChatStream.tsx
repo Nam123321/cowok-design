@@ -30,11 +30,26 @@ const SCROLL_BTN_STYLE: React.CSSProperties = {
   justifyContent: "center", cursor: "pointer", zIndex: 10, transition: "all var(--duration-fast)",
 };
 
-const ChatStreamItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
+export const ChatStreamItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
   const { t } = useTranslation();
   if (msg.sender === "human") {
     return (
-      <div className="chat-human-bubble" style={{ alignSelf: "flex-end", maxWidth: "86%", backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", fontSize: "12.5px", lineHeight: "1.5", boxShadow: "var(--shadow-sm)", wordBreak: "break-word" }}>
+      <div
+        className="chat-human-bubble"
+        data-testid="chat-human-bubble"
+        style={{
+          alignSelf: "flex-end",
+          maxWidth: "86%",
+          backgroundColor: "var(--human-soft)",
+          color: "var(--text-primary)",
+          border: "1px solid var(--human-border)",
+          padding: "8px 12px",
+          borderRadius: "12px 12px 2px 12px",
+          fontSize: "12.5px",
+          lineHeight: "1.5",
+          wordBreak: "break-word",
+        }}
+      >
         {msg.text}
       </div>
     );

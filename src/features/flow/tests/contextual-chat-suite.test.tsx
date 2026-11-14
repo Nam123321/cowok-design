@@ -114,7 +114,7 @@ describe("Story 04.3: Keyed Parallel Engine, Contextual Multi-Node Floating Chat
   });
 
   describe("AC-02: Contextual Multi-Node Floating Chat v2", () => {
-    it("should render multi-node composite tag when multiple nodes are selected", () => {
+    it("should default to compact floating bar and render multi-node composite tag when clicked open", () => {
       render(
         <ContextualNodeFloatingChat
           projectId="11111111-1111-4111-8111-111111111111"
@@ -125,16 +125,25 @@ describe("Story 04.3: Keyed Parallel Engine, Contextual Multi-Node Floating Chat
         />
       );
 
-      // Verify composite header tag
+      // Defaults to compact floating pill bar; expands only on click
+      expect(screen.getByTestId("fc-compact-pill")).toBeDefined();
+      fireEvent.click(screen.getByTestId("floating-chat-open-trigger"));
+
+      const chatWin = screen.getByTestId("contextual-node-floating-chat");
+      expect(chatWin.style.height).toBe("auto");
+      expect(chatWin.style.maxHeight).toContain("560px");
+      expect(screen.getByTestId("floating-chat-composer-wrapper")).toBeDefined();
+
+      // Verify composite header tag and chips
       expect(screen.getByText(/2 Màn hình đang chọn/i)).toBeDefined();
       expect(screen.getByText(/SCR-01/i)).toBeDefined();
       expect(screen.getByText(/SCR-02/i)).toBeDefined();
 
-      // Verify composer indicates parallel multi-node execution
+      // Verify execution mode indicator
       expect(screen.getByText(/Song song/i)).toBeDefined();
     });
 
-    it("should collapse to Floating Pill Badge and expand back", () => {
+    it("should start as Floating Pill Badge, expand to full window, and collapse back to Pill", () => {
       render(
         <ContextualNodeFloatingChat
           projectId="11111111-1111-4111-8111-111111111111"
@@ -145,19 +154,19 @@ describe("Story 04.3: Keyed Parallel Engine, Contextual Multi-Node Floating Chat
         />
       );
 
-      // Click collapse button
-      const collapseBtn = screen.getByTitle(/Thu gọn thành Pill/i);
-      fireEvent.click(collapseBtn);
-
-      // Verify collapsed pill is rendered
+      // Verify initial collapsed pill is rendered
       expect(screen.getByTestId("fc-compact-pill")).toBeDefined();
       expect(screen.getByText(/Review Summary/i)).toBeDefined();
 
-      // Click expand button to restore full window
+      // Click expand button to open floating chat window
       const expandBtn = screen.getByTitle(/Mở rộng khung Chat/i);
       fireEvent.click(expandBtn);
-
       expect(screen.getByTestId("contextual-node-floating-chat")).toBeDefined();
+
+      // Click collapse button back to pill
+      const collapseBtn = screen.getByTitle(/Thu gọn thành Pill/i);
+      fireEvent.click(collapseBtn);
+      expect(screen.getByTestId("fc-compact-pill")).toBeDefined();
     });
   });
 

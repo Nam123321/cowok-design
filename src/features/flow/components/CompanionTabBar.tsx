@@ -15,14 +15,15 @@ const NEW_TAB_MENU_ITEMS: Array<{
   kind: "app-flow" | "slide-deck" | "md" | "assets" | "code";
   defaultName: string;
   icon: string;
-  label: string;
+  labelKey: string;
+  defaultLabel: string;
   badge: string;
 }> = [
-  { kind: "app-flow", defaultName: "multi-sig-wallet.html", icon: "workflow", label: "Tạo App HTML (Userflow + Live HTML)", badge: ".html" },
-  { kind: "slide-deck", defaultName: "series-a-pitch.html", icon: "layers", label: "Tạo Slide Deck HTML (Slide CMS + HTML)", badge: "16:9" },
-  { kind: "md", defaultName: "product-spec.md", icon: "wiki", label: "Mở Tài liệu Markdown (Hỗ trợ Quote)", badge: ".md" },
-  { kind: "assets", defaultName: "brand-symbol.svg", icon: "image", label: "Mở Tệp Đồ họa / Biểu tượng (.svg/.png)", badge: ".svg/.png" },
-  { kind: "code", defaultName: "tokens.css", icon: "code", label: "Mở Tệp Mã nguồn / Cấu hình (.css/.tsx/.json)", badge: ".tsx/.json" },
+  { kind: "app-flow", defaultName: "multi-sig-wallet.html", icon: "workflow", labelKey: "canvas.newTabAppFlow", defaultLabel: "Tạo App HTML (Userflow + Live HTML)", badge: ".html" },
+  { kind: "slide-deck", defaultName: "series-a-pitch.html", icon: "layers", labelKey: "canvas.newTabSlideDeck", defaultLabel: "Tạo Slide Deck HTML (Slide CMS + HTML)", badge: "16:9" },
+  { kind: "md", defaultName: "product-spec.md", icon: "wiki", labelKey: "canvas.newTabMarkdown", defaultLabel: "Mở Tài liệu Markdown (Hỗ trợ Quote)", badge: ".md" },
+  { kind: "assets", defaultName: "brand-symbol.svg", icon: "image", labelKey: "canvas.newTabAssets", defaultLabel: "Mở Tệp Đồ họa / Biểu tượng (.svg/.png)", badge: ".svg/.png" },
+  { kind: "code", defaultName: "tokens.css", icon: "code", labelKey: "canvas.newTabCode", defaultLabel: "Mở Tệp Mã nguồn / Cấu hình (.css/.tsx/.json)", badge: ".tsx/.json" },
 ];
 
 const TAB_BAR_STYLE: React.CSSProperties = {
@@ -74,65 +75,71 @@ const CanvasTabPill: React.FC<{
   isActive: boolean;
   onSelect: (tabId: string, format: CanvasTabItem["format"]) => void;
   onClose: (e: React.MouseEvent, tabId: string) => void;
-}> = ({ tab, isActive, onSelect, onClose }) => (
-  <div
-    role="tab"
-    aria-selected={isActive}
-    data-testid={`canvas-tab-${tab.id}`}
-    onClick={() => onSelect(tab.id, tab.format)}
-    style={buildTabPillStyle(isActive)}
-  >
-    <BrandIcon name={tab.iconName} size={ICON_SIZE_SM} color="currentColor" />
-    <span>{tab.title}</span>
-    {tab.isClosable && (
-      <button
-        type="button"
-        onClick={(e) => onClose(e, tab.id)}
-        aria-label={`Đóng tab ${tab.title}`}
-        style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "13px", lineHeight: 1, color: "var(--text-muted)", padding: "0 2px", marginLeft: "2px" }}
-      >
-        ×
-      </button>
-    )}
-  </div>
-);
+}> = ({ tab, isActive, onSelect, onClose }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      role="tab"
+      aria-selected={isActive}
+      data-testid={`canvas-tab-${tab.id}`}
+      onClick={() => onSelect(tab.id, tab.format)}
+      style={buildTabPillStyle(isActive)}
+    >
+      <BrandIcon name={tab.iconName} size={ICON_SIZE_SM} color="currentColor" />
+      <span>{tab.title}</span>
+      {tab.isClosable && (
+        <button
+          type="button"
+          onClick={(e) => onClose(e, tab.id)}
+          aria-label={`${t("canvas.closeTab", "Đóng tab")} ${tab.title}`}
+          style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: "13px", lineHeight: 1, color: "var(--text-muted)", padding: "0 2px", marginLeft: "2px" }}
+        >
+          ×
+        </button>
+      )}
+    </div>
+  );
+};
 
 const NewTabPopoverMenu: React.FC<{
   onCreateTab: (kind: "app-flow" | "slide-deck" | "md" | "assets" | "code", customTitle?: string) => void;
-}> = ({ onCreateTab }) => (
-  <div
-    style={{
-      position: "absolute",
-      top: "34px",
-      right: "8px",
-      width: "290px",
-      backgroundColor: "var(--bg-surface)",
-      border: "1px solid var(--border-default)",
-      borderRadius: "var(--radius-md)",
-      boxShadow: "var(--shadow-lg)",
-      padding: "6px",
-      zIndex: POPOVER_Z_INDEX,
-      display: "flex",
-      flexDirection: "column",
-      gap: "2px",
-    }}
-  >
-    {NEW_TAB_MENU_ITEMS.map((item) => (
-      <button
-        key={item.kind}
-        type="button"
-        onClick={() => onCreateTab(item.kind, item.defaultName)}
-        style={{ padding: "7px 10px", border: "none", background: "transparent", borderRadius: "var(--radius-xs)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "var(--text-primary)", textAlign: "left" }}
-      >
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-          <BrandIcon name={item.icon} size={ICON_SIZE_SM} color="var(--human-accent)" />
-          <span>{item.label}</span>
-        </span>
-        <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>{item.badge}</span>
-      </button>
-    ))}
-  </div>
-);
+}> = ({ onCreateTab }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: "34px",
+        right: "8px",
+        width: "290px",
+        backgroundColor: "var(--bg-surface)",
+        border: "1px solid var(--border-default)",
+        borderRadius: "var(--radius-md)",
+        boxShadow: "var(--shadow-lg)",
+        padding: "6px",
+        zIndex: POPOVER_Z_INDEX,
+        display: "flex",
+        flexDirection: "column",
+        gap: "2px",
+      }}
+    >
+      {NEW_TAB_MENU_ITEMS.map((item) => (
+        <button
+          key={item.kind}
+          type="button"
+          onClick={() => onCreateTab(item.kind, item.defaultName)}
+          style={{ padding: "7px 10px", border: "none", background: "transparent", borderRadius: "var(--radius-xs)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: "12px", color: "var(--text-primary)", textAlign: "left" }}
+        >
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+            <BrandIcon name={item.icon} size={ICON_SIZE_SM} color="var(--human-accent)" />
+            <span>{t(item.labelKey, item.defaultLabel)}</span>
+          </span>
+          <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>{item.badge}</span>
+        </button>
+      ))}
+    </div>
+  );
+};
 
 export const CompanionTabBar: React.FC<{
   tabs: CanvasTabItem[];

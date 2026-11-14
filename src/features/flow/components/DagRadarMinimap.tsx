@@ -2,6 +2,7 @@
 // @implements AC-5
 import React from "react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useFormatter } from "@/hooks/useFormatter";
 import { WorkbenchNode, WorkbenchViewport } from "../store/flow-workbench-store";
 
 export interface DagRadarMinimapProps {
@@ -43,23 +44,27 @@ const calculateGraphScale = (nodes: WorkbenchNode[], width: number, height: numb
   return { minX, minY, scale };
 };
 
-const MinimapHeader: React.FC<{ count: number; title: string }> = ({ count, title }) => (
-  <div
-    style={{
-      padding: "4px 8px",
-      fontSize: "10px",
-      fontWeight: FONT_WEIGHT_SEMIBOLD,
-      color: "var(--cw-text-muted)",
-      borderBottom: "1px solid var(--cw-border-subtle)",
-      backgroundColor: "var(--bg-subtle)",
-      display: "flex",
-      justifyContent: "space-between",
-    }}
-  >
-    <span>{title}</span>
-    <span>{count} Nodes</span>
-  </div>
-);
+const MinimapHeader: React.FC<{ count: number; title: string }> = ({ count, title }) => {
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
+  return (
+    <div
+      style={{
+        padding: "4px 8px",
+        fontSize: "10px",
+        fontWeight: FONT_WEIGHT_SEMIBOLD,
+        color: "var(--cw-text-muted)",
+        borderBottom: "1px solid var(--cw-border-subtle)",
+        backgroundColor: "var(--bg-subtle)",
+        display: "flex",
+        justifyContent: "space-between",
+      }}
+    >
+      <span>{title}</span>
+      <span>{`${formatNumber(count)} ${t("flow.nodesCountLabel", "Nodes")}`}</span>
+    </div>
+  );
+};
 
 const MinimapNodeDot: React.FC<{
   node: WorkbenchNode;
@@ -104,7 +109,7 @@ const MinimapLens: React.FC<{
       width: `${Math.min(width - 2, viewW)}px`,
       height: `${Math.min(height - HEADER_OFFSET_Y, viewH)}px`,
       border: "1px solid var(--action-primary)",
-      backgroundColor: "rgba(75, 127, 255, 0.12)",
+      backgroundColor: "var(--minimap-lens-bg)",
       borderRadius: `${BORDER_RADIUS_DOT}px`,
     }}
   />
@@ -138,7 +143,7 @@ export const DagRadarMinimap: React.FC<DagRadarMinimapProps> = ({
         backgroundColor: "var(--cw-bg-surface)",
         border: "1px solid var(--cw-border-subtle)",
         borderRadius: `${BORDER_RADIUS_CONTAINER}px`,
-        boxShadow: "0 4px 16px rgba(8, 30, 58, 0.08)",
+        boxShadow: "var(--shadow-radar)",
         overflow: "hidden",
         zIndex: Z_INDEX_RADAR,
         pointerEvents: "none",
