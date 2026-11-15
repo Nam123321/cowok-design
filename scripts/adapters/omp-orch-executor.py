@@ -1594,6 +1594,7 @@ def validate_impl_plan_schema_and_paths(plan_path: Path) -> Tuple[bool, Optional
 
 def run_safe_test(test_cmd: str, cwd: Path, timeout: int = 300) -> subprocess.CompletedProcess:
     """Validates test command against prefix whitelist and enforces timeout (P1 Fix)."""
+    import shlex
     allowed_prefixes = (
         "pnpm test", "npm test", "yarn test", "pytest", "cargo test",
         "pnpm run test", "npm run test", "vitest", "tsc", "npx vitest"
@@ -1603,7 +1604,7 @@ def run_safe_test(test_cmd: str, cwd: Path, timeout: int = 300) -> subprocess.Co
         log(f"⚠️ Test command '{cmd_trimmed}' not in whitelist. Sanitizing to 'pnpm test'.")
         cmd_trimmed = "pnpm test"
 
-    return subprocess.run(cmd_trimmed, shell=True, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+    return subprocess.run(shlex.split(cmd_trimmed), shell=False, cwd=cwd, capture_output=True, text=True, timeout=timeout)
 
 def check_scope_lockdown(
     worktree_dir: Path,
