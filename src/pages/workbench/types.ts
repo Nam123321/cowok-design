@@ -1,10 +1,11 @@
-// @story 04.1, 04.3
+// @story 04.1, 04.3, 04.4
 export interface NodeSubSessionItem {
   nodeId: string;
   nodeTitle: string;
   screenKey: string;
+  compositeScopeKey?: string;
   messageCount?: number;
-  status?: "idle" | "running" | "queued" | "completed";
+  status?: "idle" | "running" | "queued" | "paused" | "interrupted" | "completed";
 }
 
 export interface ChatSession {

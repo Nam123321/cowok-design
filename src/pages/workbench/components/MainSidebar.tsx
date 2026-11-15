@@ -11,6 +11,7 @@ import { SidebarProjectGroup } from "./SidebarProjectGroup";
 import { SidebarSessionRow } from "./SidebarSessionRow";
 import { SidebarTrashJournalDrawer } from "./SidebarTrashJournalDrawer";
 import type { ThemeMode } from "./WorkbenchTopNav";
+import { useV7NodeSubSessions } from "../hooks/useAgentChatConversation";
 
 export type { ChatSession };
 
@@ -142,13 +143,17 @@ const SidebarFooter: React.FC<{
 export const MainSidebar: React.FC<MainSidebarProps> = (p) => {
   const { t } = useTranslation();
   const [isPinnedOpen, setIsPinnedOpen] = useState(true);
+  const v7SubMap = useV7NodeSubSessions(p.projectId, p.activeSessionId);
 
   if (p.isCollapsed) {
     return <SidebarCollapsedRail onToggleCollapse={p.onToggleCollapse} onOpenNewConversationModal={p.onOpenNewConversationModal} onOpenSettings={p.onOpenSettings} />;
   }
 
-  const pinned = p.sessions.filter((s) => s.isPinned);
-  const standalone = p.sessions.filter((s) => !s.projectId || s.projectId === "general" || s.projectId === "standalone");
+  const enrichedSessions = p.sessions.map((s) =>
+    v7SubMap[s.id]?.length ? { ...s, subSessions: v7SubMap[s.id] } : s
+  );
+  const pinned = enrichedSessions.filter((s) => s.isPinned);
+  const standalone = enrichedSessions.filter((s) => !s.projectId || s.projectId === "general" || s.projectId === "standalone");
 
   return (
     <aside className="workbench-main-sidebar" aria-label={t("workbench.sidebarAria", "Cây thư mục dự án và phiên hội thoại")} style={{ width: "240px", height: "100%", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-workspace)", borderRight: "1px solid var(--border-subtle)", boxSizing: "border-box", flexShrink: 0, fontFamily: "var(--font-sans)", position: "relative" }}>
@@ -162,14 +167,14 @@ export const MainSidebar: React.FC<MainSidebarProps> = (p) => {
             {isPinnedOpen && (
               <div style={{ marginTop: "2px" }}>
                 {pinned.map((s) => (
-                  <SidebarSessionRow key={`pinned-${s.id}`} session={s} keyPrefix="pinned" activeSessionId={p.activeSessionId} onSelectSession={p.onSelectSession} onTogglePinSession={p.onTogglePinSession} onRenameSession={p.onRenameSession} onDeleteSession={p.onDeleteSession} />
+                  <SidebarSessionRow key={`pinned-${s.id}`} session={s} keyPrefix="pinned" activeSessionId={p.activeSessionId} projectId={p.projectId} nodes={p.nodes} activeSubSessionKey={p.activeSubSessionKey} onSelectSession={p.onSelectSession} onSelectNodeSubSession={p.onSelectNodeSubSession} onTogglePinSession={p.onTogglePinSession} onRenameSession={p.onRenameSession} onDeleteSession={p.onDeleteSession} />
                 ))}
               </div>
             )}
           </div>
         )}
         <SidebarProjectGroup
-          projectId={p.projectId || DEFAULT_FLOW_PROJECT_ID} projectName={p.projectName} projects={p.projects} sessions={p.sessions}
+          projectId={p.projectId || DEFAULT_FLOW_PROJECT_ID} projectName={p.projectName} projects={p.projects} sessions={enrichedSessions}
           activeSessionId={p.activeSessionId} nodes={p.nodes} activeSubSessionKey={p.activeSubSessionKey}
           onSelectSession={p.onSelectSession} onSelectNodeSubSession={p.onSelectNodeSubSession}
           onOpenNewConversationModal={p.onOpenNewConversationModal} onToggleProjectFolder={p.onToggleProjectFolder}

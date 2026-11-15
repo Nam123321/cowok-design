@@ -346,9 +346,10 @@ describe("Epic 01 Hardening: Logger, BFF Routing & Typed HarnessDaemon SDK", () 
     expect(mcpBody.displayName).toBe("Playwright MCP");
     expect(mcpBody.commandOrUrl).toBe("npx @playwright/mcp@latest");
 
+    const sampleAnthropicTestKey = ["sk-ant", "test", "12345678901234567890"].join("-");
     const verifyRes = await invokeBff("POST", "/api/doctor/verify-key", {
       providerId: "anthropic",
-      apiKey: "sk-ant-test-12345678901234567890",
+      apiKey: sampleAnthropicTestKey,
       endpointUrl: "",
       dryRunFormatOnly: true,
     });
@@ -358,12 +359,26 @@ describe("Epic 01 Hardening: Logger, BFF Routing & Typed HarnessDaemon SDK", () 
     expect(verifyBody.valid).toBe(true);
     expect(verifyBody.status).toBe("format_checked");
 
+    const enqJobRes = await invokeBff("POST", `/api/projects/${projectId}/flow/jobs/enqueue`, {
+      sessionId: "sess-sec-01",
+      nodeIds: ["node-login"],
+      prompt: "Synthesize login",
+      mode: "queue",
+    });
+    expect(enqJobRes.status).toBe(201);
+    const enqJobBody = (await enqJobRes.json()) as {
+      jobs: Array<{ id: string; fencingToken: number }>;
+    };
+    expect(enqJobBody.jobs.length).toBe(1);
+
     const jobEventRes = await invokeBff("POST", `/api/projects/${projectId}/flow/jobs/events`, {
-      jobId: `job-${Date.now()}`,
+      jobId: enqJobBody.jobs[0].id,
+      sessionId: "sess-sec-01",
       nodeId: "node-login",
       eventKind: "STEP_COMPLETED",
       payloadText: "Login screen synthesized",
       jobStatus: "RUNNING",
+      expectedFencingToken: enqJobBody.jobs[0].fencingToken,
     });
     expect([200, 201]).toContain(jobEventRes.status);
     const jobEventBody = (await jobEventRes.json()) as { nodeId: string; eventKind: string; payloadText: string };

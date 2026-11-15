@@ -131,7 +131,7 @@ describe("Story 04.3: Keyed Parallel Engine, Contextual Multi-Node Floating Chat
 
       const chatWin = screen.getByTestId("contextual-node-floating-chat");
       expect(chatWin.style.height).toBe("auto");
-      expect(chatWin.style.maxHeight).toMatch(/(560px|680px)/);
+      expect(chatWin.style.maxHeight).toContain("850px");
       expect(screen.getByTestId("floating-chat-composer-wrapper")).toBeDefined();
 
       // Verify composite header tag and chips
@@ -162,6 +162,9 @@ describe("Story 04.3: Keyed Parallel Engine, Contextual Multi-Node Floating Chat
       const expandBtn = screen.getByTitle(/Mở rộng khung Chat/i);
       fireEvent.click(expandBtn);
       expect(screen.getByTestId("contextual-node-floating-chat")).toBeDefined();
+      for (const dir of ["n", "s", "e", "w", "ne", "nw", "se", "sw"]) {
+        expect(screen.getByTestId(`fc-resize-${dir}`)).toBeDefined();
+      }
 
       // Click collapse button back to pill
       const collapseBtn = screen.getByTitle(/Thu gọn thành Pill/i);
@@ -181,6 +184,10 @@ describe("Story 04.3: Keyed Parallel Engine, Contextual Multi-Node Floating Chat
             title: "Thiết kế Duyệt chi v2",
             projectId: "proj-treasury",
             updatedAt: "10:30",
+            subSessions: [
+              { nodeId: "node-scr-01", nodeTitle: "Login", screenKey: "SCR-01", status: "running" },
+              { nodeId: "node-scr-02", nodeTitle: "OTP Verify", screenKey: "SCR-02", status: "idle" },
+            ],
           }}
           keyPrefix="proj"
           activeSessionId="sess-abc"
@@ -206,6 +213,20 @@ describe("Story 04.3: Keyed Parallel Engine, Contextual Multi-Node Floating Chat
         "sess-abc",
         "node-scr-01"
       );
+    });
+
+    it("does not fabricate sub-session rows when session.subSessions is empty", () => {
+      render(
+        <SidebarSessionRow
+          session={{ id: "sess-empty", title: "Empty Flow", projectId: "proj-treasury", updatedAt: "10:31" }}
+          keyPrefix="proj"
+          activeSessionId="sess-empty"
+          projectId="proj-treasury"
+          nodes={[mockNodeA, mockNodeB]}
+          onSelectSession={vi.fn()}
+        />
+      );
+      expect(screen.queryByTestId("subsession-row-node-scr-01")).toBeNull();
     });
   });
 

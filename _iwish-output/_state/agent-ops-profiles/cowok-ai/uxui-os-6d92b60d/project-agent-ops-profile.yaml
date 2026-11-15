@@ -3,29 +3,29 @@ profile_kind: DERIVED_EVIDENCE_PROFILE
 repo_id: cowok-ai
 worktree_id: uxui-os-6d92b60d
 worktree_root: /Users/hatrang20061988/Desktop/AI Project/uxui-os
-git_head: 381dd87cc1d16158c64de324e74b2536b2982085
+git_head: 703e54ef9555530a3aa6fefa368e01aa9f9fd833
 policy_version: 2.1.0
 probe_version: 2.1.0
-generated_at: '2026-11-14T01:00:12.717394+00:00'
-sha256_digest: sha256:b89df79a65be436f23b93102a66bda41fe66873a2517c8dc4c529d23b716e126
+generated_at: '2026-11-15T11:51:52.490134+00:00'
+sha256_digest: sha256:b674f859ed58e357db6f5f6071f7eb1b193b68ced8504ad8aa233edfdfe7a9a0
 overall_status: NOT_READY
 delta_summary:
-  previous_digest: sha256:75c7b3610287b851f5abf236038911c4711d4f430d5aa7e0aa0af74056b39b94
+  previous_digest: sha256:b89df79a65be436f23b93102a66bda41fe66873a2517c8dc4c529d23b716e126
   digest_changed: true
   changed_probes: []
 source_manifest:
 - path: _iwish-output/2. Product Planning/2.5. architecture.md
   present: true
-  sha256: sha256:241181f1a85f83c14de4ecc8298ac93d80a7879f01b7be22ac31fd8da06fd129
+  sha256: sha256:81b4aa35575cdee99df7c667d089c6b41ff89fdfd0fdb1a2b3d6c46158fcc1f9
 - path: _iwish-output/3. Development/development-roadmap.md
   present: true
   sha256: sha256:73878146fd6fa36ff493c6eb8c98c43f1086117470f1ac3cd6d80d0bf7635bfc
 - path: prisma/schema.prisma
   present: true
-  sha256: sha256:24a96a0d445e4e152d589a378b76ba25e34953f9abadf7e7c66f68b8998ddcf6
+  sha256: sha256:3369079d201ef35e95a54d867b821f2dbb6aa834f32a73a8374c42de54586f27
 - path: src/lib/api-guard.ts
   present: true
-  sha256: sha256:837965a3269abf5b5c65755b2f5dd92922cc13274f7a6a3fabf88eb9a9e20805
+  sha256: sha256:972d9ae344106ef378c28c2c371821344063b9cecffe05c8f56d814703c2fd1b
 probes:
   M1:
     title: Auth, Tenant RLS & GuardedRoute Enforcement
@@ -34,7 +34,7 @@ probes:
     physical_status: PASS
     evidence:
     - path: src/lib/api-guard.ts
-      sha256: sha256:837965a3269abf5b5c65755b2f5dd92922cc13274f7a6a3fabf88eb9a9e20805
+      sha256: sha256:972d9ae344106ef378c28c2c371821344063b9cecffe05c8f56d814703c2fd1b
       assertion: guardedRoute & createCrossTenantHandler exported
     blockers: []
   M2:
@@ -78,7 +78,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: _iwish-output/2. Product Planning/2.5. architecture.md
-      sha256: sha256:241181f1a85f83c14de4ecc8298ac93d80a7879f01b7be22ac31fd8da06fd129
+      sha256: sha256:81b4aa35575cdee99df7c667d089c6b41ff89fdfd0fdb1a2b3d6c46158fcc1f9
       assertion: Execution services verified in src/
     blockers:
     - Missing plugin/tool execution service in src/
@@ -89,7 +89,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: prisma/schema.prisma
-      sha256: sha256:24a96a0d445e4e152d589a378b76ba25e34953f9abadf7e7c66f68b8998ddcf6
+      sha256: sha256:3369079d201ef35e95a54d867b821f2dbb6aa834f32a73a8374c42de54586f27
       assertion: Physical Prisma models verified
     blockers:
     - Missing required domain/registry models in Prisma schema
@@ -110,7 +110,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: prisma/schema.prisma
-      sha256: sha256:24a96a0d445e4e152d589a378b76ba25e34953f9abadf7e7c66f68b8998ddcf6
+      sha256: sha256:3369079d201ef35e95a54d867b821f2dbb6aa834f32a73a8374c42de54586f27
       assertion: PluginRegistry & CuratedPluginImportJob/CapabilityPackageVersion
         present
     blockers:

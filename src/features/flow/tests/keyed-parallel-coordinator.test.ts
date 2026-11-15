@@ -61,4 +61,42 @@ describe("KeyedParallelCoordinator (Story 04.3 - AC-01)", () => {
     coordinator.cancelJob(activeJob.id);
     expect(coordinator.getSummary().runningCount).toBe(0);
   });
+
+  it("should isolate queues by compositeScopeKey and keep unrelated scopes intact during partial reconcile", () => {
+    const coordinator = new KeyedParallelCoordinator(4);
+    const s1Job = coordinator.enqueueJob({ projectId: "p1", sessionId: "s1", nodeId: "node-shared", prompt: "S1" });
+    const s2Job = coordinator.enqueueJob({ projectId: "p1", sessionId: "s2", nodeId: "node-shared", prompt: "S2" });
+
+    expect(coordinator.getNodeStatus("node-shared", { projectId: "p1", sessionId: "s1" })?.jobId).toBe(s1Job.id);
+    expect(coordinator.getNodeStatus("node-shared", { projectId: "p1", sessionId: "s2" })?.jobId).toBe(s2Job.id);
+
+    // Unconfirmed steer does not drift fencingToken
+    const beforeToken = s1Job.fencingToken;
+    coordinator.steerJob(s1Job.id, "Keep calm");
+    expect(coordinator.getNodeStatus("node-shared", { projectId: "p1", sessionId: "s1" })?.fencingToken).toBe(beforeToken);
+
+    // Partial reconcile for s1 must not wipe s2
+    coordinator.reconcileFromDaemon(
+      [
+        {
+          id: s1Job.id,
+          projectId: "p1",
+          sessionId: "s1",
+          nodeId: "node-shared",
+          compositeScopeKey: "p1::s1::node-shared",
+          daemonNonce: "nonce-a",
+          status: "PAUSED",
+          fencingToken: beforeToken + 1,
+          priority: 10,
+          staleAfterTimestamp: null,
+          createdAt: 100,
+          updatedAt: 200,
+        },
+      ],
+      11
+    );
+
+    expect(coordinator.getNodeStatus("node-shared", { projectId: "p1", sessionId: "s1" })?.status).toBe("paused");
+    expect(coordinator.getNodeStatus("node-shared", { projectId: "p1", sessionId: "s2" })?.jobId).toBe(s2Job.id);
+  });
 });

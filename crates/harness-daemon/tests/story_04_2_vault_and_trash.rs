@@ -758,35 +758,46 @@ async fn test_empty_bearer_rejected_and_v7_workbench_convergence() {
         .1,
     )
     .unwrap();
+    let (enq1_st, enq1) = send_req(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/flow/jobs/enqueue", p.id),
+        &[("x-cowok-session-token", &tok_a)],
+        Some(json!({ "sessionId": "sess-sse-1", "nodeIds": ["node-a", "node-b"], "prompt": "Build", "mode": "parallel" })),
+    )
+    .await;
+    assert_eq!(enq1_st, StatusCode::CREATED, "{enq1}");
+    let job1_id = enq1["jobs"][0]["id"].as_str().unwrap().to_string();
+    let job2_id = enq1["jobs"][1]["id"].as_str().unwrap().to_string();
     let (e1_st, e1) = send_req(
         &router,
         "POST",
         &format!("/api/v1/projects/{}/flow/jobs/events", p.id),
         &[("x-cowok-session-token", &tok_a)],
-        Some(json!({ "jobId": "job-1", "nodeId": "node-a", "eventKind": "STEP_LOG", "payloadText": "one", "jobStatus": "PAUSED" })),
+        Some(json!({ "jobId": job1_id, "sessionId": "sess-sse-1", "nodeId": "node-a", "eventKind": "STEP_LOG", "payloadText": "one", "jobStatus": "PAUSED", "expectedFencingToken": 1 })),
     )
     .await;
     assert_eq!(e1_st, StatusCode::CREATED, "{e1}");
     assert_eq!(e1["jobStatus"], "PAUSED");
-    assert_eq!(e1["projectSeq"], 1);
+    assert_eq!(e1["projectSeq"], 3);
     let (e2_st, e2) = send_req(
         &router,
         "POST",
         &format!("/api/v1/projects/{}/flow/jobs/events", p.id),
         &[("x-cowok-session-token", &tok_a)],
-        Some(json!({ "jobId": "job-2", "nodeId": "node-b", "eventKind": "COMPLETED", "payloadText": "two", "jobStatus": "COMPLETED" })),
+        Some(json!({ "jobId": job2_id, "sessionId": "sess-sse-1", "nodeId": "node-b", "eventKind": "COMPLETED", "payloadText": "two", "jobStatus": "COMPLETED", "expectedFencingToken": 1 })),
     )
     .await;
     assert_eq!(e2_st, StatusCode::CREATED, "{e2}");
-    assert_eq!(e2["projectSeq"], 2);
+    assert_eq!(e2["projectSeq"], 4);
 
-    // 6. SSE resume with Last-Event-ID: 1 resumes at project_seq 2 without replaying seq 1
+    // 6. SSE resume with Last-Event-ID: 3 resumes at project_seq 4 without replaying seq 3
     let sse_req = Request::builder()
         .method("GET")
         .uri(format!("/api/v1/projects/{}/flow/jobs/stream", p.id))
         .header("host", "127.0.0.1:4170")
         .header("x-cowok-session-token", &tok_a)
-        .header("last-event-id", "1")
+        .header("last-event-id", "3")
         .body(Body::empty())
         .unwrap();
     let sse_resp = router.clone().oneshot(sse_req).await.unwrap();
@@ -798,14 +809,14 @@ async fn test_empty_bearer_rejected_and_v7_workbench_convergence() {
         .expect("SSE stream ended")
         .expect("SSE frame ok");
     let text = String::from_utf8_lossy(frame.data_ref().expect("data frame")).into_owned();
-    assert!(text.contains("id: 2"), "Expected SSE id: 2, got: {text}");
+    assert!(text.contains("id: 4"), "Expected SSE id: 4, got: {text}");
     assert!(
         text.contains("\"payloadText\":\"two\""),
         "Expected job-2 payload, got: {text}"
     );
     assert!(
         !text.contains("\"payloadText\":\"one\""),
-        "Must not replay seq 1: {text}"
+        "Must not replay seq 3: {text}"
     );
 }
 
@@ -853,34 +864,36 @@ async fn test_cross_scope_job_event_and_sensitive_fs_browse_guards() {
     )
     .unwrap();
 
-    // Seed session & job in p_a and p_b
-    let (s_st, _) = send_req(
+    // Seed session & job in p_a and p_b via /flow/jobs/enqueue
+    let (s_st, s_enq) = send_req(
         &router,
         "POST",
-        &format!("/api/v1/projects/{}/flow/jobs/events", p_a.id),
+        &format!("/api/v1/projects/{}/flow/jobs/enqueue", p_a.id),
         &[("x-cowok-session-token", &tok_a)],
-        Some(json!({ "jobId": "job-a-owned", "sessionId": "sess-a-owned", "nodeId": "n1", "eventKind": "started" })),
+        Some(json!({ "sessionId": "sess-a-owned", "nodeIds": ["n1"], "prompt": "Start", "mode": "parallel" })),
     )
     .await;
-    assert_eq!(s_st, StatusCode::CREATED);
-    let (sb_st, _) = send_req(
+    assert_eq!(s_st, StatusCode::CREATED, "{s_enq}");
+    let job_a_id = s_enq["jobs"][0]["id"].as_str().unwrap().to_string();
+    let (sb_st, sb_enq) = send_req(
         &router,
         "POST",
-        &format!("/api/v1/projects/{}/flow/jobs/events", p_b.id),
+        &format!("/api/v1/projects/{}/flow/jobs/enqueue", p_b.id),
         &[("x-cowok-session-token", &tok_b)],
-        Some(json!({ "jobId": "job-b-owned", "sessionId": "sess-b-owned", "nodeId": "n1", "eventKind": "started" })),
+        Some(json!({ "sessionId": "sess-b-owned", "nodeIds": ["n1"], "prompt": "Start", "mode": "parallel" })),
     )
     .await;
-    assert_eq!(sb_st, StatusCode::CREATED);
+    assert_eq!(sb_st, StatusCode::CREATED, "{sb_enq}");
+    let job_b_id = sb_enq["jobs"][0]["id"].as_str().unwrap().to_string();
 
     // Same-tenant cross-project sessionId / jobId -> 404 PROJECT_NOT_FOUND
     assert_eq!(
         send_req(
             &router,
             "POST",
-            &format!("/api/v1/projects/{}/flow/jobs/events", p_a2.id),
+            &format!("/api/v1/projects/{}/flow/jobs/enqueue", p_a2.id),
             &[("x-cowok-session-token", &tok_a)],
-            Some(json!({ "jobId": "fresh-job", "sessionId": "sess-a-owned", "nodeId": "n1", "eventKind": "started" })),
+            Some(json!({ "sessionId": "sess-a-owned", "nodeIds": ["n1"], "prompt": "Hijack", "mode": "parallel" })),
         )
         .await
         .0,
@@ -892,7 +905,7 @@ async fn test_cross_scope_job_event_and_sensitive_fs_browse_guards() {
             "POST",
             &format!("/api/v1/projects/{}/flow/jobs/events", p_a2.id),
             &[("x-cowok-session-token", &tok_a)],
-            Some(json!({ "jobId": "job-a-owned", "nodeId": "n1", "eventKind": "started" })),
+            Some(json!({ "jobId": job_a_id, "nodeId": "n1", "eventKind": "started", "expectedFencingToken": 1 })),
         )
         .await
         .0,
@@ -904,9 +917,9 @@ async fn test_cross_scope_job_event_and_sensitive_fs_browse_guards() {
         send_req(
             &router,
             "POST",
-            &format!("/api/v1/projects/{}/flow/jobs/events", p_a.id),
+            &format!("/api/v1/projects/{}/flow/jobs/enqueue", p_a.id),
             &[("x-cowok-session-token", &tok_a)],
-            Some(json!({ "jobId": "fresh-job-2", "sessionId": "sess-b-owned", "nodeId": "n1", "eventKind": "started" })),
+            Some(json!({ "sessionId": "sess-b-owned", "nodeIds": ["n1"], "prompt": "Cross", "mode": "parallel" })),
         )
         .await
         .0,
@@ -918,7 +931,7 @@ async fn test_cross_scope_job_event_and_sensitive_fs_browse_guards() {
             "POST",
             &format!("/api/v1/projects/{}/flow/jobs/events", p_a.id),
             &[("x-cowok-session-token", &tok_a)],
-            Some(json!({ "jobId": "job-b-owned", "nodeId": "n1", "eventKind": "started" })),
+            Some(json!({ "jobId": job_b_id, "nodeId": "n1", "eventKind": "started", "expectedFencingToken": 1 })),
         )
         .await
         .0,
