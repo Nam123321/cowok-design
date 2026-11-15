@@ -9,6 +9,7 @@
 use domain::{ConstraintProfile, Department, HarnessError, Portal};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::time::Instant;
 use uuid::Uuid;
 
@@ -243,6 +244,10 @@ impl ConstraintEvaluator {
                 "raw-hex" | "hex" | "inline-hex" => {
                     ("BAN_INLINE_HEX".to_string(), "BLOCKER".to_string())
                 }
+                other if other.starts_with("rule:") => (
+                    other["rule:".len()..].to_ascii_uppercase(),
+                    "BLOCKER".to_string(),
+                ),
                 other => (
                     format!("FORBID_{}", other.to_ascii_uppercase().replace('-', "_")),
                     "BLOCKER".to_string(),
@@ -292,6 +297,9 @@ impl ConstraintEvaluator {
                         .to_ascii_lowercase()
                         .replace('_', "-"),
                 );
+            } else {
+                // Preserve non-AST rules (e.g. RESTRICT_DEPARTMENT, ENFORCE_ICON_MANIFEST, etc.)
+                forbidden.push(format!("rule:{}", r.rule_code.to_ascii_lowercase()));
             }
         }
         ConstraintProfile {
@@ -417,6 +425,7 @@ struct AstCollectedNodes<'a> {
     styles: Vec<(&'a str, oxc_span::Span)>,
     components: Vec<(String, oxc_span::Span)>,
     component_props: Vec<(String, Vec<(String, oxc_span::Span)>)>,
+    unsafe_tags: Vec<(String, oxc_span::Span)>,
     icons: Vec<(&'a str, oxc_span::Span)>,
     typography_samples: Vec<AstTypographySample<'a>>,
 }
@@ -451,6 +460,35 @@ impl AstLinter {
         Ok(())
     }
 
+    fn walk_class<'a>(
+        class_decl: &'a oxc_ast::ast::Class<'a>,
+        nodes: &mut AstCollectedNodes<'a>,
+        content: &str,
+    ) {
+        for elem in &class_decl.body.body {
+            match elem {
+                oxc_ast::ast::ClassElement::MethodDefinition(m) => {
+                    if let Some(body) = &m.value.body {
+                        for s in &body.statements {
+                            Self::walk_statement(s, nodes, content);
+                        }
+                    }
+                }
+                oxc_ast::ast::ClassElement::PropertyDefinition(p) => {
+                    if let Some(val) = &p.value {
+                        Self::walk_expression(val, nodes, content);
+                    }
+                }
+                oxc_ast::ast::ClassElement::StaticBlock(b) => {
+                    for s in &b.body {
+                        Self::walk_statement(s, nodes, content);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     fn walk_statement<'a>(
         stmt: &'a oxc_ast::ast::Statement<'a>,
         nodes: &mut AstCollectedNodes<'a>,
@@ -467,6 +505,9 @@ impl AstLinter {
                             Self::walk_statement(s, nodes, content);
                         }
                     }
+                }
+                oxc_ast::ast::ExportDefaultDeclarationKind::ClassDeclaration(c) => {
+                    Self::walk_class(c, nodes, content);
                 }
                 _ => {
                     if let Some(expr) = d.declaration.as_expression() {
@@ -489,6 +530,9 @@ impl AstLinter {
                         }
                     }
                 }
+                oxc_ast::ast::Declaration::ClassDeclaration(c) => {
+                    Self::walk_class(c, nodes, content);
+                }
                 _ => {}
             },
             oxc_ast::ast::Statement::VariableDeclaration(v) => {
@@ -504,6 +548,9 @@ impl AstLinter {
                         Self::walk_statement(s, nodes, content);
                     }
                 }
+            }
+            oxc_ast::ast::Statement::ClassDeclaration(c) => {
+                Self::walk_class(c, nodes, content);
             }
             oxc_ast::ast::Statement::BlockStatement(b) => {
                 for s in &b.body {
@@ -619,6 +666,9 @@ impl AstLinter {
                     }
                 }
             }
+            oxc_ast::ast::Expression::ClassExpression(c) => {
+                Self::walk_class(c, nodes, content);
+            }
             oxc_ast::ast::Expression::ConditionalExpression(c) => {
                 Self::walk_expression(&c.consequent, nodes, content);
                 Self::walk_expression(&c.alternate, nodes, content);
@@ -731,6 +781,9 @@ impl AstLinter {
                 for quasi in &tpl.quasis {
                     ast_classes.push((quasi.value.raw.as_str(), quasi.span));
                 }
+                for sub in &tpl.expressions {
+                    Self::extract_classes_from_expr(sub, ast_classes);
+                }
             }
             oxc_ast::ast::Expression::ParenthesizedExpression(p) => {
                 Self::extract_classes_from_expr(&p.expression, ast_classes);
@@ -742,6 +795,10 @@ impl AstLinter {
             oxc_ast::ast::Expression::LogicalExpression(l) => {
                 Self::extract_classes_from_expr(&l.left, ast_classes);
                 Self::extract_classes_from_expr(&l.right, ast_classes);
+            }
+            oxc_ast::ast::Expression::BinaryExpression(b) => {
+                Self::extract_classes_from_expr(&b.left, ast_classes);
+                Self::extract_classes_from_expr(&b.right, ast_classes);
             }
             oxc_ast::ast::Expression::CallExpression(c) => {
                 for arg in &c.arguments {
@@ -756,6 +813,42 @@ impl AstLinter {
                         Self::extract_classes_from_expr(el_expr, ast_classes);
                     }
                 }
+            }
+            oxc_ast::ast::Expression::ObjectExpression(obj) => {
+                for prop_kind in &obj.properties {
+                    match prop_kind {
+                        oxc_ast::ast::ObjectPropertyKind::ObjectProperty(prop) => {
+                            use oxc_span::GetSpan;
+                            match &prop.key {
+                                oxc_ast::ast::PropertyKey::StaticIdentifier(id) => {
+                                    ast_classes.push((id.name.as_str(), id.span()));
+                                }
+                                oxc_ast::ast::PropertyKey::StringLiteral(s) => {
+                                    if let Some(raw) = s.value.as_str() {
+                                        ast_classes.push((raw, s.span()));
+                                    }
+                                }
+                                _ => {}
+                            }
+                            Self::extract_classes_from_expr(&prop.value, ast_classes);
+                        }
+                        oxc_ast::ast::ObjectPropertyKind::SpreadProperty(sp) => {
+                            Self::extract_classes_from_expr(&sp.argument, ast_classes);
+                        }
+                    }
+                }
+            }
+            oxc_ast::ast::Expression::TSAsExpression(ts) => {
+                Self::extract_classes_from_expr(&ts.expression, ast_classes);
+            }
+            oxc_ast::ast::Expression::TSSatisfiesExpression(ts) => {
+                Self::extract_classes_from_expr(&ts.expression, ast_classes);
+            }
+            oxc_ast::ast::Expression::TSTypeAssertion(ts) => {
+                Self::extract_classes_from_expr(&ts.expression, ast_classes);
+            }
+            oxc_ast::ast::Expression::TSNonNullExpression(ts) => {
+                Self::extract_classes_from_expr(&ts.expression, ast_classes);
             }
             _ => {}
         }
@@ -786,12 +879,35 @@ impl AstLinter {
                     out.push((s, lit.span));
                 }
             }
+            oxc_ast::ast::Expression::TemplateLiteral(tpl) => {
+                for quasi in &tpl.quasis {
+                    let raw = quasi.value.raw.as_str();
+                    if !raw.is_empty() {
+                        out.push((raw, quasi.span));
+                    }
+                }
+                for sub in &tpl.expressions {
+                    Self::collect_string_expr_values(sub, out);
+                }
+            }
             oxc_ast::ast::Expression::ConditionalExpression(cond) => {
                 Self::collect_string_expr_values(&cond.consequent, out);
                 Self::collect_string_expr_values(&cond.alternate, out);
             }
             oxc_ast::ast::Expression::LogicalExpression(l) => {
+                Self::collect_string_expr_values(&l.left, out);
                 Self::collect_string_expr_values(&l.right, out);
+            }
+            oxc_ast::ast::Expression::BinaryExpression(b) => {
+                Self::collect_string_expr_values(&b.left, out);
+                Self::collect_string_expr_values(&b.right, out);
+            }
+            oxc_ast::ast::Expression::ArrayExpression(arr) => {
+                for el in &arr.elements {
+                    if let Some(el_expr) = el.as_expression() {
+                        Self::collect_string_expr_values(el_expr, out);
+                    }
+                }
             }
             oxc_ast::ast::Expression::ParenthesizedExpression(p) => {
                 Self::collect_string_expr_values(&p.expression, out);
@@ -800,6 +916,12 @@ impl AstLinter {
                 Self::collect_string_expr_values(&ts.expression, out);
             }
             oxc_ast::ast::Expression::TSSatisfiesExpression(ts) => {
+                Self::collect_string_expr_values(&ts.expression, out);
+            }
+            oxc_ast::ast::Expression::TSTypeAssertion(ts) => {
+                Self::collect_string_expr_values(&ts.expression, out);
+            }
+            oxc_ast::ast::Expression::TSNonNullExpression(ts) => {
                 Self::collect_string_expr_values(&ts.expression, out);
             }
             _ => {}
@@ -922,12 +1044,19 @@ impl AstLinter {
         let tag_name = Self::extract_jsx_tag_name(&el.opening_element.name, content);
         let mut props_collected: Vec<(String, oxc_span::Span)> = Vec::new();
         if !tag_name.is_empty() {
-            nodes
-                .components
-                .push((tag_name.clone(), el.opening_element.name.span()));
+            let tag_span = el.opening_element.name.span();
+            let lower_tag = tag_name.to_ascii_lowercase();
+            if matches!(
+                lower_tag.as_str(),
+                "script" | "iframe" | "object" | "embed" | "foreignobject"
+            ) {
+                nodes.unsafe_tags.push((tag_name.clone(), tag_span));
+            }
+            nodes.components.push((tag_name.clone(), tag_span));
         }
+        let leaf_tag = tag_name.rsplit('.').next().unwrap_or(tag_name.as_str());
         let is_icon_component = matches!(
-            tag_name.as_str(),
+            leaf_tag,
             "BrandIcon" | "CowokIcon" | "Icon" | "AgentMktBrandIcon"
         );
 
@@ -960,6 +1089,12 @@ impl AstLinter {
                                             nodes
                                                 .classes
                                                 .push((quasi.value.raw.as_str(), quasi.span));
+                                        }
+                                        for sub in &tpl.expressions {
+                                            Self::extract_classes_from_expr(
+                                                sub,
+                                                &mut nodes.classes,
+                                            );
                                         }
                                     }
                                     _ => {
@@ -1106,6 +1241,26 @@ impl AstLinter {
         typography_contract: Option<&TypographyContract>,
         component_registry: Option<&ComponentRegistryContract>,
     ) -> Result<Vec<ConstraintViolation>, HarnessError> {
+        Self::lint_source_with_design_context(
+            content,
+            rules,
+            icon_manifest,
+            typography_contract,
+            component_registry,
+            None,
+        )
+    }
+
+    /// Full design-context AST linter that also resolves CSS custom properties (`var(--token)`)
+    /// against `tokens.css` before falling back to `UNVERIFIED_DYNAMIC_CONTRAST`.
+    pub fn lint_source_with_design_context(
+        content: &str,
+        rules: &[ActiveConstraint],
+        icon_manifest: Option<&IconManifest>,
+        typography_contract: Option<&TypographyContract>,
+        component_registry: Option<&ComponentRegistryContract>,
+        tokens_css: Option<&str>,
+    ) -> Result<Vec<ConstraintViolation>, HarnessError> {
         let start_time = Instant::now();
 
         if content.len() > Self::MAX_SOURCE_BYTES {
@@ -1172,6 +1327,7 @@ impl AstLinter {
             && icon_manifest.is_none()
             && typography_contract.is_none()
             && !has_comp_enforcement
+            && nodes.unsafe_tags.is_empty()
         {
             return Ok(Vec::new());
         }
@@ -1200,6 +1356,20 @@ impl AstLinter {
         };
 
         let mut violations = Vec::new();
+
+        for (unsafe_tag, span) in &nodes.unsafe_tags {
+            let (line, col) = byte_to_line_col(span.start as usize);
+            violations.push(ConstraintViolation {
+                rule_code: "FORBID_UNSAFE_JSX_TAG".to_string(),
+                severity: "BLOCKER".to_string(),
+                message: format!(
+                    "UNSAFE_JSX_TAG_BLOCKED: Intrinsic element '<{}>' is forbidden by zero-trust security policy",
+                    unsafe_tag
+                ),
+                line: Some(line),
+                column: Some(col),
+            });
+        }
 
         if let Some(rule) = tailwind_rule {
             for (class_str, span) in &nodes.classes {
@@ -1319,26 +1489,18 @@ impl AstLinter {
 
         // 4. Enforce TypographyContract on extracted inline JSX typography props
         if let Some(contract) = typography_contract {
-            let fallback_family = contract
-                .allowed_font_families
-                .first()
-                .map(|s| s.as_str())
-                .unwrap_or("Geist");
-            let fallback_weight = contract
-                .allowed_font_weights
-                .first()
-                .copied()
-                .unwrap_or(400);
+            let css_vars = tokens_css
+                .map(Self::parse_css_variables)
+                .unwrap_or_default();
 
             for sample in &nodes.typography_samples {
-                let check_family = sample.font_family.unwrap_or(fallback_family);
-                let check_weight = sample.font_weight.unwrap_or(fallback_weight);
-                let computed_contrast = match (
-                    sample.color.and_then(Self::parse_static_css_color),
-                    sample
-                        .background_color
-                        .and_then(Self::parse_static_css_color),
-                ) {
+                let resolved_fg = sample
+                    .color
+                    .and_then(|c| Self::resolve_css_color(c, &css_vars));
+                let resolved_bg = sample
+                    .background_color
+                    .and_then(|c| Self::resolve_css_color(c, &css_vars));
+                let computed_contrast = match (resolved_fg, resolved_bg) {
                     (Some(fg), Some(bg)) => Self::wcag_contrast_ratio(fg, bg),
                     _ => {
                         if sample.color.is_some() || sample.background_color.is_some() {
@@ -1354,8 +1516,35 @@ impl AstLinter {
                         contract.min_wcag_contrast
                     }
                 };
+
+                // Skip empty contract dimension checks when inline sample did not set that property
+                let (check_family, eff_family_list): (&str, Option<Vec<String>>) =
+                    match (sample.font_family, contract.allowed_font_families.first()) {
+                        (Some(f), _) => (f, None),
+                        (None, Some(first)) => (first.as_str(), None),
+                        (None, None) => ("__unset__", Some(vec!["__unset__".to_string()])),
+                    };
+                let (check_weight, eff_weight_list): (u32, Option<Vec<u32>>) =
+                    match (sample.font_weight, contract.allowed_font_weights.first()) {
+                        (Some(w), _) => (w, None),
+                        (None, Some(&first)) => (first, None),
+                        (None, None) => (0, Some(vec![0])),
+                    };
+                let effective_contract = if eff_family_list.is_some() || eff_weight_list.is_some() {
+                    let mut cloned = contract.clone();
+                    if let Some(f) = eff_family_list {
+                        cloned.allowed_font_families = f;
+                    }
+                    if let Some(w) = eff_weight_list {
+                        cloned.allowed_font_weights = w;
+                    }
+                    std::borrow::Cow::Owned(cloned)
+                } else {
+                    std::borrow::Cow::Borrowed(contract)
+                };
+
                 if let Err(errs) = IconValidator::validate_typography(
-                    contract,
+                    effective_contract.as_ref(),
                     check_family,
                     check_weight,
                     sample.font_size,
@@ -1411,7 +1600,7 @@ impl AstLinter {
                 if let Some(entry) = comp_contract
                     .components
                     .iter()
-                    .find(|c| c.name.eq_ignore_ascii_case(comp_name))
+                    .find(|c| c.name == *comp_name)
                 {
                     if !entry.allowed_props.is_empty() {
                         for (prop_name, prop_span) in used_props {
@@ -1456,6 +1645,49 @@ impl AstLinter {
         Ok(violations)
     }
 
+    fn parse_css_variables(tokens_css: &str) -> HashMap<String, String> {
+        let mut vars = HashMap::new();
+        for segment in tokens_css.split([';', '{', '}']) {
+            let trimmed = segment.trim();
+            if trimmed.starts_with("--") {
+                if let Some((key, val)) = trimmed.split_once(':') {
+                    let clean_key = key.trim();
+                    let clean_val = val.trim();
+                    if !clean_key.is_empty() && !clean_val.is_empty() {
+                        vars.insert(clean_key.to_string(), clean_val.to_string());
+                    }
+                }
+            }
+        }
+        vars
+    }
+
+    fn resolve_css_color(raw: &str, vars: &HashMap<String, String>) -> Option<(u8, u8, u8)> {
+        let mut current = raw.trim();
+        for _ in 0..4 {
+            if let Some(parsed) = Self::parse_static_css_color(current) {
+                return Some(parsed);
+            }
+            if !current
+                .get(..4)
+                .is_some_and(|p| p.eq_ignore_ascii_case("var("))
+                || !current.ends_with(')')
+            {
+                break;
+            }
+            let rest = &current[4..current.len() - 1];
+            let var_name = rest.split(',').next().map(str::trim).unwrap_or("");
+            if let Some(resolved) = vars.get(var_name) {
+                current = resolved.as_str();
+            } else if let Some(fallback) = rest.split_once(',').map(|(_, fb)| fb.trim()) {
+                return Self::parse_static_css_color(fallback);
+            } else {
+                break;
+            }
+        }
+        None
+    }
+
     fn parse_static_css_color(raw: &str) -> Option<(u8, u8, u8)> {
         let s = raw.trim().to_ascii_lowercase();
         if let Some(hex) = s.strip_prefix('#') {
@@ -1481,13 +1713,17 @@ impl AstLinter {
             .strip_prefix("rgb(")
             .or_else(|| s.strip_prefix("rgba("))?
             .strip_suffix(')')?;
-        let parts: Vec<&str> = inner.split([',', '/']).take(3).collect();
+        let parts: Vec<&str> = inner
+            .split(|c: char| c == ',' || c == '/' || c.is_whitespace())
+            .filter(|p| !p.is_empty())
+            .take(3)
+            .collect();
         if parts.len() < 3 {
             return None;
         }
-        let r = parts[0].trim().parse::<u8>().ok()?;
-        let g = parts[1].trim().parse::<u8>().ok()?;
-        let b = parts[2].trim().parse::<u8>().ok()?;
+        let r = parts[0].parse::<u8>().ok()?;
+        let g = parts[1].parse::<u8>().ok()?;
+        let b = parts[2].parse::<u8>().ok()?;
         Some((r, g, b))
     }
 
@@ -1510,15 +1746,39 @@ impl AstLinter {
         (lighter + 0.05) / (darker + 0.05)
     }
 
+    fn split_last_outside_brackets(token: &str) -> &str {
+        let mut depth = 0usize;
+        let mut last_colon = None;
+        for (idx, ch) in token.char_indices() {
+            match ch {
+                '[' => depth += 1,
+                ']' => depth = depth.saturating_sub(1),
+                ':' if depth == 0 => last_colon = Some(idx),
+                _ => {}
+            }
+        }
+        match last_colon {
+            Some(pos) => &token[pos + 1..],
+            None => token,
+        }
+    }
+
     fn is_tailwind_token(token: &str) -> bool {
-        let base = if let Some(colon_pos) = token.rfind(':') {
-            &token[colon_pos + 1..]
-        } else {
-            token
-        };
+        let after_variant = Self::split_last_outside_brackets(token);
+
+        // Strip Tailwind `!` important modifier and leading `-` negative modifier, and trailing `/opacity`
+        let without_important = after_variant.strip_prefix('!').unwrap_or(after_variant);
+        let without_neg = without_important
+            .strip_prefix('-')
+            .unwrap_or(without_important);
+        let base = without_neg.split('/').next().unwrap_or(without_neg);
 
         if base.is_empty() {
             return false;
+        }
+
+        if base.starts_with('[') && base.ends_with(']') && base.contains(':') {
+            return true;
         }
 
         const EXACT_KEYWORDS: &[&str] = &[

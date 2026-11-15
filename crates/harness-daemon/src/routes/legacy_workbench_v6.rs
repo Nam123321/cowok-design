@@ -883,7 +883,7 @@ pub async fn handle_upsert_agent_setting(
     let perm_mode = req.permission_mode.trim();
     if !matches!(
         perm_mode,
-        "ask-every-time" | "auto_sandbox" | "ask_risky" | "ask_all" | "accept_edits" | "bypass"
+        "ask-every-time" | "auto_sandbox" | "ask_risky" | "ask_all" | "accept_edits"
     ) {
         return Err(json_err(
             StatusCode::BAD_REQUEST,
@@ -1335,6 +1335,51 @@ const ALLOWED_STDIO_RUNNERS: &[&str] = &[
     "npx", "uvx", "uv", "node", "deno", "bun", "python", "python3", "docker", "podman", "cargo",
 ];
 
+const BLOCKED_PYTHON_MODULES: &[&str] = &[
+    "os",
+    "subprocess",
+    "http",
+    "http.server",
+    "pip",
+    "pdb",
+    "code",
+    "venv",
+    "webbrowser",
+    "timeit",
+    "pty",
+    "shutil",
+    "socket",
+    "ftplib",
+    "smtplib",
+    "cgi",
+    "cgitb",
+];
+
+fn is_loopback_authority(url_str: &str) -> bool {
+    let Ok(uri) = url_str.parse::<axum::http::Uri>() else {
+        return false;
+    };
+    let Some(raw_host) = uri.host() else {
+        return false;
+    };
+    let host_clean = raw_host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .to_ascii_lowercase();
+    if host_clean == "localhost" || host_clean.ends_with(".localhost") {
+        return true;
+    }
+    if let Ok(ip) = host_clean.parse::<IpAddr>() {
+        return match ip {
+            IpAddr::V4(v4) => v4.is_loopback(),
+            IpAddr::V6(v6) => {
+                v6.is_loopback() || v6.to_ipv4_mapped().is_some_and(|v4| v4.is_loopback())
+            }
+        };
+    }
+    false
+}
+
 fn validate_mcp_target(transport_kind: &str, raw_target: &str) -> Result<String, Response> {
     let target = check_non_empty_id(raw_target, "commandOrUrl")?;
     if target.chars().any(|c| c.is_control()) {
@@ -1352,6 +1397,13 @@ fn validate_mcp_target(transport_kind: &str, raw_target: &str) -> Result<String,
                 format!("http_sse URL rejected: {e}"),
             )
         })?;
+        if !target.to_ascii_lowercase().starts_with("https://") && !is_loopback_authority(&target) {
+            return Err(json_err(
+                StatusCode::BAD_REQUEST,
+                "SSRF_VIOLATION",
+                "Remote http_sse MCP servers must use https://",
+            ));
+        }
     } else {
         if [";", "&&", "||", "|", "`", "$(", "${", ">", "<", "&"]
             .iter()
@@ -1371,30 +1423,89 @@ fn validate_mcp_target(transport_kind: &str, raw_target: &str) -> Result<String,
                 "stdio commandOrUrl cannot be empty",
             ));
         };
-        let bin_name = std::path::Path::new(first_tok)
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or(first_tok);
-        let is_allowed_runner = ALLOWED_STDIO_RUNNERS.contains(&bin_name)
-            || bin_name.starts_with("mcp-server-")
-            || bin_name.starts_with("mcp_");
-        if !is_allowed_runner {
+        if first_tok.contains('/') || first_tok.contains('\\') {
             return Err(json_err(
                 StatusCode::BAD_REQUEST,
                 "VALIDATION_ERROR",
-                format!("stdio runner '{bin_name}' is not in allowed MCP launcher allowlist"),
+                "stdio runner must be an unqualified allowlisted binary name without path separators",
             ));
         }
-        if tokens
-            .iter()
-            .skip(1)
-            .any(|arg| matches!(*arg, "-c" | "--eval" | "-e" | "/c"))
-        {
+        if !ALLOWED_STDIO_RUNNERS.contains(&first_tok) {
             return Err(json_err(
                 StatusCode::BAD_REQUEST,
                 "VALIDATION_ERROR",
-                "stdio inline code execution flags (-c, -e, --eval, /c) are blocked",
+                format!("stdio runner '{first_tok}' is not in allowed MCP launcher allowlist"),
             ));
+        }
+        let is_interpreter = matches!(first_tok, "node" | "deno" | "bun" | "python" | "python3");
+        let mut iter = tokens.iter().skip(1).peekable();
+        while let Some(&raw_arg) = iter.next() {
+            let arg_lower = raw_arg.to_ascii_lowercase();
+            let flag_head = arg_lower.split('=').next().unwrap_or(arg_lower.as_str());
+            if matches!(
+                flag_head,
+                "-c" | "-e"
+                    | "-p"
+                    | "--eval"
+                    | "--print"
+                    | "-r"
+                    | "--require"
+                    | "--import"
+                    | "/c"
+                    | "eval"
+                    | "exec"
+                    | "--exec"
+            ) || (is_interpreter
+                && raw_arg.starts_with('-')
+                && !raw_arg.starts_with("--")
+                && raw_arg[1..]
+                    .chars()
+                    .any(|ch| matches!(ch, 'c' | 'e' | 'p' | 'r')))
+            {
+                return Err(json_err(
+                    StatusCode::BAD_REQUEST,
+                    "VALIDATION_ERROR",
+                    "stdio inline code execution and preload flags are blocked",
+                ));
+            }
+            if matches!(first_tok, "python" | "python3") && raw_arg == "-m" {
+                let Some(&module_name) = iter.peek() else {
+                    return Err(json_err(
+                        StatusCode::BAD_REQUEST,
+                        "VALIDATION_ERROR",
+                        "python -m requires a valid module name",
+                    ));
+                };
+                let mod_lower = module_name.to_ascii_lowercase();
+                let valid_ident = !mod_lower.is_empty()
+                    && mod_lower
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.');
+                if !valid_ident
+                    || mod_lower.contains("..")
+                    || BLOCKED_PYTHON_MODULES
+                        .iter()
+                        .any(|b| mod_lower == *b || mod_lower.starts_with(&format!("{b}.")))
+                {
+                    return Err(json_err(
+                        StatusCode::BAD_REQUEST,
+                        "VALIDATION_ERROR",
+                        format!("python module '{module_name}' is not permitted for stdio MCP"),
+                    ));
+                }
+            }
+            if is_interpreter
+                && !raw_arg.starts_with('-')
+                && [".js", ".mjs", ".cjs", ".py", ".sh", ".rb", ".pl"]
+                    .iter()
+                    .any(|ext| arg_lower.ends_with(ext))
+            {
+                return Err(json_err(
+                    StatusCode::BAD_REQUEST,
+                    "VALIDATION_ERROR",
+                    "Direct arbitrary script file execution is blocked for interpreter stdio runners",
+                ));
+            }
         }
     }
     Ok(target)
@@ -1872,8 +1983,8 @@ fn fetch_pending_events(
 
     let is_terminal = if let Some(ref jid) = state.job_id {
         conn.query_row(
-            "SELECT status FROM node_execution_jobs WHERE id = ?1 AND project_id = ?2",
-            params![jid, state.project_id],
+            "SELECT status FROM node_execution_jobs WHERE id = ?1 AND project_id = ?2 AND tenant_id = ?3",
+            params![jid, state.project_id, state.tenant_id],
             |r| r.get::<_, String>(0),
         )
         .optional()
@@ -2081,5 +2192,18 @@ mod tests {
         assert!(validate_mcp_target("http_sse", "http://169.254.169.254/sse").is_err());
         assert!(validate_mcp_target("http_sse", "http://10.0.0.1:8080/sse").is_err());
         assert!(validate_mcp_target("http_sse", "http://127.0.0.1:22/sse").is_err());
+        // Remote http_sse must use https://
+        assert!(validate_mcp_target("http_sse", "http://mcp.example.com/sse").is_err());
+    }
+
+    #[test]
+    fn test_stdio_command_blocks_wildcards_paths_and_inline_eval() {
+        assert!(validate_mcp_target("stdio", "mcp-server-evil --flag").is_err());
+        assert!(validate_mcp_target("stdio", "mcp_custom_evil").is_err());
+        assert!(validate_mcp_target("stdio", "/usr/bin/python3 -m my_mcp_server").is_err());
+        assert!(validate_mcp_target("stdio", "node -p process.env").is_err());
+        assert!(validate_mcp_target("stdio", "node --require ./evil.js").is_err());
+        assert!(validate_mcp_target("stdio", "python3 -m http.server 8000").is_err());
+        assert!(validate_mcp_target("stdio", "python3 /tmp/evil.py").is_err());
     }
 }

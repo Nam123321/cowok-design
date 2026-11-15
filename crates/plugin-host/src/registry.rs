@@ -45,15 +45,19 @@ impl SkillRegistry {
 
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_dir() {
-                let skill_md = path.join("SKILL.md");
-                let plugin_json = path.join("plugin.json");
+            let Ok(meta) = std::fs::symlink_metadata(&path) else {
+                continue;
+            };
+            if meta.file_type().is_symlink() || !meta.is_dir() {
+                continue;
+            }
+            let skill_md = path.join("SKILL.md");
+            let plugin_json = path.join("plugin.json");
 
-                if skill_md.exists() || plugin_json.exists() {
-                    if let Ok(manifest) = self.load_skill_from_folder(&path) {
-                        self.register(manifest);
-                        count += 1;
-                    }
+            if skill_md.exists() || plugin_json.exists() {
+                if let Ok(manifest) = self.load_skill_from_folder(&path) {
+                    self.register(manifest);
+                    count += 1;
                 }
             }
         }
@@ -63,18 +67,35 @@ impl SkillRegistry {
 
     /// Loads a single skill from its folder, validating SKILL.md frontmatter if present
     pub fn load_skill_from_folder(&self, folder: &Path) -> Result<SkillManifest, String> {
+        let folder_meta = std::fs::symlink_metadata(folder).map_err(|e| e.to_string())?;
+        if folder_meta.file_type().is_symlink() || !folder_meta.is_dir() {
+            return Err("skill folder must be a real non-symlink directory".to_string());
+        }
+
         let skill_md_path = folder.join("SKILL.md");
         let plugin_json_path = folder.join("plugin.json");
 
         if skill_md_path.exists() {
+            let md_meta = std::fs::symlink_metadata(&skill_md_path).map_err(|e| e.to_string())?;
+            if md_meta.file_type().is_symlink() {
+                return Err("SKILL.md symlink is forbidden".to_string());
+            }
             let content = std::fs::read_to_string(&skill_md_path).map_err(|e| e.to_string())?;
             validate_skill_frontmatter(&content).map_err(|e| format!("{:?}", e))?;
         }
 
         if plugin_json_path.exists() {
+            let pj_meta =
+                std::fs::symlink_metadata(&plugin_json_path).map_err(|e| e.to_string())?;
+            if pj_meta.file_type().is_symlink() {
+                return Err("plugin.json symlink is forbidden".to_string());
+            }
             let json_str = std::fs::read_to_string(&plugin_json_path).map_err(|e| e.to_string())?;
             let manifest: SkillManifest =
                 serde_json::from_str(&json_str).map_err(|e| e.to_string())?;
+            if !is_safe_skill_name(&manifest.name) {
+                return Err(format!("unsafe skill manifest name: {}", manifest.name));
+            }
             return Ok(manifest);
         }
 
@@ -82,7 +103,8 @@ impl SkillRegistry {
         let folder_name = folder
             .file_name()
             .and_then(|n| n.to_str())
-            .unwrap_or("unknown");
+            .filter(|name| is_safe_skill_name(name))
+            .ok_or_else(|| "invalid skill folder name".to_string())?;
         Ok(SkillManifest {
             name: folder_name.to_string(),
             version: "0.1.0".to_string(),
@@ -129,6 +151,15 @@ impl SkillRegistry {
             })
             .collect()
     }
+}
+
+fn is_safe_skill_name(name: &str) -> bool {
+    !name.is_empty()
+        && name != "."
+        && name != ".."
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
 }
 
 #[cfg(test)]

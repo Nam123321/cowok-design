@@ -1,46 +1,32 @@
 // @story 04.1
 // @implements AC-03, AC-04, AC-06
 import { guardedRoute } from "@/lib/api-guard";
-import { forwardToDaemonFlow } from "@/lib/daemon-client";
+import { forwardFromGuardedContext } from "@/lib/daemon-client";
 import { DeleteTransitionQuerySchema, UpdateFlowTransitionPayloadSchema } from "@/lib/validations/flow-workbench";
 
 export const PATCH = guardedRoute(
-  async (req, ctx, { body }) => {
+  (req, ctx, { body }) => {
     const projectId = ctx.projectId || ctx.params?.id || "";
     const transitionId = ctx.params?.transitionId || "";
-    return forwardToDaemonFlow({
-      method: "PATCH",
-      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/flow/transitions/${encodeURIComponent(transitionId)}`,
-      body,
-      inboundHeaders: req.headers,
-      principal: {
-        tenantId: ctx.tenantId || "local-default",
-        userId: ctx.userId || "local-operator",
-        role: ctx.role || "editor",
-      },
-      correlationId: ctx.correlationId,
-    });
+    return forwardFromGuardedContext(
+      req,
+      ctx,
+      `/api/v1/projects/${encodeURIComponent(projectId)}/flow/transitions/${encodeURIComponent(transitionId)}`,
+      body
+    );
   },
   { authMode: "strict-loopback", body: UpdateFlowTransitionPayloadSchema }
 );
 
 export const DELETE = guardedRoute(
-  async (req, ctx) => {
+  (req, ctx) => {
     const projectId = ctx.projectId || ctx.params?.id || "";
     const transitionId = ctx.params?.transitionId || "";
-    const url = new URL(req.url, "http://127.0.0.1");
-    return forwardToDaemonFlow({
-      method: "DELETE",
-      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/flow/transitions/${encodeURIComponent(transitionId)}`,
-      rawQuery: url.search.replace(/^\?/, ""),
-      inboundHeaders: req.headers,
-      principal: {
-        tenantId: ctx.tenantId || "local-default",
-        userId: ctx.userId || "local-operator",
-        role: ctx.role || "editor",
-      },
-      correlationId: ctx.correlationId,
-    });
+    return forwardFromGuardedContext(
+      req,
+      ctx,
+      `/api/v1/projects/${encodeURIComponent(projectId)}/flow/transitions/${encodeURIComponent(transitionId)}`
+    );
   },
   { authMode: "strict-loopback", query: DeleteTransitionQuerySchema }
 );

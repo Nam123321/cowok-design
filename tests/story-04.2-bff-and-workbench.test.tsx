@@ -28,8 +28,8 @@ const HTTP_UNAUTHORIZED = 401;
 const HTTP_FORBIDDEN = 403;
 const BFF_TEST_PORT = 5173;
 const FAKE_DAEMON_PORT = 49999;
-const SCHEMA_STALE_V6 = 6;
-const SCHEMA_CURRENT_V7 = 7;
+const SCHEMA_STALE_V7 = 7;
+const SCHEMA_CURRENT_V8 = 8;
 const SAMPLE_TS_MS = 1794654600000;
 
 const SAMPLE_PROJECT_DTO: ProjectDto = {
@@ -102,7 +102,7 @@ describe("Story 04.2: Source Security Invariants & BFF Routes", () => {
     expect(chunks.join("")).toBe("data: {\"ok\":true}\n\n");
   });
 
-  it("rejects daemon lockfile and health responses with schema_version < 7", async () => {
+  it("rejects daemon lockfile and health responses with schema_version < 8", async () => {
     const origWs = process.env.UXUI_OS_WORKSPACE_ROOT;
     const tmpRoot = fs.mkdtempSync(path.join(process.cwd(), "node_modules/.story042-ws-"));
     const lockDir = path.join(tmpRoot, ".cowok-design");
@@ -112,16 +112,16 @@ describe("Story 04.2: Source Security Invariants & BFF Routes", () => {
     let spawnedPid: number | null = null;
     try {
       const healthSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(JSON.stringify({ service: "cowok-design-harness-daemon", schema_version: SCHEMA_STALE_V6 }), { status: HTTP_OK })
+        new Response(JSON.stringify({ service: "cowok-design-harness-daemon", schema_version: SCHEMA_STALE_V7 }), { status: HTTP_OK })
       );
-      fs.writeFileSync(path.join(lockDir, "daemon.lock"), JSON.stringify({ ...baseLock, schema_version: SCHEMA_CURRENT_V7 }));
+      fs.writeFileSync(path.join(lockDir, "daemon.lock"), JSON.stringify({ ...baseLock, schema_version: SCHEMA_CURRENT_V8 }));
       await expect(ensureRunningDaemon()).rejects.toThrow("Unexpected daemon health identity or schema_version");
 
       healthSpy.mockRestore();
-      fs.writeFileSync(path.join(lockDir, "daemon.lock"), JSON.stringify({ ...baseLock, schema_version: SCHEMA_STALE_V6 }));
+      fs.writeFileSync(path.join(lockDir, "daemon.lock"), JSON.stringify({ ...baseLock, schema_version: SCHEMA_STALE_V7 }));
       const upgraded = await ensureRunningDaemon();
       spawnedPid = upgraded.pid;
-      expect(upgraded.schema_version).toBeGreaterThanOrEqual(SCHEMA_CURRENT_V7);
+      expect(upgraded.schema_version).toBeGreaterThanOrEqual(SCHEMA_CURRENT_V8);
       expect(upgraded.port).not.toBe(FAKE_DAEMON_PORT);
     } finally {
       if (spawnedPid && spawnedPid !== process.pid) {

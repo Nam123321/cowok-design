@@ -243,8 +243,8 @@
     "cronTriggers": "Trabajos cron programados",
     "saveBtn": "Guardar cambios",
     "closeBtn": "Cerrar",
-    "autoSnapshotTitle": "Instantánea automática de estado y AST del gráfico",
-    "autoSnapshotDesc": "Cada 5 minutos • Registra automáticamente deltas del gráfico DAG 2D",
+    "autoSnapshotTitle": "Instantáneas de estado y AST del gráfico",
+    "autoSnapshotDesc": "Solo bajo demanda • Ejecuta la instantánea manualmente",
     "bearerPlaceholder": "Token Bearer (solo sesión)",
     "cancelBtn": "Cancelar",
     "enterKeyOrEndpoint": "Por favor ingrese una clave o punto final",
@@ -281,8 +281,8 @@
     "daemonStatusOnline": "EN LÍNEA",
     "daemonStatusOffline": "SIN CONEXIÓN",
     "daemonStatusChecking": "VERIFICANDO",
-    "snapshotCadenceReady": "LISTO · 5M",
-    "snapshotCadencePaused": "EN ESPERA"
+    "snapshotCadenceReady": "SOLO MANUAL",
+    "snapshotCadencePaused": "SIN PROGRAMAR"
   },
   "flow": {
     "dagCanvas": "Lienzo DAG 2D",

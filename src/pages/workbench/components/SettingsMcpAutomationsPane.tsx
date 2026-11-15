@@ -211,11 +211,11 @@ export const SettingsMcpAutomationsPane: React.FC<SettingsMcpAutomationsPaneProp
         </div>
         <div style={{ padding: "8px 10px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-workspace)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-primary)" }}>{t("settings.autoSnapshotTitle", "Auto-Snapshot State & Graph AST")}</div>
-            <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{t("settings.autoSnapshotDesc", "Mỗi 5 phút • Tự động ghi nhận delta đồ thị 2D DAG")}</div>
+            <div style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-primary)" }}>{t("settings.autoSnapshotTitle", "State & Graph AST Snapshots")}</div>
+            <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{t("settings.autoSnapshotDesc", "On-demand only • Trigger manual snapshot from Toolbar or Flow Workbench")}</div>
           </div>
-          <span style={{ fontSize: "9.5px", fontWeight: 600, padding: "2px 6px", borderRadius: "10px", backgroundColor: "var(--bg-subtle)", color: "var(--text-secondary)" }}>
-            {daemonHealth === "online" ? t("settings.snapshotCadenceReady", "READY · 5M") : t("settings.snapshotCadencePaused", "STANDBY")}
+          <span data-testid="automations-snapshot-status" style={{ fontSize: "9.5px", fontWeight: 600, padding: "2px 6px", borderRadius: "10px", backgroundColor: "var(--bg-subtle)", color: "var(--text-secondary)" }}>
+            {daemonHealth === "online" ? t("settings.snapshotCadenceReady", "MANUAL ONLY") : t("settings.snapshotCadencePaused", "NOT SCHEDULED")}
           </span>
         </div>
       </div>

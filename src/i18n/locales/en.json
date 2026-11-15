@@ -243,8 +243,8 @@
     "cronTriggers": "Scheduled Cron Jobs",
     "saveBtn": "Save Changes",
     "closeBtn": "Close",
-    "autoSnapshotTitle": "Auto-Snapshot State & Graph AST",
-    "autoSnapshotDesc": "Every 5 minutes • Automatically records 2D DAG graph deltas",
+    "autoSnapshotTitle": "State & Graph AST Snapshots",
+    "autoSnapshotDesc": "On-demand only • Trigger manual snapshot from Toolbar or Flow Workbench",
     "bearerPlaceholder": "Bearer token (session-only)",
     "cancelBtn": "Cancel",
     "enterKeyOrEndpoint": "Please enter a Key or Endpoint",
@@ -281,8 +281,8 @@
     "daemonStatusOnline": "ONLINE",
     "daemonStatusOffline": "OFFLINE",
     "daemonStatusChecking": "CHECKING",
-    "snapshotCadenceReady": "READY · 5M",
-    "snapshotCadencePaused": "STANDBY"
+    "snapshotCadenceReady": "MANUAL ONLY",
+    "snapshotCadencePaused": "NOT SCHEDULED"
   },
   "flow": {
     "dagCanvas": "DAG 2D Canvas",

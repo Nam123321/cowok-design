@@ -2,7 +2,7 @@
 // @implements AC-06
 import crypto from "node:crypto";
 import { z, ZodSchema } from "zod";
-import { jsonResp, verifyStrictLoopback } from "./api-guard-session";
+import { jsonResp, verifyStrictLoopback } from "./api-guard-session.ts";
 
 export {
   getBffSessionRegistrySize,
@@ -12,7 +12,7 @@ export {
   pruneExpiredBffSessions,
   setBoundBffPort,
   type LoopbackSessionRecord,
-} from "./api-guard-session";
+} from "./api-guard-session.ts";
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_FORBIDDEN = 403;

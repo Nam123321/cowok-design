@@ -13,12 +13,7 @@ domain = { path = "../domain" }
 spec-registry = { path = "../spec-registry" }
 constraint-engine = { path = "../constraint-engine" }
 flow-graph = { path = "../flow-graph" }
-html-forge = { path = "../html-forge" }
-presentation-cms = { path = "../presentation-cms" }
 plugin-host = { path = "../plugin-host" }
-rea-bridge = { path = "../rea-bridge" }
-bot-fleet = { path = "../bot-fleet" }
-mcp-gateway = { path = "../mcp-gateway" }
 axum = "0.7"
 futures-util = { version = "0.3", default-features = false }
 tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "net", "process", "sync", "time"] }
@@ -33,6 +28,7 @@ base64 = "0.22"
 aes-gcm = "0.10"
 argon2 = "0.5"
 rand = "0.8"
+zeroize = "1.9"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 
 [dev-dependencies]

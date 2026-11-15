@@ -7,7 +7,7 @@ import { Readable } from "node:stream";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { pathToFileURL } from "node:url";
 import type { Connect, Plugin, PreviewServer, ViteDevServer } from "vite";
-import { setBoundBffPort } from "./api-guard";
+import { setBoundBffPort } from "./api-guard.ts";
 import {
   HTTP_FORBIDDEN,
   HTTP_OK,
@@ -18,9 +18,9 @@ import {
   readRawBody,
   revokeBootCapToken,
   writeJson,
-} from "./vite-bff-bootstrap";
+} from "./vite-bff-bootstrap.ts";
 
-export { handleBootstrapSession, issueBootCapToken, revokeBootCapToken } from "./vite-bff-bootstrap";
+export { handleBootstrapSession, issueBootCapToken, revokeBootCapToken } from "./vite-bff-bootstrap.ts";
 
 type RouteFn = (req: Request, ctx: { params?: Record<string, string> }) => Promise<Response>;
 type RouteMatcher = (

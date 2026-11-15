@@ -19,9 +19,9 @@ use uuid::Uuid;
 
 use super::legacy_specs::verify_anti_idor_with_caller;
 use super::{
-    constant_time_eq, decode_hex, extract_actor_id, hmac_sha256, map_error_to_response,
-    parse_project_uuid, validate_and_normalize_relative_path, IssuePathTokenRequest,
-    PathTokenPayload, PathTokenResponse, VerifyPathTokenRequest,
+    constant_time_eq, decode_hex, hmac_sha256, map_error_to_response, parse_project_uuid,
+    validate_and_normalize_relative_path, IssuePathTokenRequest, PathTokenPayload,
+    PathTokenResponse, VerifyPathTokenRequest,
 };
 use crate::daemon_auth::VerifiedLegacyIngress;
 use crate::routes::DaemonAppState;
@@ -178,11 +178,12 @@ fn is_sensitive_home_subdir(lower: &str) -> bool {
     if trimmed.is_empty() {
         return false;
     }
-    let home_canon = fs::canonicalize(trimmed).unwrap_or_else(|_| PathBuf::from(trimmed));
-    for candidate in [
-        trimmed.to_lowercase(),
-        home_canon.to_string_lossy().to_lowercase(),
-    ] {
+    let home_canon_opt = fs::canonicalize(trimmed).ok();
+    let mut candidates = vec![trimmed.to_lowercase()];
+    if let Some(hc) = home_canon_opt {
+        candidates.push(hc.to_string_lossy().to_lowercase());
+    }
+    for candidate in candidates {
         for sub in ["/library", "/.ssh", "/.gnupg", "/.aws", "/.kube"] {
             let full = format!("{candidate}{sub}");
             if lower == full || lower.starts_with(&format!("{full}/")) {
@@ -203,13 +204,22 @@ pub fn is_exact_home_dir(path: &Path) -> bool {
                 return true;
             }
             if let Ok(home_canon) = fs::canonicalize(&home) {
-                let p_canon = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-                if p_canon == home_canon
-                    || p_canon
-                        .to_string_lossy()
-                        .eq_ignore_ascii_case(&home_canon.to_string_lossy())
-                {
-                    return true;
+                if let Ok(p_canon) = fs::canonicalize(path) {
+                    if p_canon == home_canon
+                        || p_canon
+                            .to_string_lossy()
+                            .eq_ignore_ascii_case(&home_canon.to_string_lossy())
+                    {
+                        return true;
+                    }
+                } else if let Ok(p_norm) = normalize_macos_root_alias(path) {
+                    if p_norm == home_canon
+                        || p_norm
+                            .to_string_lossy()
+                            .eq_ignore_ascii_case(&home_canon.to_string_lossy())
+                    {
+                        return true;
+                    }
                 }
             }
         }
@@ -363,10 +373,20 @@ fn walk_nofollow_from_root(
         let parent = existing.parent().unwrap_or_else(|| Path::new("/"));
         let leaf = existing.file_name().map(PathBuf::from).unwrap_or_default();
         fs::canonicalize(parent)
-            .unwrap_or_else(|_| parent.to_path_buf())
+            .map_err(|e| HarnessError::BoundaryViolation {
+                reason: format!(
+                    "FS_JAIL_VIOLATION: Failed canonicalizing verified parent '{}': {e}",
+                    parent.display()
+                ),
+            })?
             .join(leaf)
     } else {
-        fs::canonicalize(&existing).unwrap_or(existing)
+        fs::canonicalize(&existing).map_err(|e| HarnessError::BoundaryViolation {
+            reason: format!(
+                "FS_JAIL_VIOLATION: Failed canonicalizing verified path '{}': {e}",
+                existing.display()
+            ),
+        })?
     };
     let mut candidate = canon_existing;
     for seg in &remaining {
@@ -460,7 +480,12 @@ pub fn inspect_workspace_relative_jail(
     };
     let normalized = normalize_macos_root_alias(&target)?;
     let ws_norm = normalize_macos_root_alias(ws_root)?;
-    let ws_canon = fs::canonicalize(&ws_norm).unwrap_or(ws_norm);
+    let ws_canon = fs::canonicalize(&ws_norm).map_err(|e| HarnessError::BoundaryViolation {
+        reason: format!(
+            "FS_JAIL_VIOLATION: Failed canonicalizing workspace root '{}': {e}",
+            ws_norm.display()
+        ),
+    })?;
     let (cur_fd, candidate, remaining, _) = walk_nofollow_from_root(&normalized, true)?;
     if !candidate.starts_with(&ws_canon) {
         return Err(HarnessError::PathTraversalDenied {
@@ -557,7 +582,12 @@ pub fn provision_dir_zero_toctou_checked(
         }
     }
     let _ = fstat_dev_ino(&cur_fd)?;
-    let final_canon = fs::canonicalize(&walked).unwrap_or(walked);
+    let final_canon = fs::canonicalize(&walked).map_err(|e| HarnessError::BoundaryViolation {
+        reason: format!(
+            "FS_JAIL_VIOLATION: Failed canonicalizing provisioned path '{}': {e}",
+            walked.display()
+        ),
+    })?;
     if is_sensitive_or_system_path(&final_canon) {
         return Err(HarnessError::BoundaryViolation {
             reason: format!("FS_JAIL_VIOLATION: '{}'", final_canon.display()),
@@ -1133,21 +1163,19 @@ pub fn decode_and_verify_path_token(
     Ok(payload)
 }
 
-fn is_browse_path_allowed(canon: &Path, managed_root_canon: &Path) -> bool {
+fn is_browse_path_allowed(
+    canon: &Path,
+    managed_root_canon: &Path,
+    registered_roots: &[PathBuf],
+) -> bool {
     if is_sensitive_or_system_path(canon) {
         return false;
     }
     if canon.starts_with(managed_root_canon) {
         return true;
     }
-    if let Ok(home) = std::env::var("HOME") {
-        let trimmed = home.trim();
-        if !trimmed.is_empty() {
-            let home_canon = fs::canonicalize(trimmed).unwrap_or_else(|_| PathBuf::from(trimmed));
-            if canon.starts_with(&home_canon) {
-                return true;
-            }
-        }
+    if registered_roots.iter().any(|root| canon.starts_with(root)) {
+        return true;
     }
     let lower = canon.to_string_lossy().to_lowercase();
     [
@@ -1161,13 +1189,14 @@ fn is_browse_path_allowed(canon: &Path, managed_root_canon: &Path) -> bool {
 }
 
 pub(super) async fn handle_fs_browse(
-    State(_state): State<DaemonAppState>,
+    State(state): State<DaemonAppState>,
     caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
     Query(query): Query<FsBrowseQuery>,
 ) -> Result<Json<FsBrowseResponse>, Response> {
-    match caller {
+    let verified_tenant = match caller {
         Some(Extension(ref verified)) => {
+            crate::daemon_auth::require_editor_role(&verified.principal)?;
             if verified.kind == crate::daemon_auth::LegacyAuthKind::Bearer
                 && !crate::daemon_auth::is_valid_superadmin_bearer(&headers)
             {
@@ -1175,6 +1204,7 @@ pub(super) async fn handle_fs_browse(
                     reason: "AUTH_SCOPE_MISMATCH: Browsing host filesystem requires superadmin Bearer, session token, or verified loopback HMAC".to_string(),
                 }));
             }
+            verified.principal.tenant_id.clone()
         }
         None => {
             return Err(crate::routes::legacy_workbench_v6::json_err(
@@ -1183,7 +1213,41 @@ pub(super) async fn handle_fs_browse(
                 "Missing caller verification for fs_browse",
             ));
         }
-    }
+    };
+    let registered_roots: Vec<PathBuf> = {
+        let conn = state
+            .registry
+            .pool()
+            .connection()
+            .map_err(map_error_to_response)?;
+        let mut stmt = conn
+            .prepare("SELECT workspace_root FROM projects WHERE tenant_id = ?1 AND trash_deleted_at IS NULL")
+            .map_err(|e| map_error_to_response(HarnessError::ValidationFailed { reason: format!("FS_BROWSE_DB_ERROR: {e}") }))?;
+        let rows = stmt
+            .query_map(rusqlite::params![verified_tenant], |r| {
+                r.get::<_, String>(0)
+            })
+            .map_err(|e| {
+                map_error_to_response(HarnessError::ValidationFailed {
+                    reason: format!("FS_BROWSE_DB_ERROR: {e}"),
+                })
+            })?;
+        let mut out = Vec::new();
+        for row_res in rows {
+            let raw_root = row_res.map_err(|e| {
+                map_error_to_response(HarnessError::ValidationFailed {
+                    reason: format!("FS_BROWSE_DB_ERROR: {e}"),
+                })
+            })?;
+            let trimmed = raw_root.trim();
+            if !trimmed.is_empty() && trimmed != "." {
+                if let Ok(canon) = fs::canonicalize(trimmed) {
+                    out.push(canon);
+                }
+            }
+        }
+        out
+    };
     let managed_root = default_managed_root().map_err(map_error_to_response)?;
     let managed_anchor = provision_dir_zero_toctou(&managed_root).map_err(map_error_to_response)?;
     let requested = query
@@ -1191,10 +1255,14 @@ pub(super) async fn handle_fs_browse(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty());
-    let current = match requested {
+    let (current, expected_dev_ino) = match requested {
         Some(raw) => {
             let anchor = inspect_path_jail(Path::new(raw)).map_err(map_error_to_response)?;
-            if !is_browse_path_allowed(&anchor.canonical_path, &managed_anchor.canonical_path) {
+            if !is_browse_path_allowed(
+                &anchor.canonical_path,
+                &managed_anchor.canonical_path,
+                &registered_roots,
+            ) {
                 return Err(map_error_to_response(HarnessError::BoundaryViolation {
                     reason: format!(
                         "FS_JAIL_VIOLATION: Browse path '{}' is outside allowed roots",
@@ -1210,12 +1278,22 @@ pub(super) async fn handle_fs_browse(
                     ),
                 }));
             }
-            anchor.canonical_path
+            (anchor.canonical_path, anchor.ancestor_dev_ino)
         }
-        None => managed_anchor.canonical_path.clone(),
+        None => (
+            managed_anchor.canonical_path.clone(),
+            managed_anchor.ancestor_dev_ino.clone(),
+        ),
     };
     let mut entries = Vec::new();
     let current_fd = open_dir_abs_nofollow(&current).map_err(map_error_to_response)?;
+    let (cur_dev, cur_ino) = fstat_dev_ino(&current_fd).map_err(map_error_to_response)?;
+    if format!("{cur_dev}:{cur_ino}") != expected_dev_ino {
+        return Err(map_error_to_response(HarnessError::BoundaryViolation {
+            reason: "FS_JAIL_VIOLATION: Browse directory inode changed (TOCTOU detected)"
+                .to_string(),
+        }));
+    }
     let dir_entries =
         read_dir_fd_nofollow(&current_fd, "fs_browse").map_err(map_error_to_response)?;
     for item in dir_entries {
@@ -1238,7 +1316,7 @@ pub(super) async fn handle_fs_browse(
     entries.sort_by_key(|a| a.name.to_lowercase());
     let parent_path = current
         .parent()
-        .filter(|p| is_browse_path_allowed(p, &managed_anchor.canonical_path))
+        .filter(|p| is_browse_path_allowed(p, &managed_anchor.canonical_path, &registered_roots))
         .map(|p| p.display().to_string());
     Ok(Json(FsBrowseResponse {
         current_path: current.display().to_string(),
@@ -1274,16 +1352,24 @@ pub(super) async fn handle_issue_path_token_v2(
         let a = inspect_workspace_relative_jail(&ws_root, &n).map_err(map_error_to_response)?;
         (n, a)
     };
-    let ttl = req.ttl_seconds.unwrap_or(3600).max(1);
+    let ttl = req.ttl_seconds.unwrap_or(3600).clamp(1, 86_400);
     let exp = Utc::now().timestamp().saturating_add(ttl);
     let canon_str = anchor.canonical_path.display().to_string();
+    let verified_principal_id = caller
+        .as_ref()
+        .map(|Extension(v)| v.principal.user_id.clone())
+        .ok_or_else(|| {
+            crate::routes::legacy_workbench_v6::json_err(
+                axum::http::StatusCode::UNAUTHORIZED,
+                "UNAUTHENTICATED",
+                "Missing verified caller for path-token issuance",
+            )
+        })?;
     let payload = PathTokenPayload {
         v: 2,
         project_id,
         normalized_relative_path: norm_path.clone(),
-        principal_id: req
-            .principal_id
-            .unwrap_or_else(|| extract_actor_id(&headers)),
+        principal_id: verified_principal_id,
         exp,
         nonce: Uuid::new_v4().to_string(),
         daemon_nonce: state.auth.daemon_nonce.clone(),

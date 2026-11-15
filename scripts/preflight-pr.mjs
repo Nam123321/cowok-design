@@ -121,7 +121,10 @@ async function main() {
 
   if (!fastMode) {
     runStep('Run Rust clippy (-D warnings)', 'cargo clippy --workspace --all-targets -- -D warnings');
+    runStep('Run Rust workspace tests (--locked)', 'cargo test --workspace --locked');
     runStep('Run Vitest suite', 'pnpm run test');
+    runStep('Build production frontend bundle', 'pnpm run build');
+    runStep('Run CI dependency vulnerability ratchet', 'node scripts/ci-audit-ratchet.js');
   }
 
   if (withE2E) {

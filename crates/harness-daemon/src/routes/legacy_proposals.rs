@@ -491,25 +491,241 @@ fn has_syntax_errors(files: &[FileDiffItemDto]) -> bool {
     false
 }
 
-fn has_missing_relative_imports(files: &[FileDiffItemDto]) -> bool {
+fn extract_relative_import_specifiers(patch: &str) -> Vec<String> {
+    let mut specs = Vec::new();
+    for line in patch.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('-') && !trimmed.starts_with("---") {
+            continue;
+        }
+        let body = trimmed.strip_prefix('+').unwrap_or(trimmed);
+        for marker in ["from '", "from \"", "import('", "import(\""] {
+            let quote = if marker.ends_with('\'') { '\'' } else { '"' };
+            let mut rest = body;
+            while let Some(idx) = rest.find(marker) {
+                let after = &rest[idx + marker.len()..];
+                if let Some(end_idx) = after.find(quote) {
+                    let spec = after[..end_idx].trim();
+                    if spec.starts_with("./") || spec.starts_with("../") {
+                        specs.push(spec.to_string());
+                    }
+                    rest = &after[end_idx + 1..];
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+    specs
+}
+
+fn normalize_rel_path(base_file: &str, rel_spec: &str) -> Option<String> {
+    let mut parts: Vec<String> = base_file
+        .split('/')
+        .filter(|s| !s.is_empty() && *s != ".")
+        .map(String::from)
+        .collect();
+    // drop filename of base_file
+    parts.pop();
+    for seg in rel_spec.split('/') {
+        match seg {
+            "" | "." => {}
+            ".." => {
+                parts.pop()?;
+            }
+            other => parts.push(other.to_string()),
+        }
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join("/"))
+    }
+}
+
+fn relative_import_candidates(norm: &str) -> Vec<String> {
+    let lower = norm.to_ascii_lowercase();
+    if lower.ends_with(".ts")
+        || lower.ends_with(".tsx")
+        || lower.ends_with(".js")
+        || lower.ends_with(".jsx")
+        || lower.ends_with(".json")
+    {
+        vec![norm.to_string()]
+    } else {
+        vec![
+            norm.to_string(),
+            format!("{norm}.ts"),
+            format!("{norm}.tsx"),
+            format!("{norm}.js"),
+            format!("{norm}.jsx"),
+            format!("{norm}.json"),
+            format!("{norm}/index.ts"),
+            format!("{norm}/index.tsx"),
+            format!("{norm}/index.js"),
+        ]
+    }
+}
+
+fn sync_workspace_file_to_disk(
+    canon_project_root: &Path,
+    rel_path: &str,
+    is_deleted: bool,
+    content: &str,
+) -> Result<(), HarnessError> {
+    let clean_rel = validate_safe_relative_path(rel_path)?;
+    let mut rel_parts = clean_rel.split('/').collect::<Vec<_>>();
+    let Some(file_name) = rel_parts.pop() else {
+        return Err(HarnessError::PathTraversalDenied {
+            path: rel_path.to_string(),
+        });
+    };
+
+    #[cfg(unix)]
+    {
+        use std::ffi::{CString, OsStr};
+        use std::os::fd::AsRawFd;
+        let mut dir_fd = crate::routes::fs_jail::open_dir_abs_nofollow(canon_project_root)?;
+        for seg in &rel_parts {
+            if is_deleted {
+                match crate::routes::fs_jail::open_child_dir_fd_nofollow(&dir_fd, OsStr::new(seg))?
+                {
+                    Some(child) => dir_fd = child,
+                    None => return Ok(()),
+                }
+            } else {
+                dir_fd =
+                    crate::routes::fs_jail::ensure_child_dir_fd(&dir_fd, OsStr::new(seg), 0o755)?;
+            }
+        }
+        if is_deleted {
+            let c_name = CString::new(file_name.as_bytes()).map_err(|_| {
+                HarnessError::PathTraversalDenied {
+                    path: rel_path.to_string(),
+                }
+            })?;
+            let mut st: libc::stat = unsafe { std::mem::zeroed() };
+            let rc = unsafe {
+                libc::fstatat(
+                    dir_fd.as_raw_fd(),
+                    c_name.as_ptr(),
+                    &mut st,
+                    libc::AT_SYMLINK_NOFOLLOW,
+                )
+            };
+            if rc != 0 {
+                let err = std::io::Error::last_os_error();
+                if err.raw_os_error() == Some(libc::ENOENT) {
+                    return Ok(());
+                }
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!("DISK_UNLINK_STAT_FAILED for '{rel_path}': {err}"),
+                });
+            }
+            let kind = st.st_mode & libc::S_IFMT;
+            if kind == libc::S_IFLNK || kind == libc::S_IFDIR {
+                return Err(HarnessError::PathTraversalDenied {
+                    path: rel_path.to_string(),
+                });
+            }
+            let u_rc = unsafe { libc::unlinkat(dir_fd.as_raw_fd(), c_name.as_ptr(), 0) };
+            if u_rc != 0 {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "DISK_UNLINK_FAILED for '{rel_path}': {}",
+                        std::io::Error::last_os_error()
+                    ),
+                });
+            }
+            return Ok(());
+        }
+        crate::routes::fs_jail::write_file_in_dir_fd(
+            &dir_fd,
+            OsStr::new(file_name),
+            content.as_bytes(),
+            0o644,
+        )
+    }
+
+    #[cfg(not(unix))]
+    {
+        let mut cur = canon_project_root.to_path_buf();
+        for seg in &rel_parts {
+            cur = cur.join(seg);
+        }
+        let target_path = cur.join(file_name);
+        if is_deleted {
+            if target_path.exists() {
+                std::fs::remove_file(&target_path).map_err(|e| HarnessError::ValidationFailed {
+                    reason: format!("DISK_UNLINK_FAILED for '{}': {e}", target_path.display()),
+                })?;
+            }
+            return Ok(());
+        }
+        std::fs::create_dir_all(&cur).map_err(|e| HarnessError::ValidationFailed {
+            reason: format!("DISK_MKDIR_FAILED for '{}': {e}", cur.display()),
+        })?;
+        std::fs::write(&target_path, content.as_bytes()).map_err(|e| {
+            HarnessError::ValidationFailed {
+                reason: format!("DISK_WRITE_FAILED for '{}': {e}", target_path.display()),
+            }
+        })?;
+        Ok(())
+    }
+}
+
+fn has_missing_relative_imports_with_context(
+    files: &[FileDiffItemDto],
+    canon_project_root: Option<&Path>,
+    db_paths: &HashSet<String>,
+) -> bool {
+    let mut batch_paths = HashSet::new();
+    for f in files {
+        if !f.status.eq_ignore_ascii_case("deleted") {
+            if let Ok(clean) = validate_safe_relative_path(&f.path) {
+                batch_paths.insert(clean);
+            }
+        }
+    }
+
     for f in files {
         if f.patch.contains("MISSING_IMPORT_TRIGGER") {
             return true;
         }
-        let lower = f.patch.to_ascii_lowercase();
-        if (lower.contains("from './")
-            || lower.contains("from \"./")
-            || lower.contains("from \"../")
-            || lower.contains("from '../"))
-            && (lower.contains("does-not-exist")
-                || lower.contains("missing")
-                || lower.contains("invalid")
-                || lower.contains("broken"))
-        {
-            return true;
+        if f.status.eq_ignore_ascii_case("deleted") {
+            continue;
+        }
+        let base_rel = match validate_safe_relative_path(&f.path) {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+        for spec in extract_relative_import_specifiers(&f.patch) {
+            let Some(norm) = normalize_rel_path(&base_rel, &spec) else {
+                return true;
+            };
+            let candidates = relative_import_candidates(&norm);
+            let exists_in_batch = candidates.iter().any(|c| batch_paths.contains(c));
+            let exists_in_db = candidates.iter().any(|c| db_paths.contains(c));
+            let exists_on_disk = canon_project_root.is_some_and(|root| {
+                candidates.iter().any(|c| {
+                    let p = root.join(c);
+                    std::fs::symlink_metadata(&p)
+                        .map(|m| m.file_type().is_file() && !m.file_type().is_symlink())
+                        .unwrap_or(false)
+                })
+            });
+            if !exists_in_batch && !exists_in_db && !exists_on_disk {
+                return true;
+            }
         }
     }
     false
+}
+
+#[cfg(test)]
+fn has_missing_relative_imports(files: &[FileDiffItemDto]) -> bool {
+    let empty_db = HashSet::new();
+    has_missing_relative_imports_with_context(files, None, &empty_db)
 }
 
 fn run_proposal_validation_checks(
@@ -586,8 +802,17 @@ fn run_proposal_validation_checks(
         ast_failures.join("; ")
     };
 
+    let existing_workspace_paths: HashSet<String> =
+        load_workspace_files_from_db(&conn, project_id)?
+            .into_iter()
+            .filter_map(|item| validate_safe_relative_path(&item.path).ok())
+            .collect();
     let type_mismatch = files.iter().any(|f| has_type_mismatch(&f.patch));
-    let missing_imports = has_missing_relative_imports(files);
+    let missing_imports = has_missing_relative_imports_with_context(
+        files,
+        Some(canon_project_root),
+        &existing_workspace_paths,
+    );
     let typecheck_failed = type_mismatch || missing_imports;
 
     let syntax_err = has_syntax_errors(files);
@@ -977,7 +1202,7 @@ pub(super) async fn handle_apply_proposal(
 ) -> Result<Json<ChangeProposalDto>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let proposal_id = parse_project_uuid(&proposal_id_raw).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) =
+    let (project_registry, canon_project_root, _) =
         verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
@@ -1027,6 +1252,15 @@ pub(super) async fn handle_apply_proposal(
 
         for f in &proposal.files {
             validate_safe_relative_path(&f.path)?;
+        }
+
+        for file in &proposal.files {
+            sync_workspace_file_to_disk(
+                &canon_project_root,
+                &file.path,
+                file.status.eq_ignore_ascii_case("deleted"),
+                &file.patch,
+            )?;
         }
 
         retry_on_busy("apply_change_proposal", || {
@@ -1434,7 +1668,7 @@ pub(super) async fn handle_revert_snapshot(
 ) -> Result<Json<RevertResultDto>, Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
     let snapshot_id = parse_project_uuid(&snapshot_id_raw).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) =
+    let (project_registry, canon_project_root, _) =
         verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
@@ -1459,9 +1693,15 @@ pub(super) async fn handle_revert_snapshot(
             return Ok::<_, HarnessError>(Err(snapshot_not_found(snapshot_id)));
         };
 
-        let mut safety_files = load_workspace_files_from_db(&conn, project_id)?;
-        if safety_files.is_empty() {
-            safety_files = target.files.clone();
+        let existing_files = load_workspace_files_from_db(&conn, project_id)?;
+        let safety_files = if existing_files.is_empty() {
+            target.files.clone()
+        } else {
+            existing_files.clone()
+        };
+        let mut target_paths = std::collections::HashSet::with_capacity(target.files.len());
+        for f in &target.files {
+            target_paths.insert(validate_safe_relative_path(&f.path)?);
         }
         let safety_sha = compute_files_tree_sha(&safety_files)?;
         let safety_files_json =
@@ -1473,6 +1713,17 @@ pub(super) async fn handle_revert_snapshot(
             .filter(|s| !s.trim().is_empty())
             .unwrap_or_else(|| "Pre-Revert Safety Backup".to_string());
         let safety_tag = format!("safety-backup-{}", &safety_id.to_string()[..8]);
+
+        for existing in &existing_files {
+            if let Ok(clean_rel) = validate_safe_relative_path(&existing.path) {
+                if !target_paths.contains(&clean_rel) {
+                    sync_workspace_file_to_disk(&canon_project_root, &clean_rel, true, "")?;
+                }
+            }
+        }
+        for f in &target.files {
+            sync_workspace_file_to_disk(&canon_project_root, &f.path, false, &f.content)?;
+        }
 
         retry_on_busy("revert_version_snapshot", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -1785,7 +2036,17 @@ pub(super) async fn handle_download_export(
     let zip_bytes = build_pkzip_archive(&entries);
     let sha256 = format!("{:x}", Sha256::digest(&zip_bytes));
     let date_str = chrono::Utc::now().format("%Y%m%d").to_string();
-    let file_name = format!("{project_id}-{tenant_id}-bundle-{date_str}.zip");
+    let safe_tenant: String = tenant_id
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let file_name = format!("{project_id}-{safe_tenant}-bundle-{date_str}.zip");
 
     Response::builder()
         .status(StatusCode::OK)
@@ -1921,6 +2182,58 @@ mod tests {
             deletions: 0,
             patch: "+import { Button } from './Button';".to_string(),
         }];
-        assert!(!has_missing_relative_imports(&clean));
+        // Without DB or disk context, ./Button is unresolved.
+        assert!(has_missing_relative_imports(&clean));
+
+        // With src/Button.tsx tracked in DB or materialized on disk, ./Button resolves cleanly.
+        let mut db_paths = HashSet::new();
+        db_paths.insert("src/Button.tsx".to_string());
+        assert!(!has_missing_relative_imports_with_context(
+            &clean, None, &db_paths
+        ));
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = std::fs::canonicalize(dir.path()).expect("canonical root");
+        sync_workspace_file_to_disk(
+            &root,
+            "src/Button.tsx",
+            false,
+            "export const Button = () => null;",
+        )
+        .expect("seed Button.tsx");
+        assert!(!has_missing_relative_imports_with_context(
+            &clean,
+            Some(&root),
+            &HashSet::new()
+        ));
+    }
+
+    #[test]
+    fn test_sync_workspace_file_to_disk_writes_unlinks_and_blocks_symlinks() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = std::fs::canonicalize(dir.path()).expect("canonical root");
+
+        sync_workspace_file_to_disk(
+            &root,
+            "src/Button.tsx",
+            false,
+            "export const Button = () => null;\n",
+        )
+        .expect("write inside workspace");
+        assert_eq!(
+            std::fs::read_to_string(root.join("src/Button.tsx")).expect("read file"),
+            "export const Button = () => null;\n"
+        );
+
+        sync_workspace_file_to_disk(&root, "src/Button.tsx", true, "").expect("unlink file");
+        assert!(!root.join("src/Button.tsx").exists());
+
+        #[cfg(unix)]
+        {
+            let outside = tempfile::tempdir().expect("outside");
+            std::os::unix::fs::symlink(outside.path(), root.join("escape")).expect("symlink");
+            let err = sync_workspace_file_to_disk(&root, "escape/pwn.ts", false, "bad");
+            assert!(err.is_err(), "symlink directory escape must be denied");
+        }
     }
 }

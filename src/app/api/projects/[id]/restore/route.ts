@@ -1,21 +1,16 @@
 import { guardedRoute } from "@/lib/api-guard";
-import { forwardToDaemonFlow } from "@/lib/daemon-client";
+import { forwardFromGuardedContext } from "@/lib/daemon-client";
 import { RestoreProjectInputSchema } from "@/lib/validations/harness-daemon";
 
 export const POST = guardedRoute(
-  async (req, ctx) => {
+  (req, ctx, { body }) => {
     const projectId = ctx.projectId || ctx.params?.id || "";
-    return forwardToDaemonFlow({
-      method: "POST",
-      daemonPath: `/api/v1/projects/${encodeURIComponent(projectId)}/restore`,
-      inboundHeaders: req.headers,
-      principal: {
-        tenantId: ctx.tenantId || "local-default",
-        userId: ctx.userId || "local-operator",
-        role: ctx.role || "editor",
-      },
-      correlationId: ctx.correlationId,
-    });
+    return forwardFromGuardedContext(
+      req,
+      ctx,
+      `/api/v1/projects/${encodeURIComponent(projectId)}/restore`,
+      body
+    );
   },
   { authMode: "strict-loopback", body: RestoreProjectInputSchema }
 );

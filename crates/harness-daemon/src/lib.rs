@@ -55,7 +55,10 @@ impl DaemonServer {
         registry: Arc<SpecRegistry>,
     ) -> Result<Self, HarnessError> {
         let (listener, lock_info, lock_path) = bind_loopback_with_lockfile(config)?;
-        let auth = crate::daemon_auth::DaemonAuthState::from_lock_info(&lock_info)?;
+        let auth = crate::daemon_auth::DaemonAuthState::from_lock_info_with_pool(
+            &lock_info,
+            Some(registry.pool().clone()),
+        )?;
         let state =
             DaemonAppState::with_auth(registry, lock_info.host.clone(), lock_info.port, auth);
         let router = build_router(state);
@@ -487,19 +490,21 @@ impl DaemonHttpClient {
     /// Injects deterministic `data-ff-id` attributes into JSX elements.
     pub fn inject_ff_id(
         &self,
-        _project_id: Uuid,
+        project_id: Uuid,
         source: &str,
         component_name: Option<&str>,
     ) -> Result<constraint_engine::AstInjectionResponse, HarnessError> {
+        let _ = resolve_project_scoped_registry(&self.state.registry, project_id)?;
         constraint_engine::SurgicalPatcher::inject_ff_ids(source, component_name)
     }
 
     /// Surgically patches text, metric, or attributes in <1ms without mutating surrounding AST.
     pub fn surgical_patch(
         &self,
-        _project_id: Uuid,
+        project_id: Uuid,
         req: &constraint_engine::SurgicalPatchRequest,
     ) -> Result<constraint_engine::SurgicalPatchResponse, HarnessError> {
+        let _ = resolve_project_scoped_registry(&self.state.registry, project_id)?;
         constraint_engine::SurgicalPatcher::patch_by_ff_id(&req.source, req)
     }
 }

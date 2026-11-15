@@ -984,3 +984,127 @@ async fn test_cross_scope_job_event_and_sensitive_fs_browse_guards() {
         assert!(harness_daemon::synthesis::ensure_project_token(&sym_tok_root).is_err());
     }
 }
+
+#[tokio::test]
+async fn wave1b_ram_only_vault_viewer_browse_and_ttl_clamping() {
+    let tmp = TempDir::new().unwrap();
+    let (state, router, tok_a, _) = setup_daemon(&tmp);
+
+    // 1. ram_only stores key in in-memory RamVaultStore without creating vault.enc on disk
+    let (st_ram, body_ram) = send_req(
+        &router,
+        "POST",
+        "/api/v1/vault/keys",
+        &[("x-cowok-session-token", &tok_a)],
+        Some(json!({
+            "providerId": "anthropic",
+            "apiKey": "sk-ram-only-secret-value-1234",
+            "vaultMode": "ram_only"
+        })),
+    )
+    .await;
+    assert_eq!(st_ram, StatusCode::OK, "{body_ram}");
+    assert_eq!(body_ram["vaultRef"], json!("vault://ram_only/anthropic"));
+    assert!(state.ram_vault.contains("tenant-a", "anthropic"));
+    assert!(!tmp.path().join(".cowok-design").join("vault.enc").exists());
+
+    // Delete removes key from RamVaultStore cleanly
+    let (st_del, body_del) = send_req(
+        &router,
+        "DELETE",
+        "/api/v1/vault/keys/anthropic",
+        &[("x-cowok-session-token", &tok_a)],
+        None,
+    )
+    .await;
+    assert_eq!(st_del, StatusCode::OK, "{body_del}");
+    assert!(!state.ram_vault.contains("tenant-a", "anthropic"));
+
+    // 2. Viewer session must be denied GET /api/v1/fs/browse (403)
+    let tok_viewer = format!("sess-viewer-{}", uuid::Uuid::new_v4());
+    state.auth.insert_session(
+        tok_viewer.clone(),
+        harness_daemon::daemon_auth::FlowPrincipal {
+            tenant_id: "tenant-a".into(),
+            user_id: "viewer-user".into(),
+            role: "viewer".into(),
+        },
+        chrono::Utc::now().timestamp() + 3600,
+    );
+    let (st_vw, _) = send_req(
+        &router,
+        "GET",
+        "/api/v1/fs/browse",
+        &[("x-cowok-session-token", &tok_viewer)],
+        None,
+    )
+    .await;
+    assert_eq!(st_vw, StatusCode::FORBIDDEN);
+
+    // 3. Path-token clamps excessive ttl_seconds to <= 86400 and ignores spoofed principal_id
+    let ws = tmp.path().join("tok-ws");
+    fs::create_dir_all(&ws).unwrap();
+    let (p_st, p_val) = send_req(
+        &router,
+        "POST",
+        "/api/v1/projects",
+        &[("x-cowok-session-token", &tok_a)],
+        Some(json!({
+            "slug": "tok-proj",
+            "name": "Tok",
+            "product_brief": "Brief",
+            "workspace_root": ws.display().to_string()
+        })),
+    )
+    .await;
+    assert_eq!(p_st, StatusCode::CREATED, "{p_val}");
+    let pid = p_val["id"].as_str().unwrap();
+
+    let (t_st, t_val) = send_req(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{pid}/path-token"),
+        &[("x-cowok-session-token", &tok_a)],
+        Some(json!({
+            "relative_path": "product/specs/overview.md",
+            "ttl_seconds": 99_999_999,
+            "principal_id": "spoofed-admin"
+        })),
+    )
+    .await;
+    assert_eq!(t_st, StatusCode::OK, "{t_val}");
+    let now_s = chrono::Utc::now().timestamp();
+    let exp_s = t_val["expires_at"].as_i64().unwrap();
+    assert!(
+        exp_s <= now_s + 86_405,
+        "expires_at {exp_s} exceeded clamped max 86400s from {now_s}"
+    );
+    let (v_st, v_val) = send_req(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{pid}/verify-path-token"),
+        &[("x-cowok-session-token", &tok_a)],
+        Some(json!({
+            "token": t_val["token"],
+            "expected_relative_path": "product/specs/overview.md"
+        })),
+    )
+    .await;
+    assert_eq!(v_st, StatusCode::OK, "{v_val}");
+    assert_eq!(v_val["principal_id"], json!("u1"));
+
+    // 4. agent-settings rejects 'bypass' permission_mode
+    let (as_st, as_val) = send_req(
+        &router,
+        "PUT",
+        "/api/v1/agent-settings",
+        &[("x-cowok-session-token", &tok_a)],
+        Some(json!({
+            "providerId": "anthropic",
+            "modelId": "claude-3-7-sonnet",
+            "permissionMode": "bypass"
+        })),
+    )
+    .await;
+    assert_eq!(as_st, StatusCode::BAD_REQUEST, "{as_val}");
+}

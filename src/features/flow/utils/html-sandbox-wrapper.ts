@@ -22,6 +22,7 @@ export const DESIGN_CDN_CSP =
 export interface WrapUserHtmlOptions {
   allowDesignCdn?: boolean;
   epoch?: number;
+  parentOrigin?: string;
 }
 
 export interface PreviewDocumentLabels {
@@ -75,8 +76,48 @@ function escapeHtmlAttr(raw: string): string {
     .replace(/>/g, "&gt;");
 }
 
+function hasDangerousUrlScheme(value: string): boolean {
+  const normalized = value.replace(/[\u0000-\u0020\u007f]+/g, "").toLowerCase();
+  return (
+    normalized.startsWith("javascript:") ||
+    normalized.startsWith("vbscript:") ||
+    normalized.startsWith("data:text/html") ||
+    normalized.startsWith("data:image/svg+xml")
+  );
+}
+
+const URL_CHECKED_ATTRS = new Set([
+  "href",
+  "src",
+  "xlink:href",
+  "action",
+  "formaction",
+  "poster",
+  "data",
+]);
+
 function buildBridgeApplyHtmlSnippet(): string {
-  return `  function applySanitizedHtml(raw) {
+  return `  function hasBadUrlScheme(v) {
+    var s = String(v || "").replace(/[\\u0000-\\u0020\\u007f]+/g, "").toLowerCase();
+    return s.indexOf("javascript:") === 0 || s.indexOf("vbscript:") === 0 || s.indexOf("data:text/html") === 0 || s.indexOf("data:image/svg+xml") === 0;
+  }
+  function sanitizeDomTreeAttrs(root) {
+    if (!root) return;
+    root.querySelectorAll("*").forEach(function(el){
+      Array.from(el.attributes).forEach(function(attr){
+        var attrName = attr.name.trim().toLowerCase();
+        if (/^on/i.test(attrName) || attrName === "srcdoc") {
+          el.removeAttribute(attr.name);
+          return;
+        }
+        if ((attrName === "href" || attrName === "src" || attrName === "xlink:href" || attrName === "action" || attrName === "formaction" || attrName === "poster" || attrName === "data") &&
+            hasBadUrlScheme(attr.value)) {
+          el.removeAttribute(attr.name);
+        }
+      });
+    });
+  }
+  function applySanitizedHtml(raw) {
     if (typeof raw !== "string" || !document.body) return;
     if (typeof DOMParser !== "undefined") {
       var parsed = new DOMParser().parseFromString(raw, "text/html");
@@ -86,11 +127,7 @@ function buildBridgeApplyHtmlSnippet(): string {
         if (eq === "refresh" || eq === "content-security-policy") el.remove();
       });
       if (parsed.body) {
-        parsed.body.querySelectorAll("*").forEach(function(el){
-          Array.from(el.attributes).forEach(function(attr){
-            if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
-          });
-        });
+        sanitizeDomTreeAttrs(parsed.body);
         document.body.innerHTML = parsed.body.innerHTML;
       }
     }
@@ -99,12 +136,16 @@ function buildBridgeApplyHtmlSnippet(): string {
   }`;
 }
 
-function buildByteZeroBridgeScript(epoch: number): string {
+function buildByteZeroBridgeScript(epoch: number, parentOrigin?: string): string {
   const safeEpoch = Number.isInteger(epoch) && epoch >= 1 ? epoch : 1;
+  const safeOrigin = typeof parentOrigin === "string" && parentOrigin.length > 0 && parentOrigin !== "null"
+    ? JSON.stringify(parentOrigin)
+    : "null";
   const applySnippet = buildBridgeApplyHtmlSnippet();
   return `<script data-cowok-sandbox-bridge="v1">(function(){
   "use strict";
   var EPOCH = ${safeEpoch};
+  var EXPECTED_PARENT_ORIGIN = ${safeOrigin};
   var channelBound = false;
   var bridgePort = null;
   if (typeof MessagePort !== "undefined" && MessagePort.prototype) {
@@ -116,7 +157,8 @@ function buildByteZeroBridgeScript(epoch: number): string {
   }, true);
 ${applySnippet}
   window.addEventListener("message", function(event) {
-    if (channelBound || !event || !event.data || event.data.type !== "INIT_PORT") return;
+    if (channelBound || !event || event.source !== window.parent || !event.data || event.data.type !== "INIT_PORT") return;
+    if (EXPECTED_PARENT_ORIGIN && event.origin !== EXPECTED_PARENT_ORIGIN) return;
     if (event.data.epoch !== EPOCH || !event.ports || !event.ports[0]) return;
     channelBound = true;
     bridgePort = event.ports[0];
@@ -146,7 +188,12 @@ ${applySnippet}
 function stripForbiddenHeadTagsRegex(html: string): string {
   return html
     .replace(/<base\b[^>]*>/gi, "")
-    .replace(/<meta\b[^>]*http-equiv\s*=\s*["']?\s*(?:refresh|content-security-policy)\s*["']?[^>]*>/gi, "");
+    .replace(/<meta\b[^>]*http-equiv\s*=\s*["']?\s*(?:refresh|content-security-policy)\s*["']?[^>]*>/gi, "")
+    .replace(/\s(?:on[a-zA-Z0-9_-]+|srcdoc)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s(href|src|xlink:href|action|formaction|poster|data)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi, (full, _attr, dq, sq) => {
+      const val = dq ?? sq ?? "";
+      return hasDangerousUrlScheme(val) ? "" : full;
+    });
 }
 
 function sanitizeViaDomParser(rawHtml: string, headPrefixHtml: string): string | null {
@@ -157,6 +204,18 @@ function sanitizeViaDomParser(rawHtml: string, headPrefixHtml: string): string |
   doc.querySelectorAll("meta[http-equiv]").forEach((el) => {
     const eq = (el.getAttribute("http-equiv") || "").trim().toLowerCase();
     if (eq === "refresh" || eq === "content-security-policy") el.remove();
+  });
+  doc.querySelectorAll("*").forEach((el) => {
+    for (const attr of Array.from(el.attributes)) {
+      const lowerName = attr.name.trim().toLowerCase();
+      if (INLINE_EVENT_ATTR_RE.test(lowerName) || lowerName === "srcdoc") {
+        el.removeAttribute(attr.name);
+        continue;
+      }
+      if (URL_CHECKED_ATTRS.has(lowerName) && hasDangerousUrlScheme(attr.value)) {
+        el.removeAttribute(attr.name);
+      }
+    }
   });
   const headHtml = doc.head ? doc.head.innerHTML : "";
   const bodyAttrs = doc.body
@@ -172,7 +231,12 @@ function sanitizeViaDomParser(rawHtml: string, headPrefixHtml: string): string |
 export function wrapUserHtmlSrcDoc(rawHtml: string, opts?: WrapUserHtmlOptions): string {
   const csp = opts?.allowDesignCdn ? DESIGN_CDN_CSP : STRICT_OFFLINE_CSP;
   const epoch = opts?.epoch ?? generateEpochNonce();
-  const headPrefix = `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeHtmlAttr(csp)}">${buildByteZeroBridgeScript(epoch)}`;
+  const parentOrigin =
+    opts?.parentOrigin ??
+    (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null"
+      ? window.location.origin
+      : undefined);
+  const headPrefix = `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeHtmlAttr(csp)}">${buildByteZeroBridgeScript(epoch, parentOrigin)}`;
 
   const domResult = sanitizeViaDomParser(rawHtml, headPrefix);
   if (domResult !== null) return domResult;

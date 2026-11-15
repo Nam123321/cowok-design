@@ -243,8 +243,8 @@
     "cronTriggers": "计划的 cron 定时任务",
     "saveBtn": "保存更改",
     "closeBtn": "关闭",
-    "autoSnapshotTitle": "状态与图表 AST 自动快照",
-    "autoSnapshotDesc": "每 5 分钟 • 自动记录 2D DAG 图表增量",
+    "autoSnapshotTitle": "状态与图表 AST 快照",
+    "autoSnapshotDesc": "仅限按需 • 从工具栏或工作台手动触发快照",
     "bearerPlaceholder": "Bearer 令牌 (仅限当前会话)",
     "cancelBtn": "取消",
     "enterKeyOrEndpoint": "请输入密钥或端点",
@@ -281,8 +281,8 @@
     "daemonStatusOnline": "在线",
     "daemonStatusOffline": "离线",
     "daemonStatusChecking": "检查中",
-    "snapshotCadenceReady": "就绪 · 5分钟",
-    "snapshotCadencePaused": "待机"
+    "snapshotCadenceReady": "仅限手动",
+    "snapshotCadencePaused": "未计划"
   },
   "flow": {
     "dagCanvas": "DAG 2D 画布",

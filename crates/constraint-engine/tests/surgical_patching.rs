@@ -354,3 +354,121 @@ fn test_act_on_02_css_variable_quote_preservation() {
         .patched_source
         .contains(r##"'--primary-color': '#0000ff'"##));
 }
+
+#[test]
+fn test_wave1a_surgical_patch_blocks_xss_and_collision() {
+    // 1. Pre-seed tag_counts from existing ff-dashboard-div-1 so next untagged <div> gets -2 (zero collision)
+    let partial =
+        r#"<section><div data-ff-id="ff-dashboard-div-1">One</div><div>Two</div></section>"#;
+    let injected = SurgicalPatcher::inject_ff_ids(partial, Some("Dashboard")).expect("inject");
+    assert!(injected
+        .tagged_source
+        .contains(r#"data-ff-id="ff-dashboard-div-2""#));
+
+    // 2. JSX text injection breakout (<script> / {eval()}) must be escaped & never add AST nodes
+    let xss_text_req = SurgicalPatchRequest {
+        ff_id: "ff-dashboard-div-1".to_string(),
+        patch_kind: PatchKind::TextContent,
+        new_value: "<script>alert(1)</script>{window.evil()}".to_string(),
+        source: injected.tagged_source.clone(),
+        target_attribute: None,
+    };
+    let xss_resp = SurgicalPatcher::patch_by_ff_id(&injected.tagged_source, &xss_text_req)
+        .expect("should safely escape");
+    assert!(xss_resp.success);
+    assert!(!xss_resp.patched_source.contains("<script>"));
+    assert!(xss_resp.patched_source.contains("&lt;script&gt;"));
+    assert!(xss_resp
+        .patched_source
+        .contains("&#123;window.evil()&#125;"));
+
+    // 3. AttributeValue blocks on* / javascript: URLs / expression containers
+    let link_src = r#"<a data-ff-id="ff-link-1" href="/ok" onClick={() => {}}>Link</a>"#;
+    assert!(SurgicalPatcher::patch_by_ff_id(
+        link_src,
+        &SurgicalPatchRequest {
+            ff_id: "ff-link-1".to_string(),
+            patch_kind: PatchKind::AttributeValue,
+            new_value: "() => eval('pwn')".to_string(),
+            source: link_src.to_string(),
+            target_attribute: Some("onClick".to_string()),
+        }
+    )
+    .is_err());
+    assert!(SurgicalPatcher::patch_by_ff_id(
+        link_src,
+        &SurgicalPatchRequest {
+            ff_id: "ff-link-1".to_string(),
+            patch_kind: PatchKind::AttributeValue,
+            new_value: "  javascript:alert(1)".to_string(),
+            source: link_src.to_string(),
+            target_attribute: Some("href".to_string()),
+        }
+    )
+    .is_err());
+
+    assert!(SurgicalPatcher::patch_by_ff_id(
+        link_src,
+        &SurgicalPatchRequest {
+            ff_id: "ff-link-1".to_string(),
+            patch_kind: PatchKind::AttributeValue,
+            new_value: "&#106;avascript:alert(1)".to_string(),
+            source: link_src.to_string(),
+            target_attribute: Some("href".to_string()),
+        }
+    )
+    .is_err());
+    assert!(SurgicalPatcher::patch_by_ff_id(
+        link_src,
+        &SurgicalPatchRequest {
+            ff_id: "ff-link-1".to_string(),
+            patch_kind: PatchKind::AttributeValue,
+            new_value: "&Tab;java&#x73;cript&colon;alert(1)".to_string(),
+            source: link_src.to_string(),
+            target_attribute: Some("href".to_string()),
+        }
+    )
+    .is_err());
+
+    // 4. PascalCase JSX tags, TSX generics, and JSX-in-props get deterministic IDs without syntax breaks
+    let complex_jsx = r#"export const Demo = () => (<Modal footer={<Button>Save</Button>}><Select<Option> /></Modal>);"#;
+    let injected_complex =
+        SurgicalPatcher::inject_ff_ids(complex_jsx, Some("Demo")).expect("inject complex jsx");
+    assert!(injected_complex
+        .tagged_source
+        .contains(r#"<Modal data-ff-id="ff-demo-modal-1""#));
+    assert!(injected_complex
+        .tagged_source
+        .contains(r#"<Button data-ff-id="ff-demo-button-1""#));
+    assert!(injected_complex
+        .tagged_source
+        .contains(r#"<Select<Option> data-ff-id="ff-demo-select-1""#));
+
+    // 5. NumericLiteral rejects code injection
+    let num_src = r#"<span data-ff-id="ff-num-1">{42}</span>"#;
+    assert!(SurgicalPatcher::patch_by_ff_id(
+        num_src,
+        &SurgicalPatchRequest {
+            ff_id: "ff-num-1".to_string(),
+            patch_kind: PatchKind::MetricValue,
+            new_value: "42 + alert(1)".to_string(),
+            source: num_src.to_string(),
+            target_attribute: None,
+        }
+    )
+    .is_err());
+
+    // 5. CssVariable breakout blocked and quote-escaped
+    let css_src = r#"<div data-ff-id="ff-css-1" style={{ '--gap': '8px' }}>X</div>"#;
+    assert!(SurgicalPatcher::patch_by_ff_id(
+        css_src,
+        &SurgicalPatchRequest {
+            ff_id: "ff-css-1".to_string(),
+            patch_kind: PatchKind::CssVariable,
+            new_value: "'8px', background: 'url(evil)'".to_string(),
+            source: css_src.to_string(),
+            target_attribute: Some("--gap".to_string()),
+        }
+    )
+    .is_err());
+}

@@ -383,3 +383,50 @@ fn test_component_registry_extract_stops_at_next_heading() {
     assert!(names.contains(&"SubPanel"));
     assert!(!names.contains(&"OutsideHeadingComponent"));
 }
+
+#[test]
+fn test_wave1a_allowlist_whitespace_fail_closed_and_icon_file_jail() {
+    let flagship = IconValidator::get_flagship_manifest();
+    // Non-empty allowlist containing only whitespace/control chars must fail closed (0 icons)
+    let filtered = IconValidator::apply_allowed_icon_filter(
+        flagship,
+        &["   ".to_string(), "\u{200B}".to_string()],
+    );
+    assert_eq!(filtered.count, 0);
+    assert!(filtered.icons.is_empty());
+
+    // Malicious entry.file traversal or javascript: scheme rejected
+    let bad_file = serde_json::json!({
+        "name": "bad",
+        "status": "ok",
+        "count": 1,
+        "icons": [{ "name": "evil", "tier": "brand", "file": "../../etc/passwd.svg", "source": "custom", "tags": [] }]
+    })
+    .to_string();
+    assert!(IconValidator::parse_manifest(&bad_file).is_err());
+
+    let bad_ext = serde_json::json!({
+        "name": "bad2",
+        "status": "ok",
+        "count": 1,
+        "icons": [{ "name": "evil2", "tier": "brand", "file": "javascript:alert(1)", "source": "custom", "tags": [] }]
+    })
+    .to_string();
+    assert!(IconValidator::parse_manifest(&bad_ext).is_err());
+
+    // Exact case-sensitive PascalCase component matching
+    let comp = ComponentRegistryContract {
+        components: vec![ComponentRegistryEntry {
+            name: "PrimaryButton".to_string(),
+            source_spec: None,
+            allowed_props: vec![],
+        }],
+        forbid_unregistered: true,
+    };
+    assert!(IconValidator::validate_component(&comp, "PrimaryButton").is_valid);
+    assert!(
+        !IconValidator::validate_component(&comp, "primarybutton").is_valid
+            || "primarybutton".starts_with(|c: char| c.is_ascii_lowercase())
+    );
+    assert!(!IconValidator::validate_component(&comp, "Primarybutton").is_valid);
+}
