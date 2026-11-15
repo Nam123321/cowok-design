@@ -60,10 +60,55 @@ function useFloatingDragListeners(params: {
   }, [isDragging, width, isCollapsed, dragStartRef, setAnchor, setIsDragging]);
 }
 
+const FLOATING_CHAT_GEOMETRY_KEY = "cowok_floating_chat_geometry";
+
 export function useFloatingWindowGeometry(isCollapsed: boolean) {
-  const [anchor, setAnchor] = useState<{ x: number; bottom: number } | null>(null);
-  const [width, setWidth] = useState<number>(FLOATING_CHAT_BOUNDS.DEFAULT_WIDTH);
-  const [customHeight, setCustomHeight] = useState<number | null>(null);
+  const [anchor, setAnchor] = useState<{ x: number; bottom: number } | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const saved = localStorage.getItem(FLOATING_CHAT_GEOMETRY_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as { x: number; bottom: number };
+        if (typeof parsed.x === "number" && typeof parsed.bottom === "number") {
+          return {
+            x: clampBound(parsed.x, 12, Math.max(12, window.innerWidth - 360)),
+            bottom: clampBound(parsed.bottom, 12, Math.max(12, window.innerHeight - 60)),
+          };
+        }
+      }
+    } catch {}
+    return null;
+  });
+
+  const [width, setWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return FLOATING_CHAT_BOUNDS.DEFAULT_WIDTH;
+    try {
+      const saved = localStorage.getItem(FLOATING_CHAT_GEOMETRY_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as { width: number };
+        if (typeof parsed.width === "number") {
+          return clampBound(parsed.width, FLOATING_CHAT_BOUNDS.MIN_WIDTH, FLOATING_CHAT_BOUNDS.MAX_WIDTH);
+        }
+      }
+    } catch {}
+    return FLOATING_CHAT_BOUNDS.DEFAULT_WIDTH;
+  });
+
+  const [customHeight, setCustomHeight] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const saved = localStorage.getItem(FLOATING_CHAT_GEOMETRY_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as { height: number | null };
+        if (typeof parsed.height === "number") {
+          const maxAllowed = Math.min(FLOATING_CHAT_BOUNDS.MAX_HEIGHT, window.innerHeight - 24);
+          return clampBound(parsed.height, FLOATING_CHAT_BOUNDS.MIN_HEIGHT, maxAllowed);
+        }
+      }
+    } catch {}
+    return null;
+  });
+
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ mouseX: 0, mouseY: 0, startX: 0, startBottom: FLOATING_CHAT_BOUNDS.DEFAULT_BOTTOM as number });
 
@@ -72,6 +117,16 @@ export function useFloatingWindowGeometry(isCollapsed: boolean) {
       setAnchor({ x: Math.max(12, Math.round(window.innerWidth / 2 - width / 2)), bottom: FLOATING_CHAT_BOUNDS.DEFAULT_BOTTOM });
     }
   }, [anchor, width]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !anchor) return;
+    try {
+      localStorage.setItem(
+        FLOATING_CHAT_GEOMETRY_KEY,
+        JSON.stringify({ x: anchor.x, bottom: anchor.bottom, width, height: customHeight })
+      );
+    } catch {}
+  }, [anchor, width, customHeight]);
 
   useFloatingDragListeners({ isDragging, width, isCollapsed, dragStartRef, setAnchor, setIsDragging });
 
@@ -89,6 +144,9 @@ export function useFloatingWindowGeometry(isCollapsed: boolean) {
     setWidth(FLOATING_CHAT_BOUNDS.DEFAULT_WIDTH);
     setCustomHeight(null);
     setAnchor({ x: Math.max(12, Math.round(window.innerWidth / 2 - FLOATING_CHAT_BOUNDS.DEFAULT_WIDTH / 2)), bottom: FLOATING_CHAT_BOUNDS.DEFAULT_BOTTOM });
+    try {
+      localStorage.removeItem(FLOATING_CHAT_GEOMETRY_KEY);
+    } catch {}
   };
 
   return { anchor, setAnchor, width, setWidth, customHeight, setCustomHeight, isDragging, handleHeaderMouseDown, handleRedockToBottom };
@@ -104,9 +162,13 @@ export function computeResizedBounds(
   if (direction.includes("e")) {
     out.width = clampBound(state.width + dx, FLOATING_CHAT_BOUNDS.MIN_WIDTH, FLOATING_CHAT_BOUNDS.MAX_WIDTH);
   } else if (direction.includes("w")) {
-    const nextW = clampBound(state.width - dx, FLOATING_CHAT_BOUNDS.MIN_WIDTH, FLOATING_CHAT_BOUNDS.MAX_WIDTH);
+    const rawW = state.width - dx;
+    const maxGrowLeft = Math.max(0, state.x - 12);
+    const nextW = dx < 0
+      ? Math.min(clampBound(rawW, FLOATING_CHAT_BOUNDS.MIN_WIDTH, FLOATING_CHAT_BOUNDS.MAX_WIDTH), state.width + maxGrowLeft)
+      : clampBound(rawW, FLOATING_CHAT_BOUNDS.MIN_WIDTH, FLOATING_CHAT_BOUNDS.MAX_WIDTH);
     out.width = nextW;
-    out.x = Math.max(12, state.x + (state.width - nextW));
+    out.x = Math.max(12, state.x - (nextW - state.width));
   }
   if (direction.includes("n")) {
     out.height = clampBound(state.height - dy, FLOATING_CHAT_BOUNDS.MIN_HEIGHT, FLOATING_CHAT_BOUNDS.MAX_HEIGHT);

@@ -322,15 +322,7 @@
     "nodesCountLabel": "Nodes",
     "draftBadge": "DRAFT",
     "runningBadge": "RUNNING",
-    "pausedBadge": "PAUSED",
-    "interruptedBadge": "INTERRUPTED",
     "queuedBadgePrefix": "QUEUED #",
-    "queue": {
-      "running": "RUNNING",
-      "paused": "PAUSED",
-      "interrupted": "INTERRUPTED",
-      "queuedPrefix": "QUEUED #"
-    },
     "transitionErrorPrefix": "Graph transition error"
   },
   "brand": {
@@ -361,7 +353,6 @@
     "enterHintSuffix": "(Enter to send, Shift+Enter for newline)",
     "fifoMode": "FIFO per-node",
     "focusNodeOnDag": "Focus Node on DAG",
-    "jobInterrupted": "Interrupted",
     "jobPaused": "Paused",
     "jobRunning": "Processing...",
     "multiNodePlaceholder": "Ask Agent to process all selected screens concurrently...",
@@ -482,13 +473,5 @@
     "wsSandboxedDesc": "Auto-isolated under .cowok-design/projects/ with HMAC token",
     "doctorError": "Unable to reach CLI Doctor daemon; using default settings.",
     "saveDaemonWarning": "Saved locally; failed to sync onboarding preferences to daemon."
-  },
-  "sidebar": {
-    "subsessions": {
-      "queued": "QUEUED",
-      "running": "RUNNING",
-      "paused": "PAUSED",
-      "interrupted": "INTERRUPTED"
-    }
   }
 }

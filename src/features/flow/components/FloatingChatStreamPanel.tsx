@@ -80,7 +80,7 @@ const MessageHistoryList: React.FC<{
   if (messages.length === 0) {
     return (
       <div className="fc-history" style={{ flex: 1, padding: "12px", display: "flex", alignItems: "flex-start", gap: "6px", backgroundColor: "var(--bg-canvas)", fontSize: "11.5px", color: "var(--text-muted)" }}>
-        <BrandIcon name="sparkles" size={12} color="var(--agent-accent)" />
+        <BrandIcon name="ai-agent" size={14} color="var(--agent-accent)" />
         <span>
           {t("floatingChat.emptyHint", "Nhập yêu cầu cho")} {isMulti ? `${formatNumber(selectedCount)} ${t("floatingChat.screensUnit", "màn hình")}` : primaryTitle || t("floatingChat.singleScreenFallback", "màn hình")}
         </span>

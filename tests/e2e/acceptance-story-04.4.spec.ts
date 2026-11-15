@@ -179,11 +179,19 @@ async function verifyFifoCasAndSse(request: APIRequestContext, baseUrl: string, 
 
 test.describe("Story 04.4 Unconditional Live E2E Acceptance", () => {
   test("verifies live UI surfaces, 8-dir resize, 3-level sidebar, FIFO promotion, CAS 409, SSE replay & plugins", async ({
-    page,
+    browser,
     request,
   }) => {
     fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
     fs.writeFileSync(path.join(EVIDENCE_DIR, "qa-nonce.json"), JSON.stringify({ nonce: crypto.randomBytes(16).toString("hex"), generatedAt: new Date().toISOString() }, null, 2));
+
+    const videoDir = path.join(EVIDENCE_DIR, "videos");
+    fs.mkdirSync(videoDir, { recursive: true });
+    const context = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      recordVideo: { dir: videoDir, size: { width: 1440, height: 900 } },
+    });
+    const page = await context.newPage();
 
     const consoleErrors: string[] = [];
     const pageErrors: string[] = [];
@@ -198,17 +206,29 @@ test.describe("Story 04.4 Unconditional Live E2E Acceptance", () => {
     });
     const targetPort = process.env.TARGET_PORT || process.env.PORT || "4173";
     const baseUrl = `http://127.0.0.1:${targetPort}/`;
-    await page.goto(baseUrl, { waitUntil: "networkidle" });
+    try {
+      await page.goto(baseUrl, { waitUntil: "networkidle" });
 
-    const saveShot = async (name: string) => { await page.screenshot({ path: path.join(EVIDENCE_DIR, name), fullPage: true }); };
-    await verifyUiAndResize(page, saveShot);
-    await verifyDualSurfaceAndSidebarSync(page, saveShot);
-    const { headers, projectId } = await verifyPluginsAndCreateProject(page, request, baseUrl);
-    await verifyFifoCasAndSse(request, baseUrl, headers, projectId);
-    fs.writeFileSync(path.join(EVIDENCE_DIR, "dom-snapshot.html"), await page.content(), "utf8");
+      const saveShot = async (name: string) => { await page.screenshot({ path: path.join(EVIDENCE_DIR, name), fullPage: true }); };
+      await verifyUiAndResize(page, saveShot);
+      await verifyDualSurfaceAndSidebarSync(page, saveShot);
+      const { headers, projectId } = await verifyPluginsAndCreateProject(page, request, baseUrl);
+      await verifyFifoCasAndSse(request, baseUrl, headers, projectId);
+      fs.writeFileSync(path.join(EVIDENCE_DIR, "dom-snapshot.html"), await page.content(), "utf8");
 
-    expect(consoleErrors).toEqual([]);
-    expect(pageErrors).toEqual([]);
-    expect(http500s).toEqual([]);
+      expect(consoleErrors).toEqual([]);
+      expect(pageErrors).toEqual([]);
+      expect(http500s).toEqual([]);
+    } finally {
+      const vid = page.video();
+      await context.close();
+      if (vid) {
+        try {
+          await vid.saveAs(path.join(EVIDENCE_DIR, "acceptance-story-04.4.webm"));
+        } catch {
+          // ignore video flush error
+        }
+      }
+    }
   });
 });
