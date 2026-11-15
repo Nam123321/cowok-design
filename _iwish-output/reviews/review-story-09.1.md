@@ -12,3 +12,7 @@
 
 ## 2. Final Verdict
 **VERDICT: PASS / APPROVED**
+---
+
+## 3. Formal-verify candidates Triage
+- **Formal-verify candidates:** Stage 1/3A deferred triage (story not yet implemented): deterministic DNA sanitizer/extractor — no distributed state machine identified yet; re-evaluate at Stage 3A.
