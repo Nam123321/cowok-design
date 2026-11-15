@@ -84,7 +84,7 @@ function applyDefaultAgentSettingRow(
 function useSettingsDialogState(isOpen: boolean, onClose: () => void, activeTab: SettingsTab) {
   const initial = loadPersistedSettings();
   const [selectedTab, setSelectedTab] = useState<SettingsTab>(activeTab);
-  const [defaultModel, setDefaultModel] = useState(initial.defaultModel || "claude-sonnet-4-6");
+  const [defaultModel, setDefaultModel] = useState(initial.defaultModel || "cowok-swarm");
   const [byosEndpoint, setByosEndpoint] = useState(initial.byosEndpoint || "");
   const [vaultMode, setVaultMode] = useState<string>("vault_0600");
   const [permissionMode, setPermissionMode] = useState<string>("auto_sandbox");

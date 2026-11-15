@@ -11,6 +11,7 @@ import { WorkbenchBodyLayout } from "./components/WorkbenchBodyLayout";
 import { useWorkbenchShellState } from "./hooks/useWorkbenchShellState";
 import { DEFAULT_FLOW_PROJECT_ID, DEFAULT_INITIAL_NODES, DEFAULT_INITIAL_TRANSITIONS } from "./constants";
 import { useTranslation } from "../../hooks/useTranslation";
+import { apiWorkbenchSettings } from "../../api/workbench-settings";
 
 export type { ThemeMode };
 
@@ -164,13 +165,26 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
   const resolvedProjectName = activeProjObj?.name || projectName;
   const resolvedProjectId = activeProjObj?.id || sessionManager.activeProjectId || projectId;
 
-  const [isOnboardingOpen, setIsOnboardingOpen] = React.useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return !window.localStorage.getItem("cowok_first_run_completed");
-  });
+  const [isOnboardingOpen, setIsOnboardingOpen] = React.useState<boolean>(false);
   const [daemonWarning, setDaemonWarning] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    void apiWorkbenchSettings
+      .listAgentSettings()
+      .then((rows) => {
+        if (cancelled) return;
+        const alreadyOnboarded = rows.some((row) => Boolean(row.onboardingDone));
+        setIsOnboardingOpen(!alreadyOnboarded);
+      })
+      .catch(() => {
+        // Keep wizard closed if daemon is unreachable or tests mock partial endpoints.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const closeOnboarding = () => {
-    if (typeof window !== "undefined") window.localStorage.setItem("cowok_first_run_completed", "true");
     setIsOnboardingOpen(false);
   };
 

@@ -1147,6 +1147,16 @@ fn validate_ipv4_ssrf(
             "Carrier-grade NAT {context}target '{v4}' is blocked (SSRF prevention)"
         ));
     }
+    if octets[0] == 198 && (octets[1] == 18 || octets[1] == 19) {
+        return Err(format!(
+            "Benchmarking RFC2544 {context}target '{v4}' is blocked (SSRF prevention)"
+        ));
+    }
+    if v4.is_multicast() || octets[0] >= 224 {
+        return Err(format!(
+            "Multicast/reserved {context}target '{v4}' is blocked (SSRF prevention)"
+        ));
+    }
     if v4.is_loopback() {
         if !allow_loopback_policy {
             return Err(format!(
@@ -1201,9 +1211,25 @@ fn validate_ip_ssrf(
                     && segments[3] == 0
                     && segments[4] == 0
                     && (segments[5] == 0xffff || segments[5] == 0);
+                let is_nat64_embedded = segments[0] == 0x0064
+                    && segments[1] == 0xff9b
+                    && segments[2] == 0
+                    && segments[3] == 0
+                    && segments[4] == 0
+                    && segments[5] == 0;
 
-                if is_v4_embedded {
-                    if let Some(v4) = v6.to_ipv4() {
+                if is_v4_embedded || is_nat64_embedded {
+                    let embedded_v4 = if is_v4_embedded {
+                        v6.to_ipv4()
+                    } else {
+                        Some(std::net::Ipv4Addr::new(
+                            (segments[6] >> 8) as u8,
+                            (segments[6] & 0xff) as u8,
+                            (segments[7] >> 8) as u8,
+                            (segments[7] & 0xff) as u8,
+                        ))
+                    };
+                    if let Some(v4) = embedded_v4 {
                         validate_ipv4_ssrf(
                             v4,
                             port,

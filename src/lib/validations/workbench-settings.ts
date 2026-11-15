@@ -65,15 +65,30 @@ export const CliDiagnosticItemSchema = z.object({
   id: z.string(),
   name: z.string(),
   command: z.string(),
-  category: z.enum(["cli", "ide", "local"]).optional(),
-  scanMode: z.enum(["passive", "active"]).optional(),
+  category: z.enum(["cli", "ide", "ide_extension", "local"]).optional(),
+  scanMode: z.enum(["passive", "active", "active_probe"]).optional(),
   installed: z.boolean(),
-  version: z.string().optional(),
+  version: z.string().nullable().optional(),
   authenticated: z.boolean(),
-  status: z.enum(["ready", "not_installed", "auth_needed", "error"]),
-  authReason: z.string().optional(),
+  status: z.enum(["ready", "not_installed", "auth_needed", "manual_ide_setup", "timeout", "error"]),
+  authReason: z.string().nullable().optional(),
+  timedOut: z.boolean().optional(),
   latencyMs: z.number(),
 });
+
+export const SkillPluginDtoSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  pluginSlug: z.string(),
+  version: z.string(),
+  lifecycleState: z.string(),
+  enabled: z.boolean(),
+  sourceRepoUrl: z.string().nullable().optional(),
+  manifestJson: z.record(z.string(), z.unknown()).optional().default({}),
+  updatedAt: z.string(),
+});
+
+export type SkillPluginDto = z.infer<typeof SkillPluginDtoSchema>;
 
 export const DoctorScanResponseSchema = z.object({
   clis: z.array(CliDiagnosticItemSchema).optional().default([]),

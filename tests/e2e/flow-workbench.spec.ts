@@ -15,11 +15,40 @@ test.describe("Story 04.1: Unified DualMainPanel Workbench, Rust SQLite WAL SSOT
     fs.mkdirSync(evidenceDir, { recursive: true });
 
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.addInitScript(() => {
-      window.localStorage.setItem("cowok_first_run_completed", "true");
-    });
     const targetPort = process.env.TARGET_PORT || "4173";
     await page.goto(`http://127.0.0.1:${targetPort}/`, { waitUntil: "networkidle" });
+    await page.evaluate(async () => {
+      const bootCap = document.querySelector('meta[name="cowok-boot-cap"]')?.getAttribute("content")?.trim() || "";
+      const authRes = await fetch("/api/auth/local-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(bootCap ? { "X-Cowok-Boot-Cap": bootCap } : {}),
+        },
+        body: JSON.stringify({ role: "editor" }),
+      });
+      const auth = (await authRes.json()) as { sessionToken?: string };
+      if (auth.sessionToken) {
+        const res = await fetch("/api/agent-settings", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Cowok-Session-Token": auth.sessionToken,
+          },
+          body: JSON.stringify({
+            providerId: "cowok-swarm",
+            modelId: "cowok-swarm",
+            vaultMode: "vault_0600",
+            permissionMode: "auto_sandbox",
+            onboardingDone: true,
+          }),
+        });
+        if (!res.ok) {
+          throw new Error(`PUT /api/agent-settings failed: ${res.status}`);
+        }
+      }
+    });
+    await page.reload({ waitUntil: "networkidle" });
 
     // 1. Verify initial DualMainPanel Workbench & Sandboxed HTML Preview (Option CSP-B)
     const iframe = page.getByTestId("sandboxed-html-iframe");

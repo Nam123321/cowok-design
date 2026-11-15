@@ -4,9 +4,11 @@ id: "04.3"
 title: "Story 04.3: Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier"
 description: "Triển khai bề mặt mở rộng HYBRID / EXTENSION_PLUGIN và két bảo mật cho Epic 04 (EC-E04-03, EC-E04-04): Day-0 First-Run Onboarding Wizard (<60s) dẫn nhập bằng thiết lập BYOK/provider không biệt ngữ + mục Developer CLI có thể gập gọn; tách bạch Passive Day-0 CLI Scan (PATH + metadata phi-Keychain + extension IDE cline/roo không gây bão modal securityd hay treo FD Electron) khỏi Explicit Per-CLI Active Auth Probe (concurrency <=4, CI=1, GIT_TERMINAL_PROMPT=0, closed FDs, -PGID SIGKILL <=1500ms); thay handle_verify_provider_key prefix mock (legacy_workbench_v6.rs:1525-1651) bằng Live Verifier <3s kèm reqwest Redirect Policy::none() + connect-time SocketAddr SSRF blocklist + sửa lỗi truyền nhầm byosEndpoint thành byosToken trong SettingsGeneralModelsPane.tsx; tự động fallback OS Keychain -> Argon2id+AES-256-GCM .cowok-design/vault.enc (0o600) và CHẶN hạ cấp agent_settings sang ephemeral khi vault.enc ghi được; chuẩn hóa hoàn toàn về /api/v1/{doctor/verify-key,agent-settings,mcp-servers} + SQLite V7 qua src/api/workbench-settings.ts."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-04/Story-04.3/story.md"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: hybrid
+plugin_id: "cli-doctor-extension"
+plugin_dir: "src/plugins/cli-doctor-extension"
 timestamp: "2026-11-14T08:47:00+07:00"
 tags:
   - "story-04.3"
@@ -40,7 +42,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-02: Interactive Multi-Portal Flow Graph, FR-03: State-Hydrated Live Preview, FR-06: Element-Anchored Comments (Day-0 Runtime Doctor & Secure BYOS/BYOK Enabler)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/3.%20Development/1.%20Epic%20&%20Story/VS-02.%20Flow-First%20Executable%20Design%20Workbench%20&%20SDI%20Engine/Epic-04/epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context
@@ -59,18 +61,18 @@ Story 04.3 tách riêng toàn bộ miền rủi ro bảo mật `EXTENSION_PLUGIN
 - **AC-04 (`[EDGE-CASE]` Automatic `X-Cowok-Session-Token` Injection & Fail-Closed Extension Boundary):** Tất cả lời gọi qua `src/api/workbench-settings.ts` (`apiWorkbenchSettings` / `apiAgentSettings`) tự động đính kèm `X-Cowok-Session-Token` qua `daemon-client.ts` / `apiClient` trung tâm; extension probe (`agent-enablement.md`) vận hành `READ_ONLY` với hệ thống máy chủ và chỉ ghi xuống SQLite V7 sau xác nhận người dùng.
 
 ## 4. Tasks
-- [ ] **Task 04.3.1**: Tách Passive Day-0 Scan vs Explicit Per-CLI Active Auth Probe (`concurrency <= 4`, `CI=1`, `GIT_TERMINAL_PROMPT=0`, closed FDs, `-PGID` `SIGKILL <= 1500ms`, phân loại extension `cline`/`roo`) cho 16+ CLIs, dẫn nhập Day-0 Wizard `<60s` với BYOK step-1 & mục Developer CLI gập gọn cùng `/api/v1/mcp-servers` SQLite V7 (thỏa mãn `AC-01`).
-- [ ] **Task 04.3.2**: Thay prefix mock ở `handle_verify_provider_key` (`legacy_workbench_v6.rs:1525-1651`) bằng `POST /api/v1/doctor/verify-key` `<3s` live probe + `reqwest::redirect::Policy::none()` + connect-time `SocketAddr` SSRF blocklist (`[::ffff:127.0.0.1]`, RFC1918, `169.254.0.0/16`, `100.64.0.0/10`) + log redaction; sửa lỗi `byosToken`/`byosEndpoint` trong `SettingsGeneralModelsPane.tsx` và bỏ server import khỏi `OnboardingWizardModal.tsx` sang `src/api/workbench-settings.ts` (thỏa mãn `AC-01`, `AC-02`, `AC-04`).
-- [ ] **Task 04.3.3**: Cài đặt OS Keychain -> `.cowok-design/vault.enc` (`0o600`, Argon2id + AES-256-GCM) auto-fallback và anti-downgrade guard chặn `PUT /api/v1/agent-settings` hạ cấp `ephemeral` khi `vault.enc` ghi được (thỏa mãn `AC-03`).
-- [ ] **Task 04.3.4**: Di chuyển toàn bộ cờ bảo mật / `permission_mode` / `vault_mode` / `onboarding_done` trong `useWorkbenchSessionSettings.ts` khỏi `localStorage` sang `GET/PUT /api/v1/agent-settings` SQLite V7 (thỏa mãn `AC-03`, `AC-04`).
+- [x] **Task 04.3.1**: Tách Passive Day-0 Scan vs Explicit Per-CLI Active Auth Probe (`concurrency <= 4`, `CI=1`, `GIT_TERMINAL_PROMPT=0`, closed FDs, `-PGID` `SIGKILL <= 1500ms`, phân loại extension `cline`/`roo`) cho 16+ CLIs, dẫn nhập Day-0 Wizard `<60s` với BYOK step-1 & mục Developer CLI gập gọn cùng `/api/v1/mcp-servers` SQLite V7 (thỏa mãn `AC-01`).
+- [x] **Task 04.3.2**: Thay prefix mock ở `handle_verify_provider_key` (`legacy_workbench_v6.rs:1525-1651`) bằng `POST /api/v1/doctor/verify-key` `<3s` live probe + `reqwest::redirect::Policy::none()` + connect-time `SocketAddr` SSRF blocklist (`[::ffff:127.0.0.1]`, RFC1918, `169.254.0.0/16`, `100.64.0.0/10`) + log redaction; sửa lỗi `byosToken`/`byosEndpoint` trong `SettingsGeneralModelsPane.tsx` và bỏ server import khỏi `OnboardingWizardModal.tsx` sang `src/api/workbench-settings.ts` (thỏa mãn `AC-01`, `AC-02`, `AC-04`).
+- [x] **Task 04.3.3**: Cài đặt OS Keychain -> `.cowok-design/vault.enc` (`0o600`, Argon2id + AES-256-GCM) auto-fallback và anti-downgrade guard chặn `PUT /api/v1/agent-settings` hạ cấp `ephemeral` khi `vault.enc` ghi được (thỏa mãn `AC-03`).
+- [x] **Task 04.3.4**: Di chuyển toàn bộ cờ bảo mật / `permission_mode` / `vault_mode` / `onboarding_done` trong `useWorkbenchSessionSettings.ts` khỏi `localStorage` sang `GET/PUT /api/v1/agent-settings` SQLite V7 (thỏa mãn `AC-03`, `AC-04`).
 
 ## 5. AC-to-Task Traceability Matrix
 | AC ID | Description | Mapped Implementation Tasks | Verification Method | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **AC-01** | [EDGE-CASE] Zero-Jargon Wizard `<60s`, Passive vs Active 16+ CLI Doctor | `Task 04.3.1`, `Task 04.3.2` | Passive No-Popup Scan, Bounded `-PGID` Timeout & MCP SQLite Test | pending |
-| **AC-02** | [EDGE-CASE] Live Verifier `<3s`, `SocketAddr` SSRF Block & `byosToken` Fix | `Task 04.3.2` | Redirect `Policy::none()`, `[::ffff:127.0.0.1]` SSRF & Redaction Test | pending |
-| **AC-03** | [EDGE-CASE] Keychain/`0o600` Auto-Fallback, Anti-Downgrade & Zero-LS | `Task 04.3.3`, `Task 04.3.4` | Vault Fallback CRYPTO `0o600`, Anti-Ephemeral Guard & Zero-LS Test | pending |
-| **AC-04** | [EDGE-CASE] Auto Session Token (`apiWorkbenchSettings`) & Extension Boundary | `Task 04.3.2`, `Task 04.3.4` | Token Header Injection & Read-Only Probe Test | pending |
+| **AC-01** | [EDGE-CASE] Zero-Jargon Wizard `<60s`, Passive vs Active 16+ CLI Doctor | `Task 04.3.1`, `Task 04.3.2` | Passive No-Popup Scan, Bounded `-PGID` Timeout & MCP SQLite Test | completed |
+| **AC-02** | [EDGE-CASE] Live Verifier `<3s`, `SocketAddr` SSRF Block & `byosToken` Fix | `Task 04.3.2` | Redirect `Policy::none()`, `[::ffff:127.0.0.1]` SSRF & Redaction Test | completed |
+| **AC-03** | [EDGE-CASE] Keychain/`0o600` Auto-Fallback, Anti-Downgrade & Zero-LS | `Task 04.3.3`, `Task 04.3.4` | Vault Fallback CRYPTO `0o600`, Anti-Ephemeral Guard & Zero-LS Test | completed |
+| **AC-04** | [EDGE-CASE] Auto Session Token (`apiWorkbenchSettings`) & Extension Boundary | `Task 04.3.2`, `Task 04.3.4` | Token Header Injection & Read-Only Probe Test | completed |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** `["04.2"]`

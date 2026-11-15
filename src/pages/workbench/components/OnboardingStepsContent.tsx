@@ -63,8 +63,6 @@ export const OnboardingStepsContent: React.FC<OnboardingStepsContentProps> = (p)
           return "sk-...";
         case "openrouter":
           return "sk-or-...";
-        case "ollama":
-          return "http://127.0.0.1:11434";
         default:
           return "sk-...";
       }
@@ -347,7 +345,6 @@ export const OnboardingStepsContent: React.FC<OnboardingStepsContentProps> = (p)
               <option value="gemini">{t("settings.modelOptionGemini25", "Google Gemini")}</option>
               <option value="deepseek">{t("settings.modelOptionDeepseekR1", "DeepSeek")}</option>
               <option value="openrouter">{t("settings.modelOptionByos", "OpenRouter")}</option>
-              <option value="ollama">{t("settings.ollamaLabel", "Ollama")}</option>
             </select>
 
             <div style={{ display: "flex", flex: 1, minWidth: "220px", gap: "6px" }}>

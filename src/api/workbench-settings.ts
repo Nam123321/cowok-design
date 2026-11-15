@@ -17,6 +17,8 @@ import {
   PostJobEventInput,
   PostJobEventInputSchema,
   ProbeCliInputSchema,
+  SkillPluginDto,
+  SkillPluginDtoSchema,
   UpsertAgentSettingInput,
   UpsertAgentSettingInputSchema,
   UpsertMcpServerInput,
@@ -84,6 +86,15 @@ export class WorkbenchSettingsClient extends HarnessDaemonTransport {
       method: "POST",
       body: JSON.stringify(validated),
     });
+  }
+
+  probeCli(cliId: string): Promise<CliDiagnosticItem> {
+    return this.probeCliTool(cliId);
+  }
+
+  listPlugins(opts?: { enabled?: boolean }): Promise<SkillPluginDto[]> {
+    const qs = opts?.enabled !== undefined ? `?enabled=${opts.enabled ? "true" : "false"}` : "";
+    return this.request(`/api/plugins${qs}`, z.array(SkillPluginDtoSchema), { method: "GET" });
   }
 
   listVaultKeys(): Promise<VaultKeyDto[]> {

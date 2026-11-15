@@ -193,7 +193,7 @@ const ModelsByosSection: React.FC<
           setStorageMode(vMode);
         }
         const pMode = def.permissionMode || def.status;
-        if (pMode === "auto_sandbox" || pMode === "ask_risky" || pMode === "ask_all" || pMode === "accept_edits" || pMode === "ask-every-time" || pMode === "bypass") {
+        if (pMode === "auto_sandbox" || pMode === "ask_risky" || pMode === "ask_all" || pMode === "accept_edits" || pMode === "ask-every-time") {
           setPermissionLevel(pMode);
         }
       })
@@ -220,7 +220,7 @@ const ModelsByosSection: React.FC<
     const { nextStorage, nextPerm, prevStorage, prevPerm, modelId, endpoint } = opts;
     const vaultMap: Record<string, "ram_only" | "keychain" | "vault_0600"> = { ram_only: "ram_only", keychain: "keychain", vault_0600: "vault_0600" };
     const resolvedVault = vaultMap[nextStorage] ?? "vault_0600";
-    const resolvedPerm = nextPerm === "ask_risky" || nextPerm === "ask_all" || nextPerm === "accept_edits" || nextPerm === "ask-every-time" || nextPerm === "bypass"
+    const resolvedPerm = nextPerm === "ask_risky" || nextPerm === "ask_all" || nextPerm === "accept_edits" || nextPerm === "ask-every-time"
       ? nextPerm
       : "auto_sandbox";
     try {

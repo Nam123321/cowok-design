@@ -19,9 +19,9 @@ use uuid::Uuid;
 
 use crate::daemon_auth::{flow_dual_ingress_auth_middleware, FlowPrincipal};
 use crate::routes::doctor_vault::{
-    handle_delete_vault_key, handle_get_doctor_cli_matrix, handle_list_vault_keys,
-    handle_probe_cli_tool, handle_update_vault_settings, handle_upsert_vault_key,
-    handle_verify_provider_key,
+    handle_delete_vault_key, handle_get_doctor_cli_matrix, handle_list_plugins,
+    handle_list_vault_keys, handle_probe_cli_tool, handle_update_vault_settings,
+    handle_upsert_vault_key, handle_verify_provider_key,
 };
 use crate::routes::legacy_workbench_v6::{
     handle_create_comment, handle_create_fixture, handle_delete_mcp_server,
@@ -135,6 +135,8 @@ pub fn build_flow_subrouter(state: DaemonAppState) -> Router<DaemonAppState> {
             delete(handle_delete_vault_key),
         )
         .route("/api/v1/settings/vault", put(handle_update_vault_settings))
+        .route("/api/v1/plugins", get(handle_list_plugins))
+        .route("/api/v1/plugins/registry", get(handle_list_plugins))
         .layer(DefaultBodyLimit::max(1_048_576))
         .route_layer(middleware::from_fn_with_state(
             state,
