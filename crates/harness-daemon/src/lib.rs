@@ -9,6 +9,7 @@ pub mod flow_routes;
 pub mod lockfile;
 pub mod routes;
 pub mod synthesis;
+pub mod vault;
 
 use std::path::PathBuf;
 use std::sync::Arc;

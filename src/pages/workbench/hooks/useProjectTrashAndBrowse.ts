@@ -75,7 +75,12 @@ export function toManagedSlug(rawName: string): string {
 export function readActiveProjectHint(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    const val = window.localStorage.getItem(ACTIVE_PROJECT_HINT_KEY);
+    const bootstrapDefault = (window as unknown as { __COWOK_BOOTSTRAP__?: { defaultProjectId?: string } })
+      .__COWOK_BOOTSTRAP__?.defaultProjectId;
+    if (bootstrapDefault && bootstrapDefault.trim().length > 0) return bootstrapDefault.trim();
+    const val =
+      window.localStorage.getItem(ACTIVE_PROJECT_HINT_KEY) ||
+      window.localStorage.getItem("cowok:active-project-id");
     return val && val.trim() ? val.trim() : null;
   } catch {
     return null;
@@ -87,8 +92,10 @@ export function writeActiveProjectHint(projectId: string): void {
   try {
     if (!projectId.trim()) {
       window.localStorage.removeItem(ACTIVE_PROJECT_HINT_KEY);
+      window.localStorage.removeItem("cowok:active-project-id");
     } else {
       window.localStorage.setItem(ACTIVE_PROJECT_HINT_KEY, projectId);
+      window.localStorage.setItem("cowok:active-project-id", projectId);
     }
   } catch {
     // Restricted storage sandbox

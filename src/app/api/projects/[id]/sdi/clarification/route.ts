@@ -1,7 +1,7 @@
 // @story 05.1
-import { guardedRoute } from "../../../../../../lib/api-guard";
-import { forwardFromGuardedContext } from "../../../../../../lib/daemon-client";
-import { ClarificationSelectSchema } from "../../../../../../lib/validations/sdi";
+import { guardedRoute } from "@/lib/api-guard";
+import { forwardFromGuardedContext } from "@/lib/daemon-client";
+import { ClarificationSelectSchema } from "@/lib/validations/sdi";
 
 export const POST = guardedRoute(
   (req, ctx, { body }) => {
@@ -9,7 +9,7 @@ export const POST = guardedRoute(
     return forwardFromGuardedContext(
       req,
       ctx,
-      `/api/v1/projects/${projectId}/sdi/clarification`,
+      `/api/v1/projects/${encodeURIComponent(projectId)}/sdi/clarification`,
       body
     );
   },

@@ -218,17 +218,18 @@ const ModelsByosSection: React.FC<
     endpoint: string;
   }) => {
     const { nextStorage, nextPerm, prevStorage, prevPerm, modelId, endpoint } = opts;
-    const vaultMap: Record<string, "ram_only" | "keychain" | "vault_0600"> = { ram_only: "ram_only", keychain: "keychain" };
+    const vaultMap: Record<string, "ram_only" | "keychain" | "vault_0600"> = { ram_only: "ram_only", keychain: "keychain", vault_0600: "vault_0600" };
     const resolvedVault = vaultMap[nextStorage] ?? "vault_0600";
     const resolvedPerm = nextPerm === "ask_risky" || nextPerm === "ask_all" || nextPerm === "accept_edits" || nextPerm === "ask-every-time" || nextPerm === "bypass"
       ? nextPerm
       : "auto_sandbox";
     try {
+      await apiWorkbenchSettings.updateVaultConfig({ vaultMode: resolvedVault });
       await apiWorkbenchSettings.upsertAgentSetting({
         providerId: modelId || "cowok-swarm",
         modelId: modelId || "cowok-swarm",
         endpointUrl: endpoint || "",
-        credentialRef: resolvedVault,
+        credentialRef: `vault://${resolvedVault}/${modelId || "cowok-swarm"}`,
         status: resolvedPerm,
         permissionMode: resolvedPerm,
         vaultMode: resolvedVault,
@@ -307,7 +308,7 @@ const ModelsByosSection: React.FC<
           {t("settings.modelsTitle", "Khóa API & Tự cấp gói thuê bao (BYOS)")}
         </div>
         <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", lineHeight: "1.4" }}>
-          {t("settings.modelsDesc", "Cấu hình quyền hạn thực thi và kiểm tra định dạng Key/Endpoint (Live upstream probe ở Story 04.3)")}
+          {t("settings.modelsDesc", "Cấu hình quyền hạn thực thi và xác thực trực tiếp Key/Endpoint qua Upstream Probe")}
         </div>
         {daemonNotice && (
           <div
@@ -394,7 +395,66 @@ const ModelsByosSection: React.FC<
         </div>
       </div>
 
-      {/* Keys with Format Validation (Live upstream probe in Story 04.3) */}
+      {/* 1. Prioritized BYOS / Custom Gateway (Bring Your Own Subscription) */}
+      <div style={{ padding: "10px 12px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+          <div style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-primary)" }}>
+            {t("settings.byosTitle", "Tùy biến Endpoint (BYOS / Custom Gateway)")}
+          </div>
+          <button
+            type="button"
+            data-testid="verify-byos-btn"
+            onClick={() => void verifyEndpoint("byos", p.byosEndpoint, p.ephemeralApiKeys.byosToken)}
+            style={{
+              border: "none",
+              background: "transparent",
+              fontSize: "10.5px",
+              color: "var(--action-primary)",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              lineHeight: 1,
+              gap: "4px",
+            }}
+          >
+            <BrandIcon name="play" size={10} color="currentColor" />
+            <span>{t("settings.verifyConnection", "Kiểm tra kết nối")}</span>
+          </button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <input
+            type="text"
+            value={p.byosEndpoint}
+            onChange={(e) => p.onByosEndpointChange(e.target.value)}
+            placeholder="http://localhost:11434/v1"
+            className="cowok-input"
+            style={INPUT_STYLE}
+          />
+          <input
+            type={inputType}
+            value={p.ephemeralApiKeys.byosToken}
+            onChange={(e) => p.onEphemeralKeyChange("byosToken", e.target.value)}
+            placeholder={t("settings.bearerPlaceholder", "Bearer token (chỉ giữ trong phiên)")}
+            className="cowok-input"
+            style={INPUT_STYLE}
+          />
+        </div>
+        {verifyStates["byos"] && (
+          <div
+            style={{
+              fontSize: "10.5px",
+              marginTop: "6px",
+              color: verifyStates["byos"].status === "success" ? "var(--state-success)" : "var(--state-danger)",
+            }}
+          >
+            {verifyStates["byos"].message ||
+              (verifyStates["byos"].status === "verifying" ? t("settings.verifyingEndpointShort", "Đang kiểm tra endpoint (<3s)...") : "")}
+          </div>
+        )}
+      </div>
+
+      {/* 2. Direct Provider API Keys (BYOK) */}
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         {PROVIDER_KEY_FIELDS.map((field, idx) => (
           <div key={field.id}>
@@ -412,8 +472,10 @@ const ModelsByosSection: React.FC<
                     fontSize: "10.5px",
                     color: "var(--action-primary)",
                     cursor: "pointer",
-                    display: "flex",
+                    display: "inline-flex",
                     alignItems: "center",
+                    justifyContent: "center",
+                    lineHeight: 1,
                     gap: "4px",
                   }}
                 >
@@ -453,63 +515,6 @@ const ModelsByosSection: React.FC<
             )}
           </div>
         ))}
-      </div>
-
-      {/* BYOS / Custom Gateway */}
-      <div style={{ padding: "10px 12px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-          <div style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-primary)" }}>
-            {t("settings.byosTitle", "Tùy biến Endpoint (BYOS / Custom Gateway)")}
-          </div>
-          <button
-            type="button"
-            data-testid="verify-byos-btn"
-            onClick={() => void verifyEndpoint("byos", p.byosEndpoint, p.ephemeralApiKeys.byosToken)}
-            style={{
-              border: "none",
-              background: "transparent",
-              fontSize: "10.5px",
-              color: "var(--action-primary)",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-            }}
-          >
-            <BrandIcon name="play" size={10} color="currentColor" />
-            <span>{t("settings.verifyConnection", "Kiểm tra kết nối")}</span>
-          </button>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          <input
-            type="text"
-            value={p.byosEndpoint}
-            onChange={(e) => p.onByosEndpointChange(e.target.value)}
-            placeholder="http://localhost:11434/v1"
-            className="cowok-input"
-            style={INPUT_STYLE}
-          />
-          <input
-            type={inputType}
-            value={p.ephemeralApiKeys.byosToken}
-            onChange={(e) => p.onEphemeralKeyChange("byosToken", e.target.value)}
-            placeholder={t("settings.bearerPlaceholder", "Bearer token (chỉ giữ trong phiên)")}
-            className="cowok-input"
-            style={INPUT_STYLE}
-          />
-        </div>
-        {verifyStates["byos"] && (
-          <div
-            style={{
-              fontSize: "10.5px",
-              marginTop: "6px",
-              color: verifyStates["byos"].status === "success" ? "var(--state-success)" : "var(--state-danger)",
-            }}
-          >
-            {verifyStates["byos"].message ||
-              (verifyStates["byos"].status === "verifying" ? t("settings.verifyingEndpointShort", "Đang kiểm tra endpoint (<3s)...") : "")}
-          </div>
-        )}
       </div>
     </>
   );

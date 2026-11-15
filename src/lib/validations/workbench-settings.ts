@@ -65,6 +65,8 @@ export const CliDiagnosticItemSchema = z.object({
   id: z.string(),
   name: z.string(),
   command: z.string(),
+  category: z.enum(["cli", "ide", "local"]).optional(),
+  scanMode: z.enum(["passive", "active"]).optional(),
   installed: z.boolean(),
   version: z.string().optional(),
   authenticated: z.boolean(),
@@ -74,14 +76,32 @@ export const CliDiagnosticItemSchema = z.object({
 });
 
 export const DoctorScanResponseSchema = z.object({
-  clis: z.array(CliDiagnosticItemSchema),
+  clis: z.array(CliDiagnosticItemSchema).optional().default([]),
+  tools: z.array(CliDiagnosticItemSchema).optional().default([]),
+  scanMode: z.enum(["passive", "active"]).optional(),
   scannedAt: z.string(),
+}).transform((data): {
+  clis: z.infer<typeof CliDiagnosticItemSchema>[];
+  tools: z.infer<typeof CliDiagnosticItemSchema>[];
+  scanMode?: "passive" | "active";
+  scannedAt: string;
+} => ({
+  clis: data.clis.length > 0 ? data.clis : data.tools,
+  tools: data.tools.length > 0 ? data.tools : data.clis,
+  ...(data.scanMode !== undefined ? { scanMode: data.scanMode } : {}),
+  scannedAt: data.scannedAt,
+}));
+
+export const ProbeCliInputSchema = z.object({
+  cliId: z.string().optional().default(""),
+  toolId: z.string().optional().default(""),
 });
 
 export const VerifyProviderKeyInputSchema = z.object({
   providerId: z.string().min(1),
   apiKey: z.string().default(""),
   endpointUrl: z.string().default(""),
+  dryRunFormatOnly: z.boolean().optional(),
 });
 
 export const VerifyProviderKeyResponseSchema = z.object({
@@ -90,6 +110,42 @@ export const VerifyProviderKeyResponseSchema = z.object({
   providerId: z.string(),
   message: z.string(),
   credentialRef: z.string(),
+  liveProbed: z.boolean().optional(),
+  httpStatus: z.number().optional(),
+});
+
+export const VaultKeyDtoSchema = z.object({
+  id: z.string(),
+  providerId: z.string(),
+  keyHint: z.string(),
+  vaultRef: z.string().optional(),
+  vaultMode: z.string(),
+  status: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const UpsertVaultKeyInputSchema = z.object({
+  providerId: z.string().min(1),
+  apiKey: z.string().min(1),
+  vaultMode: z.enum(["keychain", "vault_0600", "ram_only", "ephemeral"]).optional().default("vault_0600"),
+});
+
+export const DeleteVaultKeyResponseSchema = z.object({
+  deleted: z.boolean(),
+  id: z.string(),
+});
+
+export const VaultConfigInputSchema = z.object({
+  vaultMode: z.enum(["keychain", "vault_0600", "ram_only", "ephemeral"]),
+  masterPassphrase: z.string().optional(),
+});
+
+export const VaultConfigResponseSchema = z.object({
+  vaultMode: z.string(),
+  vaultWritable: z.boolean(),
+  encryptedVaultPresent: z.boolean(),
+  updatedAt: z.string(),
 });
 
 export const ExecutionEventDtoSchema = z.object({
@@ -121,7 +177,12 @@ export type McpServerDto = z.infer<typeof McpServerDtoSchema>;
 export type UpsertMcpServerInput = z.infer<typeof UpsertMcpServerInputSchema>;
 export type CliDiagnosticItem = z.infer<typeof CliDiagnosticItemSchema>;
 export type DoctorScanResponse = z.infer<typeof DoctorScanResponseSchema>;
-export type VerifyProviderKeyInput = z.infer<typeof VerifyProviderKeyInputSchema>;
+export type VerifyProviderKeyInput = z.input<typeof VerifyProviderKeyInputSchema>;
 export type VerifyProviderKeyResponse = z.infer<typeof VerifyProviderKeyResponseSchema>;
+export type VaultKeyDto = z.infer<typeof VaultKeyDtoSchema>;
+export type UpsertVaultKeyInput = z.input<typeof UpsertVaultKeyInputSchema>;
+export type DeleteVaultKeyResponse = z.infer<typeof DeleteVaultKeyResponseSchema>;
+export type VaultConfigInput = z.infer<typeof VaultConfigInputSchema>;
+export type VaultConfigResponse = z.infer<typeof VaultConfigResponseSchema>;
 export type ExecutionEventDto = z.infer<typeof ExecutionEventDtoSchema>;
 export type PostJobEventInput = z.infer<typeof PostJobEventInputSchema>;

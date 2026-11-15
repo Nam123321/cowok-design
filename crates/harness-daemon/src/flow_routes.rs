@@ -5,7 +5,7 @@ use axum::{
     http::StatusCode,
     middleware,
     response::{IntoResponse, Response},
-    routing::{delete, get, patch, post},
+    routing::{delete, get, patch, post, put},
     Json, Router,
 };
 use flow_graph::{
@@ -18,13 +18,19 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::daemon_auth::{flow_dual_ingress_auth_middleware, FlowPrincipal};
+use crate::routes::doctor_vault::{
+    handle_delete_vault_key, handle_get_doctor_cli_matrix, handle_list_vault_keys,
+    handle_probe_cli_tool, handle_update_vault_settings, handle_upsert_vault_key,
+    handle_verify_provider_key,
+};
 use crate::routes::legacy_workbench_v6::{
     handle_create_comment, handle_create_fixture, handle_delete_mcp_server,
     handle_list_agent_settings, handle_list_comments, handle_list_fixtures,
     handle_list_mcp_servers, handle_post_job_event, handle_stream_job_events,
     handle_update_comment, handle_update_fixture, handle_update_viewport,
-    handle_upsert_agent_setting, handle_upsert_mcp_server, handle_verify_provider_key,
+    handle_upsert_agent_setting, handle_upsert_mcp_server,
 };
+
 use crate::routes::{DaemonAppState, HttpErrorBody};
 
 #[derive(Debug, Default, Deserialize)]
@@ -114,6 +120,21 @@ pub fn build_flow_subrouter(state: DaemonAppState) -> Router<DaemonAppState> {
             "/api/v1/doctor/verify-key",
             post(handle_verify_provider_key),
         )
+        .route(
+            "/api/v1/doctor/cli-matrix",
+            get(handle_get_doctor_cli_matrix),
+        )
+        .route("/api/v1/doctor/clis", get(handle_get_doctor_cli_matrix))
+        .route("/api/v1/doctor/probe-cli", post(handle_probe_cli_tool))
+        .route(
+            "/api/v1/vault/keys",
+            get(handle_list_vault_keys).post(handle_upsert_vault_key),
+        )
+        .route(
+            "/api/v1/vault/keys/:key_id",
+            delete(handle_delete_vault_key),
+        )
+        .route("/api/v1/settings/vault", put(handle_update_vault_settings))
         .layer(DefaultBodyLimit::max(1_048_576))
         .route_layer(middleware::from_fn_with_state(
             state,

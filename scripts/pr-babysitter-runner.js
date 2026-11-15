@@ -77,18 +77,44 @@ function recordLocalState(stateFile, prNumber, branch, errorDesc, attempt, statu
 
 function getGitBabysitterCommitCount(repoRoot, baseRef, execFn = execSync) {
   try {
-    const range = baseRef ? `origin/${baseRef}..HEAD` : '-n 20';
-    const cmd = baseRef
-      ? `git log ${range} --grep="\\[babysitter\\]" --format="%H"`
+    const safeBaseRef = baseRef ? String(baseRef).replace(/[^A-Za-z0-9._/-]/g, '') : '';
+    const cmd = safeBaseRef
+      ? `git log origin/${safeBaseRef}..HEAD --grep="\\[babysitter\\]" --format="%H"`
       : `git log -n 20 --grep="\\[babysitter\\]" --format="%H"`;
     const out = execFn(cmd, { cwd: repoRoot, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
     return out ? out.split('\n').filter(Boolean).length : 0;
-  } catch {
+  } catch (err) {
+    console.warn(`[pr-babysitter] Warning inspecting git babysitter commits: ${sanitizeMessage(err instanceof Error ? err.message : String(err))}`);
     return 0;
   }
 }
 
-async function syncGitHubLedger({ env, fetchFn, prNumber, branch, diagnostic, status, commitSha }) {
+const MAX_COMMENT_PAGES = 5;
+
+async function findExistingLedgerComment(baseUrl, headers, fetchFn) {
+  for (let page = 1; page <= MAX_COMMENT_PAGES; page += 1) {
+    const pageUrl = `${baseUrl}?per_page=100&page=${page}`;
+    const res = await fetchFn(pageUrl, { headers });
+    if (!res.ok) {
+      console.warn(`[pr-babysitter] Warning fetching PR comments page ${page}: HTTP ${res.status}`);
+      return null;
+    }
+    const comments = await res.json();
+    if (!Array.isArray(comments) || comments.length === 0) {
+      return null;
+    }
+    const found = comments.find((c) => typeof c?.body === 'string' && c.body.includes(LEDGER_MARKER));
+    if (found) {
+      return found;
+    }
+    if (comments.length < 100) {
+      return null;
+    }
+  }
+  return null;
+}
+
+async function syncGitHubLedger({ env, fetchFn, prNumber, branch, diagnostic, status, commitSha, readOnly = false }) {
   const token = env.GITHUB_TOKEN;
   const repo = env.GITHUB_REPOSITORY;
   if (!token || !repo || !/^\d+$/.test(String(prNumber)) || typeof fetchFn !== 'function') {
@@ -100,20 +126,14 @@ async function syncGitHubLedger({ env, fetchFn, prNumber, branch, diagnostic, st
     Accept: 'application/vnd.github+json',
     'User-Agent': 'cowok-design-pr-babysitter',
   };
-  const commentsUrl = `https://api.github.com/repos/${repo}/issues/${prNumber}/comments?per_page=50`;
+  const commentsBaseUrl = `https://api.github.com/repos/${repo}/issues/${prNumber}/comments`;
 
   try {
-    const res = await fetchFn(commentsUrl, { headers });
-    if (!res.ok) return { remoteAttempts: 0 };
-    const comments = await res.json();
-    const existing = Array.isArray(comments)
-      ? comments.find((c) => typeof c?.body === 'string' && c.body.includes(LEDGER_MARKER))
-      : null;
-
+    const existing = await findExistingLedgerComment(commentsBaseUrl, headers, fetchFn);
     const priorBody = existing?.body || `${LEDGER_MARKER}\n### PR Babysitter Triage Ledger\n\n| PR # | Branch | Diagnostic | Attempt | Status | Commit |\n| :---: | :--- | :--- | :---: | :---: | :--- |\n`;
     const remoteAttempts = countPrAttemptsInMarkdown(priorBody, prNumber);
 
-    if (!diagnostic) {
+    if (!diagnostic || readOnly) {
       return { remoteAttempts };
     }
 
@@ -124,7 +144,7 @@ async function syncGitHubLedger({ env, fetchFn, prNumber, branch, diagnostic, st
 
     const targetUrl = existing
       ? `https://api.github.com/repos/${repo}/issues/comments/${existing.id}`
-      : `https://api.github.com/repos/${repo}/issues/${prNumber}/comments`;
+      : commentsBaseUrl;
     await fetchFn(targetUrl, {
       method: existing ? 'PATCH' : 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
@@ -132,7 +152,8 @@ async function syncGitHubLedger({ env, fetchFn, prNumber, branch, diagnostic, st
     });
 
     return { remoteAttempts };
-  } catch {
+  } catch (err) {
+    console.warn(`[pr-babysitter] Warning syncing GitHub ledger: ${sanitizeMessage(err instanceof Error ? err.message : String(err))}`);
     return { remoteAttempts: 0 };
   }
 }
@@ -141,8 +162,8 @@ function appendStepSummary(env, markdown, fsApi = fs) {
   if (!env.GITHUB_STEP_SUMMARY) return;
   try {
     fsApi.appendFileSync(env.GITHUB_STEP_SUMMARY, `${markdown}\n`, 'utf8');
-  } catch {
-    // Ignore non-writable summary paths
+  } catch (err) {
+    console.warn(`[pr-babysitter] Warning writing GITHUB_STEP_SUMMARY: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -203,6 +224,12 @@ export async function runPrBabysitter(options = {}) {
 
   console.log(`📊 [PR-BABYSITTER] PR #${prNumber} Attempts: ${currentAttempts}/${MAX_ATTEMPTS} (autoPush=${autoPushEnabled}, fork=${isFork}, draft=${isDraft})`);
 
+  if (isFork) {
+    console.log('⚠️ [PR-BABYSITTER] External Fork PR detected -> READ-ONLY triage (no remote mutation).');
+    recordLocalState(stateFile, prNumber, branch, 'External Fork PR', currentAttempts + 1, 'READ_ONLY_TRIAGE', 'NONE', fsApi);
+    return { status: 'read-only-triage', isFork: true, exitCode: 0 };
+  }
+
   if (currentAttempts >= MAX_ATTEMPTS) {
     console.warn(`🚨 [CIRCUIT-BREAKER TRIPPED] PR #${prNumber} reached max limit (${MAX_ATTEMPTS}).`);
     recordLocalState(stateFile, prNumber, branch, 'Circuit breaker tripped', currentAttempts + 1, 'CIRCUIT_BREAKER_LOCKED', 'LOCKED', fsApi);
@@ -216,12 +243,6 @@ export async function runPrBabysitter(options = {}) {
       commitSha: 'LOCKED',
     });
     return { status: 'locked', reason: 'max-attempts-exceeded', exitCode: 1 };
-  }
-
-  if (isFork) {
-    console.log('⚠️ [PR-BABYSITTER] External Fork PR detected -> READ-ONLY triage.');
-    recordLocalState(stateFile, prNumber, branch, 'External Fork PR', currentAttempts + 1, 'READ_ONLY_TRIAGE', 'NONE', fsApi);
-    return { status: 'read-only-triage', isFork: true, exitCode: 0 };
   }
 
   try {

@@ -1,16 +1,18 @@
 // @story 05.2
-import { guardedRoute } from "../../../../../../../lib/api-guard";
-import { forwardFromGuardedContext } from "../../../../../../../lib/daemon-client";
+import { guardedRoute } from "@/lib/api-guard";
+import { forwardFromGuardedContext } from "@/lib/daemon-client";
+import { ValidateProposalSchema } from "@/lib/validations/change-proposal";
 
 export const POST = guardedRoute(
-  (req, ctx) => {
+  (req, ctx, { body }) => {
     const projectId = ctx.projectId || ctx.params?.id || "";
     const proposalId = ctx.params?.proposalId || "";
     return forwardFromGuardedContext(
       req,
       ctx,
-      `/api/v1/projects/${projectId}/proposals/${encodeURIComponent(proposalId)}/validate`
+      `/api/v1/projects/${encodeURIComponent(projectId)}/proposals/${encodeURIComponent(proposalId)}/validate`,
+      body
     );
   },
-  { authMode: "strict-loopback" }
+  { authMode: "strict-loopback", body: ValidateProposalSchema }
 );

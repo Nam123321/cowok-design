@@ -116,7 +116,7 @@ export const ExportBundleModal: React.FC<ExportBundleModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-lg rounded-lg border bg-background p-6 shadow-xl">
         <h3 className="text-lg font-semibold text-foreground">{t("snapshots.exportModalTitle", "Xuất bản Mã nguồn Toàn diện (Full Repo)")}</h3>
         <p className="mt-1 text-sm text-muted-foreground">{t("snapshots.exportModalDesc", "Đóng gói mã nguồn dự án chạy được độc lập hoặc tạo GitHub PR.")}</p>

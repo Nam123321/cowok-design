@@ -135,8 +135,56 @@ export const SPECIAL_ICON_RENDERERS: Record<
     </svg>
   ),
   sparkles: ({ size, strokeWidth }) => (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" data-icon-name="sparkles">
       <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" />
+    </svg>
+  ),
+  "ai-agent": ({ size, strokeWidth }) => (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      data-icon-name="ai-agent"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <circle cx="12" cy="12" r="7.5" strokeDasharray="2 2" />
+      <circle cx="12" cy="3.5" r="1.5" />
+      <circle cx="20.5" cy="12" r="1.5" />
+      <circle cx="12" cy="20.5" r="1.5" />
+      <circle cx="3.5" cy="12" r="1.5" />
+      <line x1="12" y1="5" x2="12" y2="9" />
+      <line x1="19" y1="12" x2="15" y2="12" />
+      <line x1="12" y1="19" x2="12" y2="15" />
+      <line x1="5" y1="12" x2="9" y2="12" />
+    </svg>
+  ),
+  agent: ({ size, strokeWidth }) => (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      data-icon-name="ai-agent"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <circle cx="12" cy="12" r="7.5" strokeDasharray="2 2" />
+      <circle cx="12" cy="3.5" r="1.5" />
+      <circle cx="20.5" cy="12" r="1.5" />
+      <circle cx="12" cy="20.5" r="1.5" />
+      <circle cx="3.5" cy="12" r="1.5" />
+      <line x1="12" y1="5" x2="12" y2="9" />
+      <line x1="19" y1="12" x2="15" y2="12" />
+      <line x1="12" y1="19" x2="12" y2="15" />
+      <line x1="5" y1="12" x2="9" y2="12" />
     </svg>
   ),
   "arrow-left": ({ size, strokeWidth }) => (

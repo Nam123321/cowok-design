@@ -40,6 +40,118 @@ pub struct FlowPrincipal {
     pub role: String,
 }
 
+pub type AuthPrincipal = FlowPrincipal;
+
+/// Resolves the effective role for a principal given HTTP headers and an optional token string.
+/// If `x-cowok-role` header is supplied: only `"editor"` is accepted; any other value (`"viewer"`,
+/// `"admin"`, or unknown) fails closed to `"viewer"`.
+/// If omitted: tokens ending in `:viewer` resolve to `"viewer"`, otherwise defaults to `"editor"`.
+/// NOTE: Untrusted headers can NEVER grant `"admin"` or escalate beyond `"editor"`.
+pub fn resolve_role(headers: &HeaderMap, token_opt: Option<&str>) -> String {
+    if let Some(tok) = token_opt {
+        if tok.ends_with(":viewer") {
+            return "viewer".to_string();
+        }
+    }
+    if let Some(role_hdr) = headers.get("x-cowok-role").and_then(|v| v.to_str().ok()) {
+        let trimmed = role_hdr.trim();
+        if trimmed.eq_ignore_ascii_case("editor") {
+            return "editor".to_string();
+        }
+        // Fail closed on "viewer", "admin", or any unknown role header
+        return "viewer".to_string();
+    }
+    "editor".to_string()
+}
+
+/// Enforces that mutating operations require at least editor (or admin) role.
+/// Rejects `viewer` role with 403 FORBIDDEN.
+pub fn require_editor_role(principal: &FlowPrincipal) -> Result<(), Response> {
+    if principal.role == "viewer" {
+        return Err(auth_err_resp(
+            StatusCode::FORBIDDEN,
+            "INSUFFICIENT_ROLE",
+            "Viewer role cannot mutate resources; editor role required",
+        ));
+    }
+    Ok(())
+}
+
+/// Authenticates an incoming request using either HMAC-SHA256 v2, session token, or verified superadmin Bearer.
+/// Arbitrary non-superadmin Bearer tokens are strictly rejected for flow dual-ingress.
+/// Supports explicit role scoping on local-default tokens: if request header `x-cowok-role` is `"viewer"`
+/// (or token carries a `:viewer` suffix), sets `AuthPrincipal.role = "viewer"`.
+pub fn authenticate_request(
+    auth: &DaemonAuthState,
+    method: &Method,
+    uri: &axum::http::Uri,
+    headers: &HeaderMap,
+    raw_body: &[u8],
+) -> Result<AuthPrincipal, Response> {
+    if headers.contains_key("x-cowok-hmac-sig") {
+        match verify_hmac_v2(auth, method, uri, headers, raw_body) {
+            Ok(mut principal) => {
+                let role = resolve_role(headers, None);
+                if role == "viewer" {
+                    principal.role = "viewer".to_string();
+                }
+                Ok(principal)
+            }
+            Err((st, code, msg)) => Err(auth_err_resp(st, code, msg)),
+        }
+    } else if let Some(tok) = headers
+        .get("x-cowok-session-token")
+        .and_then(|v| v.to_str().ok())
+    {
+        match auth.get_valid_session(tok) {
+            Some(mut principal) => {
+                let role = resolve_role(headers, Some(tok));
+                if role == "viewer" {
+                    principal.role = "viewer".to_string();
+                }
+                Ok(principal)
+            }
+            None => Err(auth_err_resp(
+                StatusCode::UNAUTHORIZED,
+                "UNAUTHENTICATED",
+                "Invalid session token",
+            )),
+        }
+    } else if let Some(auth_hdr) = headers.get("authorization").and_then(|v| v.to_str().ok()) {
+        if let Some(_tok) = auth_hdr
+            .strip_prefix("Bearer ")
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+        {
+            if is_valid_superadmin_bearer(headers) {
+                Ok(FlowPrincipal {
+                    tenant_id: default_tenant_id(),
+                    user_id: default_user_id(),
+                    role: "admin".to_string(),
+                })
+            } else {
+                Err(auth_err_resp(
+                    StatusCode::UNAUTHORIZED,
+                    "UNAUTHENTICATED",
+                    "Invalid bearer token for flow ingress",
+                ))
+            }
+        } else {
+            Err(auth_err_resp(
+                StatusCode::UNAUTHORIZED,
+                "UNAUTHORIZED",
+                "Authorization header must provide a non-empty Bearer token",
+            ))
+        }
+    } else {
+        Err(auth_err_resp(
+            StatusCode::UNAUTHORIZED,
+            "UNAUTHENTICATED",
+            "Missing authentication",
+        ))
+    }
+}
+
 fn default_tenant_id() -> String {
     "local-default".to_string()
 }
@@ -425,39 +537,15 @@ pub async fn flow_dual_ingress_auth_middleware(
         }
     };
     let auth = state_auth(&state);
-    let principal = if parts.headers.contains_key("x-cowok-hmac-sig") {
-        match verify_hmac_v2(&auth, &parts.method, &parts.uri, &parts.headers, &raw_bytes) {
+    let principal =
+        match authenticate_request(&auth, &parts.method, &parts.uri, &parts.headers, &raw_bytes) {
             Ok(p) => p,
-            Err((st, code, msg)) => return auth_err_resp(st, code, msg),
+            Err(resp) => return resp,
+        };
+    if parts.method != Method::GET && parts.method != Method::HEAD {
+        if let Err(resp) = require_editor_role(&principal) {
+            return resp;
         }
-    } else if let Some(tok) = parts
-        .headers
-        .get("x-cowok-session-token")
-        .and_then(|v| v.to_str().ok())
-    {
-        match auth.get_valid_session(tok) {
-            Some(principal) => principal,
-            None => {
-                return auth_err_resp(
-                    StatusCode::UNAUTHORIZED,
-                    "UNAUTHENTICATED",
-                    "Invalid session token",
-                )
-            }
-        }
-    } else {
-        return auth_err_resp(
-            StatusCode::UNAUTHORIZED,
-            "UNAUTHENTICATED",
-            "Missing authentication",
-        );
-    };
-    if principal.role == "viewer" && parts.method != Method::GET {
-        return auth_err_resp(
-            StatusCode::FORBIDDEN,
-            "INSUFFICIENT_ROLE",
-            "Viewer role cannot mutate flow graph",
-        );
     }
     let mut rebuilt = Request::from_parts(parts, Body::from(raw_bytes));
     rebuilt.extensions_mut().insert(principal);
@@ -679,11 +767,17 @@ pub async fn legacy_project_auth_middleware(
     let verified: Option<VerifiedLegacyIngress> = if parts.headers.contains_key("x-cowok-hmac-sig")
     {
         match verify_hmac_v2(&auth, &parts.method, &parts.uri, &parts.headers, &raw_bytes) {
-            Ok(principal) => Some(VerifiedLegacyIngress {
-                principal,
-                kind: LegacyAuthKind::HmacV2,
-                bearer_token: None,
-            }),
+            Ok(mut principal) => {
+                let role = resolve_role(&parts.headers, None);
+                if role == "viewer" {
+                    principal.role = "viewer".to_string();
+                }
+                Some(VerifiedLegacyIngress {
+                    principal,
+                    kind: LegacyAuthKind::HmacV2,
+                    bearer_token: None,
+                })
+            }
             Err((st, code, msg)) => return auth_err_resp(st, code, msg),
         }
     } else if let Some(tok) = parts
@@ -692,11 +786,17 @@ pub async fn legacy_project_auth_middleware(
         .and_then(|v| v.to_str().ok())
     {
         match auth.get_valid_session(tok) {
-            Some(principal) => Some(VerifiedLegacyIngress {
-                principal,
-                kind: LegacyAuthKind::SessionToken,
-                bearer_token: None,
-            }),
+            Some(mut principal) => {
+                let role = resolve_role(&parts.headers, Some(tok));
+                if role == "viewer" {
+                    principal.role = "viewer".to_string();
+                }
+                Some(VerifiedLegacyIngress {
+                    principal,
+                    kind: LegacyAuthKind::SessionToken,
+                    bearer_token: None,
+                })
+            }
             None => {
                 return auth_err_resp(
                     StatusCode::UNAUTHORIZED,
@@ -716,11 +816,16 @@ pub async fn legacy_project_auth_middleware(
             .filter(|t| !t.is_empty())
         {
             let is_superadmin = is_valid_superadmin_bearer(&parts.headers);
+            let role = if is_superadmin {
+                "admin".to_string()
+            } else {
+                resolve_role(&parts.headers, Some(tok))
+            };
             Some(VerifiedLegacyIngress {
                 principal: FlowPrincipal {
                     tenant_id: default_tenant_id(),
                     user_id: default_user_id(),
-                    role: if is_superadmin { "admin" } else { "editor" }.to_string(),
+                    role,
                 },
                 kind: LegacyAuthKind::Bearer,
                 bearer_token: Some(tok.to_string()),
@@ -737,12 +842,10 @@ pub async fn legacy_project_auth_middleware(
     };
 
     if let Some(ref caller) = verified {
-        if caller.principal.role == "viewer" && parts.method != Method::GET {
-            return auth_err_resp(
-                StatusCode::FORBIDDEN,
-                "INSUFFICIENT_ROLE",
-                "Viewer role cannot mutate project resources",
-            );
+        if parts.method != Method::GET && parts.method != Method::HEAD {
+            if let Err(resp) = require_editor_role(&caller.principal) {
+                return resp;
+            }
         }
     } else {
         return auth_err_resp(
@@ -833,5 +936,77 @@ mod tests {
         assert!(auth.get_valid_session("s1").is_none());
         assert!(auth.get_valid_session("s2").is_some());
         assert!(auth.get_valid_session("s3").is_some());
+    }
+
+    #[test]
+    fn test_viewer_role_rejected_by_require_editor_role() {
+        let viewer = AuthPrincipal {
+            tenant_id: "local-default".to_string(),
+            user_id: "u-viewer".to_string(),
+            role: "viewer".to_string(),
+        };
+        let res = require_editor_role(&viewer);
+        assert!(res.is_err());
+        let err_response = res.unwrap_err();
+        assert_eq!(err_response.status(), StatusCode::FORBIDDEN);
+
+        let editor = AuthPrincipal {
+            tenant_id: "local-default".to_string(),
+            user_id: "u-editor".to_string(),
+            role: "editor".to_string(),
+        };
+        assert!(require_editor_role(&editor).is_ok());
+
+        let admin = AuthPrincipal {
+            tenant_id: "local-default".to_string(),
+            user_id: "u-admin".to_string(),
+            role: "admin".to_string(),
+        };
+        assert!(require_editor_role(&admin).is_ok());
+    }
+
+    #[test]
+    fn test_resolve_role_scoping() {
+        let mut headers = HeaderMap::new();
+        assert_eq!(resolve_role(&headers, None), "editor");
+        assert_eq!(resolve_role(&headers, Some("token:viewer")), "viewer");
+
+        headers.insert("x-cowok-role", HeaderValue::from_static("viewer"));
+        assert_eq!(resolve_role(&headers, None), "viewer");
+
+        headers.insert("x-cowok-role", HeaderValue::from_static("editor"));
+        assert_eq!(resolve_role(&headers, None), "editor");
+    }
+
+    #[test]
+    fn test_admin_role_cannot_be_escalated_via_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-cowok-role", HeaderValue::from_static("admin"));
+        // resolve_role must fail closed on unknown/admin header -> "viewer"
+        assert_ne!(resolve_role(&headers, None), "admin");
+        assert_eq!(resolve_role(&headers, None), "viewer");
+
+        // Even with a token, header "admin" does not escalate
+        assert_ne!(resolve_role(&headers, Some("token123")), "admin");
+        assert_eq!(resolve_role(&headers, Some("token123")), "viewer");
+
+        // Arbitrary unknown role header also fails closed to "viewer"
+        headers.insert("x-cowok-role", HeaderValue::from_static("superuser"));
+        assert_eq!(resolve_role(&headers, Some("token123")), "viewer");
+    }
+
+    #[test]
+    fn test_arbitrary_bearer_rejected_by_authenticate_request() {
+        let auth = DaemonAuthState::with_secrets("nonce".to_string(), vec![7u8; 32]);
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "authorization",
+            HeaderValue::from_static("Bearer untrusted_token"),
+        );
+        let uri = "/api/v1/projects/p1/flow/stream".parse().unwrap();
+        let res = authenticate_request(&auth, &Method::POST, &uri, &headers, b"{}");
+        assert!(res.is_err());
+        let err_resp = res.unwrap_err();
+        assert_eq!(err_resp.status(), StatusCode::UNAUTHORIZED);
     }
 }

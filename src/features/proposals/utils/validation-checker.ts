@@ -3,7 +3,7 @@ import { FileDiffItem, ValidationCheckResult } from "../../../lib/validations/ch
 
 const TS_CODE_JSX_INTRINSIC = 7026;
 const TS_CODE_REACT_RUNTIME = 2875;
-const IGNORED_TS_CODES = new Set([TS_CODE_JSX_INTRINSIC, TS_CODE_REACT_RUNTIME]);
+const IGNORED_TS_CODES: readonly number[] = [TS_CODE_JSX_INTRINSIC, TS_CODE_REACT_RUNTIME];
 
 const FORBIDDEN_EVAL_PATTERN = ["ev", "al("].join("");
 const FORBIDDEN_HTML_TOKEN = ["dangerously", "SetInnerHTML"].join("");
@@ -17,7 +17,7 @@ function hasForbiddenRegexPatterns(patch: string): boolean {
   );
 }
 
-function hasForbiddenAstTokens(path: string, patch: string): boolean {
+function hasForbiddenAstTokens(path: string, patch: string): { hasForbidden: boolean; error?: string } {
   try {
     const added = patch
       .split("\n")
@@ -40,23 +40,36 @@ function hasForbiddenAstTokens(path: string, patch: string): boolean {
       ts.forEachChild(node, inspectNode);
     };
     inspectNode(sourceFile);
-    return found;
-  } catch {
-    return false;
+    return { hasForbidden: found };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { hasForbidden: true, error: `AST parser failure: ${msg}` };
   }
 }
 
 export function checkAstLint(files: FileDiffItem[]): ValidationCheckResult {
   const now = new Date().toISOString();
-  const hasForbidden = files.some(
-    (f) => hasForbiddenRegexPatterns(f.patch) || hasForbiddenAstTokens(f.path, f.patch)
-  );
+  let failureMessage: string | null = null;
+
+  for (const f of files) {
+    if (hasForbiddenRegexPatterns(f.patch)) {
+      failureMessage = "Forbidden AST patterns detected (eval or dangerous innerHTML)";
+      break;
+    }
+    const astOutcome = hasForbiddenAstTokens(f.path, f.patch);
+    if (astOutcome.hasForbidden) {
+      failureMessage = astOutcome.error ?? "Forbidden AST patterns detected (eval or dangerous innerHTML)";
+      break;
+    }
+  }
+
+  const hasForbidden = failureMessage !== null;
 
   return {
     checkType: "ast_lint",
     status: hasForbidden ? "failed" : "passed",
     message: hasForbidden
-      ? "Forbidden AST patterns detected (eval or dangerous innerHTML)"
+      ? failureMessage!
       : "AST constraints verified",
     timestamp: now,
   };
@@ -136,7 +149,7 @@ function createInMemoryCompilerHost(fileName: string, added: string, isJsx: bool
 
 export function checkTsCompilerDiagnostics(files: FileDiffItem[]): { hasError: boolean; message?: string } {
   try {
-    if (!ts) return { hasError: false };
+    if (!ts) return { hasError: true, message: "TypeScript compiler service unavailable" };
 
     for (const f of files) {
       const added = f.patch
@@ -162,7 +175,7 @@ export function checkTsCompilerDiagnostics(files: FileDiffItem[]): { hasError: b
       const syntactic = program.getSyntacticDiagnostics();
       const semantic = program.getSemanticDiagnostics();
       const diags = [...syntactic, ...semantic];
-      const relevant = diags.filter((d: ts.Diagnostic) => !IGNORED_TS_CODES.has(d.code));
+      const relevant = diags.filter((d: ts.Diagnostic) => !IGNORED_TS_CODES.includes(d.code));
       if (relevant.length > 0) {
         const first = relevant[0];
         const msg =
@@ -172,8 +185,9 @@ export function checkTsCompilerDiagnostics(files: FileDiffItem[]): { hasError: b
         return { hasError: true, message: msg };
       }
     }
-  } catch {
-    // ignore
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { hasError: true, message: `TypeScript compiler exception: ${msg}` };
   }
   return { hasError: false };
 }

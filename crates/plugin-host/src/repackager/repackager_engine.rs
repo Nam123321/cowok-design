@@ -57,38 +57,81 @@ impl SkillRepackager {
         let mut files_count = 0;
         let mut hasher = Sha256::new();
 
-        // 1. Traverse and scan source files for security
-        let entries = std::fs::read_dir(src).map_err(|e| e.to_string())?;
-        for entry in entries.flatten() {
-            let p = entry.path();
-            let file_name = p.file_name().and_then(|n| n.to_str()).unwrap_or("file");
-
-            if p.is_file() {
-                let content = std::fs::read_to_string(&p).unwrap_or_default();
-
-                // AC-03 Zero-Trust Security Scan
-                scan_external_script_security(file_name, &content)
-                    .map_err(|e| format!("Security scan failed on {:?}: {:?}", file_name, e))?;
-
-                hasher.update(content.as_bytes());
-                files_count += 1;
-
-                // Sort file into standard layout
-                if file_name.ends_with(".py")
-                    || file_name.ends_with(".js")
-                    || file_name.ends_with(".ts")
-                    || file_name.ends_with(".sh")
-                {
-                    std::fs::copy(&p, scripts_dir.join(file_name)).map_err(|e| e.to_string())?;
-                } else if file_name.ends_with(".md")
-                    || file_name.ends_with(".txt")
-                    || file_name.ends_with(".json")
-                {
-                    std::fs::copy(&p, refs_dir.join(file_name)).map_err(|e| e.to_string())?;
-                } else {
-                    std::fs::copy(&p, assets_dir.join(file_name)).map_err(|e| e.to_string())?;
+        // 1. Recursively traverse and scan source files for security (binary & nested safe)
+        let mut stack = vec![src.to_path_buf()];
+        let mut discovered_files = Vec::new();
+        while let Some(dir) = stack.pop() {
+            let entries = std::fs::read_dir(&dir).map_err(|e| e.to_string())?;
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if let Ok(meta) = std::fs::symlink_metadata(&p) {
+                    if meta.file_type().is_symlink() {
+                        return Err(format!("Security scan failed: symlink rejected at {:?}", p));
+                    }
+                    if meta.is_dir() {
+                        stack.push(p);
+                    } else if meta.is_file() {
+                        discovered_files.push(p);
+                    }
                 }
             }
+        }
+        discovered_files.sort();
+
+        for p in discovered_files {
+            let rel_path = p.strip_prefix(src).unwrap_or(&p);
+            let file_name = p.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+            let raw_bytes = std::fs::read(&p).map_err(|e| e.to_string())?;
+            let is_script_or_text = file_name.ends_with(".py")
+                || file_name.ends_with(".js")
+                || file_name.ends_with(".ts")
+                || file_name.ends_with(".sh")
+                || file_name.ends_with(".md")
+                || file_name.ends_with(".txt")
+                || file_name.ends_with(".json")
+                || file_name.ends_with(".yaml")
+                || file_name.ends_with(".yml");
+
+            let content = match String::from_utf8(raw_bytes.clone()) {
+                Ok(text) => text,
+                Err(_) if is_script_or_text => {
+                    return Err(format!(
+                        "Security scan failed on {:?}: non-UTF-8 binary payload in script/text file",
+                        file_name
+                    ));
+                }
+                Err(_) => String::from_utf8_lossy(&raw_bytes).into_owned(),
+            };
+
+            // AC-03 Zero-Trust Security Scan
+            scan_external_script_security(file_name, &content)
+                .map_err(|e| format!("Security scan failed on {:?}: {:?}", file_name, e))?;
+
+            hasher.update(rel_path.to_string_lossy().as_bytes());
+            hasher.update(&raw_bytes);
+            files_count += 1;
+
+            let dest_base = if file_name.ends_with(".py")
+                || file_name.ends_with(".js")
+                || file_name.ends_with(".ts")
+                || file_name.ends_with(".sh")
+            {
+                &scripts_dir
+            } else if file_name.ends_with(".md")
+                || file_name.ends_with(".txt")
+                || file_name.ends_with(".json")
+                || file_name.ends_with(".yaml")
+                || file_name.ends_with(".yml")
+            {
+                &refs_dir
+            } else {
+                &assets_dir
+            };
+            let dest_file = dest_base.join(rel_path);
+            if let Some(parent) = dest_file.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            std::fs::copy(&p, dest_file).map_err(|e| e.to_string())?;
         }
 
         let package_sha256 = format!("{:x}", hasher.finalize());
@@ -136,8 +179,8 @@ This skill was repackaged into standard agentskills.io layout from external sour
         std::fs::write(dst.join("plugin.json"), manifest_json).map_err(|e| e.to_string())?;
         files_count += 1;
 
-        // 4. Generate Upstream Discovery Stub (~1.2KB) (AC-04)
-        let stub = DiscoveryStub {
+        // 4. Generate Upstream Discovery Stub with actual serialized byte length (AC-04)
+        let mut stub = DiscoveryStub {
             name: skill_name.to_string(),
             version: "1.0.0".to_string(),
             description: description.to_string(),
@@ -145,10 +188,20 @@ This skill was repackaged into standard agentskills.io layout from external sour
             capabilities,
             risk_tier: 2,
             package_sha256,
-            stub_size_bytes: 1200,
+            stub_size_bytes: 0,
         };
+        let initial_len = serde_json::to_string_pretty(&stub)
+            .map_err(|e| e.to_string())?
+            .len();
+        stub.stub_size_bytes = initial_len;
+        let second_len = serde_json::to_string_pretty(&stub)
+            .map_err(|e| e.to_string())?
+            .len();
+        if second_len != initial_len {
+            stub.stub_size_bytes = second_len;
+        }
         let stub_json = serde_json::to_string_pretty(&stub).map_err(|e| e.to_string())?;
-        std::fs::write(dst.join("discovery-stub.json"), stub_json).map_err(|e| e.to_string())?;
+        std::fs::write(dst.join("discovery-stub.json"), &stub_json).map_err(|e| e.to_string())?;
         files_count += 1;
 
         Ok(RepackageReceipt {

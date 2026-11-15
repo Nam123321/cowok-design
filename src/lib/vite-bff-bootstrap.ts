@@ -181,16 +181,25 @@ export async function handleBootstrapSession(req: IncomingMessage, res: ServerRe
   const data = await parseBootstrapInput(req, res);
   if (!data) return;
 
+  const headerRole = singleHeader(req.headers["x-cowok-role"]);
+  const effectiveRole =
+    headerRole === "viewer" || headerRole === "editor" || headerRole === "admin"
+      ? headerRole
+      : data.role;
+
   const isAdmin = isAuthorizedAdminBearer(req.headers.authorization);
-  if (data.role === "admin" && !isAdmin) {
+  if (effectiveRole === "admin" && !isAdmin) {
     return writeJson(res, HTTP_FORBIDDEN, { code: "INSUFFICIENT_ROLE", error: "INSUFFICIENT_ROLE", message: "Unauthenticated local-session bootstrap cannot issue admin role" });
   }
   const requestedTenant = data.tenantId?.trim() || "local-default";
   if (requestedTenant !== "local-default" && !isAdmin) {
     return writeJson(res, HTTP_FORBIDDEN, { code: "TENANT_ISOLATION_BREACH", error: "TENANT_ISOLATION_BREACH", message: "Unauthenticated local-session bootstrap cannot switch away from local-default tenant" });
   }
-  if (data.role === "editor" && !hasEditorBootstrapProof(req)) {
+  if (effectiveRole === "editor" && !hasEditorBootstrapProof(req)) {
     return writeJson(res, HTTP_FORBIDDEN, { code: "INSUFFICIENT_ROLE", error: "INSUFFICIENT_ROLE", message: "Editor local-session bootstrap requires daemon nonce, boot capability token, or strict same-origin proof" });
   }
-  return writeJson(res, HTTP_OK, issueBffLoopbackSession({ tenantId: requestedTenant, userId: data.userId, role: data.role }));
+  if (headerRole) {
+    res.setHeader("x-cowok-role", headerRole);
+  }
+  return writeJson(res, HTTP_OK, issueBffLoopbackSession({ tenantId: requestedTenant, userId: data.userId, role: effectiveRole }));
 }

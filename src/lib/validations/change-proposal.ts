@@ -31,6 +31,14 @@ export const ApplyProposalSchema = z.object({
   force: z.boolean().optional().default(false),
 });
 
+export const ValidateProposalSchema = z.object({
+  dryRun: z.boolean().optional().default(false),
+});
+
+export const RejectProposalSchema = z.object({
+  reason: z.string().max(MAX_DESCRIPTION_LENGTH).optional(),
+});
+
 export const ChangeProposalResponseSchema = z.object({
   id: z.string().uuid(),
   tenantId: z.string().min(1),
@@ -50,6 +58,8 @@ export type FileDiffItem = z.infer<typeof FileDiffItemSchema>;
 export type ValidationCheckResult = z.infer<typeof ValidationCheckResultSchema>;
 export type CreateProposalInput = z.infer<typeof CreateProposalSchema>;
 export type ApplyProposalInput = z.input<typeof ApplyProposalSchema>;
+export type ValidateProposalInput = z.infer<typeof ValidateProposalSchema>;
+export type RejectProposalInput = z.infer<typeof RejectProposalSchema>;
 export type ChangeProposalResponse = z.infer<typeof ChangeProposalResponseSchema>;
 
 export interface RustChangeProposalV1 {

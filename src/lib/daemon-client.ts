@@ -6,7 +6,31 @@ import fs from "node:fs";
 import path from "node:path";
 import { logger } from "./logger";
 
-export const DEFAULT_FLOW_PROJECT_ID = "11111111-1111-4111-8111-111111111111";
+/**
+ * Local workspace bootstrap default IDs.
+ * These deterministic UUIDs correspond to the V1 SQLite migration bootstrap seed rows
+ * (projects 'cowok-design-default', 'cowok-ai-workbench', and 'markops-platform')
+ * ensuring seamless offline dev bootstrap when no environment override is provided.
+ */
+export const LOCAL_BOOTSTRAP_DEFAULTS = {
+  flowProjectId:
+    (typeof process !== "undefined" && process.env?.COWOK_DEFAULT_PROJECT_ID?.trim()) ||
+    "11111111-1111-4111-8111-111111111111",
+  cowokAiProjectId:
+    (typeof process !== "undefined" && process.env?.COWOK_DEFAULT_COWOK_AI_PROJECT_ID?.trim()) ||
+    "22222222-2222-4222-8222-222222222222",
+  markopsProjectId:
+    (typeof process !== "undefined" && process.env?.COWOK_DEFAULT_MARKOPS_PROJECT_ID?.trim()) ||
+    "33333333-3333-4333-8333-333333333333",
+  orgId:
+    (typeof process !== "undefined" && process.env?.COWOK_DEFAULT_ORG_ID?.trim()) ||
+    "00000000-0000-4000-8000-000000000001",
+  tenantId:
+    (typeof process !== "undefined" && process.env?.COWOK_DEFAULT_TENANT_ID?.trim()) ||
+    "local-default",
+} as const;
+
+export const DEFAULT_FLOW_PROJECT_ID = LOCAL_BOOTSTRAP_DEFAULTS.flowProjectId;
 
 interface DaemonLockRecord {
   pid: number;
@@ -88,28 +112,36 @@ function resolveDaemonBinaryPath(): string {
   throw new Error(`Missing harness-daemon binary at ${repoBin}; run 'cargo build --bin harness-daemon'`);
 }
 
-async function seedDefaultProjects(lock: DaemonLockRecord): Promise<void> {
-  const defaultProjects = [
+function buildSeedProjects() {
+  const projects = [
     {
-      id: DEFAULT_FLOW_PROJECT_ID,
+      id: LOCAL_BOOTSTRAP_DEFAULTS.flowProjectId,
       slug: "cowok-design-default",
       name: "cowok-design",
       product_brief: "Default seeded Flow-First 2D DAG Studio project for local workbench execution.",
     },
-    {
-      id: "22222222-2222-4222-8222-222222222222",
-      slug: "cowok-ai-workbench",
-      name: "Cowok.ai",
-      product_brief: "Seeded Cowok.ai multi-agent OS workbench project.",
-    },
-    {
-      id: "33333333-3333-4333-8333-333333333333",
-      slug: "markops-platform",
-      name: "Markops_platform",
-      product_brief: "Seeded Markops scratch workbench project.",
-    },
   ];
-  for (const proj of defaultProjects) {
+  if (process.env.COWOK_DEMO_SEED === "1") {
+    projects.push(
+      {
+        id: LOCAL_BOOTSTRAP_DEFAULTS.cowokAiProjectId,
+        slug: "cowok-ai-workbench",
+        name: "Cowok.ai",
+        product_brief: "Seeded Cowok.ai multi-agent OS workbench project.",
+      },
+      {
+        id: LOCAL_BOOTSTRAP_DEFAULTS.markopsProjectId,
+        slug: "markops-platform",
+        name: "Markops_platform",
+        product_brief: "Seeded Markops scratch workbench project.",
+      }
+    );
+  }
+  return projects;
+}
+
+async function seedDefaultProjects(lock: DaemonLockRecord): Promise<void> {
+  for (const proj of buildSeedProjects()) {
     const rawBody = JSON.stringify({
       ...proj,
       workspace_root: null,
@@ -277,6 +309,7 @@ export async function forwardToDaemonFlow(opts: {
     }
   }
   Object.assign(headers, signedHeaders);
+  headers["X-Cowok-Role"] = opts.principal.role;
 
   const qs = rawQuery ? `?${rawQuery}` : "";
   const targetUrl = `http://127.0.0.1:${lock.port}${opts.daemonPath}${qs}`;

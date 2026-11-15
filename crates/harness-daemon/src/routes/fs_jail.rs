@@ -1162,8 +1162,28 @@ fn is_browse_path_allowed(canon: &Path, managed_root_canon: &Path) -> bool {
 
 pub(super) async fn handle_fs_browse(
     State(_state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
+    headers: HeaderMap,
     Query(query): Query<FsBrowseQuery>,
 ) -> Result<Json<FsBrowseResponse>, Response> {
+    match caller {
+        Some(Extension(ref verified)) => {
+            if verified.kind == crate::daemon_auth::LegacyAuthKind::Bearer
+                && !crate::daemon_auth::is_valid_superadmin_bearer(&headers)
+            {
+                return Err(map_error_to_response(HarnessError::BoundaryViolation {
+                    reason: "AUTH_SCOPE_MISMATCH: Browsing host filesystem requires superadmin Bearer, session token, or verified loopback HMAC".to_string(),
+                }));
+            }
+        }
+        None => {
+            return Err(crate::routes::legacy_workbench_v6::json_err(
+                axum::http::StatusCode::UNAUTHORIZED,
+                "UNAUTHENTICATED",
+                "Missing caller verification for fs_browse",
+            ));
+        }
+    }
     let managed_root = default_managed_root().map_err(map_error_to_response)?;
     let managed_anchor = provision_dir_zero_toctou(&managed_root).map_err(map_error_to_response)?;
     let requested = query

@@ -277,7 +277,12 @@
     "vaultStorageRamOnly": "RAM Only (Session-only)",
     "permAutoSandbox": "Auto in Sandbox",
     "permAskRisky": "Ask Risky Only",
-    "permAskAll": "Ask All"
+    "permAskAll": "Ask All",
+    "daemonStatusOnline": "ONLINE",
+    "daemonStatusOffline": "OFFLINE",
+    "daemonStatusChecking": "CHECKING",
+    "snapshotCadenceReady": "READY · 5M",
+    "snapshotCadencePaused": "STANDBY"
   },
   "flow": {
     "dagCanvas": "DAG 2D Canvas",
@@ -457,7 +462,7 @@
     "scanningLocal": "Scanning local CLI tools...",
     "skipBtn": "Skip (Use Defaults)",
     "step1Desc": "Automatically probe supported CLIs via loopback daemon (max 1.5s/probe)",
-    "step1Title": "1. CLI Doctor: Verify Local Coding Agents",
+    "step1Title": "1. Connect Local CLI Agents — Bring Your Own Subscription (BYOS)",
     "step2Desc": "Configure project data storage mode and secret vault mechanism",
     "step2Title": "2. Workspace & Secret Storage Policy",
     "step3Desc": "Select auto-approval policy when Agent modifies source code and workspace files",
@@ -472,6 +477,19 @@
     "wsSandboxed": "Self-Managed Sandbox (Recommended)",
     "wsSandboxedDesc": "Auto-isolated under .cowok-design/projects/ with HMAC token",
     "doctorError": "Unable to reach CLI Doctor daemon; using default settings.",
-    "saveDaemonWarning": "Saved locally; failed to sync onboarding preferences to daemon."
+    "saveDaemonWarning": "Saved locally; failed to sync onboarding preferences to daemon.",
+    "autoConnectedBadge": "Auto-connected",
+    "byosAutoConnectedNotice": "Auto-detected & connected {{count}} local BYOS subscriptions: {{names}}",
+    "byokSectionTitle": "2. Or paste API Key directly (BYOK)",
+    "byokSectionDesc": "Enter a provider API key (OpenAI, Claude, Gemini, etc.) for quick activation",
+    "probeBtn": "Probe",
+    "probing": "Probing...",
+    "verifyBtn": "Verify Key",
+    "verifying": "Verifying...",
+    "keyValid": "API Key is valid!",
+    "keyInvalid": "Invalid API Key",
+    "verifyError": "Verification error",
+    "byosAccordionToggle": "Toggle CLI List",
+    "probeError": "Unable to probe CLI on daemon"
   }
 }

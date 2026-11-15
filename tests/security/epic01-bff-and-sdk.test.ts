@@ -1,6 +1,8 @@
 // @story 01.3
 // @implements AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07
 import { Readable } from "node:stream";
+import fs from "node:fs";
+import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it, vi } from "vitest";
 import { logger } from "../../src/lib/logger";
@@ -348,11 +350,13 @@ describe("Epic 01 Hardening: Logger, BFF Routing & Typed HarnessDaemon SDK", () 
       providerId: "anthropic",
       apiKey: "sk-ant-test-12345678901234567890",
       endpointUrl: "",
+      dryRunFormatOnly: true,
     });
     expect(verifyRes.status).toBe(200);
-    const verifyBody = (await verifyRes.json()) as { providerId: string; valid: boolean };
+    const verifyBody = (await verifyRes.json()) as { providerId: string; valid: boolean; status: string };
     expect(verifyBody.providerId).toBe("anthropic");
     expect(verifyBody.valid).toBe(true);
+    expect(verifyBody.status).toBe("format_checked");
 
     const jobEventRes = await invokeBff("POST", `/api/projects/${projectId}/flow/jobs/events`, {
       jobId: `job-${Date.now()}`,
@@ -366,5 +370,33 @@ describe("Epic 01 Hardening: Logger, BFF Routing & Typed HarnessDaemon SDK", () 
     expect(jobEventBody.nodeId).toBe("node-login");
     expect(jobEventBody.eventKind).toBe("STEP_COMPLETED");
     expect(jobEventBody.payloadText).toBe("Login screen synthesized");
+  });
+
+  it("enforces Zod body schemas on every mutating proxyRoute entry in vite-bff-routes.ts", async () => {
+    const routesSrc = fs.readFileSync(
+      path.resolve(process.cwd(), "src/lib/vite-bff-routes.ts"),
+      "utf8"
+    );
+    const { Project } = await import("ts-morph");
+    const project = new Project({ useInMemoryFileSystem: true });
+    const sf = project.createSourceFile("vite-bff-routes.ts", routesSrc);
+    const missingSchemaCalls: string[] = [];
+    sf.forEachDescendant((node) => {
+      if (node.getKindName() !== "CallExpression") return;
+      const call = node as import("ts-morph").CallExpression;
+      if (call.getExpression().getText() !== "proxyRoute") return;
+      const args = call.getArguments();
+      const methodArg = args[0]?.getText().replace(/['"`]/g, "").toUpperCase();
+      if (methodArg === "POST" || methodArg === "PUT" || methodArg === "PATCH") {
+        const pathArg = args[1]?.getText() ?? "<unknown>";
+        // Mutating routes without body (action/restore triggers) are allowed only when explicitly empty-body;
+        // state-bearing JSON endpoints must provide a 4th Zod schema argument.
+        const isActionTrigger = /\/restore|\/probe/.test(pathArg);
+        if (!isActionTrigger && args.length < 4) {
+          missingSchemaCalls.push(`${methodArg} ${pathArg}`);
+        }
+      }
+    });
+    expect(missingSchemaCalls).toEqual([]);
   });
 });

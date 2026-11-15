@@ -160,6 +160,21 @@ const McpClientRegistryList: React.FC = () => {
 
 export const SettingsMcpAutomationsPane: React.FC<SettingsMcpAutomationsPaneProps> = ({ selectedTab }) => {
   const { t } = useTranslation();
+  const [daemonHealth, setDaemonHealth] = useState<"checking" | "online" | "offline">("checking");
+
+  useEffect(() => {
+    if (selectedTab !== "automations") return;
+    let active = true;
+    void apiWorkbenchSettings.getDoctorCliMatrix("passive")
+      .then(() => {
+        if (active) setDaemonHealth("online");
+      })
+      .catch(() => {
+        if (active) setDaemonHealth("offline");
+      });
+    return () => { active = false; };
+  }, [selectedTab]);
+
   if (selectedTab === "mcp") {
     return (
       <>
@@ -168,6 +183,18 @@ export const SettingsMcpAutomationsPane: React.FC<SettingsMcpAutomationsPaneProp
       </>
     );
   }
+  const daemonBadgeLabel =
+    daemonHealth === "online"
+      ? t("settings.daemonStatusOnline", "ONLINE")
+      : daemonHealth === "offline"
+      ? t("settings.daemonStatusOffline", "OFFLINE")
+      : t("settings.daemonStatusChecking", "CHECKING");
+  const daemonBadgeColors =
+    daemonHealth === "online"
+      ? { backgroundColor: "var(--state-success-soft)", color: "var(--state-success)" }
+      : daemonHealth === "offline"
+      ? { backgroundColor: "var(--bg-subtle)", color: "var(--state-danger)" }
+      : { backgroundColor: "var(--bg-subtle)", color: "var(--text-secondary)" };
   return (
     <>
       <div>
@@ -180,14 +207,16 @@ export const SettingsMcpAutomationsPane: React.FC<SettingsMcpAutomationsPaneProp
             <div style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-primary)" }}>{t("settings.daemonLoopbackTitle", "Cowok Rust SQLite WAL Daemon (Loopback)")}</div>
             <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{t("settings.daemonLoopbackSubtitle", "127.0.0.1 • Dual-Ingress HMAC-SHA256 v2")}</div>
           </div>
-          <span style={{ fontSize: "9.5px", fontWeight: 600, padding: "2px 6px", borderRadius: "10px", backgroundColor: "var(--state-success-soft)", color: "var(--state-success)", border: "1px solid var(--border-subtle)" }}>RUNNING</span>
+          <span data-testid="automations-daemon-status" style={{ fontSize: "9.5px", fontWeight: 600, padding: "2px 6px", borderRadius: "10px", border: "1px solid var(--border-subtle)", ...daemonBadgeColors }}>{daemonBadgeLabel}</span>
         </div>
         <div style={{ padding: "8px 10px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-workspace)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-primary)" }}>{t("settings.autoSnapshotTitle", "Auto-Snapshot State & Graph AST")}</div>
             <div style={{ fontSize: "10px", color: "var(--text-muted)" }}>{t("settings.autoSnapshotDesc", "Mỗi 5 phút • Tự động ghi nhận delta đồ thị 2D DAG")}</div>
           </div>
-          <span style={{ fontSize: "9.5px", fontWeight: 600, padding: "2px 6px", borderRadius: "10px", backgroundColor: "var(--bg-subtle)", color: "var(--text-secondary)" }}>SCHEDULED</span>
+          <span style={{ fontSize: "9.5px", fontWeight: 600, padding: "2px 6px", borderRadius: "10px", backgroundColor: "var(--bg-subtle)", color: "var(--text-secondary)" }}>
+            {daemonHealth === "online" ? t("settings.snapshotCadenceReady", "READY · 5M") : t("settings.snapshotCadencePaused", "STANDBY")}
+          </span>
         </div>
       </div>
     </>

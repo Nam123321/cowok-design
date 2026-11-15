@@ -26,7 +26,7 @@ import {
   WorkbenchTransition,
 } from "../store/flow-workbench-store";
 import { FlowWorkbenchClient } from "../../../api/flow-workbench";
-import { guardedRoute } from "../../../lib/api-guard";
+import { guardedRoute, issueBffLoopbackSession } from "../../../lib/api-guard";
 
 describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
   describe("Zod Runtime Schemas (Khóa P1)", () => {
@@ -170,11 +170,16 @@ describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
         }
       );
 
+      const { sessionToken } = await issueBffLoopbackSession({
+        tenantId: "tenant-xyz",
+        role: "editor",
+      });
+
       const request = new Request("http://localhost/api/v1/projects/p1/flow/nodes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": "tenant-xyz",
+          "x-cowok-session-token": sessionToken,
         },
         body: JSON.stringify({
           screenKey: "screen-home",
@@ -196,9 +201,17 @@ describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
         async () => new Response("OK")
       );
 
+      const { sessionToken } = await issueBffLoopbackSession({
+        tenantId: "tenant-xyz",
+        role: "editor",
+      });
+
       const request = new Request("http://localhost/api/v1/projects/p1/flow/nodes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-cowok-session-token": sessionToken,
+        },
         body: JSON.stringify({
           title: "", // invalid empty
         }),
@@ -228,9 +241,17 @@ describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
         }
       );
 
+      const { sessionToken: attackerSession } = await issueBffLoopbackSession({
+        tenantId: "tenant-attacker",
+        role: "editor",
+      });
+
       const reqA = new Request("http://localhost/api/v1/projects/p1/flow/nodes", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-tenant-id": "tenant-attacker" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-cowok-session-token": attackerSession,
+        },
         body: JSON.stringify({ screenKey: "SCR-1", title: "Target Screen" }),
       });
 
@@ -461,20 +482,31 @@ describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
         async () => new Response(JSON.stringify({ ok: true }), { status: 200 })
       );
 
-      // Caller with 'viewer' role should be rejected
-      const viewerReq = new Request("http://localhost/api/projects/p1/flow/deploy-draft", {
+      const viewerSession = issueBffLoopbackSession({ role: "viewer", userId: "test-viewer" });
+      const editorSession = issueBffLoopbackSession({ role: "editor", userId: "test-editor" });
+      const adminSession = issueBffLoopbackSession({ role: "admin", userId: "test-admin" });
+
+      // Caller with 'viewer' or 'editor' role should be rejected on admin-only endpoint
+      const viewerReq = new Request("http://127.0.0.1:5173/api/projects/p1/flow/deploy-draft", {
         method: "POST",
-        headers: { "x-user-roles": "viewer" },
+        headers: { "x-cowok-session-token": viewerSession.sessionToken },
       });
-      const res403 = await handler(viewerReq);
-      expect(res403.status).toBe(403);
-      const data403 = await res403.json();
+      const resViewer403 = await handler(viewerReq);
+      expect(resViewer403.status).toBe(403);
+
+      const editorReq = new Request("http://127.0.0.1:5173/api/projects/p1/flow/deploy-draft", {
+        method: "POST",
+        headers: { "x-cowok-session-token": editorSession.sessionToken },
+      });
+      const resEditor403 = await handler(editorReq);
+      expect(resEditor403.status).toBe(403);
+      const data403 = await resEditor403.json();
       expect(data403.error).toBe("FORBIDDEN");
 
-      // Caller with 'admin' role should be authorized
-      const adminReq = new Request("http://localhost/api/projects/p1/flow/deploy-draft", {
+      // Caller with verified 'admin' loopback session should be authorized
+      const adminReq = new Request("http://127.0.0.1:5173/api/projects/p1/flow/deploy-draft", {
         method: "POST",
-        headers: { "x-user-roles": "admin" },
+        headers: { "x-cowok-session-token": adminSession.sessionToken },
       });
       const res200 = await handler(adminReq);
       expect(res200.status).toBe(200);

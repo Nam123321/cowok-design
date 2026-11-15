@@ -64,7 +64,7 @@ export const VisualClarificationModal: React.FC<VisualClarificationModalProps> =
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-2xl bg-card border border-border rounded-xl p-5 shadow-2xl flex flex-col gap-4">
         <ModalHeader />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

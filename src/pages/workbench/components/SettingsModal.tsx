@@ -85,7 +85,7 @@ function useSettingsDialogState(isOpen: boolean, onClose: () => void, activeTab:
   const initial = loadPersistedSettings();
   const [selectedTab, setSelectedTab] = useState<SettingsTab>(activeTab);
   const [defaultModel, setDefaultModel] = useState(initial.defaultModel || "claude-sonnet-4-6");
-  const [byosEndpoint, setByosEndpoint] = useState(initial.byosEndpoint || "http://127.0.0.1:43110/v1");
+  const [byosEndpoint, setByosEndpoint] = useState(initial.byosEndpoint || "");
   const [vaultMode, setVaultMode] = useState<string>("vault_0600");
   const [permissionMode, setPermissionMode] = useState<string>("auto_sandbox");
   const [onboardingDone, setOnboardingDone] = useState<boolean>(false);
@@ -140,15 +140,28 @@ const SettingsModalFooter: React.FC<{
   );
 };
 
-function buildSavePayload(s: ReturnType<typeof useSettingsDialogState>) {
+const VAULT_MODE_OPTIONS = new Set<"keychain" | "vault_0600" | "ram_only" | "ephemeral">([
+  "keychain",
+  "vault_0600",
+  "ram_only",
+  "ephemeral",
+]);
+
+function normalizeVaultMode(raw: string): "keychain" | "vault_0600" | "ram_only" | "ephemeral" {
+  return VAULT_MODE_OPTIONS.has(raw as "keychain")
+    ? (raw as "keychain" | "vault_0600" | "ram_only" | "ephemeral")
+    : "vault_0600";
+}
+
+function buildSavePayload(s: ReturnType<typeof useSettingsDialogState>, resolvedCredentialRef?: string) {
   return {
     providerId: s.defaultModel || "cowok-swarm",
     modelId: s.defaultModel || "cowok-swarm",
     endpointUrl: s.byosEndpoint || "",
-    credentialRef: s.vaultMode || "vault_0600",
+    credentialRef: resolvedCredentialRef || (s.vaultMode ? `vault://${normalizeVaultMode(s.vaultMode)}/${s.defaultModel || "cowok-swarm"}` : "vault://vault_0600/cowok-swarm"),
     status: s.permissionMode || "auto_sandbox",
     permissionMode: s.permissionMode || "auto_sandbox",
-    vaultMode: s.vaultMode || "vault_0600",
+    vaultMode: normalizeVaultMode(s.vaultMode || "vault_0600"),
     onboardingDone: s.onboardingDone,
     isDefault: true,
   };
@@ -159,7 +172,29 @@ async function executeSaveSettings(p: SettingsModalProps, s: ReturnType<typeof u
   s.setIsSaving(true);
   savePersistedSettings({ theme: p.currentTheme, locale: p.currentLocale, fontSize: p.currentFontSize, defaultModel: s.defaultModel, byosEndpoint: s.byosEndpoint });
   try {
-    await apiWorkbenchSettings.upsertAgentSetting(buildSavePayload(s));
+    const resolvedVaultMode = normalizeVaultMode(s.vaultMode || "vault_0600");
+    await apiWorkbenchSettings.updateVaultConfig({ vaultMode: resolvedVaultMode });
+
+    let primaryVaultRef: string | undefined;
+    const providerKeyEntries: Array<{ providerId: string; secret: string }> = [
+      { providerId: "gemini", secret: s.ephemeralKeys.gemini.trim() },
+      { providerId: "anthropic", secret: s.ephemeralKeys.claude.trim() },
+      { providerId: "openai", secret: s.ephemeralKeys.openai.trim() },
+      { providerId: "byos", secret: s.ephemeralKeys.byosToken.trim() },
+    ];
+    for (const entry of providerKeyEntries) {
+      if (!entry.secret) continue;
+      const stored = await apiWorkbenchSettings.upsertVaultKey({
+        providerId: entry.providerId,
+        apiKey: entry.secret,
+        vaultMode: resolvedVaultMode,
+      });
+      if (!primaryVaultRef && stored.vaultRef) {
+        primaryVaultRef = stored.vaultRef;
+      }
+    }
+
+    await apiWorkbenchSettings.upsertAgentSetting(buildSavePayload(s, primaryVaultRef));
     s.setSyncWarning(null);
     s.setSavedFeedback(true);
     setTimeout(() => { s.setSavedFeedback(false); p.onClose(); }, 260);

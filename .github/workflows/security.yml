@@ -51,7 +51,7 @@ jobs:
 
       - name: Run Semgrep SAST
         run: |
-          python3 -m pip install semgrep
+          python3 -m pip install "semgrep==1.185.0"
           semgrep scan --config auto --severity ERROR --error
 
   # ==========================================

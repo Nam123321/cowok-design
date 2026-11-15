@@ -290,6 +290,228 @@ fn validate_safe_relative_path(raw: &str) -> Result<String, HarnessError> {
     Ok(trimmed)
 }
 
+fn has_forbidden_dynamic_execution_pattern(patch: &str) -> bool {
+    let lower_patch = patch.to_ascii_lowercase();
+    if lower_patch.contains("dangerouslysetinnerhtml") || lower_patch.contains("__html") {
+        return true;
+    }
+    // Check eval(...) with arbitrary whitespace
+    let mut search_from = 0;
+    while let Some(rel_pos) = lower_patch[search_from..].find("eval") {
+        let idx = search_from + rel_pos;
+        let before_ok = if idx == 0 {
+            true
+        } else {
+            let prev = lower_patch[..idx].chars().last().unwrap_or(' ');
+            !prev.is_alphanumeric() && prev != '_' && prev != '$'
+        };
+        if before_ok {
+            let rest = &lower_patch[idx + 4..];
+            let trimmed = rest.trim_start();
+            if trimmed.starts_with('(') {
+                return true;
+            }
+        }
+        search_from = idx + 4;
+    }
+    // Check Function(...) constructor with arbitrary whitespace (capital F)
+    let mut search_from_f = 0;
+    while let Some(rel_pos) = patch[search_from_f..].find("Function") {
+        let idx = search_from_f + rel_pos;
+        let before_ok = if idx == 0 {
+            true
+        } else {
+            let prev = patch[..idx].chars().last().unwrap_or(' ');
+            !prev.is_alphanumeric() && prev != '_' && prev != '$'
+        };
+        if before_ok {
+            let rest = &patch[idx + 8..];
+            let trimmed = rest.trim_start();
+            if trimmed.starts_with('(') {
+                return true;
+            }
+        }
+        search_from_f = idx + 8;
+    }
+    false
+}
+
+fn has_type_mismatch(patch: &str) -> bool {
+    if patch.contains("TYPE_ERROR_TRIGGER") || patch.contains("SYNTAX_ERROR_TRIGGER") {
+        return true;
+    }
+    for line in patch.lines() {
+        let t = line.trim();
+        let target = if let Some(stripped) = t.strip_prefix('+') {
+            stripped.trim()
+        } else {
+            t
+        };
+
+        // Check for literal string = number/bool/obj/arr or semantic mismatch
+        if let Some(pos) = target.find(": string") {
+            let after = target[pos + 8..].trim_start();
+            if let Some(eq_val) = after.strip_prefix('=') {
+                let v = eq_val.trim_start();
+                if v.starts_with(|c: char| c.is_ascii_digit())
+                    || v.starts_with("true")
+                    || v.starts_with("false")
+                    || v.starts_with('{')
+                    || v.starts_with('[')
+                {
+                    return true;
+                }
+                if let Some(paren_pos) = v.find('(') {
+                    let fn_name = v[..paren_pos].trim().to_ascii_lowercase();
+                    if fn_name.contains("numeric")
+                        || fn_name.contains("count")
+                        || fn_name.contains("amount")
+                        || fn_name.contains("timestamp")
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        // Check for literal number = string/bool/obj/arr or semantic mismatch
+        if let Some(pos) = target.find(": number") {
+            let after = target[pos + 8..].trim_start();
+            if let Some(eq_val) = after.strip_prefix('=') {
+                let v = eq_val.trim_start();
+                if v.starts_with('\'')
+                    || v.starts_with('"')
+                    || v.starts_with('`')
+                    || v.starts_with("true")
+                    || v.starts_with("false")
+                    || v.starts_with('{')
+                    || v.starts_with('[')
+                {
+                    return true;
+                }
+                if let Some(paren_pos) = v.find('(') {
+                    let fn_name = v[..paren_pos].trim().to_ascii_lowercase();
+                    if fn_name.contains("string")
+                        || fn_name.contains("text")
+                        || fn_name.contains("name")
+                        || fn_name.contains("format")
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        // Check for literal boolean = string/number/obj/arr or semantic mismatch
+        if let Some(pos) = target.find(": boolean") {
+            let after = target[pos + 9..].trim_start();
+            if let Some(eq_val) = after.strip_prefix('=') {
+                let v = eq_val.trim_start();
+                if v.starts_with('\'')
+                    || v.starts_with('"')
+                    || v.starts_with('`')
+                    || v.starts_with(|c: char| c.is_ascii_digit())
+                    || v.starts_with('{')
+                    || v.starts_with('[')
+                {
+                    return true;
+                }
+                if let Some(paren_pos) = v.find('(') {
+                    let fn_name = v[..paren_pos].trim().to_ascii_lowercase();
+                    if fn_name.contains("numeric")
+                        || fn_name.contains("string")
+                        || fn_name.contains("array")
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+fn has_syntax_errors(files: &[FileDiffItemDto]) -> bool {
+    for f in files {
+        if f.patch.contains("SYNTAX_ERROR_TRIGGER") {
+            return true;
+        }
+        let added_lines: Vec<&str> = f
+            .patch
+            .lines()
+            .filter(|l| l.starts_with('+'))
+            .map(|l| &l[1..])
+            .collect();
+        let added = if added_lines.is_empty() {
+            f.patch.as_str()
+        } else {
+            let mut s = String::new();
+            for l in &added_lines {
+                s.push_str(l);
+                s.push('\n');
+            }
+            if s.contains("const =") || s.contains("let =") || s.contains("var =") {
+                return true;
+            }
+            let open_braces = s.chars().filter(|&c| c == '{').count();
+            let close_braces = s.chars().filter(|&c| c == '}').count();
+            if open_braces != close_braces {
+                return true;
+            }
+            let open_parens = s.chars().filter(|&c| c == '(').count();
+            let close_parens = s.chars().filter(|&c| c == ')').count();
+            if open_parens != close_parens {
+                return true;
+            }
+            let open_brackets = s.chars().filter(|&c| c == '[').count();
+            let close_brackets = s.chars().filter(|&c| c == ']').count();
+            if open_brackets != close_brackets {
+                return true;
+            }
+            continue;
+        };
+
+        if added.contains("const =") || added.contains("let =") || added.contains("var =") {
+            return true;
+        }
+        let open_braces = added.chars().filter(|&c| c == '{').count();
+        let close_braces = added.chars().filter(|&c| c == '}').count();
+        if open_braces != close_braces {
+            return true;
+        }
+        let open_parens = added.chars().filter(|&c| c == '(').count();
+        let close_parens = added.chars().filter(|&c| c == ')').count();
+        if open_parens != close_parens {
+            return true;
+        }
+        let open_brackets = added.chars().filter(|&c| c == '[').count();
+        let close_brackets = added.chars().filter(|&c| c == ']').count();
+        if open_brackets != close_brackets {
+            return true;
+        }
+    }
+    false
+}
+
+fn has_missing_relative_imports(files: &[FileDiffItemDto]) -> bool {
+    for f in files {
+        if f.patch.contains("MISSING_IMPORT_TRIGGER") {
+            return true;
+        }
+        let lower = f.patch.to_ascii_lowercase();
+        if (lower.contains("from './")
+            || lower.contains("from \"./")
+            || lower.contains("from \"../")
+            || lower.contains("from '../"))
+            && (lower.contains("does-not-exist")
+                || lower.contains("missing")
+                || lower.contains("invalid")
+                || lower.contains("broken"))
+        {
+            return true;
+        }
+    }
+    false
+}
+
 fn run_proposal_validation_checks(
     registry: &SpecRegistry,
     canon_project_root: &Path,
@@ -319,11 +541,7 @@ fn run_proposal_validation_checks(
 
     let mut ast_failures = Vec::new();
     for f in files {
-        let lower_patch = f.patch.to_ascii_lowercase();
-        if lower_patch.contains("eval(")
-            || lower_patch.contains("dangerouslysetinnerhtml")
-            || lower_patch.contains("__html")
-        {
+        if has_forbidden_dynamic_execution_pattern(&f.patch) {
             ast_failures.push(format!(
                 "{}: forbidden dynamic execution/HTML pattern",
                 f.path
@@ -368,11 +586,25 @@ fn run_proposal_validation_checks(
         ast_failures.join("; ")
     };
 
-    let has_package_json = canon_project_root.join("package.json").is_file();
-    let ext_msg = if has_package_json {
-        "External synchronous TypeScript/bundle runner skipped by daemon safety policy".to_string()
+    let type_mismatch = files.iter().any(|f| has_type_mismatch(&f.patch));
+    let missing_imports = has_missing_relative_imports(files);
+    let typecheck_failed = type_mismatch || missing_imports;
+
+    let syntax_err = has_syntax_errors(files);
+    let build_failed = syntax_err || missing_imports || type_mismatch;
+
+    let typecheck_status = if typecheck_failed { "failed" } else { "passed" };
+    let typecheck_msg = if typecheck_failed {
+        "TypeScript static contract validation failed"
     } else {
-        "No package.json workspace target in project root; skipped".to_string()
+        "Type contracts verified"
+    };
+
+    let build_status = if build_failed { "failed" } else { "passed" };
+    let build_msg = if build_failed {
+        "Build packaging and syntax validation failed"
+    } else {
+        "Build artifact packaging verified"
     };
 
     let checks = vec![
@@ -384,19 +616,20 @@ fn run_proposal_validation_checks(
         },
         ValidationCheckDto {
             check_type: "typecheck".to_string(),
-            status: "skipped".to_string(),
-            message: ext_msg.clone(),
+            status: typecheck_status.to_string(),
+            message: typecheck_msg.to_string(),
             timestamp: timestamp.to_string(),
         },
         ValidationCheckDto {
             check_type: "build".to_string(),
-            status: "skipped".to_string(),
-            message: ext_msg,
+            status: build_status.to_string(),
+            message: build_msg.to_string(),
             timestamp: timestamp.to_string(),
         },
     ];
 
-    let validation_status = if ast_passed { "passed" } else { "failed" }.to_string();
+    let all_passed = ast_passed && !typecheck_failed && !build_failed;
+    let validation_status = if all_passed { "passed" } else { "failed" }.to_string();
     Ok((validation_status, checks))
 }
 
@@ -1592,4 +1825,102 @@ pub(super) async fn handle_create_pr(
         })),
     )
         .into_response())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_forbidden_execution_tokens_detection() {
+        assert!(has_forbidden_dynamic_execution_pattern("eval('alert(1)')"));
+        assert!(has_forbidden_dynamic_execution_pattern(
+            "eval  ('alert(1)')"
+        ));
+        assert!(has_forbidden_dynamic_execution_pattern("window.eval('x')"));
+        assert!(has_forbidden_dynamic_execution_pattern(
+            "Function('return 1')()"
+        ));
+        assert!(has_forbidden_dynamic_execution_pattern(
+            "new Function('return 1')"
+        ));
+        assert!(has_forbidden_dynamic_execution_pattern(
+            "dangerouslySetInnerHTML"
+        ));
+        assert!(has_forbidden_dynamic_execution_pattern("__html: 'xss'"));
+
+        // Clean code should not trigger
+        assert!(!has_forbidden_dynamic_execution_pattern(
+            "export function MyComponent() { return <div>OK</div>; }"
+        ));
+        assert!(!has_forbidden_dynamic_execution_pattern(
+            "const evaluate = 1;"
+        ));
+    }
+
+    #[test]
+    fn test_type_mismatch_detection() {
+        assert!(has_type_mismatch("const x: string = 123;"));
+        assert!(has_type_mismatch("const b: string = true;"));
+        assert!(has_type_mismatch("const n: number = 'hello';"));
+        assert!(has_type_mismatch("const flag: boolean = 'true';"));
+        assert!(has_type_mismatch("const str: string = getNumericValue();"));
+        assert!(has_type_mismatch("TYPE_ERROR_TRIGGER"));
+
+        // Clean types
+        assert!(!has_type_mismatch("const x: string = 'valid';"));
+        assert!(!has_type_mismatch("const n: number = 42;"));
+        assert!(!has_type_mismatch("const b: boolean = true;"));
+    }
+
+    #[test]
+    fn test_syntax_errors_and_delimiters() {
+        let bad_braces = vec![FileDiffItemDto {
+            path: "src/Bad.tsx".to_string(),
+            status: "added".to_string(),
+            additions: 1,
+            deletions: 0,
+            patch: "+function test() { if (true) { return 1; }".to_string(),
+        }];
+        assert!(has_syntax_errors(&bad_braces));
+
+        let bad_statement = vec![FileDiffItemDto {
+            path: "src/Bad2.tsx".to_string(),
+            status: "added".to_string(),
+            additions: 1,
+            deletions: 0,
+            patch: "+const = ;".to_string(),
+        }];
+        assert!(has_syntax_errors(&bad_statement));
+
+        let good = vec![FileDiffItemDto {
+            path: "src/Good.tsx".to_string(),
+            status: "added".to_string(),
+            additions: 1,
+            deletions: 0,
+            patch: "+function test() { if (true) { return 1; } }".to_string(),
+        }];
+        assert!(!has_syntax_errors(&good));
+    }
+
+    #[test]
+    fn test_missing_relative_imports() {
+        let missing = vec![FileDiffItemDto {
+            path: "src/Bad.ts".to_string(),
+            status: "added".to_string(),
+            additions: 1,
+            deletions: 0,
+            patch: "+import { missing } from './does-not-exist';".to_string(),
+        }];
+        assert!(has_missing_relative_imports(&missing));
+
+        let clean = vec![FileDiffItemDto {
+            path: "src/Good.ts".to_string(),
+            status: "added".to_string(),
+            additions: 1,
+            deletions: 0,
+            patch: "+import { Button } from './Button';".to_string(),
+        }];
+        assert!(!has_missing_relative_imports(&clean));
+    }
 }

@@ -2,6 +2,7 @@
 // @implements V6 SQLite Workbench Endpoints (Comments, Fixtures, Viewport, Settings, MCP, Job SSE, Key Verify)
 
 use std::convert::Infallible;
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::time::Duration;
 
 use axum::{
@@ -24,13 +25,13 @@ use uuid::Uuid;
 use crate::daemon_auth::FlowPrincipal;
 use crate::routes::{DaemonAppState, HttpErrorBody};
 
-fn epoch_ms_to_iso(ms: i64) -> String {
+pub(crate) fn epoch_ms_to_iso(ms: i64) -> String {
     DateTime::from_timestamp_millis(ms)
         .map(|dt| dt.to_rfc3339())
         .unwrap_or_else(|| Utc::now().to_rfc3339())
 }
 
-fn json_err(status: StatusCode, code: &str, message: impl Into<String>) -> Response {
+pub(crate) fn json_err(status: StatusCode, code: &str, message: impl Into<String>) -> Response {
     let body = HttpErrorBody {
         code: code.to_string(),
         kind: Some(code.to_string()),
@@ -53,7 +54,7 @@ fn check_project_uuid(raw: &str) -> Result<String, Response> {
         })
 }
 
-fn check_non_empty_id(raw: &str, label: &str) -> Result<String, Response> {
+pub(crate) fn check_non_empty_id(raw: &str, label: &str) -> Result<String, Response> {
     let trimmed = raw.trim();
     if trimmed.is_empty() || trimmed.len() > 160 {
         return Err(json_err(
@@ -101,7 +102,7 @@ fn verify_project_ownership(
     }
 }
 
-async fn run_db<T, F>(op: F) -> Result<T, Response>
+pub(crate) async fn run_db<T, F>(op: F) -> Result<T, Response>
 where
     T: Send + 'static,
     F: FnOnce() -> Result<T, Response> + Send + 'static,
@@ -115,7 +116,7 @@ where
     })?
 }
 
-fn map_harness_resp(err: HarnessError, op: &str) -> Response {
+pub(crate) fn map_harness_resp(err: HarnessError, op: &str) -> Response {
     json_err(
         StatusCode::INTERNAL_SERVER_ERROR,
         "DB_ERROR",
@@ -787,12 +788,16 @@ fn default_vault_mode() -> String {
     "keychain".to_string()
 }
 
-fn sanitize_credential_ref(raw: &str) -> String {
+pub(crate) fn sanitize_credential_ref(raw: &str) -> String {
     let t = raw.trim();
     if t.is_empty() {
         return String::new();
     }
-    if t.starts_with("env:") || t.starts_with("keychain:") || t.contains("****") {
+    if t.starts_with("env:")
+        || t.starts_with("keychain:")
+        || t.starts_with("vault://")
+        || t.contains("****")
+    {
         return t.chars().take(64).collect();
     }
     let suffix: String = t
@@ -865,6 +870,16 @@ pub async fn handle_upsert_agent_setting(
 ) -> Result<Json<AgentSettingDto>, Response> {
     let provider_id = check_non_empty_id(&req.provider_id, "providerId")?;
     let model_id = check_non_empty_id(&req.model_id, "modelId")?;
+    let endpoint_trimmed = req.endpoint_url.trim();
+    if !endpoint_trimmed.is_empty() {
+        validate_ssrf_safe_url(endpoint_trimmed, true).map_err(|e| {
+            json_err(
+                StatusCode::BAD_REQUEST,
+                "SSRF_VIOLATION",
+                format!("endpointUrl rejected: {e}"),
+            )
+        })?;
+    }
     let perm_mode = req.permission_mode.trim();
     if !matches!(
         perm_mode,
@@ -885,6 +900,16 @@ pub async fn handle_upsert_agent_setting(
             StatusCode::BAD_REQUEST,
             "VALIDATION_ERROR",
             "Invalid vaultMode",
+        ));
+    }
+    if vault_mode == "ephemeral"
+        && crate::vault::VaultStore::from_workspace_root(state.registry.pool().workspace_root())
+            .is_vault_writable()
+    {
+        return Err(json_err(
+            StatusCode::CONFLICT,
+            "VAULT_DOWNGRADE_FORBIDDEN",
+            "Cannot downgrade credential custody to ephemeral when encrypted 0o600 vault is writable",
         ));
     }
     let proj_opt = match req.project_id {
@@ -1088,9 +1113,231 @@ pub async fn handle_list_mcp_servers(
     Ok(Json(list))
 }
 
+pub const ALLOWED_LOOPBACK_PORTS: &[u16] = &[11434, 1234, 8000, 8080, 5000];
+
+fn validate_ipv4_ssrf(
+    v4: std::net::Ipv4Addr,
+    port: Option<u16>,
+    allow_loopback_policy: bool,
+    context: &str,
+) -> Result<(), String> {
+    let octets = v4.octets();
+    if octets[0] == 0 {
+        return Err(format!(
+            "Reserved / this-network {context}target '{v4}' is blocked (SSRF prevention)"
+        ));
+    }
+    if v4.is_link_local() || (octets[0] == 169 && octets[1] == 254) {
+        return Err(format!(
+            "Link-local / cloud-metadata {context}target '{v4}' is blocked (SSRF prevention)"
+        ));
+    }
+    if v4.is_private() {
+        return Err(format!(
+            "Private RFC1918 {context}target '{v4}' is blocked (SSRF prevention)"
+        ));
+    }
+    if v4.is_broadcast() || v4.is_unspecified() {
+        return Err(format!(
+            "Broadcast or unspecified {context}target '{v4}' is blocked"
+        ));
+    }
+    if octets[0] == 100 && (64..=127).contains(&octets[1]) {
+        return Err(format!(
+            "Carrier-grade NAT {context}target '{v4}' is blocked (SSRF prevention)"
+        ));
+    }
+    if v4.is_loopback() {
+        if !allow_loopback_policy {
+            return Err(format!(
+                "Loopback {context}target '{v4}' is blocked by security policy"
+            ));
+        }
+        let p = port.ok_or_else(|| {
+            format!("Loopback {context}target requires an explicit port in allowlist")
+        })?;
+        if !ALLOWED_LOOPBACK_PORTS.contains(&p) {
+            return Err(format!(
+                "Loopback port {p} is not in allowed local Ollama/CLI port list: {ALLOWED_LOOPBACK_PORTS:?}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+pub fn check_ssrf_socket_addr(addr: SocketAddr, allow_loopback_policy: bool) -> Result<(), String> {
+    validate_ip_ssrf(addr.ip(), Some(addr.port()), allow_loopback_policy)
+}
+
+fn validate_ip_ssrf(
+    ip: IpAddr,
+    port: Option<u16>,
+    allow_loopback_policy: bool,
+) -> Result<(), String> {
+    match ip {
+        IpAddr::V4(v4) => validate_ipv4_ssrf(v4, port, allow_loopback_policy, "IPv4 "),
+        IpAddr::V6(v6) => {
+            if v6.is_loopback() {
+                if !allow_loopback_policy {
+                    return Err(format!(
+                        "Loopback IPv6 target '{v6}' is blocked by security policy"
+                    ));
+                }
+                let p = port.ok_or_else(|| {
+                    "Loopback target requires an explicit port in allowlist".to_string()
+                })?;
+                if !ALLOWED_LOOPBACK_PORTS.contains(&p) {
+                    return Err(format!(
+                        "Loopback port {p} is not in allowed local Ollama/CLI port list: {ALLOWED_LOOPBACK_PORTS:?}"
+                    ));
+                }
+            } else if v6.is_unspecified() {
+                return Err(format!("Unspecified IPv6 target '{v6}' is blocked"));
+            } else {
+                let segments = v6.segments();
+                let is_v4_embedded = segments[0] == 0
+                    && segments[1] == 0
+                    && segments[2] == 0
+                    && segments[3] == 0
+                    && segments[4] == 0
+                    && (segments[5] == 0xffff || segments[5] == 0);
+
+                if is_v4_embedded {
+                    if let Some(v4) = v6.to_ipv4() {
+                        validate_ipv4_ssrf(
+                            v4,
+                            port,
+                            allow_loopback_policy,
+                            "mapped/compatible IPv4 ",
+                        )?;
+                    }
+                } else {
+                    if (segments[0] & 0xffc0) == 0xfe80 {
+                        return Err(format!(
+                            "Link-local IPv6 target '{v6}' is blocked (SSRF prevention)"
+                        ));
+                    }
+                    if (segments[0] & 0xfe00) == 0xfc00 {
+                        return Err(format!(
+                            "Unique-local private IPv6 target '{v6}' is blocked (SSRF prevention)"
+                        ));
+                    }
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+pub fn validate_ssrf_safe_url(
+    raw_url: &str,
+    allow_loopback_policy: bool,
+) -> Result<String, String> {
+    let trimmed = raw_url.trim();
+    if trimmed.is_empty() {
+        return Err("URL cannot be empty".to_string());
+    }
+    if trimmed.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err("URL contains whitespace or control characters".to_string());
+    }
+
+    let uri = trimmed
+        .parse::<axum::http::Uri>()
+        .map_err(|e| format!("Invalid URL syntax: {e}"))?;
+
+    let scheme = uri
+        .scheme_str()
+        .ok_or_else(|| "URL missing scheme (http:// or https:// required)".to_string())?
+        .to_ascii_lowercase();
+
+    if scheme != "http" && scheme != "https" {
+        return Err(format!(
+            "Forbidden scheme '{scheme}': only http and https are permitted"
+        ));
+    }
+
+    let raw_host = uri
+        .host()
+        .ok_or_else(|| "URL missing host authority".to_string())?;
+
+    let host_clean = raw_host
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .to_ascii_lowercase();
+
+    if host_clean.is_empty() {
+        return Err("URL host cannot be empty".to_string());
+    }
+
+    // Block cloud metadata endpoints
+    if host_clean == "169.254.169.254"
+        || host_clean == "metadata.google.internal"
+        || host_clean == "metadata.google"
+        || host_clean == "instance-data"
+        || host_clean == "100.100.100.200"
+        || host_clean == "fd00:ec2::254"
+    {
+        return Err(format!(
+            "Access to cloud metadata endpoint '{host_clean}' is strictly blocked (SSRF prevention)"
+        ));
+    }
+
+    let host_no_dot = host_clean.trim_end_matches('.');
+    for blocked_suffix in [
+        ".nip.io",
+        ".xip.io",
+        ".sslip.io",
+        ".localtest.me",
+        ".internal",
+        ".local",
+        ".localhost.localdomain",
+    ] {
+        if host_no_dot == blocked_suffix.trim_start_matches('.')
+            || host_no_dot.ends_with(blocked_suffix)
+        {
+            return Err(format!(
+                "DNS-rebinding or internal domain '{host_clean}' is blocked (SSRF prevention)"
+            ));
+        }
+    }
+
+    let port = uri.port_u16();
+
+    if let Ok(ip) = host_clean.parse::<IpAddr>() {
+        validate_ip_ssrf(ip, port, allow_loopback_policy)?;
+    } else if host_clean == "localhost" || host_clean.ends_with(".localhost") {
+        if !allow_loopback_policy {
+            return Err(format!(
+                "Localhost target '{host_clean}' is blocked by security policy"
+            ));
+        }
+        let p = port
+            .ok_or_else(|| "Localhost target requires an explicit port in allowlist".to_string())?;
+        if !ALLOWED_LOOPBACK_PORTS.contains(&p) {
+            return Err(format!(
+                "Localhost port {p} is not in allowed local Ollama/CLI port list: {ALLOWED_LOOPBACK_PORTS:?}"
+            ));
+        }
+    } else {
+        // Best-effort synchronous DNS check for public hostnames (catches records resolving to internal/loopback IPs)
+        let eff_port = port.unwrap_or(if scheme == "https" { 443 } else { 80 });
+        if let Ok(addrs) = (host_no_dot, eff_port).to_socket_addrs() {
+            for sa in addrs {
+                check_ssrf_socket_addr(sa, allow_loopback_policy)?;
+            }
+        }
+    }
+
+    Ok(trimmed.to_string())
+}
+
+const ALLOWED_STDIO_RUNNERS: &[&str] = &[
+    "npx", "uvx", "uv", "node", "deno", "bun", "python", "python3", "docker", "podman", "cargo",
+];
+
 fn validate_mcp_target(transport_kind: &str, raw_target: &str) -> Result<String, Response> {
     let target = check_non_empty_id(raw_target, "commandOrUrl")?;
-    if target.contains('\n') || target.contains('\r') || target.contains('\0') {
+    if target.chars().any(|c| c.is_control()) {
         return Err(json_err(
             StatusCode::BAD_REQUEST,
             "VALIDATION_ERROR",
@@ -1098,24 +1345,57 @@ fn validate_mcp_target(transport_kind: &str, raw_target: &str) -> Result<String,
         ));
     }
     if transport_kind == "http_sse" {
-        if !(target.starts_with("http://") || target.starts_with("https://"))
-            || target.contains(char::is_whitespace)
+        validate_ssrf_safe_url(&target, true).map_err(|e| {
+            json_err(
+                StatusCode::BAD_REQUEST,
+                "SSRF_VIOLATION",
+                format!("http_sse URL rejected: {e}"),
+            )
+        })?;
+    } else {
+        if [";", "&&", "||", "|", "`", "$(", "${", ">", "<", "&"]
+            .iter()
+            .any(|ch| target.contains(ch))
         {
             return Err(json_err(
                 StatusCode::BAD_REQUEST,
                 "VALIDATION_ERROR",
-                "http_sse commandOrUrl must be an http:// or https:// URL without whitespace",
+                "stdio commandOrUrl contains disallowed shell metacharacters",
             ));
         }
-    } else if [";", "&&", "||", "|", "`", "$(", ">", "<"]
-        .iter()
-        .any(|ch| target.contains(ch))
-    {
-        return Err(json_err(
-            StatusCode::BAD_REQUEST,
-            "VALIDATION_ERROR",
-            "stdio commandOrUrl contains disallowed shell metacharacters",
-        ));
+        let tokens: Vec<&str> = target.split_whitespace().collect();
+        let Some(first_tok) = tokens.first().copied() else {
+            return Err(json_err(
+                StatusCode::BAD_REQUEST,
+                "VALIDATION_ERROR",
+                "stdio commandOrUrl cannot be empty",
+            ));
+        };
+        let bin_name = std::path::Path::new(first_tok)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or(first_tok);
+        let is_allowed_runner = ALLOWED_STDIO_RUNNERS.contains(&bin_name)
+            || bin_name.starts_with("mcp-server-")
+            || bin_name.starts_with("mcp_");
+        if !is_allowed_runner {
+            return Err(json_err(
+                StatusCode::BAD_REQUEST,
+                "VALIDATION_ERROR",
+                format!("stdio runner '{bin_name}' is not in allowed MCP launcher allowlist"),
+            ));
+        }
+        if tokens
+            .iter()
+            .skip(1)
+            .any(|arg| matches!(*arg, "-c" | "--eval" | "-e" | "/c"))
+        {
+            return Err(json_err(
+                StatusCode::BAD_REQUEST,
+                "VALIDATION_ERROR",
+                "stdio inline code execution flags (-c, -e, --eval, /c) are blocked",
+            ));
+        }
     }
     Ok(target)
 }
@@ -1418,6 +1698,7 @@ pub async fn handle_post_job_event(
                     tx.execute(
                         "UPDATE node_execution_jobs
                          SET status = ?1,
+                             fencing_token = fencing_token + 1,
                              composite_scope_key = CASE WHEN composite_scope_key = '' THEN ?2 ELSE composite_scope_key END,
                              started_at = COALESCE(started_at, ?3),
                              completed_at = CASE WHEN ?1 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?3 ELSE completed_at END,
@@ -1639,8 +1920,14 @@ pub async fn handle_stream_job_events(
         closed: false,
     };
 
-    let stream = futures_util::stream::unfold(init, |mut st| async move {
-        if st.closed || st.ticks >= 40 {
+    let max_ticks: u32 = std::env::var("COWOK_SSE_MAX_TICKS")
+        .ok()
+        .and_then(|v| v.parse::<u32>().ok())
+        .filter(|&v| v > 0)
+        .unwrap_or(250);
+
+    let stream = futures_util::stream::unfold(init, move |mut st| async move {
+        if st.closed || st.ticks >= max_ticks {
             return None;
         }
         loop {
@@ -1677,7 +1964,7 @@ pub async fn handle_stream_job_events(
                             .data(payload);
                         return Some((Ok(ev), st));
                     }
-                    if is_terminal || st.ticks >= 40 {
+                    if is_terminal || st.ticks >= max_ticks {
                         return None;
                     }
                 }
@@ -1690,161 +1977,109 @@ pub async fn handle_stream_job_events(
 }
 
 // -----------------------------------------------------------------------------
-// 6. Provider Key Verification (`POST /api/v1/doctor/verify-key`)
+// 6. Provider Key Verification (`POST /api/v1/doctor/verify-key`) -> Extracted to doctor_vault.rs (Story 04.3 Gate H6)
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct VerifyKeyRequest {
-    pub provider_id: String,
-    #[serde(default)]
-    pub api_key: String,
-    #[serde(default)]
-    pub endpoint_url: String,
-}
+pub use crate::routes::doctor_vault::{
+    handle_verify_provider_key, VerifyKeyRequest, VerifyKeyResponse,
+};
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct VerifyKeyResponse {
-    pub valid: bool,
-    pub status: String,
-    pub provider_id: String,
-    pub message: String,
-    pub credential_ref: String,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-pub async fn handle_verify_provider_key(
-    Extension(_principal): Extension<FlowPrincipal>,
-    Json(req): Json<VerifyKeyRequest>,
-) -> Result<Json<VerifyKeyResponse>, Response> {
-    let provider = req.provider_id.trim().to_ascii_lowercase();
-    let key = req.api_key.trim();
-    let endpoint = req.endpoint_url.trim();
-
-    if provider.is_empty() {
-        return Err(json_err(
-            StatusCode::BAD_REQUEST,
-            "VALIDATION_ERROR",
-            "providerId is required",
-        ));
+    #[test]
+    fn test_ssrf_blocks_cloud_metadata() {
+        assert!(validate_ssrf_safe_url("http://169.254.169.254/latest/meta-data", true).is_err());
+        assert!(validate_ssrf_safe_url("http://169.254.169.254", true).is_err());
+        assert!(validate_ssrf_safe_url("http://[::169.254.169.254]/", true).is_err());
+        assert!(validate_ssrf_safe_url("http://[::ffff:169.254.169.254]/", true).is_err());
+        assert!(validate_ssrf_safe_url(
+            "http://metadata.google.internal/computeMetadata/v1/",
+            true
+        )
+        .is_err());
+        assert!(validate_ssrf_safe_url("http://instance-data", true).is_err());
+        assert!(validate_ssrf_safe_url("http://100.100.100.200/latest/meta-data", true).is_err());
+        assert!(validate_ssrf_safe_url("http://[fd00:ec2::254]/latest/meta-data", true).is_err());
     }
 
-    let (valid, status, message) = match provider.as_str() {
-        "anthropic" | "claude" => {
-            if key.starts_with("sk-ant-") && key.len() >= 24 {
-                (
-                    true,
-                    "format_checked",
-                    "Anthropic key format valid (syntax check only; live upstream probe deferred to Story 04.3)",
-                )
-            } else {
-                (
-                    false,
-                    "invalid_key",
-                    "Expected Anthropic key starting with 'sk-ant-' (min 24 chars)",
-                )
-            }
-        }
-        "openai" => {
-            if key.starts_with("sk-") && key.len() >= 20 {
-                (
-                    true,
-                    "format_checked",
-                    "OpenAI key format valid (syntax check only; live upstream probe deferred to Story 04.3)",
-                )
-            } else {
-                (
-                    false,
-                    "invalid_key",
-                    "Expected OpenAI key starting with 'sk-' (min 20 chars)",
-                )
-            }
-        }
-        "gemini" | "google" => {
-            if key.starts_with("AIza") && key.len() >= 24 {
-                (
-                    true,
-                    "format_checked",
-                    "Gemini key format valid (syntax check only; live upstream probe deferred to Story 04.3)",
-                )
-            } else {
-                (
-                    false,
-                    "invalid_key",
-                    "Expected Gemini key starting with 'AIza' (min 24 chars)",
-                )
-            }
-        }
-        "deepseek" => {
-            if key.starts_with("sk-") && key.len() >= 18 {
-                (
-                    true,
-                    "format_checked",
-                    "DeepSeek key format valid (syntax check only; live upstream probe deferred to Story 04.3)",
-                )
-            } else {
-                (
-                    false,
-                    "invalid_key",
-                    "Expected DeepSeek key starting with 'sk-'",
-                )
-            }
-        }
-        "openrouter" => {
-            if key.starts_with("sk-or-") && key.len() >= 20 {
-                (
-                    true,
-                    "format_checked",
-                    "OpenRouter key format valid (syntax check only; live upstream probe deferred to Story 04.3)",
-                )
-            } else {
-                (
-                    false,
-                    "invalid_key",
-                    "Expected OpenRouter key starting with 'sk-or-'",
-                )
-            }
-        }
-        "ollama" | "byos" => {
-            let valid_ep = endpoint.starts_with("http://127.0.0.1:")
-                || endpoint.starts_with("http://localhost:")
-                || endpoint.starts_with("https://");
-            if valid_ep {
-                (
-                    true,
-                    "format_checked",
-                    "Local/BYOS endpoint URL format validated (probe deferred to Story 04.3)",
-                )
-            } else {
-                (
-                    false,
-                    "invalid_endpoint",
-                    "Expected valid http://127.0.0.1:<port> or https:// endpointUrl",
-                )
-            }
-        }
-        _ => {
-            if key.len() >= 16 {
-                (
-                    true,
-                    "format_checked",
-                    "Custom provider key format validated (probe deferred to Story 04.3)",
-                )
-            } else {
-                (
-                    false,
-                    "invalid_key",
-                    "API key must be at least 16 characters",
-                )
-            }
-        }
-    };
+    #[test]
+    fn test_ssrf_blocks_rfc1918_private_ips() {
+        assert!(validate_ssrf_safe_url("http://10.0.0.1:8080/v1", true).is_err());
+        assert!(validate_ssrf_safe_url("http://192.168.1.1/api", true).is_err());
+        assert!(validate_ssrf_safe_url("http://172.16.0.1/", true).is_err());
+        assert!(validate_ssrf_safe_url("http://172.31.255.255:8000/", true).is_err());
+        assert!(validate_ssrf_safe_url("http://100.64.0.1:8080/", true).is_err());
+        assert!(validate_ssrf_safe_url("http://[::ffff:100.64.0.1]/", true).is_err());
+        assert!(validate_ssrf_safe_url("http://[::ffff:10.0.0.1]:8080/", true).is_err());
+    }
 
-    Ok(Json(VerifyKeyResponse {
-        valid,
-        status: status.to_string(),
-        provider_id: provider,
-        message: message.to_string(),
-        credential_ref: sanitize_credential_ref(key),
-    }))
+    #[test]
+    fn test_ssrf_loopback_policy_with_port_allowlist() {
+        // Allowed loopback ports: 11434, 1234, 8000, 8080, 5000
+        assert!(validate_ssrf_safe_url("http://127.0.0.1:11434/v1", true).is_ok());
+        assert!(validate_ssrf_safe_url("http://localhost:11434/v1", true).is_ok());
+        assert!(validate_ssrf_safe_url("http://127.0.0.1:1234/v1", true).is_ok());
+        assert!(validate_ssrf_safe_url("http://localhost:8000/v1", true).is_ok());
+        assert!(validate_ssrf_safe_url("http://127.0.0.1:8080/v1", true).is_ok());
+        assert!(validate_ssrf_safe_url("http://127.0.0.1:5000/v1", true).is_ok());
+        assert!(validate_ssrf_safe_url("http://[::1]:11434/v1", true).is_ok());
+        assert!(validate_ssrf_safe_url("http://[::ffff:127.0.0.1]:11434/v1", true).is_ok());
+
+        // Disallowed loopback ports
+        assert!(validate_ssrf_safe_url("http://127.0.0.1:22/", true).is_err());
+        assert!(validate_ssrf_safe_url("http://localhost:6379/", true).is_err());
+        assert!(validate_ssrf_safe_url("http://127.0.0.1:5432/", true).is_err());
+        assert!(validate_ssrf_safe_url("http://127.0.0.1/", true).is_err());
+        assert!(validate_ssrf_safe_url("http://localhost/", true).is_err());
+        assert!(validate_ssrf_safe_url("http://[::1]:22/", true).is_err());
+        assert!(validate_ssrf_safe_url("http://[::1]/", true).is_err());
+        assert!(validate_ssrf_safe_url("http://[::ffff:127.0.0.1]:22/", true).is_err());
+
+        // When loopback is disallowed entirely
+        assert!(validate_ssrf_safe_url("http://127.0.0.1:11434/v1", false).is_err());
+        assert!(validate_ssrf_safe_url("http://localhost:11434/v1", false).is_err());
+        assert!(validate_ssrf_safe_url("http://[::ffff:127.0.0.1]:11434/v1", false).is_err());
+    }
+
+    #[test]
+    fn test_ssrf_allows_legitimate_public_urls() {
+        assert!(validate_ssrf_safe_url("https://api.openai.com/v1", true).is_ok());
+        assert!(validate_ssrf_safe_url("https://api.anthropic.com/v1/messages", true).is_ok());
+        assert!(validate_ssrf_safe_url("https://generativelanguage.googleapis.com", true).is_ok());
+        assert!(validate_ssrf_safe_url("http://api.deepseek.com/v1", true).is_ok());
+    }
+
+    #[test]
+    fn test_stdio_command_hardening() {
+        // Safe commands
+        assert!(validate_mcp_target(
+            "stdio",
+            "npx -y @modelcontextprotocol/server-filesystem /tmp"
+        )
+        .is_ok());
+        assert!(validate_mcp_target("stdio", "uvx mcp-server-sqlite --db /tmp/test.db").is_ok());
+        assert!(validate_mcp_target("stdio", "python3 -m my_mcp_server").is_ok());
+
+        // Block shell injection / chaining / redirection
+        assert!(validate_mcp_target("stdio", "cat /etc/passwd; rm -rf /").is_err());
+        assert!(validate_mcp_target("stdio", "echo hello && evil").is_err());
+        assert!(validate_mcp_target("stdio", "echo hello & evil").is_err());
+        assert!(validate_mcp_target("stdio", "cmd | evil").is_err());
+        assert!(validate_mcp_target("stdio", "eval $(whoami)").is_err());
+        assert!(validate_mcp_target("stdio", "echo ${SECRET}").is_err());
+        assert!(validate_mcp_target("stdio", "cat < /etc/shadow").is_err());
+        assert!(validate_mcp_target("stdio", "echo evil > /tmp/bad").is_err());
+        assert!(validate_mcp_target("stdio", "`whoami`").is_err());
+    }
+
+    #[test]
+    fn test_mcp_http_sse_ssrf_validation() {
+        assert!(validate_mcp_target("http_sse", "http://127.0.0.1:11434/sse").is_ok());
+        assert!(validate_mcp_target("http_sse", "https://mcp.example.com/sse").is_ok());
+        assert!(validate_mcp_target("http_sse", "http://169.254.169.254/sse").is_err());
+        assert!(validate_mcp_target("http_sse", "http://10.0.0.1:8080/sse").is_err());
+        assert!(validate_mcp_target("http_sse", "http://127.0.0.1:22/sse").is_err());
+    }
 }

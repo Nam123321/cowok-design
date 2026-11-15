@@ -20,7 +20,10 @@ async function runAcceptance() {
     process.cwd(),
     "_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-04/Story-04.1/qa/evidence"
   );
-  const brainDir = "/Users/hatrang20061988/.gemini/antigravity/brain/f823b228-c81c-47ac-b77a-4f101f8783d5";
+  const artifactMirrorDir = process.env.COWOK_E2E_ARTIFACT_DIR || "";
+  if (artifactMirrorDir) {
+    fs.mkdirSync(artifactMirrorDir, { recursive: true });
+  }
   const videoDir = path.join(evidenceDir, "videos");
 
   fs.mkdirSync(evidenceDir, { recursive: true });
@@ -84,8 +87,9 @@ async function runAcceptance() {
     const fileName = `${name}.png`;
     const fullPath = path.join(evidenceDir, fileName);
     await page.screenshot({ path: fullPath, fullPage: false });
-    const brainPath = path.join(brainDir, fileName);
-    fs.copyFileSync(fullPath, brainPath);
+    if (artifactMirrorDir) {
+      fs.copyFileSync(fullPath, path.join(artifactMirrorDir, fileName));
+    }
     screenshots.push(fileName);
     console.log(`📸 [MILESTONE CAPTURED] ${fileName} - ${description}`);
   };
@@ -333,17 +337,17 @@ async function runAcceptance() {
     const rawVideoPath = path.join(videoDir, videoFiles[0]);
     finalVideoName = "story-04.1-acceptance-walkthrough.webm";
     const finalEvidenceVideoPath = path.join(evidenceDir, finalVideoName);
-    const finalBrainVideoPath = path.join(brainDir, finalVideoName);
-
     fs.copyFileSync(rawVideoPath, finalEvidenceVideoPath);
-    fs.copyFileSync(rawVideoPath, finalBrainVideoPath);
     console.log(`🎥 Video nghiệm thu đã lưu tại: ${finalEvidenceVideoPath}`);
-    console.log(`🎥 Video nghiệm thu đã sao chép về Brain: ${finalBrainVideoPath}`);
+    if (artifactMirrorDir) {
+      const mirroredVideoPath = path.join(artifactMirrorDir, finalVideoName);
+      fs.copyFileSync(rawVideoPath, mirroredVideoPath);
+      console.log(`🎥 Video nghiệm thu đã sao chép về Mirror: ${mirroredVideoPath}`);
+    }
   }
 
   // Write Defect and Audit Log
   const defectReportPath = path.join(evidenceDir, "qa-defect-and-observation-log.json");
-  const brainDefectPath = path.join(brainDir, "qa-defect-and-observation-log.json");
   const reportPayload = {
     testDate: new Date().toISOString(),
     targetOrigin: "http://127.0.0.1:3142/",
@@ -356,7 +360,9 @@ async function runAcceptance() {
   };
 
   fs.writeFileSync(defectReportPath, JSON.stringify(reportPayload, null, 2), "utf-8");
-  fs.writeFileSync(brainDefectPath, JSON.stringify(reportPayload, null, 2), "utf-8");
+  if (artifactMirrorDir) {
+    fs.writeFileSync(path.join(artifactMirrorDir, "qa-defect-and-observation-log.json"), JSON.stringify(reportPayload, null, 2), "utf-8");
+  }
 
   console.log("\n================================================================================");
   console.log(`✅ HOÀN TẤT KIỂM THỬ BROWSER THỰC NGHIỆM!`);

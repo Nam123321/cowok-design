@@ -52,8 +52,10 @@ async function waitForDaemonHealth(port, childProc, logPath) {
         console.log(`✅ [preflight] harness-daemon healthy on port ${port} (attempt ${i}/30).`);
         return;
       }
-    } catch {
-      // Daemon still binding loopback socket
+    } catch (err) {
+      if (i === 30) {
+        console.warn(`[preflight] Last health probe error: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }

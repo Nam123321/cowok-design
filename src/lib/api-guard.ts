@@ -41,40 +41,21 @@ type RouteHandler<B, Q> = (
   data: { body?: B; query?: Q }
 ) => Promise<Response> | Response;
 
-function resolveFallbackRole(userRoles: string[]): "viewer" | "editor" | "admin" {
-  if (userRoles.includes("admin")) return "admin";
-  if (userRoles.includes("editor")) return "editor";
-  return "viewer";
-}
-
 function resolveAuthIdentity<B, Q>(
   req: Request,
   url: URL,
   options: GuardedRouteOptions<B, Q>,
-  context: { tenantId?: string }
+  _context: { tenantId?: string }
 ): { ok: true; tenantId: string; userId: string; role: "viewer" | "editor" | "admin" } | { ok: false; response: Response } {
-  const isVitestHarness = typeof process !== "undefined" && process.env?.VITEST === "true";
-  if (options.authMode === "strict-loopback" || !isVitestHarness) {
-    const verified = verifyStrictLoopback(req, url);
-    if (!verified.ok) return verified;
-    return { ok: true, ...verified.session };
-  }
-  const rawRoles = req.headers.get("x-user-roles") || "";
-  const userRoles = rawRoles
-    ? rawRoles.split(",").map((r) => r.trim().toLowerCase()).filter(Boolean)
-    : ["viewer"];
+  const verified = verifyStrictLoopback(req, url);
+  if (!verified.ok) return verified;
   if (options.roles && options.roles.length > 0) {
     const allowed = options.roles.map((r) => r.toLowerCase());
-    if (!allowed.some((r) => userRoles.includes(r) || userRoles.includes("admin"))) {
+    if (!allowed.includes(verified.session.role) && verified.session.role !== "admin") {
       return { ok: false, response: jsonResp(HTTP_FORBIDDEN, { error: "FORBIDDEN", message: "Insufficient permissions" }) };
     }
   }
-  return {
-    ok: true,
-    tenantId: context.tenantId || req.headers.get("x-tenant-id") || "local-default",
-    userId: req.headers.get("x-user-id") || "anonymous",
-    role: resolveFallbackRole(userRoles),
-  };
+  return { ok: true, ...verified.session };
 }
 
 async function parseGuardedBody<B, Q>(
