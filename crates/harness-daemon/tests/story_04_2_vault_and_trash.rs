@@ -696,18 +696,54 @@ async fn test_empty_bearer_rejected_and_v7_workbench_convergence() {
     .await;
     assert_eq!(del_404, StatusCode::NOT_FOUND);
 
-    // 4. Key verify returns honest syntax-only status (constructed dummy string avoids Gitleaks generic-api-key false positive)
+    // 4. Key verify returns honest syntax-only status when dryRunFormatOnly=true (constructed dummy string avoids Gitleaks generic-api-key false positive)
     let dummy_key = format!("sk-{}", "0".repeat(20));
     let (vst, vval) = send_req(
         &router,
         "POST",
         "/api/v1/doctor/verify-key",
         &[("x-cowok-session-token", &tok_a)],
-        Some(json!({ "providerId": "openai", "apiKey": dummy_key })),
+        Some(json!({ "providerId": "openai", "apiKey": dummy_key, "dryRunFormatOnly": true })),
     )
     .await;
     assert_eq!(vst, StatusCode::OK, "{vval}");
     assert_eq!(vval["status"], "format_checked");
+    assert_eq!(vval["liveProbed"], false);
+
+    // 4b. CLI doctor returns >= 20 CLIs passively with category + scanMode, and vault settings rejects ephemeral downgrade
+    let (doc_st, doc_val) = send_req(
+        &router,
+        "GET",
+        "/api/v1/doctor/cli-matrix",
+        &[("x-cowok-session-token", &tok_a)],
+        None,
+    )
+    .await;
+    assert_eq!(doc_st, StatusCode::OK, "{doc_val}");
+    assert!(doc_val["tools"].as_array().map(|a| a.len()).unwrap_or(0) >= 20);
+    assert_eq!(doc_val["scanMode"], "passive");
+
+    let (vset_st, vset_val) = send_req(
+        &router,
+        "POST",
+        "/api/v1/vault/keys",
+        &[("x-cowok-session-token", &tok_a)],
+        Some(json!({ "providerId": "openai", "apiKey": dummy_key, "vaultMode": "vault_0600" })),
+    )
+    .await;
+    assert_eq!(vset_st, StatusCode::OK, "{vset_val}");
+    assert!(tmp.path().join(".cowok-design/vault.enc").is_file());
+
+    let (downgrade_st, downgrade_val) = send_req(
+        &router,
+        "PUT",
+        "/api/v1/settings/vault",
+        &[("x-cowok-session-token", &tok_a)],
+        Some(json!({ "vaultMode": "ephemeral" })),
+    )
+    .await;
+    assert_eq!(downgrade_st, StatusCode::CONFLICT, "{downgrade_val}");
+    assert_eq!(downgrade_val["code"], "VAULT_DOWNGRADE_FORBIDDEN");
 
     // 5. Job events accept PAUSED, populate composite_scope_key + monotonically increasing project_seq across jobs
     let p: ProjectDto = serde_json::from_value(

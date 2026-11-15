@@ -21,12 +21,14 @@ export function savePersistedSettings(patch: Partial<PersistedWorkbenchSettings>
   if (typeof window === "undefined") return;
   try {
     const prev = loadPersistedSettings();
+    const defaultByos =
+      (typeof import.meta !== "undefined" && import.meta.env?.VITE_DEFAULT_BYOS_ENDPOINT) || "";
     const safeNext: Partial<PersistedWorkbenchSettings> = {
       theme: patch.theme ?? prev.theme ?? "warm",
       locale: patch.locale ?? prev.locale ?? "vi",
       fontSize: patch.fontSize ?? prev.fontSize ?? "13px",
       defaultModel: patch.defaultModel ?? prev.defaultModel ?? "claude-sonnet-4-6",
-      byosEndpoint: patch.byosEndpoint ?? prev.byosEndpoint ?? "http://127.0.0.1:43110/v1",
+      byosEndpoint: patch.byosEndpoint ?? prev.byosEndpoint ?? defaultByos,
       autoContextSlice: patch.autoContextSlice ?? prev.autoContextSlice ?? true,
     };
     window.localStorage.setItem(WORKBENCH_SETTINGS_STORAGE_KEY, JSON.stringify(safeNext));

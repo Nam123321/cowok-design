@@ -187,4 +187,93 @@ describe('scripts/pr-babysitter-runner.js', () => {
     expect(countPrAttemptsInMarkdown(md, '5')).toBe(2);
     expect(countPrAttemptsInMarkdown(md, '50')).toBe(1);
   });
+
+  it('never attempts mutating GitHub API writes on external fork PRs even when attempts >= 3', async () => {
+    const repoRoot = createTempRepo();
+    const stateFile = path.join(repoRoot, 'state.md');
+    const execFn = vi.fn((cmd: string) => {
+      if (cmd.startsWith('git log')) return 'sha1\nsha2\nsha3\n';
+      return '';
+    });
+    const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
+      expect(init?.method ?? 'GET').toBe('GET');
+      return {
+        ok: true,
+        json: async () => [],
+      } as Response;
+    });
+
+    const res = await runPrBabysitter({
+      repoRoot,
+      stateFile,
+      env: {
+        CI: 'true',
+        IS_FORK: 'true',
+        PR_NUMBER: '205',
+        GITHUB_TOKEN: 'test-token',
+        GITHUB_REPOSITORY: 'org/repo',
+        GITHUB_BASE_REF: 'master',
+      },
+      execFn,
+      fetchFn,
+    });
+
+    expect(res).toEqual({ status: 'read-only-triage', isFork: true, exitCode: 0 });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('paginates PR comments beyond page 1 when finding existing ledger comment', async () => {
+    const repoRoot = createTempRepo();
+    const stateFile = path.join(repoRoot, 'state.md');
+    const execFn = vi.fn((cmd: string) => {
+      if (cmd.startsWith('git log')) return '';
+      if (cmd === 'cargo fmt --all --check') {
+        throw new Error('unformatted');
+      }
+      return '';
+    });
+    const page1 = Array.from({ length: 100 }, (_, i) => ({ id: i + 1, body: `comment ${i}` }));
+    const fetchCalls: Array<{ url: string; method: string }> = [];
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      fetchCalls.push({ url, method });
+      if (url.includes('&page=1')) {
+        return { ok: true, json: async () => page1 } as Response;
+      }
+      if (url.includes('&page=2')) {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              id: 999,
+              body: '<!-- pr-babysitter-ledger -->\n| #206 | `b` | old | `1/3` | **TRIAGE_ADVISORY** | `NONE` |\n',
+            },
+          ],
+        } as Response;
+      }
+      return { ok: true, json: async () => ({ id: 999 }) } as Response;
+    });
+
+    const res = await runPrBabysitter({
+      repoRoot,
+      stateFile,
+      env: {
+        CI: 'true',
+        PR_NUMBER: '206',
+        GITHUB_TOKEN: 'test-token',
+        GITHUB_REPOSITORY: 'org/repo',
+      },
+      execFn,
+      fetchFn,
+    });
+
+    expect(res).toEqual({ status: 'triage-advisory', needsFormat: true, exitCode: 0 });
+    expect(fetchCalls.map((c) => `${c.method} ${c.url}`)).toEqual([
+      'GET https://api.github.com/repos/org/repo/issues/206/comments?per_page=100&page=1',
+      'GET https://api.github.com/repos/org/repo/issues/206/comments?per_page=100&page=2',
+      'GET https://api.github.com/repos/org/repo/issues/206/comments?per_page=100&page=1',
+      'GET https://api.github.com/repos/org/repo/issues/206/comments?per_page=100&page=2',
+      'PATCH https://api.github.com/repos/org/repo/issues/comments/999',
+    ]);
+  });
 });

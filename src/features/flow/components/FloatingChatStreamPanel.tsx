@@ -15,6 +15,51 @@ export interface FloatingChatMessage {
   timestamp: number;
 }
 
+function extractPayloadSummaryParts(
+  parsed: Record<string, unknown>,
+  t: (k: string, f: string) => string
+): string[] {
+  if (parsed.summary) {
+    return [String(parsed.summary)];
+  }
+  const parts: string[] = [];
+  if (parsed.prompt) {
+    parts.push(`"${parsed.prompt}"`);
+  }
+  if (parsed.status) {
+    parts.push(`${t("floatingChat.nodeStatusLabel", "Status")}: ${parsed.status}`);
+  }
+  if (parsed.fencingToken !== undefined) {
+    parts.push(`#${parsed.fencingToken}`);
+  }
+  if (parsed.instruction) {
+    parts.push(`${t("floatingChat.steerPrefix", "Steer instruction")}: "${parsed.instruction}"`);
+  }
+  return parts;
+}
+
+export function formatStructuredPayload(payloadText: string, t: (k: string, f: string) => string): string {
+  if (!payloadText || typeof payloadText !== "string") return payloadText;
+  const trimmed = payloadText.trim();
+  const match = trimmed.match(/^(\[[a-zA-Z0-9_-]+\]\s*)?(\{[\s\S]*\})$/);
+  if (!match) return payloadText;
+
+  const prefix = match[1] ? match[1].trim() : "";
+  const jsonStr = match[2];
+
+  try {
+    const parsed = JSON.parse(jsonStr);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return payloadText;
+
+    const parts = extractPayloadSummaryParts(parsed as Record<string, unknown>, t);
+    if (parts.length === 0) return payloadText;
+    const body = parts.join(" · ");
+    return prefix ? `${prefix} ${body}` : body;
+  } catch {
+    return payloadText;
+  }
+}
+
 export interface FloatingChatStreamPanelProps {
   projectId: string;
   sessionId: string;
@@ -93,7 +138,7 @@ const MessageHistoryList: React.FC<{
         className="fc-history"
         style={{ padding: "8px 12px", display: "flex", alignItems: "center", gap: "6px", backgroundColor: "var(--bg-canvas)", fontSize: "11.5px", color: "var(--text-muted)", flexShrink: 0 }}
       >
-        <BrandIcon name="sparkles" size={12} color="var(--agent-accent)" />
+        <BrandIcon name="ai-agent" size={14} color="var(--agent-accent)" />
         <span>
           {t("floatingChat.emptyHint", "Nhập yêu cầu cho")} {isMulti ? `${formatNumber(selectedCount)} ${t("floatingChat.screensUnit", "màn hình")}` : primaryTitle || t("floatingChat.singleScreenFallback", "màn hình")}
         </span>
@@ -106,10 +151,11 @@ const MessageHistoryList: React.FC<{
       style={{ flex: "0 1 auto", minHeight: 0, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: "10px", backgroundColor: "var(--bg-canvas)" }}
     >
       {messages.map((m) => {
+        const text = m.role === "assistant" ? formatStructuredPayload(m.content, t) : m.content;
         const mapped: ChatMessage = {
           id: m.id,
           sender: m.role === "user" ? "human" : "agent",
-          text: m.content,
+          text,
           timestamp: formatTime(m.timestamp),
         };
         return <ChatStreamItem key={m.id} msg={mapped} />;

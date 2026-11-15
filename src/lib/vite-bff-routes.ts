@@ -3,7 +3,12 @@
 import { z, type ZodSchema } from "zod";
 import { guardedRoute } from "./api-guard";
 import { forwardToDaemonFlow } from "./daemon-client";
-import { ApplyProposalSchema, CreateProposalSchema } from "./validations/change-proposal";
+import {
+  ApplyProposalSchema,
+  CreateProposalSchema,
+  RejectProposalSchema,
+  ValidateProposalSchema,
+} from "./validations/change-proposal";
 import {
   CreateSnapshotSchema,
   ExportZipSchema,
@@ -20,8 +25,11 @@ import {
 } from "./validations/constraints";
 import {
   PostJobEventInputSchema,
+  ProbeCliInputSchema,
   UpsertAgentSettingInputSchema,
   UpsertMcpServerInputSchema,
+  UpsertVaultKeyInputSchema,
+  VaultConfigInputSchema,
   VerifyProviderKeyInputSchema,
 } from "./validations/workbench-settings";
 import { UpdateElementCommentSchema } from "./validations/element-comment";
@@ -50,7 +58,6 @@ import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
 import * as commentsRoute from "../app/api/projects/[id]/flow/nodes/[nodeId]/comments/route";
 import * as fixturesRoute from "../app/api/projects/[id]/flow/nodes/[nodeId]/fixtures/route";
-import * as doctorRoute from "../app/api/doctor/route";
 
 export type RouteFn = (req: Request, ctx: { params?: Record<string, string> }) => Promise<Response>;
 
@@ -151,8 +158,14 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/projects$/, extractParams: noParams, resolveHandler: () => projectListRoute.POST },
   proxyRoute("PATCH", /^\/api\/projects\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}`, ProjectPatchSchema),
   proxyRoute("DELETE", /^\/api\/projects\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}`),
-  { method: "GET", pattern: /^\/api\/doctor$/, extractParams: noParams, resolveHandler: () => doctorRoute.GET },
+  proxyRoute("GET", /^\/api\/doctor$/, () => "/api/v1/doctor/cli-matrix"),
+  proxyRoute("GET", /^\/api\/doctor\/cli-matrix$/, () => "/api/v1/doctor/cli-matrix"),
+  proxyRoute("POST", /^\/api\/doctor\/probe-cli$/, () => "/api/v1/doctor/probe-cli", ProbeCliInputSchema),
   proxyRoute("POST", /^\/api\/doctor\/verify-key$/, () => "/api/v1/doctor/verify-key", VerifyProviderKeyInputSchema),
+  proxyRoute("GET", /^\/api\/vault\/keys$/, () => "/api/v1/vault/keys"),
+  proxyRoute("POST", /^\/api\/vault\/keys$/, () => "/api/v1/vault/keys", UpsertVaultKeyInputSchema),
+  proxyRoute("DELETE", /^\/api\/vault\/keys\/([^/]+)$/, (m) => `/api/v1/vault/keys/${safeEncodeSegment(m[1])}`),
+  proxyRoute("PUT", /^\/api\/settings\/vault$/, () => "/api/v1/settings/vault", VaultConfigInputSchema),
   proxyRoute("GET", /^\/api\/agent-settings$/, () => "/api/v1/agent-settings"),
   proxyRoute("PUT", /^\/api\/agent-settings$/, () => "/api/v1/agent-settings", UpsertAgentSettingInputSchema),
   proxyRoute("GET", /^\/api\/mcp-servers$/, () => "/api/v1/mcp-servers"),
@@ -222,9 +235,9 @@ const ROUTE_TABLE: RouteEntry[] = [
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/proposals$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals`),
   proxyRoute("POST", /^\/api\/projects\/([^/]+)\/proposals$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals`, CreateProposalSchema),
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals/${safeEncodeSegment(m[2])}`),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/validate$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals/${safeEncodeSegment(m[2])}/validate`, { rawJsonPassthrough: true }),
+  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/validate$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals/${safeEncodeSegment(m[2])}/validate`, ValidateProposalSchema),
   proxyRoute("POST", /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/apply$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals/${safeEncodeSegment(m[2])}/apply`, ApplyProposalSchema),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/reject$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals/${safeEncodeSegment(m[2])}/reject`, { rawJsonPassthrough: true }),
+  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/reject$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals/${safeEncodeSegment(m[2])}/reject`, RejectProposalSchema),
 
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/sdi\/intent$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent`),
   proxyRoute("POST", /^\/api\/projects\/([^/]+)\/sdi\/intent$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent`, CompileIntentSchema),

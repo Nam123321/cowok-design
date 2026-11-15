@@ -1,34 +1,17 @@
 {
   "extends": "./tsconfig.json",
   "include": [
-    "src/vite-env.d.ts",
-    "src/main.tsx",
-    "src/App.tsx",
-    "src/api/flow-workbench.ts",
-    "src/api/harness-daemon.ts",
-    "src/lib/**/*.ts",
-    "src/components/ui/**/*.ts",
-    "src/components/ui/**/*.tsx",
-    "src/pages/workbench/**/*.ts",
-    "src/pages/workbench/**/*.tsx",
-    "src/features/flow/**/*.ts",
-    "src/features/flow/**/*.tsx",
-    "src/app/api/projects/route.ts",
-    "src/app/api/projects/[id]/sessions/**/*.ts",
-    "src/app/api/projects/[id]/specs/**/*.ts",
-    "src/app/api/projects/[id]/context-slice/**/*.ts",
-    "src/app/api/projects/[id]/path-token/**/*.ts",
-    "src/app/api/projects/[id]/flow/snapshot/**/*.ts",
-    "src/app/api/projects/[id]/flow/nodes/route.ts",
-    "src/app/api/projects/[id]/flow/nodes/[nodeId]/route.ts",
-    "src/app/api/projects/[id]/flow/nodes/positions/**/*.ts",
-    "src/app/api/projects/[id]/flow/transitions/**/*.ts",
-    "src/app/api/projects/[id]/flow/deploy-draft/**/*.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "packages/*/src/**/*.ts",
+    "packages/*/src/**/*.tsx",
     "tests/**/*.ts",
     "tests/**/*.tsx",
     "vite.config.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "dist",
+    "packages/*/dist"
   ]
 }

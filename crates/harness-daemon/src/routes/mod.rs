@@ -1,5 +1,6 @@
 // @story 04.1
 // @implements AC-01, AC-03, AC-04, AC-06
+pub mod doctor_vault;
 pub mod fs_jail;
 pub mod legacy_proposals;
 pub mod legacy_sdi;
@@ -26,7 +27,9 @@ use crate::daemon_auth::{
 use crate::flow_routes::build_flow_subrouter;
 use crate::lockfile::CURRENT_SCHEMA_VERSION;
 
+pub use doctor_vault::*;
 pub use fs_jail::{FsBrowseEntry, FsBrowseQuery, FsBrowseResponse};
+
 pub use legacy_proposals::*;
 pub use legacy_sdi::*;
 pub use legacy_sessions::*;

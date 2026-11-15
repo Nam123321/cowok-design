@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import viDict from "../i18n/locales/vi.json";
 import enDict from "../i18n/locales/en.json";
+import zhDict from "../i18n/locales/zh.json";
+import jaDict from "../i18n/locales/ja.json";
+import koDict from "../i18n/locales/ko.json";
+import frDict from "../i18n/locales/fr.json";
+import esDict from "../i18n/locales/es.json";
+import ptDict from "../i18n/locales/pt.json";
+import itDict from "../i18n/locales/it.json";
 
 /**
  * Minimalist reactive i18n hook conforming to cowok.ai 9-locale standards (DESIGN.md 11.3)
@@ -11,6 +18,20 @@ const DICTS: Record<string, Record<string, any>> = {
   vi: viDict,
   "en-US": enDict,
   en: enDict,
+  "zh-CN": zhDict,
+  zh: zhDict,
+  "ja-JP": jaDict,
+  ja: jaDict,
+  "ko-KR": koDict,
+  ko: koDict,
+  "fr-FR": frDict,
+  fr: frDict,
+  "es-ES": esDict,
+  es: esDict,
+  "pt-PT": ptDict,
+  pt: ptDict,
+  "it-IT": itDict,
+  it: itDict,
 };
 
 let currentGlobalLocale = "vi-VN";

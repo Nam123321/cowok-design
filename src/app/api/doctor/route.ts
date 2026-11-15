@@ -99,42 +99,52 @@ const SUPPORTED_CLIS: CliTargetSpec[] = [
   },
 ];
 
-async function checkCliAuthentication(
-  target: CliTargetSpec
-): Promise<{ authenticated: boolean; reason?: string }> {
-  for (const key of target.envKeys) {
-    if (process.env[key]?.trim()) {
-      return { authenticated: true };
-    }
-  }
-  for (const cfgPath of target.configPaths) {
+function hasValidConfigCredential(configPaths: string[]): boolean {
+  for (const cfgPath of configPaths) {
     try {
       const lstat = fs.lstatSync(cfgPath);
       if (lstat.isSymbolicLink() || !lstat.isFile()) continue;
       const raw = fs.readFileSync(cfgPath, "utf8").trim();
       if (raw.length <= 2 || raw === "{}" || raw === "[]" || raw === "null") continue;
       if (cfgPath.endsWith(".json")) {
-        const parsed = JSON.parse(raw) as unknown;
+        const parsed: Record<string, string | number | boolean | null | object> | null = JSON.parse(raw);
         if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
-          return { authenticated: true };
+          return true;
         }
         continue;
       }
-      return { authenticated: true };
+      return true;
     } catch {
       // Ignore missing, symlinked, or malformed config files and continue checking
     }
   }
+  return false;
+}
+
+async function probesOllamaDaemon(): Promise<boolean> {
+  const base = (process.env.OLLAMA_HOST || "http://127.0.0.1:11434").replace(/\/$/, "");
+  try {
+    const resp = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(750) });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function checkCliAuthentication(
+  target: CliTargetSpec
+): Promise<{ authenticated: boolean; reason?: string }> {
+  if (target.envKeys.some((key) => Boolean(process.env[key]?.trim()))) {
+    return { authenticated: true };
+  }
+  if (hasValidConfigCredential(target.configPaths)) {
+    return { authenticated: true };
+  }
   if (target.id === "ollama") {
-    const base = (process.env.OLLAMA_HOST || "http://127.0.0.1:11434").replace(/\/$/, "");
-    try {
-      const resp = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(750) });
-      if (resp.ok) {
-        return { authenticated: true };
-      }
-    } catch {
-      return { authenticated: false, reason: "Ollama daemon is not running on 127.0.0.1:11434" };
-    }
+    const alive = await probesOllamaDaemon();
+    return alive
+      ? { authenticated: true }
+      : { authenticated: false, reason: "Ollama daemon is not running on 127.0.0.1:11434" };
   }
   const expectedEnv = target.envKeys[0] || "API_KEY";
   return {

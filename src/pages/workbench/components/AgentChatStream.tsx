@@ -57,7 +57,7 @@ export const ChatStreamItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
   return (
     <div className="chat-agent-prose" data-quotable="true" style={{ alignSelf: "stretch", width: "100%", color: "var(--text-primary)", fontSize: "13px", lineHeight: "1.6", padding: "4px 0", wordBreak: "break-word" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px", fontSize: "11px", color: "var(--text-muted)" }}>
-        <BrandIcon name="sparkles" size={12} color="var(--agent-accent)" />
+        <BrandIcon name="ai-agent" size={14} color="var(--agent-accent)" />
         <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>{t("chat.agentTitle", "cowok Agent")}</span>
         <span>•</span>
         <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px" }}>{msg.timestamp}</span>

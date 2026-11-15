@@ -56,12 +56,13 @@ export function evaluateAuditRatchet(rawAuditOutput, customBaseline) {
   let criticalCount = 0;
   let highCount = 0;
   let parsedFromJson = false;
+  let parsedReport = null;
 
   try {
-    const parsed = JSON.parse(auditJson);
-    if (parsed.metadata && parsed.metadata.vulnerabilities) {
-      criticalCount = parsed.metadata.vulnerabilities.critical || 0;
-      highCount = parsed.metadata.vulnerabilities.high || 0;
+    parsedReport = JSON.parse(auditJson);
+    if (parsedReport.metadata && parsedReport.metadata.vulnerabilities) {
+      criticalCount = parsedReport.metadata.vulnerabilities.critical || 0;
+      highCount = parsedReport.metadata.vulnerabilities.high || 0;
       parsedFromJson = true;
     }
   } catch (err) {
@@ -99,6 +100,27 @@ export function evaluateAuditRatchet(rawAuditOutput, customBaseline) {
   if (highCount > baseline.max_high) {
     console.error(`::error::🚨 Security Ratchet Breach: High vulnerabilities (${highCount}) exceeded baseline (${baseline.max_high})! New high CVEs introduced.`);
     failed = true;
+  }
+
+  if (
+    parsedReport &&
+    parsedReport.advisories &&
+    Array.isArray(baseline.allowed_advisories)
+  ) {
+    const allowedSet = new Set(baseline.allowed_advisories);
+    const unexpectedAdvisories = Object.values(parsedReport.advisories).filter((adv) => {
+      const sev = String(adv?.severity || '').toLowerCase();
+      if (sev !== 'critical' && sev !== 'high') return false;
+      const advId = adv?.github_advisory_id || String(adv?.id || '');
+      return advId && !allowedSet.has(advId);
+    });
+    if (unexpectedAdvisories.length > 0) {
+      const summary = unexpectedAdvisories
+        .map((adv) => `${adv.github_advisory_id || adv.id} (${adv.severity}, ${adv.module_name || 'unknown'})`)
+        .join(', ');
+      console.error(`::error::🚨 Security Ratchet Breach: Unlisted high/critical advisories detected (CVE swap/regression): ${summary}`);
+      failed = true;
+    }
   }
 
   return { success: !failed, critical: criticalCount, high: highCount };

@@ -1,7 +1,7 @@
 // @story 05.2
-import { guardedRoute } from "../../../../../../../lib/api-guard";
-import { forwardFromGuardedContext } from "../../../../../../../lib/daemon-client";
-import { ApplyProposalSchema } from "../../../../../../../lib/validations/change-proposal";
+import { guardedRoute } from "@/lib/api-guard";
+import { forwardFromGuardedContext } from "@/lib/daemon-client";
+import { ApplyProposalSchema } from "@/lib/validations/change-proposal";
 
 export const POST = guardedRoute(
   (req, ctx, { body }) => {
@@ -10,7 +10,7 @@ export const POST = guardedRoute(
     return forwardFromGuardedContext(
       req,
       ctx,
-      `/api/v1/projects/${projectId}/proposals/${encodeURIComponent(proposalId)}/apply`,
+      `/api/v1/projects/${encodeURIComponent(projectId)}/proposals/${encodeURIComponent(proposalId)}/apply`,
       body
     );
   },

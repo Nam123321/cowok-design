@@ -10,7 +10,8 @@ import { NodeJobStatus } from "../store/keyed-parallel-coordinator";
 export interface FloatingChatCollapsedPillProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   pillX: number;
-  pillBottom: number;
+  pillBottom?: number;
+  pillY?: number;
   isDragging: boolean;
   isMulti: boolean;
   selectedCount: number;
@@ -143,7 +144,7 @@ const PillNodeBadge: React.FC<{
       </span>
       {isRunning && (
         <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "10px", fontWeight: 600, color: "var(--action-primary)", backgroundColor: "var(--bg-selected)", padding: "2px 6px", borderRadius: "var(--radius-xs)" }}>
-          <BrandIcon name="execution-pipeline" size={10} color="currentColor" />
+          <BrandIcon name="ai-agent" size={10} color="currentColor" />
           <span>{t("floatingChat.processing", "Đang xử lý")}</span>
         </span>
       )}
@@ -160,7 +161,8 @@ const PillNodeBadge: React.FC<{
 export const FloatingChatCollapsedPill: React.FC<FloatingChatCollapsedPillProps> = ({
   containerRef,
   pillX,
-  pillBottom,
+  pillBottom = 20,
+  pillY,
   isDragging,
   isMulti,
   selectedCount,
@@ -179,7 +181,12 @@ export const FloatingChatCollapsedPill: React.FC<FloatingChatCollapsedPillProps>
       ref={containerRef}
       className="fc-compact-pill"
       data-testid="fc-compact-pill"
-      style={{ ...PILL_CONTAINER_STYLE, left: `${pillX}px`, bottom: `${pillBottom}px`, cursor: isDragging ? "grabbing" : "grab" }}
+      style={{
+        ...PILL_CONTAINER_STYLE,
+        left: `${pillX}px`,
+        ...(pillY !== undefined ? { top: `${pillY}px` } : { bottom: `${pillBottom}px` }),
+        cursor: isDragging ? "grabbing" : "grab",
+      }}
       onMouseDown={onHeaderMouseDown}
     >
       <PillNodeBadge isMulti={isMulti} selectedCount={selectedCount} primaryNode={primaryNode} primaryNodeStatus={primaryNodeStatus} onExpand={onExpand} />

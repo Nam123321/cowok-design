@@ -38,7 +38,7 @@ import {
   WorkbenchTransition,
 } from "../store/flow-workbench-store";
 import { FlowWorkbenchClient } from "../../../api/flow-workbench";
-import { guardedRoute } from "../../../lib/api-guard";
+import { guardedRoute, issueBffLoopbackSession } from "../../../lib/api-guard";
 
 describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
   describe("Zod Runtime Schemas (Khóa P1)", () => {
@@ -182,11 +182,16 @@ describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
         }
       );
 
+      const { sessionToken } = await issueBffLoopbackSession({
+        tenantId: "tenant-xyz",
+        role: "editor",
+      });
+
       const request = new Request("http://localhost/api/v1/projects/p1/flow/nodes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-tenant-id": "tenant-xyz",
+          "x-cowok-session-token": sessionToken,
         },
         body: JSON.stringify({
           screenKey: "screen-home",
@@ -208,9 +213,17 @@ describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
         async () => new Response("OK")
       );
 
+      const { sessionToken } = await issueBffLoopbackSession({
+        tenantId: "tenant-xyz",
+        role: "editor",
+      });
+
       const request = new Request("http://localhost/api/v1/projects/p1/flow/nodes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-cowok-session-token": sessionToken,
+        },
         body: JSON.stringify({
           title: "", // invalid empty
         }),
@@ -240,9 +253,17 @@ describe("Flow Workbench Core Test Suite (Story 04.1)", () => {
         }
       );
 
+      const { sessionToken: attackerSession } = await issueBffLoopbackSession({
+        tenantId: "tenant-attacker",
+        role: "editor",
+      });
+
       const reqA = new Request("http://localhost/api/v1/projects/p1/flow/nodes", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-tenant-id": "tenant-attacker" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-cowok-session-token": attackerSession,
+        },
         body: JSON.stringify({ screenKey: "SCR-1", title: "Target Screen" }),
       });
 

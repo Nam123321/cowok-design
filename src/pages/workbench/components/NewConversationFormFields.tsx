@@ -60,7 +60,7 @@ const ProvenanceSelector: React.FC<{
         </button>
         <button type="button" onClick={() => onChangeProvenance("scratch")} style={cardOptionStyle(provenance === "scratch")}>
           <div style={{ fontSize: "11.5px", fontWeight: 600, marginBottom: "2px", display: "flex", alignItems: "center", gap: "5px" }}>
-            <BrandIcon name="sparkles" size={12} color="var(--agent-accent)" />
+            <BrandIcon name="ai-agent" size={14} color="var(--agent-accent)" />
             <span>{t("workbench.managedScratchTitle", "Managed Scratch")}</span>
           </div>
           <div style={{ fontSize: "10px", color: "var(--text-muted)", lineHeight: "1.35" }}>

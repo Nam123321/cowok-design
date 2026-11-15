@@ -75,6 +75,23 @@ function fetchSnapshotSingleflight(projectId: string) {
   return request;
 }
 
+async function applyRemoteSnapshotOrSeed(
+  resolvedProjectId: string,
+  store: ReturnType<typeof createNewFlowWorkbenchStore>,
+  remoteSnap: Awaited<ReturnType<typeof fetchSnapshotSingleflight>>
+): Promise<void> {
+  if (remoteSnap.nodes.length > 0 || remoteSnap.transitions.length > 0 || remoteSnap.graphVersion > 1) {
+    store.hydrateFromSnapshot(remoteSnap, true);
+    return;
+  }
+  if (store.getState().nodes.length > 0 && resolvedProjectId === DEFAULT_FLOW_PROJECT_ID) {
+    store.hydrateFromSnapshot(remoteSnap, false);
+    await seedVirginDefaultGraph(resolvedProjectId, store);
+  } else {
+    store.hydrateFromSnapshot(remoteSnap, true);
+  }
+}
+
 function useRemoteProjectHydration(
   resolvedProjectId: string,
   store: ReturnType<typeof createNewFlowWorkbenchStore>
@@ -99,15 +116,7 @@ function useRemoteProjectHydration(
         if (cancelled) return;
         hydratedProjectRef.current = resolvedProjectId;
         store.setNetworkSyncEnabled(true, resolvedProjectId);
-        if (remoteSnap.nodes.length > 0 || remoteSnap.transitions.length > 0 || remoteSnap.graphVersion > 1) {
-          store.hydrateFromSnapshot(remoteSnap, true);
-          if (!cancelled) setIsFlowHydrated(true);
-          return;
-        }
-        if (store.getState().nodes.length > 0) {
-          store.hydrateFromSnapshot(remoteSnap, false);
-          await seedVirginDefaultGraph(resolvedProjectId, store);
-        }
+        await applyRemoteSnapshotOrSeed(resolvedProjectId, store, remoteSnap);
         if (!cancelled) setIsFlowHydrated(true);
       })
       .catch(() => {

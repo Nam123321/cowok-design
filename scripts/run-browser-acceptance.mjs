@@ -39,8 +39,10 @@ async function waitForDaemonHealth(port, childProc, logPath) {
         console.log(`✅ [acceptance-runner] harness-daemon healthy on port ${port} (attempt ${i}/30).`);
         return;
       }
-    } catch {
-      // Daemon socket opening
+    } catch (err) {
+      if (i === 30) {
+        console.warn(`[acceptance-runner] Last health probe error: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
@@ -117,8 +119,8 @@ async function main() {
         stdio: 'ignore',
       });
       console.log('🔓 [acceptance-runner] Released worktree ports.');
-    } catch {
-      // Ignore release error
+    } catch (err) {
+      console.warn(`[acceptance-runner] Warning releasing worktree port 04.1: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

@@ -3,7 +3,11 @@ import { z } from "zod";
 import {
   AgentSettingDto,
   AgentSettingDtoSchema,
+  CliDiagnosticItem,
+  CliDiagnosticItemSchema,
   DeleteMcpServerResponseSchema,
+  DeleteVaultKeyResponse,
+  DeleteVaultKeyResponseSchema,
   DoctorScanResponse,
   DoctorScanResponseSchema,
   ExecutionEventDto,
@@ -12,10 +16,19 @@ import {
   McpServerDtoSchema,
   PostJobEventInput,
   PostJobEventInputSchema,
+  ProbeCliInputSchema,
   UpsertAgentSettingInput,
   UpsertAgentSettingInputSchema,
   UpsertMcpServerInput,
   UpsertMcpServerInputSchema,
+  UpsertVaultKeyInput,
+  UpsertVaultKeyInputSchema,
+  VaultConfigInput,
+  VaultConfigInputSchema,
+  VaultConfigResponse,
+  VaultConfigResponseSchema,
+  VaultKeyDto,
+  VaultKeyDtoSchema,
   VerifyProviderKeyInput,
   VerifyProviderKeyInputSchema,
   VerifyProviderKeyResponse,
@@ -59,6 +72,48 @@ export class WorkbenchSettingsClient extends HarnessDaemonTransport {
   scanDoctor(): Promise<DoctorScanResponse> {
     return this.request("/api/doctor", DoctorScanResponseSchema, { method: "GET" });
   }
+
+  getDoctorCliMatrix(mode: "passive" | "active" = "passive"): Promise<DoctorScanResponse> {
+    const qs = mode === "active" ? "?mode=active" : "";
+    return this.request(`/api/doctor/cli-matrix${qs}`, DoctorScanResponseSchema, { method: "GET" });
+  }
+
+  probeCliTool(cliId: string): Promise<CliDiagnosticItem> {
+    const validated = ProbeCliInputSchema.parse({ cliId });
+    return this.request("/api/doctor/probe-cli", CliDiagnosticItemSchema, {
+      method: "POST",
+      body: JSON.stringify(validated),
+    });
+  }
+
+  listVaultKeys(): Promise<VaultKeyDto[]> {
+    return this.request("/api/vault/keys", z.array(VaultKeyDtoSchema), { method: "GET" });
+  }
+
+  upsertVaultKey(input: UpsertVaultKeyInput): Promise<VaultKeyDto> {
+    const validated = UpsertVaultKeyInputSchema.parse(input);
+    return this.request("/api/vault/keys", VaultKeyDtoSchema, {
+      method: "POST",
+      body: JSON.stringify(validated),
+    });
+  }
+
+  deleteVaultKey(keyId: string): Promise<DeleteVaultKeyResponse> {
+    return this.request(
+      `/api/vault/keys/${encodeURIComponent(keyId)}`,
+      DeleteVaultKeyResponseSchema,
+      { method: "DELETE" }
+    );
+  }
+
+  updateVaultConfig(input: VaultConfigInput): Promise<VaultConfigResponse> {
+    const validated = VaultConfigInputSchema.parse(input);
+    return this.request("/api/settings/vault", VaultConfigResponseSchema, {
+      method: "PUT",
+      body: JSON.stringify(validated),
+    });
+  }
+
 
   verifyProviderKey(input: VerifyProviderKeyInput): Promise<VerifyProviderKeyResponse> {
     const validated = VerifyProviderKeyInputSchema.parse(input);

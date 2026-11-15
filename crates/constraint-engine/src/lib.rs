@@ -1340,7 +1340,19 @@ impl AstLinter {
                         .and_then(Self::parse_static_css_color),
                 ) {
                     (Some(fg), Some(bg)) => Self::wcag_contrast_ratio(fg, bg),
-                    _ => contract.min_wcag_contrast,
+                    _ => {
+                        if sample.color.is_some() || sample.background_color.is_some() {
+                            let (line, col) = byte_to_line_col(sample.span.start as usize);
+                            violations.push(ConstraintViolation {
+                                rule_code: "UNVERIFIED_DYNAMIC_CONTRAST".to_string(),
+                                severity: "WARNING".to_string(),
+                                message: "Dynamic or partial color/backgroundColor cannot be statically verified for WCAG contrast; prefer paired static hex/rgb tokens or verifiable theme vars".to_string(),
+                                line: Some(line),
+                                column: Some(col),
+                            });
+                        }
+                        contract.min_wcag_contrast
+                    }
                 };
                 if let Err(errs) = IconValidator::validate_typography(
                     contract,

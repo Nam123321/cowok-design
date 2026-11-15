@@ -25,6 +25,20 @@ export {
   useWorkbenchSettings,
 } from "./useWorkbenchSettingsStorage";
 
+export function resolveTargetProjectId(projectId?: string | null): string | null {
+  if (projectId && projectId.trim().length > 0) return projectId.trim();
+  if (typeof window !== "undefined") {
+    const bootstrapDefault = (window as unknown as { __COWOK_BOOTSTRAP__?: { defaultProjectId?: string } })
+      .__COWOK_BOOTSTRAP__?.defaultProjectId;
+    if (bootstrapDefault && bootstrapDefault.trim().length > 0) return bootstrapDefault.trim();
+    const stored =
+      window.localStorage.getItem("cowok:active-project-id") ||
+      window.localStorage.getItem("cowok.activeProjectId");
+    if (stored && stored.trim().length > 0) return stored.trim();
+  }
+  return null;
+}
+
 function buildNewProjectObjects(input: {
   projectName: string;
   initialTitle: string;
@@ -34,7 +48,7 @@ function buildNewProjectObjects(input: {
   managedSlug?: string;
 }): { newProj: WorkbenchProject; newSession: ChatSession; slug: string } {
   const newProjId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : DEFAULT_FLOW_PROJECT_ID;
-  const newSessionId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : "22222222-2222-4222-8222-222222222299";
+  const newSessionId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `session-${Date.now()}`;
   const slug = toManagedSlug(input.managedSlug || input.projectName);
   const resolvedPath = input.localPath || (input.provenance === "scratch" ? `~/.cowok-design/projects/${slug}` : `~/CowokProjects/${slug}`);
   return {

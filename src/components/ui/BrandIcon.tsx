@@ -57,6 +57,7 @@ export const BrandIcon: React.FC<BrandIconProps> = (props) => {
         style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", color, ...style }}
         aria-label={resolvedLabel}
         title={title}
+        data-icon-name={normalizedKey}
       >
         {specialRenderer({ size: numSize, strokeWidth })}
       </span>

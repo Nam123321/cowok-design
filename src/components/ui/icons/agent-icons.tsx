@@ -59,8 +59,6 @@ export const AGENT_ICON_COMPONENTS = {
   mcp: PluginIcon,
   tool: ToolIcon,
   tools: ToolIcon,
-  "ai-agent": AiAgentIcon,
-  agent: AiAgentIcon,
   proposal: ProposalIcon,
   draft: DraftIcon,
   shield: ShieldCheckIcon,

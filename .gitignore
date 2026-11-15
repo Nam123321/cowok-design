@@ -32,3 +32,6 @@ playwright-report/
 .staging/
 .worktrees/
 _SSOT
+__pycache__/
+*.pyc
+.profile.lock

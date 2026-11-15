@@ -5,11 +5,13 @@ import path from "node:path";
 test.describe("Story 04.1: Unified DualMainPanel Workbench, Rust SQLite WAL SSOT & Cowok Minimalist UX", () => {
   test("verifies live SQLite WAL deploy-draft persistence, Cowok Night Mode minimalist tabs/composer, PD-02=A 40px rail, and CSP-B iframe sandbox", async ({
     page,
-  }) => {
-    const evidenceDir = path.resolve(
-      process.cwd(),
-      "_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-04/Story-04.1/qa/evidence"
-    );
+  }, testInfo) => {
+    const evidenceDir = process.env.CI
+      ? testInfo.outputDir
+      : path.resolve(
+          process.cwd(),
+          "_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-04/Story-04.1/qa/evidence"
+        );
     fs.mkdirSync(evidenceDir, { recursive: true });
 
     await page.setViewportSize({ width: 1440, height: 900 });

@@ -1,7 +1,7 @@
 // @story 05.3
-import { guardedRoute } from "../../../../../../../lib/api-guard";
-import { forwardFromGuardedContext } from "../../../../../../../lib/daemon-client";
-import { RevertSnapshotSchema } from "../../../../../../../lib/validations/version-snapshot";
+import { guardedRoute } from "@/lib/api-guard";
+import { forwardFromGuardedContext } from "@/lib/daemon-client";
+import { RevertSnapshotSchema } from "@/lib/validations/version-snapshot";
 
 export const POST = guardedRoute(
   (req, ctx, { body }) => {
@@ -10,7 +10,7 @@ export const POST = guardedRoute(
     return forwardFromGuardedContext(
       req,
       ctx,
-      `/api/v1/projects/${projectId}/snapshots/${encodeURIComponent(snapshotId)}/revert`,
+      `/api/v1/projects/${encodeURIComponent(projectId)}/snapshots/${encodeURIComponent(snapshotId)}/revert`,
       body
     );
   },

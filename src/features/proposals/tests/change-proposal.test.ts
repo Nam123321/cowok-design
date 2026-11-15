@@ -3,6 +3,8 @@ import {
   CreateProposalSchema,
   ChangeProposalResponseSchema,
   toRustChangeProposalV1,
+  ValidateProposalSchema,
+  RejectProposalSchema,
 } from "../../../lib/validations/change-proposal";
 import {
   computeUnifiedDiff,
@@ -200,6 +202,36 @@ describe("Story 05.2: Sandboxed ChangeProposal Diff, Validation Gate & One-Click
       });
       expect(valid.title).toBe("Tối ưu hóa UI Cart");
       expect(() => CreateProposalSchema.parse({ title: "", files: [] })).toThrow();
+    });
+
+    it("should validate ValidateProposalSchema and RejectProposalSchema strictly via Zod", () => {
+      const defaultValidate = ValidateProposalSchema.parse({});
+      expect(defaultValidate.dryRun).toBe(false);
+
+      const dryRunValidate = ValidateProposalSchema.parse({ dryRun: true });
+      expect(dryRunValidate.dryRun).toBe(true);
+
+      const defaultReject = RejectProposalSchema.parse({});
+      expect(defaultReject.reason).toBeUndefined();
+
+      const reasonedReject = RejectProposalSchema.parse({ reason: "Architecture mismatch" });
+      expect(reasonedReject.reason).toBe("Architecture mismatch");
+    });
+
+    it("should fail-closed on spaced eval and Function dynamic execution patterns", () => {
+      const spacedEval = [
+        computeUnifiedDiff("src/SpacedEval.tsx", "", "export const x = () => eval  ('alert(1)');"),
+      ];
+      const resEval = runValidationChecks(spacedEval);
+      expect(resEval.validationStatus).toBe("failed");
+      expect(resEval.checks.find((c) => c.checkType === "ast_lint")?.status).toBe("failed");
+
+      const funcEval = [
+        computeUnifiedDiff("src/FuncEval.tsx", "", "export const run = () => Function('return 1')();"),
+      ];
+      const resFunc = runValidationChecks(funcEval);
+      expect(resFunc.validationStatus).toBe("failed");
+      expect(resFunc.checks.find((c) => c.checkType === "ast_lint")?.status).toBe("failed");
     });
   });
 
