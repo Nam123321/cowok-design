@@ -26,3 +26,7 @@
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-14 | 2.0.0 | Replaced stale pre-split Nov 7 review with fresh Edge Case Guardian + Cross-Model Ambiguity scan against `master` (`f7d03c1`), resolving all `EC-04.2-F1..F7` findings into `story.md`/`data-spec.md`/`ui-spec.md`. | Edge Case Guardian (`review-agent-persona`) |
+---
+
+## 3. Formal-verify candidates Triage
+- **Formal-verify candidates:** `FsJailAndV7Migration` (`_iwish/verification/formal-specs/Story-04.2/FsJailAndV7Migration.tla`), TLC-verified (54 model states, 44 distinct chart states; `FkRestoredAfterMigration` & `JailNeverProvisionsUnsafeTarget` hold; mutation check caught `inodeChanged` guard omission).

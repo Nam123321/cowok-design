@@ -12,3 +12,7 @@
 
 ## 2. Final Verdict
 **VERDICT: PASS / APPROVED**
+---
+
+## 3. Formal-verify candidates Triage
+- **Formal-verify candidates:** Stage 1/3A deferred triage (story not yet implemented): `LiveSpecAtomicHotApplyRollback` (atomic `$UIUX_LIVE_SPEC` swap with invalid-JSON rollback and `Cmd+Z` stack) to be evaluated at Stage 3A.

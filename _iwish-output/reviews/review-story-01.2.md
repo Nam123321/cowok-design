@@ -16,3 +16,7 @@
 
 ## 2. Final Verdict
 **VERDICT: PASS / APPROVED** (Reconciled 2026-11-13 via `/audit-360` + `/party-mode`)
+---
+
+## 3. Formal-verify candidates Triage
+- **Formal-verify candidates:** `SpecWriteIntentWalSync` (`_iwish/verification/formal-specs/Story-01.2/SpecWriteIntentWalSync.tla`), TLC-verified (43 model states, 29 distinct chart states; `MutualExclusion`, `DbDiskConsistentWhenSettled`, `AbortedLeavesNoPartialWrite` hold; mutation check caught `lockOwner='none'` omission with `MutualExclusion` broken).

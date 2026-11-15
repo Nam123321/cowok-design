@@ -4,7 +4,7 @@ id: "03.3"
 title: "Story 03.3: Deterministic data-ff-id AST Injector & <1ms Surgical Patcher"
 description: "Tự động gắn thuộc tính data-ff-id ổn định vào các nút DOM/JSX và cung cấp hàm patch_by_ff_id cập nhật chữ, số liệu hoặc biến CSS trong <1ms với 0 token LLM."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-03/Story-03.3/story.md"
-status: planned
+status: completed
 risk_tier: 3
 delivery: core
 timestamp: "2026-11-02T13:30:00+07:00"
@@ -27,7 +27,7 @@ consumes_apis: []
 
 - **FR Covered:** [FR-10: Deterministic data-ff-id AST Injector & <1ms Surgical Patcher](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 03: Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-03/epic.md)
-- **Status:** `planned`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context
@@ -42,9 +42,9 @@ Tự động gắn thuộc tính data-ff-id ổn định vào các nút DOM/JSX 
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Bảo toàn hoàn toàn cấu trúc cây cú pháp AST và định dạng code xung quanh khi vá nội dung chứa ký tự đặc biệt hoặc đa dòng.
 
 ## 4. Tasks
-- [ ] **Task 03.3.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Deterministic data-ff-id AST Injector & <1ms Surgical Patcher" (thỏa mãn `AC-01`).
-- [ ] **Task 03.3.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
-- [ ] **Task 03.3.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
+- [x] **Task 03.3.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Deterministic data-ff-id AST Injector & <1ms Surgical Patcher" (thỏa mãn `AC-01`).
+- [x] **Task 03.3.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
+- [x] **Task 03.3.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
 
 ## 5. AC-to-Task Traceability Matrix
 
