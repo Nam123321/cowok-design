@@ -13,6 +13,6 @@ export default defineConfig({
   test: {
     globalSetup: ["./vitest.globalSetup.ts"],
     include: ["**/*.test.ts", "**/*.test.tsx"],
-    exclude: ["**/node_modules/**", "**/dist/**", "**/.agent/**"],
+    exclude: ["**/node_modules/**", "**/dist/**", "**/.agent/**", "**/.worktrees/**"],
   },
 });

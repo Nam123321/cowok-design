@@ -13,7 +13,7 @@ export default defineConfig({
     baseURL: process.env.BASE_URL || `http://127.0.0.1:${targetPort}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: process.env.CI ? 'retain-on-failure' : 'off',
+    video: process.env.RECORD_VIDEO === 'on' ? 'on' : (process.env.CI ? 'retain-on-failure' : 'off'),
   },
   webServer: {
     command: `pnpm run preview --port ${targetPort} --host 127.0.0.1`,

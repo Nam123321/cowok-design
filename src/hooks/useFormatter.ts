@@ -4,6 +4,8 @@
  * Zero raw .toLocaleString() / .toLocaleTimeString() inside UI components.
  */
 
+import { getGlobalLocale } from "./useTranslation";
+
 export interface FormatterOptions {
   locale?: string;
   currency?: string;
@@ -11,7 +13,8 @@ export interface FormatterOptions {
 }
 
 export function useFormatter(options?: FormatterOptions) {
-  const locale = options?.locale || "vi-VN";
+  const activeLocale = typeof window !== "undefined" ? getGlobalLocale() : "vi-VN";
+  const locale = options?.locale || activeLocale || "vi-VN";
   const currency = options?.currency || "USD";
 
   const formatNumber = (val: number, decimals = 0): string => {
