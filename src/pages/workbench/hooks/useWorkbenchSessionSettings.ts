@@ -8,6 +8,10 @@ import type { ProjectDto } from "../../../lib/validations/harness-daemon";
 import { DEFAULT_FLOW_PROJECT_ID, type WorkbenchProject } from "../constants";
 import type { ChatSession } from "../types";
 import {
+  readPinnedSessionIds,
+  writePinnedSessionIds,
+} from "./usePinnedSessionsStorage";
+import {
   collectFetchedProjectSessions,
   extractDaemonErrorMessage,
   mapDtoToWorkbenchProject,
@@ -110,9 +114,12 @@ function useSessionCrudActions(deps: SessionCrudDeps) {
     showToast({ kind: "danger", message: extractDaemonErrorMessage(err, t("workbench.daemonActionError", "Lỗi đồng bộ Daemon SQLite V7")) });
   }, [showToast, t]);
 
-  // Pin state is UI-only because SQLite `chat_sessions` has no `is_pinned` column.
   const handleTogglePinSession = useCallback((id: string) => {
-    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, isPinned: !s.isPinned } : s)));
+    setSessions((prev) => {
+      const next = prev.map((s) => (s.id === id ? { ...s, isPinned: !s.isPinned } : s));
+      writePinnedSessionIds(next);
+      return next;
+    });
   }, [setSessions]);
 
   const handleRenameSession = useCallback((id: string, title: string) => {
@@ -137,10 +144,12 @@ function useSessionCrudActions(deps: SessionCrudDeps) {
     const target = prevSessions.find((s) => s.id === id);
     const remaining = prevSessions.filter((s) => s.id !== id);
     setSessions(remaining);
+    writePinnedSessionIds(remaining);
     if (prevActSess === id && remaining.length > 0) setActiveSessionIdState(remaining[0].id);
     if (target?.projectId) {
       void apiHarnessDaemon.deleteSession(target.projectId, id).catch((err) => {
         setSessions(prevSessions);
+        writePinnedSessionIds(prevSessions);
         setActiveSessionIdState(prevActSess);
         notifyErr(err);
       });
@@ -199,7 +208,9 @@ function useInitialProjectHydration(args: {
         const settled = await Promise.allSettled(mappedProjs.map(async (proj) => ({ projId: proj.id, sessList: await apiHarnessDaemon.listSessions(proj.id) })));
         if (cancelled) return;
         const { fetchedByProject, allFetchedSessions, seenIds } = collectFetchedProjectSessions(settled, formatTime);
-        setSessions((prev) => [...allFetchedSessions, ...prev.filter((ex) => isGenuineStandaloneSession(ex) && !seenIds.has(ex.id))]);
+        const pinnedIds = readPinnedSessionIds();
+        const hydratedFetched = allFetchedSessions.map((s) => (pinnedIds.has(s.id) ? { ...s, isPinned: true } : s));
+        setSessions((prev) => [...hydratedFetched, ...prev.filter((ex) => isGenuineStandaloneSession(ex) && !seenIds.has(ex.id))]);
         const targetSessions = fetchedByProject.get(targetProjId) || allFetchedSessions;
         setActiveSessionIdState(targetSessions[0]?.id || "");
       } catch (err) {

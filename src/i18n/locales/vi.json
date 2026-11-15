@@ -243,8 +243,8 @@
     "cronTriggers": "Lịch chạy định kỳ (Cron)",
     "saveBtn": "Lưu thay đổi",
     "closeBtn": "Đóng",
-    "autoSnapshotTitle": "Tự động chụp State & Graph AST (Auto-Snapshot)",
-    "autoSnapshotDesc": "Mỗi 5 phút • Tự động ghi nhận delta đồ thị 2D DAG",
+    "autoSnapshotTitle": "Chụp Snapshot State & Graph AST",
+    "autoSnapshotDesc": "Chỉ chạy thủ công • Bấm Snapshot từ thanh công cụ hoặc Flow Workbench",
     "bearerPlaceholder": "Bearer token (chỉ giữ trong phiên)",
     "cancelBtn": "Hủy",
     "enterKeyOrEndpoint": "Vui lòng nhập Key hoặc Endpoint",
@@ -281,8 +281,8 @@
     "daemonStatusOnline": "TRỰC TUYẾN",
     "daemonStatusOffline": "NGOẠI TUYẾN",
     "daemonStatusChecking": "ĐANG KIỂM TRA",
-    "snapshotCadenceReady": "SẴN SÀNG · 5P",
-    "snapshotCadencePaused": "CHỜ LỆNH"
+    "snapshotCadenceReady": "THỦ CÔNG · MANUAL ONLY",
+    "snapshotCadencePaused": "CHƯA LẬP LỊCH"
   },
   "flow": {
     "dagCanvas": "Khung đồ thị DAG 2D",

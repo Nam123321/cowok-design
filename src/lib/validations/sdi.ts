@@ -58,13 +58,22 @@ export interface RustDesignIntentV1 {
   key_principles: string[];
 }
 
-export function toRustDesignIntentV1(intent: DesignIntentResponse): RustDesignIntentV1 {
+export function toRustDesignIntentV1(
+  intent: DesignIntentResponse,
+  tokens?: {
+    visualStyle?: string;
+    colorPalette?: string[];
+    typography?: string[];
+  }
+): RustDesignIntentV1 {
   return {
     id: intent.id,
     project_id: intent.projectId,
-    visual_style: "clean-modern",
-    color_palette: ["#3B82F6", "#10B981", "#F59E0B"],
-    typography: ["Inter", "sans-serif"],
+    visual_style: tokens?.visualStyle ?? "design-token-governed",
+    color_palette: tokens?.colorPalette?.length
+      ? tokens.colorPalette
+      : ["var(--accent-primary)", "var(--accent-success)", "var(--accent-warning)"],
+    typography: tokens?.typography?.length ? tokens.typography : ["system-ui", "sans-serif"],
     key_principles: [
       `Intent: ${intent.intentType}`,
       `Prompt: ${intent.rawPrompt}`,

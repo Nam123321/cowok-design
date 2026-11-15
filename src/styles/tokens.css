@@ -16,6 +16,11 @@
   /* Global App Font Size (12px / 13px / 14px / 15px configurable in Settings) */
   --app-font-size: 13px;
 
+  /* Brand Symbol Fixed Accents */
+  --accent-cyan: #00D4FF;
+  --text-inverse: #FFFFFF;
+  --cw-navy-deep: #081E3A;
+
   /* Spacing Scale (4px Base Grid) */
   --space-1: 4px;
   --space-2: 8px;

@@ -1,9 +1,11 @@
 // @story 04.3
 // @implements AC-03 (OS Keychain + Argon2id + AES-256-GCM 0o600 Vault Custody & Anti-Downgrade)
-use std::collections::BTreeMap;
-use std::fs::{self, OpenOptions};
+use std::collections::{BTreeMap, HashMap};
+use std::ffi::CString;
+use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
@@ -13,10 +15,16 @@ use base64::Engine;
 use rand::rngs::OsRng;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
+use zeroize::Zeroizing;
 
 #[cfg(unix)]
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::os::unix::ffi::OsStrExt;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
+use std::os::unix::io::{FromRawFd, OwnedFd};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +43,48 @@ pub struct VaultPayload {
     pub secrets: BTreeMap<String, String>,
 }
 
+type RamVaultMap = HashMap<(String, String), Zeroizing<String>>;
+
+#[derive(Debug, Clone, Default)]
+pub struct RamVaultStore {
+    inner: Arc<RwLock<RamVaultMap>>,
+}
+
+impl RamVaultStore {
+    pub fn upsert(&self, tenant_id: &str, provider_id: &str, secret: &str) {
+        if let Ok(mut guard) = self.inner.write() {
+            guard.insert(
+                (tenant_id.to_string(), provider_id.to_ascii_lowercase()),
+                Zeroizing::new(secret.to_string()),
+            );
+        }
+    }
+
+    pub fn remove(&self, tenant_id: &str, provider_id: &str) -> bool {
+        if let Ok(mut guard) = self.inner.write() {
+            return guard
+                .remove(&(tenant_id.to_string(), provider_id.to_ascii_lowercase()))
+                .is_some();
+        }
+        false
+    }
+
+    pub fn contains(&self, tenant_id: &str, provider_id: &str) -> bool {
+        self.inner
+            .read()
+            .map(|guard| {
+                guard.contains_key(&(tenant_id.to_string(), provider_id.to_ascii_lowercase()))
+            })
+            .unwrap_or(false)
+    }
+
+    pub fn clear_tenant(&self, tenant_id: &str) {
+        if let Ok(mut guard) = self.inner.write() {
+            guard.retain(|(tid, _), _| tid != tenant_id);
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct VaultStore {
     cowok_dir: PathBuf,
@@ -45,9 +95,27 @@ pub struct VaultStore {
 impl VaultStore {
     pub fn from_workspace_root(workspace_root: &Path) -> Self {
         let cowok_dir = workspace_root.join(".cowok-design");
+        let ws_canon =
+            fs::canonicalize(workspace_root).unwrap_or_else(|_| workspace_root.to_path_buf());
+        let mut hasher = Sha256::new();
+        hasher.update(ws_canon.to_string_lossy().as_bytes());
+        let digest = hasher.finalize();
+        let ws_hash: String = digest.iter().take(12).map(|b| format!("{b:02x}")).collect();
+
+        // Keep key custody OUTSIDE workspace `.cowok-design/` so repository/workspace backups never co-bundle key + ciphertext
+        let key_dir = std::env::var_os("COWOK_VAULT_KEY_DIR")
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOME")
+                    .filter(|v| !v.is_empty())
+                    .map(|h| PathBuf::from(h).join(".config/cowok-design/keys"))
+            })
+            .unwrap_or_else(|| std::env::temp_dir().join("cowok-design-keys"));
+
         Self {
             vault_path: cowok_dir.join("vault.enc"),
-            master_key_path: cowok_dir.join("vault.key"),
+            master_key_path: key_dir.join(format!("{ws_hash}.key")),
             cowok_dir,
         }
     }
@@ -56,8 +124,12 @@ impl VaultStore {
         &self.vault_path
     }
 
-    /// Returns true if `.cowok-design/vault.enc` (or `.cowok-design/` directory) is writable.
-    /// Used by anti-downgrade guard (409 VAULT_DOWNGRADE_FORBIDDEN on `ephemeral`).
+    pub fn master_key_path(&self) -> &Path {
+        &self.master_key_path
+    }
+
+    /// Pure read-only check: returns true if `.cowok-design/vault.enc` (or existing parent dir) is writable
+    /// without mutating filesystem state (`create_dir_all` forbidden in check).
     pub fn is_vault_writable(&self) -> bool {
         if let Ok(meta) = fs::symlink_metadata(&self.vault_path) {
             if meta.file_type().is_symlink() {
@@ -65,28 +137,92 @@ impl VaultStore {
             }
             return !meta.permissions().readonly();
         }
-        if fs::create_dir_all(&self.cowok_dir).is_err() {
+        let check_dir = if self.cowok_dir.exists() {
+            if fs::symlink_metadata(&self.cowok_dir)
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(true)
+            {
+                return false;
+            }
+            &self.cowok_dir
+        } else if let Some(parent) = self.cowok_dir.parent() {
+            if !parent.exists()
+                || fs::symlink_metadata(parent)
+                    .map(|m| m.file_type().is_symlink())
+                    .unwrap_or(true)
+            {
+                return false;
+            }
+            parent
+        } else {
             return false;
-        }
+        };
+
         #[cfg(unix)]
         {
-            if let Ok(meta) = fs::metadata(&self.cowok_dir) {
+            if let Ok(meta) = fs::symlink_metadata(check_dir) {
                 let mode = meta.permissions().mode();
-                // Owner write bit (0o200)
                 return (mode & 0o200) != 0 && !meta.permissions().readonly();
             }
+            false
         }
-        true
+        #[cfg(not(unix))]
+        {
+            fs::metadata(check_dir)
+                .map(|m| !m.permissions().readonly())
+                .unwrap_or(false)
+        }
     }
 
     fn ensure_cowok_dir(&self) -> Result<(), String> {
+        if let Ok(meta) = fs::symlink_metadata(&self.cowok_dir) {
+            if meta.file_type().is_symlink() || !meta.is_dir() {
+                return Err(
+                    "Security violation: .cowok-design is a symlink or non-directory".into(),
+                );
+            }
+        }
         fs::create_dir_all(&self.cowok_dir)
             .map_err(|e| format!("Failed creating .cowok-design dir: {e}"))?;
+        let meta = fs::symlink_metadata(&self.cowok_dir)
+            .map_err(|e| format!("Failed inspecting .cowok-design dir: {e}"))?;
+        if meta.file_type().is_symlink() || !meta.is_dir() {
+            return Err("Security violation: .cowok-design became a symlink".into());
+        }
         #[cfg(unix)]
         {
-            let _ = fs::set_permissions(&self.cowok_dir, fs::Permissions::from_mode(0o700));
+            fs::set_permissions(&self.cowok_dir, fs::Permissions::from_mode(0o700))
+                .map_err(|e| format!("Failed enforcing 0700 on .cowok-design: {e}"))?;
         }
         Ok(())
+    }
+
+    #[cfg(unix)]
+    fn open_parent_dir_nofollow(parent: &Path) -> Result<OwnedFd, String> {
+        if let Ok(meta) = fs::symlink_metadata(parent) {
+            if meta.file_type().is_symlink() || !meta.is_dir() {
+                return Err(format!(
+                    "Security violation: vault parent '{}' is a symlink or non-directory",
+                    parent.display()
+                ));
+            }
+        }
+        let c_parent = CString::new(parent.as_os_str().as_bytes())
+            .map_err(|_| "Invalid NUL byte in vault parent path".to_string())?;
+        let fd = unsafe {
+            libc::open(
+                c_parent.as_ptr(),
+                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        };
+        if fd < 0 {
+            return Err(format!(
+                "Failed opening vault parent dir '{}' with O_NOFOLLOW: {}",
+                parent.display(),
+                std::io::Error::last_os_error()
+            ));
+        }
+        Ok(unsafe { OwnedFd::from_raw_fd(fd) })
     }
 
     fn write_atomic_0600(target: &Path, bytes: &[u8]) -> Result<(), String> {
@@ -94,89 +230,147 @@ impl VaultStore {
             .parent()
             .ok_or_else(|| "Vault target path missing parent dir".to_string())?;
         fs::create_dir_all(parent).map_err(|e| format!("Failed creating parent vault dir: {e}"))?;
-
-        let tmp_name = format!(
-            ".{}.tmp.{}",
-            target
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("vault"),
-            Uuid::new_v4()
-        );
-        let tmp_path = parent.join(tmp_name);
-
-        let mut opts = OpenOptions::new();
-        opts.write(true).create_new(true);
         #[cfg(unix)]
         {
-            opts.mode(0o600);
+            let _ = fs::set_permissions(parent, fs::Permissions::from_mode(0o700));
         }
 
-        let mut f = opts
-            .open(&tmp_path)
-            .map_err(|e| format!("Failed opening temp 0o600 vault file: {e}"))?;
-        if let Err(e) = f.write_all(bytes).and_then(|_| f.sync_all()) {
-            let _ = fs::remove_file(&tmp_path);
-            return Err(format!("Failed writing/syncing temp vault file: {e}"));
-        }
-        drop(f);
+        let target_name = target
+            .file_name()
+            .and_then(|n| n.to_str())
+            .filter(|n| !n.is_empty())
+            .ok_or_else(|| "Vault target path missing filename".to_string())?;
+        let tmp_name = format!(".{target_name}.tmp.{}", Uuid::new_v4());
+        let tmp_path = parent.join(&tmp_name);
 
         #[cfg(unix)]
         {
-            fs::set_permissions(&tmp_path, fs::Permissions::from_mode(0o600))
-                .map_err(|e| format!("Failed enforcing 0o600 on temp vault file: {e}"))?;
-        }
-
-        fs::rename(&tmp_path, target).map_err(|e| {
-            let _ = fs::remove_file(&tmp_path);
-            format!("Failed atomic rename of vault file: {e}")
-        })?;
-
-        #[cfg(unix)]
-        {
+            use std::os::unix::io::AsRawFd;
+            if let Ok(meta) = fs::symlink_metadata(target) {
+                if meta.file_type().is_symlink() {
+                    return Err(format!(
+                        "Security violation: target vault file '{}' is a symlink",
+                        target.display()
+                    ));
+                }
+            }
+            let dir_fd = Self::open_parent_dir_nofollow(parent)?;
+            let c_tmp = CString::new(tmp_name.as_bytes())
+                .map_err(|_| "Invalid NUL byte in temp filename".to_string())?;
+            let c_target = CString::new(target_name.as_bytes())
+                .map_err(|_| "Invalid NUL byte in target filename".to_string())?;
+            let fd = unsafe {
+                libc::openat(
+                    dir_fd.as_raw_fd(),
+                    c_tmp.as_ptr(),
+                    libc::O_WRONLY
+                        | libc::O_CREAT
+                        | libc::O_EXCL
+                        | libc::O_NOFOLLOW
+                        | libc::O_CLOEXEC,
+                    0o600 as libc::c_uint,
+                )
+            };
+            if fd < 0 {
+                return Err(format!(
+                    "Failed creating 0o600 vault temp file via O_NOFOLLOW: {}",
+                    std::io::Error::last_os_error()
+                ));
+            }
+            let mut file = unsafe { File::from_raw_fd(fd) };
+            if let Err(e) = file.write_all(bytes).and_then(|_| file.sync_all()) {
+                drop(file);
+                unsafe {
+                    libc::unlinkat(dir_fd.as_raw_fd(), c_tmp.as_ptr(), 0);
+                }
+                return Err(format!("Failed writing/syncing temp vault file: {e}"));
+            }
+            drop(file);
+            if unsafe {
+                libc::renameat(
+                    dir_fd.as_raw_fd(),
+                    c_tmp.as_ptr(),
+                    dir_fd.as_raw_fd(),
+                    c_target.as_ptr(),
+                )
+            } != 0
+            {
+                let err = std::io::Error::last_os_error();
+                unsafe {
+                    libc::unlinkat(dir_fd.as_raw_fd(), c_tmp.as_ptr(), 0);
+                }
+                return Err(format!("Failed atomic renameat of vault file: {err}"));
+            }
             fs::set_permissions(target, fs::Permissions::from_mode(0o600))
                 .map_err(|e| format!("Failed enforcing 0o600 on vault file: {e}"))?;
         }
+        #[cfg(not(unix))]
+        {
+            let mut f = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&tmp_path)
+                .map_err(|e| format!("Failed opening temp vault file: {e}"))?;
+            if let Err(e) = f.write_all(bytes).and_then(|_| f.sync_all()) {
+                let _ = fs::remove_file(&tmp_path);
+                return Err(format!("Failed writing/syncing temp vault file: {e}"));
+            }
+            drop(f);
+            fs::rename(&tmp_path, target).map_err(|e| {
+                let _ = fs::remove_file(&tmp_path);
+                format!("Failed atomic rename of vault file: {e}")
+            })?;
+        }
+        let _ = tmp_path;
         Ok(())
     }
 
-    fn load_or_init_machine_secret(&self) -> Result<Vec<u8>, String> {
-        self.ensure_cowok_dir()?;
+    fn load_or_init_machine_secret(&self) -> Result<Zeroizing<Vec<u8>>, String> {
+        if let Ok(test_key) = std::env::var("COWOK_VAULT_TEST_KEY") {
+            let trimmed = test_key.trim();
+            if !trimmed.is_empty() {
+                return Ok(Zeroizing::new(trimmed.as_bytes().to_vec()));
+            }
+        }
+
         if self.master_key_path.exists() {
             let meta = fs::symlink_metadata(&self.master_key_path)
-                .map_err(|e| format!("Failed checking vault.key metadata: {e}"))?;
+                .map_err(|e| format!("Failed checking vault key metadata: {e}"))?;
             if meta.file_type().is_symlink() || !meta.is_file() {
                 return Err(
-                    "Security violation: .cowok-design/vault.key is a symlink or non-file"
+                    "Security violation: vault master key path is a symlink or non-file"
                         .to_string(),
                 );
             }
-            let raw = fs::read_to_string(&self.master_key_path)
-                .map_err(|e| format!("Failed reading .cowok-design/vault.key: {e}"))?;
-            let decoded = B64
-                .decode(raw.trim())
-                .map_err(|e| format!("Corrupted .cowok-design/vault.key base64: {e}"))?;
+            let raw = Zeroizing::new(
+                fs::read_to_string(&self.master_key_path)
+                    .map_err(|e| format!("Failed reading vault master key: {e}"))?,
+            );
+            let decoded = Zeroizing::new(
+                B64.decode(raw.trim())
+                    .map_err(|e| format!("Corrupted vault master key base64: {e}"))?,
+            );
             if decoded.len() < 32 {
-                return Err("Corrupted .cowok-design/vault.key length < 32 bytes".to_string());
+                return Err("Corrupted vault master key length < 32 bytes".to_string());
             }
             return Ok(decoded);
         }
 
-        let mut secret = [0u8; 32];
-        OsRng.fill_bytes(&mut secret);
-        let encoded = B64.encode(secret);
+        let mut secret = Zeroizing::new([0u8; 32]);
+        OsRng.fill_bytes(&mut *secret);
+        let encoded = Zeroizing::new(B64.encode(*secret));
         Self::write_atomic_0600(&self.master_key_path, encoded.as_bytes())?;
-        Ok(secret.to_vec())
+        Ok(Zeroizing::new(secret.to_vec()))
     }
 
-    fn derive_aes_key(ikm: &[u8], salt: &[u8]) -> Result<[u8; 32], String> {
-        let mut derived = [0u8; 32];
+    fn derive_aes_key(ikm: &[u8], salt: &[u8]) -> Result<Zeroizing<[u8; 32]>, String> {
+        let mut derived = Zeroizing::new([0u8; 32]);
         // Argon2id with explicit moderate cost parameters suitable for fast daemon calls
         let params = argon2::Params::new(16 * 1024, 2, 1, Some(32))
             .map_err(|e| format!("Argon2id params error: {e}"))?;
         let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
         argon2
-            .hash_password_into(ikm, salt, &mut derived)
+            .hash_password_into(ikm, salt, &mut *derived)
             .map_err(|e| format!("Argon2id derivation error: {e}"))?;
         Ok(derived)
     }
@@ -186,10 +380,12 @@ impl VaultStore {
         secrets: &BTreeMap<String, String>,
         master_passphrase: Option<&str>,
     ) -> Result<(), String> {
-        let ikm = match master_passphrase.map(str::trim).filter(|s| !s.is_empty()) {
-            Some(pass) => pass.as_bytes().to_vec(),
-            None => self.load_or_init_machine_secret()?,
-        };
+        self.ensure_cowok_dir()?;
+        let ikm: Zeroizing<Vec<u8>> =
+            match master_passphrase.map(str::trim).filter(|s| !s.is_empty()) {
+                Some(pass) => Zeroizing::new(pass.as_bytes().to_vec()),
+                None => self.load_or_init_machine_secret()?,
+            };
 
         let mut salt = [0u8; 16];
         let mut nonce_bytes = [0u8; 12];
@@ -197,15 +393,17 @@ impl VaultStore {
         OsRng.fill_bytes(&mut nonce_bytes);
 
         let key_bytes = Self::derive_aes_key(&ikm, &salt)?;
-        let cipher = Aes256Gcm::new_from_slice(&key_bytes)
+        let cipher = Aes256Gcm::new_from_slice(&*key_bytes)
             .map_err(|e| format!("AES-256-GCM init error: {e}"))?;
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         let payload = VaultPayload {
             secrets: secrets.clone(),
         };
-        let plaintext = serde_json::to_vec(&payload)
-            .map_err(|e| format!("Failed serializing vault payload: {e}"))?;
+        let plaintext = Zeroizing::new(
+            serde_json::to_vec(&payload)
+                .map_err(|e| format!("Failed serializing vault payload: {e}"))?,
+        );
         let ciphertext = cipher
             .encrypt(nonce, plaintext.as_slice())
             .map_err(|e| format!("AES-256-GCM encryption failed: {e}"))?;
@@ -260,17 +458,19 @@ impl VaultStore {
             .decode(env.ciphertext_b64.trim())
             .map_err(|e| format!("Invalid vault.enc ciphertext: {e}"))?;
 
-        let ikm = match master_passphrase.map(str::trim).filter(|s| !s.is_empty()) {
-            Some(pass) => pass.as_bytes().to_vec(),
-            None => self.load_or_init_machine_secret()?,
-        };
+        let ikm: Zeroizing<Vec<u8>> =
+            match master_passphrase.map(str::trim).filter(|s| !s.is_empty()) {
+                Some(pass) => Zeroizing::new(pass.as_bytes().to_vec()),
+                None => self.load_or_init_machine_secret()?,
+            };
         let key_bytes = Self::derive_aes_key(&ikm, &salt)?;
-        let cipher = Aes256Gcm::new_from_slice(&key_bytes)
+        let cipher = Aes256Gcm::new_from_slice(&*key_bytes)
             .map_err(|e| format!("AES-256-GCM init error: {e}"))?;
         let nonce = Nonce::from_slice(&nonce_bytes);
-        let plaintext = cipher.decrypt(nonce, ciphertext.as_slice()).map_err(|_| {
-            "Vault decryption failed (invalid master key or tampered ciphertext)".to_string()
-        })?;
+        let plaintext =
+            Zeroizing::new(cipher.decrypt(nonce, ciphertext.as_slice()).map_err(|_| {
+                "Vault decryption failed (invalid master key or tampered ciphertext)".to_string()
+            })?);
         let payload: VaultPayload = serde_json::from_slice(&plaintext)
             .map_err(|e| format!("Corrupted decrypted vault payload: {e}"))?;
         Ok(payload.secrets)
@@ -282,7 +482,11 @@ impl VaultStore {
         secret: &str,
         master_passphrase: Option<&str>,
     ) -> Result<String, String> {
-        let mut secrets = self.unseal_secrets(master_passphrase).unwrap_or_default();
+        let mut secrets = if self.vault_path.exists() {
+            self.unseal_secrets(master_passphrase)?
+        } else {
+            BTreeMap::new()
+        };
         let pid = provider_id.trim().to_ascii_lowercase();
         secrets.insert(pid.clone(), secret.trim().to_string());
         self.seal_secrets(&secrets, master_passphrase)?;
@@ -301,10 +505,9 @@ impl VaultStore {
     ) -> Result<(), String> {
         let pid = provider_id.trim().to_ascii_lowercase();
         if self.vault_path.exists() {
-            if let Ok(mut secrets) = self.unseal_secrets(master_passphrase) {
-                if secrets.remove(&pid).is_some() {
-                    self.seal_secrets(&secrets, master_passphrase)?;
-                }
+            let mut secrets = self.unseal_secrets(master_passphrase)?;
+            if secrets.remove(&pid).is_some() {
+                self.seal_secrets(&secrets, master_passphrase)?;
             }
         }
         if std::env::var("COWOK_OS_KEYCHAIN").as_deref() == Ok("1") {
@@ -315,24 +518,35 @@ impl VaultStore {
 
     #[cfg(target_os = "macos")]
     fn try_store_os_keychain(&self, provider_id: &str, secret: &str) -> Result<(), String> {
-        let out = std::process::Command::new("/usr/bin/security")
-            .args([
-                "add-generic-password",
-                "-U",
-                "-s",
-                "cowok-design-byok",
-                "-a",
-                provider_id,
-                "-w",
-                secret,
-            ])
-            .stdin(std::process::Stdio::null())
-            .output()
+        if provider_id
+            .chars()
+            .any(|c| c.is_control() || c == '"' || c == '\\')
+            || secret.chars().any(|c| c.is_control())
+        {
+            return Err("Keychain item contains unsupported control characters".to_string());
+        }
+        // Pass secret via piped stdin (`security -i`) so secret NEVER appears in process CLI argv (`ps aux`)
+        let escaped_secret = secret.replace('\\', "\\\\").replace('"', "\\\"");
+        let cmd_line = Zeroizing::new(format!(
+            "add-generic-password -U -s cowok-design-byok -a \"{provider_id}\" -w \"{escaped_secret}\"\n"
+        ));
+        let mut child = std::process::Command::new("/usr/bin/security")
+            .arg("-i")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
             .map_err(|e| e.to_string())?;
-        if out.status.success() {
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(cmd_line.as_bytes())
+                .map_err(|e| e.to_string())?;
+        }
+        let status = child.wait().map_err(|e| e.to_string())?;
+        if status.success() {
             Ok(())
         } else {
-            Err("security add-generic-password failed".to_string())
+            Err("security -i add-generic-password failed".to_string())
         }
     }
 
@@ -423,6 +637,10 @@ mod tests {
             .unwrap();
 
         assert!(store.unseal_secrets(Some("wrong-passphrase")).is_err());
+        // Security invariant: wrong passphrase must NOT overwrite or wipe vault.enc
+        assert!(store
+            .upsert_secret("extra", "sk-nope", Some("wrong-passphrase"))
+            .is_err());
         let ok = store
             .unseal_secrets(Some("correct-horse-battery-staple"))
             .unwrap();
@@ -430,5 +648,23 @@ mod tests {
             ok.get("openai").map(String::as_str),
             Some("sk-test-secret-key-987654")
         );
+        // Master key path must stay outside .cowok-design/ workspace config directory
+        assert!(!store
+            .master_key_path
+            .starts_with(tmp.path().join(".cowok-design")));
+    }
+
+    #[test]
+    fn test_ram_vault_store_clears_tenant_and_is_isolated() {
+        let ram = RamVaultStore::default();
+        ram.upsert("tenant-a", "Anthropic", "sk-secret-a");
+        ram.upsert("tenant-b", "openai", "sk-secret-b");
+        assert!(ram.contains("tenant-a", "anthropic"));
+        assert!(ram.contains("tenant-b", "openai"));
+        ram.clear_tenant("tenant-a");
+        assert!(!ram.contains("tenant-a", "anthropic"));
+        assert!(ram.contains("tenant-b", "openai"));
+        assert!(ram.remove("tenant-b", "openai"));
+        assert!(!ram.contains("tenant-b", "openai"));
     }
 }

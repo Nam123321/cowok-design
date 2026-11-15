@@ -30,6 +30,7 @@ model Project {
   workspaceFiles ProjectWorkspaceFile[]
   tombstones     SpecTombstone[]
   recoveryCommits RecoveryCommit[]
+  workspaceSyncIntents WorkspaceSyncIntent[]
 
   @@index([inheritBrandFromProjectId])
   @@map("projects")
@@ -746,4 +747,51 @@ model SkillPlugin {
 
   @@unique([projectId, pluginSlug])
   @@map("skill_plugins")
+}
+
+// ============================================================================
+// Bounded Context: loopback-auth-v8 (V8 Durable Sessions, Nonces & Sync Intents)
+// ============================================================================
+
+model DaemonSession {
+  tokenSha256 String  @id @map("token_sha256")
+  tenantId    String  @default("local-default") @map("tenant_id")
+  userId      String  @default("local-operator") @map("user_id")
+  role        String
+  expiresAt   BigInt  @map("expires_at")
+  createdAt   BigInt  @map("created_at")
+  revokedAt   BigInt? @map("revoked_at")
+
+  @@index([expiresAt])
+  @@index([tenantId, userId])
+  @@map("daemon_sessions")
+}
+
+model DaemonReplayNonce {
+  nonce       String @id
+  daemonNonce String @map("daemon_nonce")
+  expiresAt   BigInt @map("expires_at")
+  seenAt      BigInt @map("seen_at")
+
+  @@index([expiresAt])
+  @@map("daemon_replay_nonces")
+}
+
+model WorkspaceSyncIntent {
+  id             String  @id @default(uuid())
+  tenantId       String  @default("local-default") @map("tenant_id")
+  projectId      String  @map("project_id")
+  intentKind     String  @map("intent_kind")
+  targetPath     String  @map("target_path")
+  expectedSha256 String? @map("expected_sha256")
+  state          String
+  fencingToken   BigInt  @default(1) @map("fencing_token")
+  createdAt      BigInt  @map("created_at")
+  updatedAt      BigInt  @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, state, createdAt])
+  @@index([tenantId, updatedAt])
+  @@map("workspace_sync_intents")
 }

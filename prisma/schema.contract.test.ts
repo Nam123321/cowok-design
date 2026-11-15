@@ -39,11 +39,45 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  // Mirror pool.rs idempotent V6/V7 column guards prior to V7 12-step rebuild
+  db.exec(`
+    ALTER TABLE projects ADD COLUMN project_code TEXT;
+    ALTER TABLE projects ADD COLUMN trash_deleted_at BIGINT;
+    ALTER TABLE projects ADD COLUMN provenance TEXT NOT NULL DEFAULT 'scratch';
+    ALTER TABLE chat_sessions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
+    ALTER TABLE chat_sessions ADD COLUMN archived_at BIGINT;
+    ALTER TABLE chat_messages ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
+    ALTER TABLE node_execution_jobs ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
+    ALTER TABLE chat_artifact_snapshots ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
+    ALTER TABLE chat_message_node_scopes ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
+    ALTER TABLE element_comments ADD COLUMN artifact_sha256 TEXT NOT NULL DEFAULT '';
+    ALTER TABLE element_comments ADD COLUMN anchor_kind TEXT NOT NULL DEFAULT 'html_element';
+    ALTER TABLE execution_events ADD COLUMN project_seq INTEGER;
+    ALTER TABLE execution_events ADD COLUMN composite_scope_key TEXT NOT NULL DEFAULT '';
+    ALTER TABLE agent_settings ADD COLUMN permission_mode TEXT NOT NULL DEFAULT 'ask-every-time';
+    ALTER TABLE agent_settings ADD COLUMN vault_mode TEXT NOT NULL DEFAULT 'keychain';
+    ALTER TABLE agent_settings ADD COLUMN onboarding_done INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE node_chat_sessions ADD COLUMN composite_scope_key TEXT NOT NULL DEFAULT '';
+    ALTER TABLE node_chat_sessions ADD COLUMN unread_count INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE node_chat_sessions ADD COLUMN last_message_id TEXT;
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V7__epic04_cas_seq_and_vault_convergence.sql"),
+      "utf-8"
+    )
+  );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V8__daemon_auth_sessions_and_nonces.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
 
-describe("P1 Persistence Contract & SQLite WAL V1-V6 Mirror Verification (ADR-091)", () => {
+describe("P1 Persistence Contract & SQLite WAL V1-V8 Mirror Verification (ADR-091)", () => {
   const schemaPath = path.resolve(__dirname, "schema.prisma");
   const migrationsDir = path.resolve(__dirname, "../crates/spec-registry/migrations");
 
@@ -58,10 +92,13 @@ describe("P1 Persistence Contract & SQLite WAL V1-V6 Mirror Verification (ADR-09
     expect(mappedTables).toContain("project_specs");
     expect(mappedTables).toContain("spec_revisions");
     expect(mappedTables).toContain("sdi_intents");
-    expect(mappedTables).toHaveLength(39);
+    expect(mappedTables).toContain("daemon_sessions");
+    expect(mappedTables).toContain("daemon_replay_nonces");
+    expect(mappedTables).toContain("workspace_sync_intents");
+    expect(mappedTables).toHaveLength(42);
   });
 
-  it("UT-DB-02: executes V1-V6 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V8 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 

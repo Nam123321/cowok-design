@@ -779,6 +779,33 @@ fn intent_not_found(id: Uuid) -> Response {
         .into_response()
 }
 
+fn compute_sdi_risk_score(
+    lower_prompt: &str,
+    has_specific: bool,
+    active_constraints: &[constraint_engine::ActiveConstraint],
+) -> f64 {
+    let mut risk: f64 = 0.15;
+    if !has_specific {
+        risk += 0.40;
+    }
+    if lower_prompt.contains("delete")
+        || lower_prompt.contains("drop")
+        || lower_prompt.contains("auth")
+        || lower_prompt.contains("security")
+        || lower_prompt.contains("migration")
+        || lower_prompt.contains("schema")
+        || lower_prompt.contains("remove")
+    {
+        risk += 0.15;
+    }
+    let blocker_count = active_constraints
+        .iter()
+        .filter(|c| format!("{:?}", c.severity).eq_ignore_ascii_case("blocker"))
+        .count();
+    risk += (blocker_count.min(3) as f64) * 0.05;
+    (risk.clamp(0.0, 1.0) * 100.0).round() / 100.0
+}
+
 pub(super) async fn handle_sdi_intent(
     State(state): State<DaemonAppState>,
     caller: Option<Extension<VerifiedLegacyIngress>>,
@@ -787,7 +814,7 @@ pub(super) async fn handle_sdi_intent(
     Json(req): Json<SdiCompileRequest>,
 ) -> Result<(StatusCode, Json<SdiCompileResponse>), Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) =
+    let (project_registry, canon_project_root, _) =
         verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
 
@@ -797,6 +824,30 @@ pub(super) async fn handle_sdi_intent(
     let active_constraints = slicer
         .load_active_constraints(project_id)
         .unwrap_or_default();
+
+    let (typography_fonts, visual_style, color_palette) = {
+        let conn = project_registry.pool().connection().ok();
+        let proj_str = project_id.to_string();
+        let loaded_fonts = conn
+            .as_ref()
+            .and_then(|c| {
+                constraint_engine::IconValidator::load_project_design_context(
+                    c,
+                    &canon_project_root,
+                    &proj_str,
+                )
+                .ok()
+            })
+            .map(|(_, typo, _)| typo.allowed_font_families)
+            .filter(|fonts| !fonts.is_empty())
+            .unwrap_or_else(|| vec!["system-ui".to_string(), "sans-serif".to_string()]);
+        let palette = vec![
+            "var(--accent-primary)".to_string(),
+            "var(--accent-success)".to_string(),
+            "var(--accent-warning)".to_string(),
+        ];
+        (loaded_fonts, "design-token-governed".to_string(), palette)
+    };
 
     let lower = req.raw_prompt.to_lowercase();
     let has_vague = lower.contains("đẹp")
@@ -824,7 +875,7 @@ pub(super) async fn handle_sdi_intent(
     } else {
         0.40
     };
-    let risk_score = 0.25;
+    let risk_score = compute_sdi_risk_score(&lower, has_specific, &active_constraints);
     let is_ambiguous = ambiguity_score >= 0.45;
 
     let variants = if is_ambiguous {
@@ -878,13 +929,9 @@ pub(super) async fn handle_sdi_intent(
     let design_intent = domain::DesignIntentV1 {
         id: intent_id,
         project_id,
-        visual_style: "clean-modern".to_string(),
-        color_palette: vec![
-            "#3B82F6".to_string(),
-            "#10B981".to_string(),
-            "#F59E0B".to_string(),
-        ],
-        typography: vec!["Inter".to_string(), "sans-serif".to_string()],
+        visual_style,
+        color_palette,
+        typography: typography_fonts,
         key_principles,
     };
 

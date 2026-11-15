@@ -12,3 +12,8 @@
 
 ## 2. Final Verdict
 **VERDICT: PASS / APPROVED**
+---
+
+## 3. Formal-verify candidates Triage
+- **Stage 4 Verifier:** Subagent `deed8e88-a48f-4595-a853-73b4b4ac1ceb` (`APPROVED` across `crates/constraint-engine/src/surgical_patcher.rs` and `tests/surgical_patching.rs`).
+- **Formal-verify candidates:** None. Story `03.3` performs single-shot deterministic AST surgical patching (`try_surgical_patch`) without distributed locks, concurrent job queues, or multi-step persistence state machines.

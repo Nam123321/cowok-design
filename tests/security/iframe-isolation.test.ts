@@ -178,12 +178,18 @@ describe("Option CSP-B Sandboxed HTML Preview Security Gate (SEC-IFRAME-01..08)"
     }
   });
 
-  it("SEC-IFRAME-09: strips inline on* body attributes and rotates CSPRNG epoch nonce by default", () => {
-    const out1 = wrapUserHtmlSrcDoc('<body onload="alert(1)" onclick="steal()" data-ok="yes"><p>Hi</p></body>');
+  it("SEC-IFRAME-09: strips inline on* body attributes, control-padded javascript: URLs, srcdoc, and rotates epoch", () => {
+    const out1 = wrapUserHtmlSrcDoc(
+      '<body onload="alert(1)" onclick="steal()" data-ok="yes"><a href="java\tscript:alert(1)">Bad</a><iframe srcdoc="<script>1</script>"></iframe><p>Hi</p></body>'
+    );
     const out2 = wrapUserHtmlSrcDoc("<body><p>Hi</p></body>");
-    expect(out1).not.toContain("onload");
-    expect(out1).not.toContain("onclick");
-    expect(out1).toContain('data-ok="yes"');
+    const bodySlice = out1.slice(out1.indexOf("<body"));
+    expect(bodySlice).not.toContain("onload");
+    expect(bodySlice).not.toContain("onclick");
+    expect(bodySlice).not.toContain("javascript:");
+    expect(bodySlice).not.toContain("script:alert");
+    expect(bodySlice).not.toContain("srcdoc");
+    expect(bodySlice).toContain('data-ok="yes"');
 
     const m1 = out1.match(/var EPOCH = (\d+);/);
     const m2 = out2.match(/var EPOCH = (\d+);/);

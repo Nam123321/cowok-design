@@ -4,9 +4,9 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
-import { getBoundBffPort, isAllowedLoopbackHost, issueBffLoopbackSession } from "./api-guard";
-import { resolveWorkspaceRoot } from "./daemon-client";
-import { LocalSessionBootstrapInputSchema } from "./validations/harness-daemon";
+import { getBoundBffPort, isAllowedLoopbackHost, issueBffLoopbackSession } from "./api-guard.ts";
+import { resolveWorkspaceRoot } from "./daemon-client.ts";
+import { LocalSessionBootstrapInputSchema } from "./validations/harness-daemon.ts";
 
 export const MAX_BODY_BYTES = 1_048_576;
 export const HTTP_OK = 200;
@@ -124,8 +124,8 @@ function hasEditorBootstrapProof(req: IncomingMessage): boolean {
   if (isAuthorizedAdminBearer(req.headers.authorization)) return true;
   if (isValidDaemonNonceHeader(req.headers["x-cowok-daemon-nonce"])) return true;
   const sfs = singleHeader(req.headers["sec-fetch-site"]);
-  if (isValidBootCapHeader(req.headers["x-cowok-boot-cap"])) {
-    return !sfs || sfs === "same-origin";
+  if (req.headers["x-cowok-boot-cap"] !== undefined) {
+    return isValidBootCapHeader(req.headers["x-cowok-boot-cap"]) && (!sfs || sfs === "same-origin");
   }
   if (getBootCapTokens().size > 0) return false;
   return hasSameOriginPortProof(req, sfs);

@@ -1,17 +1,19 @@
 // @story 04.1
 // @implements AC-01, AC-06
 use std::fs;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
 use domain::{HarnessError, SafeJsInteger};
+use rand::rngs::OsRng;
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub const DEFAULT_DAEMON_PORT: u16 = 4170;
-pub const CURRENT_SCHEMA_VERSION: u32 = 7;
+pub const CURRENT_SCHEMA_VERSION: u32 = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -55,13 +57,7 @@ fn default_schema_version() -> u32 {
 
 pub fn generate_csprng_hex_32() -> String {
     let mut buf = [0u8; 32];
-    if fs::File::open("/dev/urandom")
-        .and_then(|mut f| f.read_exact(&mut buf))
-        .is_err()
-    {
-        buf[..16].copy_from_slice(Uuid::new_v4().as_bytes());
-        buf[16..].copy_from_slice(Uuid::new_v4().as_bytes());
-    }
+    OsRng.fill_bytes(&mut buf);
     buf.iter().map(|b| format!("{b:02x}")).collect()
 }
 
@@ -136,8 +132,10 @@ fn reap_dead_lockfile_if_stale(canonical_root: &Path) {
     if let Ok(raw) = fs::read_to_string(&lock_path) {
         if let Ok(info) = serde_json::from_str::<DaemonLockInfo>(&raw) {
             #[cfg(unix)]
-            if unsafe { libc::kill(info.pid as libc::pid_t, 0) } != 0
-                && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH)
+            if info.pid == 0
+                || info.pid > i32::MAX as u32
+                || unsafe { libc::kill(info.pid as libc::pid_t, 0) } != 0
+                    && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH)
             {
                 let _ = fs::remove_file(&lock_path);
             }
@@ -216,6 +214,11 @@ fn write_daemon_lock_atomic(
         })?;
     #[cfg(unix)]
     write_daemon_lock_unix_nofollow(canonical_root, &json_bytes)?;
+    #[cfg(not(unix))]
+    return Err(HarnessError::ValidationFailed {
+        reason: "LOCKFILE_UNSUPPORTED_PLATFORM: O_NOFOLLOW lockfile write requires Unix"
+            .to_string(),
+    });
     Ok(uxui_dir.join("daemon.lock"))
 }
 

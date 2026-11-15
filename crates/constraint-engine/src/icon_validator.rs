@@ -1,7 +1,7 @@
 // @story 03.2
 // @implements AC-01, AC-02, AC-03
 use domain::HarnessError;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
 
@@ -79,9 +79,52 @@ impl IconValidator {
                     ),
                 });
             }
+            Self::validate_icon_entry_file(&entry.name, &entry.file)?;
         }
 
         Ok(manifest)
+    }
+
+    fn validate_icon_entry_file(icon_name: &str, file: &str) -> Result<(), HarnessError> {
+        let cleaned = Self::sanitize_identifier(file);
+        if cleaned.is_empty()
+            || cleaned != file
+            || file.contains('\0')
+            || file.contains('\\')
+            || file.contains(':')
+        {
+            return Err(HarnessError::BoundaryViolation {
+                reason: format!(
+                    "INVALID_ICON_FILE_PATH: Icon '{}' file '{}' contains invalid or unsafe characters",
+                    icon_name, file
+                ),
+            });
+        }
+        let rel = Path::new(&cleaned);
+        if rel.is_absolute()
+            || rel.components().any(|c| {
+                matches!(
+                    c,
+                    Component::ParentDir | Component::RootDir | Component::Prefix(_)
+                )
+            })
+        {
+            return Err(HarnessError::BoundaryViolation {
+                reason: format!(
+                    "ICON_FILE_TRAVERSAL_BLOCKED: Icon '{}' file '{}' must be a jailed relative path",
+                    icon_name, file
+                ),
+            });
+        }
+        if !cleaned.to_ascii_lowercase().ends_with(".svg") {
+            return Err(HarnessError::ValidationFailed {
+                reason: format!(
+                    "INVALID_ICON_FILE_EXTENSION: Icon '{}' file '{}' must end with .svg",
+                    icon_name, file
+                ),
+            });
+        }
+        Ok(())
     }
 
     /// Loads the embedded flagship cowok-brand-product-system-v4.3 143-icon catalog.
@@ -195,6 +238,8 @@ impl IconValidator {
             .filter(|s| !s.is_empty())
             .collect();
         if allowed_norm.is_empty() {
+            manifest.icons.clear();
+            manifest.count = 0;
             return manifest;
         }
         manifest
@@ -219,7 +264,10 @@ impl IconValidator {
                 params![project_id],
                 |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
             )
-            .ok();
+            .optional()
+            .map_err(|e| HarnessError::SqliteBusy {
+                details: format!("Failed to read constraint_profiles design contracts: {e}"),
+            })?;
 
         let (manifest_path_raw, allowed_json, typography_json, min_contrast) = profile_row
             .unwrap_or_else(|| {
@@ -275,7 +323,10 @@ impl IconValidator {
                 params![project_id],
                 |r| r.get(0),
             )
-            .ok();
+            .optional()
+            .map_err(|e| HarnessError::SqliteBusy {
+                details: format!("Failed to read ENFORCE_COMPONENT_REGISTRY rule: {e}"),
+            })?;
 
         let component_registry = if let Some(raw_cfg) = comp_rule_json {
             let cfg_trimmed = raw_cfg.trim();
@@ -285,7 +336,7 @@ impl IconValidator {
                     project_root,
                     project_id,
                     true,
-                )
+                )?
             } else {
                 serde_json::from_str::<ComponentRegistryContract>(cfg_trimmed).map_err(|e| {
                     HarnessError::ValidationFailed {
@@ -294,7 +345,7 @@ impl IconValidator {
                 })?
             }
         } else {
-            Self::load_component_registry_from_project_specs(conn, project_root, project_id, false)
+            Self::load_component_registry_from_project_specs(conn, project_root, project_id, false)?
         };
 
         Ok(ProjectDesignContracts {
@@ -348,7 +399,7 @@ impl IconValidator {
         project_root: &Path,
         project_id: &str,
         forbid_unregistered: bool,
-    ) -> ComponentRegistryContract {
+    ) -> Result<ComponentRegistryContract, HarnessError> {
         let rel_path: Option<String> = conn
             .query_row(
                 "SELECT file_path FROM project_specs
@@ -357,23 +408,30 @@ impl IconValidator {
                 params![project_id],
                 |r| r.get(0),
             )
-            .ok();
+            .optional()
+            .map_err(|e| HarnessError::SqliteBusy {
+                details: format!("Failed to read project_specs for component registry: {e}"),
+            })?;
 
         if let Some(rel) = rel_path {
-            if let Ok(jailed) = Self::resolve_jailed_manifest_path(project_root, &rel) {
-                if let Ok(md) = std::fs::read_to_string(jailed) {
-                    return Self::extract_component_registry_from_markdown(
-                        &md,
-                        forbid_unregistered,
-                    );
-                }
-            }
+            let jailed = Self::resolve_jailed_manifest_path(project_root, &rel)?;
+            let md =
+                std::fs::read_to_string(&jailed).map_err(|e| HarnessError::ValidationFailed {
+                    reason: format!(
+                        "COMPONENT_REGISTRY_SPEC_UNREADABLE: Failed to read '{}': {e}",
+                        jailed.display()
+                    ),
+                })?;
+            return Ok(Self::extract_component_registry_from_markdown(
+                &md,
+                forbid_unregistered,
+            ));
         }
 
-        ComponentRegistryContract {
+        Ok(ComponentRegistryContract {
             components: Vec::new(),
             forbid_unregistered,
-        }
+        })
     }
 
     /// Persists `ProjectDesignContracts` safely into `constraint_profiles` & `constraint_rules`.
@@ -438,38 +496,58 @@ impl IconValidator {
                 details: format!("Failed to open design contracts tx: {e}"),
             })?;
 
-        tx.execute(
-            "INSERT INTO constraint_profiles (id, project_id, preset_profile, styling_policy, forbid_tailwind, forbid_raw_hex, tokens_css_path, icon_manifest_path, allowed_icon_set_json, typography_contract_json, min_wcag_contrast, updated_at)
-             VALUES (?1, ?2, 'custom', 'tokens_strict', 1, 1, 'tokens.css', ?3, ?4, ?5, ?6, ?7)
-             ON CONFLICT(project_id, preset_profile) DO UPDATE SET
-                icon_manifest_path = excluded.icon_manifest_path,
-                allowed_icon_set_json = excluded.allowed_icon_set_json,
-                typography_contract_json = excluded.typography_contract_json,
-                min_wcag_contrast = excluded.min_wcag_contrast,
-                updated_at = excluded.updated_at",
-            params![
-                prof_id,
-                project_id,
-                stored_path,
-                allowed_json,
-                typography_json,
-                contracts.typography_contract.min_wcag_contrast,
-                now_ms
-            ],
-        )
-        .map_err(|e| HarnessError::SqliteBusy {
-            details: format!("Failed to upsert constraint_profiles design contracts: {e}"),
-        })?;
-
-        let effective_prof_id: String = tx
+        let existing_prof_id: Option<String> = tx
             .query_row(
                 "SELECT id FROM constraint_profiles WHERE project_id = ?1 ORDER BY updated_at DESC LIMIT 1",
                 params![project_id],
                 |r| r.get(0),
             )
+            .optional()
             .map_err(|e| HarnessError::SqliteBusy {
-                details: format!("Failed to resolve profile id: {e}"),
+                details: format!("Failed to resolve existing profile id: {e}"),
             })?;
+
+        let effective_prof_id = if let Some(existing_id) = existing_prof_id {
+            tx.execute(
+                "UPDATE constraint_profiles
+                 SET icon_manifest_path = ?1,
+                     allowed_icon_set_json = ?2,
+                     typography_contract_json = ?3,
+                     min_wcag_contrast = ?4,
+                     updated_at = ?5
+                 WHERE id = ?6",
+                params![
+                    stored_path,
+                    allowed_json,
+                    typography_json,
+                    contracts.typography_contract.min_wcag_contrast,
+                    now_ms,
+                    existing_id
+                ],
+            )
+            .map_err(|e| HarnessError::SqliteBusy {
+                details: format!("Failed to update constraint_profiles design contracts: {e}"),
+            })?;
+            existing_id
+        } else {
+            tx.execute(
+                "INSERT INTO constraint_profiles (id, project_id, preset_profile, styling_policy, forbid_tailwind, forbid_raw_hex, tokens_css_path, icon_manifest_path, allowed_icon_set_json, typography_contract_json, min_wcag_contrast, updated_at)
+                 VALUES (?1, ?2, 'custom', 'tokens_strict', 1, 1, 'tokens.css', ?3, ?4, ?5, ?6, ?7)",
+                params![
+                    prof_id,
+                    project_id,
+                    stored_path,
+                    allowed_json,
+                    typography_json,
+                    contracts.typography_contract.min_wcag_contrast,
+                    now_ms
+                ],
+            )
+            .map_err(|e| HarnessError::SqliteBusy {
+                details: format!("Failed to insert constraint_profiles design contracts: {e}"),
+            })?;
+            prof_id
+        };
 
         tx.execute(
             "INSERT INTO constraint_rules (id, profile_id, rule_code, severity, config_json, enabled, updated_at)
@@ -574,10 +652,7 @@ impl IconValidator {
             };
         }
 
-        let direct_match = contract
-            .components
-            .iter()
-            .any(|c| c.name.eq_ignore_ascii_case(&sanitized));
+        let direct_match = contract.components.iter().any(|c| c.name == sanitized);
 
         if direct_match {
             return ComponentValidationReport {

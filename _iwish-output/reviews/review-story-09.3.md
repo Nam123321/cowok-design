@@ -12,3 +12,7 @@
 
 ## 2. Final Verdict
 **VERDICT: PASS / APPROVED**
+---
+
+## 3. Formal-verify candidates Triage
+- **Formal-verify candidates:** Stage 1/3A deferred triage (story not yet implemented): `ThreeStrikeBreakerAndStaleFileOCC` (circuit-breaker counter + optimistic concurrency conflict check) to be evaluated at Stage 3A before implementation.

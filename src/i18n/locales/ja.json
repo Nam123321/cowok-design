@@ -243,8 +243,8 @@
     "cronTriggers": "スケジュールされた cron ジョブ",
     "saveBtn": "変更を保存",
     "closeBtn": "閉じる",
-    "autoSnapshotTitle": "状態とグラフ AST の自動スナップショット",
-    "autoSnapshotDesc": "5分ごと • 2D DAG グラフの差分を自動記録",
+    "autoSnapshotTitle": "状態とグラフ AST のスナップショット",
+    "autoSnapshotDesc": "オンデマンドのみ • ツールバーから手動実行",
     "bearerPlaceholder": "Bearer トークン (セッション限定)",
     "cancelBtn": "キャンセル",
     "enterKeyOrEndpoint": "キーまたはエンドポイントを入力してください",
@@ -281,8 +281,8 @@
     "daemonStatusOnline": "オンライン",
     "daemonStatusOffline": "オフライン",
     "daemonStatusChecking": "確認中",
-    "snapshotCadenceReady": "準備完了 · 5分",
-    "snapshotCadencePaused": "待機中"
+    "snapshotCadenceReady": "手動のみ",
+    "snapshotCadencePaused": "未スケジュール"
   },
   "flow": {
     "dagCanvas": "DAG 2D キャンバス",

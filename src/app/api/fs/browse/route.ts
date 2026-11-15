@@ -17,5 +17,5 @@ export const GET = guardedRoute(
       correlationId: ctx.correlationId,
     });
   },
-  { authMode: "strict-loopback" }
+  { authMode: "strict-loopback", roles: ["editor", "admin"] }
 );

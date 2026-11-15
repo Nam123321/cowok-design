@@ -407,3 +407,78 @@ async fn sec_legacy_ingress_fail_closed_and_verified_hmac_v2() {
     assert_eq!(ok_st, StatusCode::OK);
     assert_eq!(ok_json["project_id"], project_id);
 }
+
+#[tokio::test]
+async fn v8_sessions_and_replay_nonces_persist_across_auth_state_restart() {
+    use harness_daemon::daemon_auth::DaemonAuthState;
+
+    let tmp = TempDir::new().expect("tempdir");
+    let root = tmp.path().to_path_buf();
+    let cowok_dir = root.join(".cowok-design");
+    std::fs::create_dir_all(&cowok_dir).expect("mkdir .cowok-design");
+    let canon_root = root.canonicalize().expect("canon");
+
+    let db_path = canon_root
+        .join(".cowok-design")
+        .join("cowok-design.sqlite3");
+    let pool = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, &canon_root)).expect("pool");
+    let registry = Arc::new(SpecRegistry::new(pool.clone()));
+    let cfg = DaemonConfig {
+        host: "127.0.0.1".into(),
+        preferred_port: 0,
+        workspace_root: canon_root.clone(),
+    };
+    let _server = DaemonServer::bind_loopback(&cfg, registry).expect("bind");
+    let lock = read_daemon_lock(&canon_root).expect("lock");
+
+    let token = format!("tok_restart_{}", Uuid::new_v4());
+    let nonce = format!("nonce_restart_{}", Uuid::new_v4());
+    let principal = FlowPrincipal {
+        tenant_id: "tenant-v8".into(),
+        user_id: "u-v8".into(),
+        role: "editor".into(),
+    };
+    let expires_at = Utc::now().timestamp() + 600;
+
+    {
+        let auth_before =
+            DaemonAuthState::from_lock_info_with_pool(&lock, Some(pool.clone())).expect("auth1");
+        auth_before.insert_session(token.clone(), principal.clone(), expires_at);
+        assert!(
+            auth_before.record_nonce_once(&nonce),
+            "fresh nonce must be accepted first time"
+        );
+        assert!(
+            !auth_before.record_nonce_once(&nonce),
+            "replayed nonce must be rejected within same instance"
+        );
+    }
+
+    // Verify raw session token is never stored plaintext in daemon_sessions
+    {
+        let conn = pool.connection().expect("conn");
+        let expected_sha = format!("{:x}", Sha256::digest(token.as_bytes()));
+        let stored: (String, String) = conn
+            .query_row(
+                "SELECT token_sha256, tenant_id FROM daemon_sessions WHERE token_sha256 = ?1",
+                params![expected_sha],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .expect("session row");
+        assert_ne!(stored.0, token);
+        assert_eq!(stored.1, "tenant-v8");
+    }
+
+    // Simulate daemon restart: brand-new DaemonAuthState with empty in-memory maps backed by same SqlitePool
+    let auth_after = DaemonAuthState::from_lock_info_with_pool(&lock, Some(pool)).expect("auth2");
+    let restored = auth_after
+        .get_valid_session(&token)
+        .expect("session must survive restart via SQLite V8 daemon_sessions");
+    assert_eq!(restored.tenant_id, "tenant-v8");
+    assert_eq!(restored.user_id, "u-v8");
+    assert_eq!(restored.role, "editor");
+    assert!(
+        !auth_after.record_nonce_once(&nonce),
+        "nonce seen before restart must still be rejected via SQLite V8 daemon_replay_nonces"
+    );
+}

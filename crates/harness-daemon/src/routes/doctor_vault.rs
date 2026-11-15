@@ -175,6 +175,13 @@ async fn resolve_and_pin_ssrf_addr(target_url: &str) -> Result<(String, SocketAd
         }
     }
     let chosen = pinned.ok_or_else(|| format!("DNS returned no addresses for '{host}'"))?;
+    // Require TLS (https://) whenever BYOK probe sends API keys to any non-loopback address
+    if !chosen.ip().is_loopback() && uri.scheme_str() != Some("https") {
+        return Err(
+            "Non-loopback provider endpointUrl must use https:// to protect secrets in transit"
+                .to_string(),
+        );
+    }
     Ok((host, chosen))
 }
 
@@ -299,6 +306,29 @@ pub async fn handle_verify_provider_key(
                 live_probed: Some(false),
                 http_status: None,
             }));
+        }
+        if let Ok(parsed_ep) = endpoint.parse::<Uri>() {
+            let h = parsed_ep
+                .host()
+                .unwrap_or("")
+                .trim_start_matches('[')
+                .trim_end_matches(']')
+                .to_ascii_lowercase();
+            let is_local = h == "localhost"
+                || h.ends_with(".localhost")
+                || h.parse::<std::net::IpAddr>()
+                    .is_ok_and(|ip| ip.is_loopback());
+            if !is_local && parsed_ep.scheme_str() != Some("https") {
+                return Ok(Json(VerifyKeyResponse {
+                    valid: false,
+                    status: "invalid_endpoint".to_string(),
+                    provider_id: provider,
+                    message: "Non-loopback provider endpointUrl must use https:// to protect API keys in transit".to_string(),
+                    credential_ref: sanitize_credential_ref(key),
+                    live_probed: Some(false),
+                    http_status: None,
+                }));
+            }
         }
     }
 
@@ -966,9 +996,18 @@ pub async fn handle_upsert_vault_key(
             .await
             .map_err(|e| json_err(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_IO", e.to_string()))?
             .map_err(|e| json_err(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_IO", e))?
-    } else {
+    } else if vault_mode == "ram_only" {
+        state
+            .ram_vault
+            .upsert(&principal.tenant_id, &provider_id, &api_key_trimmed);
         format!("vault://ram_only/{provider_id}")
+    } else {
+        state.ram_vault.remove(&principal.tenant_id, &provider_id);
+        format!("vault://ephemeral/{provider_id}")
     };
+    if vault_mode != "ram_only" {
+        state.ram_vault.remove(&principal.tenant_id, &provider_id);
+    }
 
     let pool = state.registry.pool().clone();
     let saved = run_db(move || {
@@ -977,10 +1016,10 @@ pub async fn handle_upsert_vault_key(
         let new_id = Uuid::new_v4().to_string();
 
         let dto = retry_on_busy("upsert_vault_key", || {
-            let tx = conn.transaction()?;
+            let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
             let existing: Option<String> = tx
                 .query_row(
-                    "SELECT id FROM agent_settings WHERE tenant_id = ?1 AND provider_id = ?2",
+                    "SELECT id FROM agent_settings WHERE tenant_id = ?1 AND provider_id = ?2 AND project_id IS NULL",
                     params![principal.tenant_id, provider_id],
                     |r| r.get(0),
                 )
@@ -1046,6 +1085,7 @@ pub async fn handle_delete_vault_key(
     let store = VaultStore::from_workspace_root(pool.workspace_root());
     let key_lookup = key_id.clone();
 
+    let tenant_for_db = principal.tenant_id.clone();
     let (cnt, matched_providers) = run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
         let mut providers = Vec::new();
@@ -1053,20 +1093,23 @@ pub async fn handle_delete_vault_key(
             let mut stmt = conn
                 .prepare("SELECT provider_id FROM agent_settings WHERE tenant_id = ?1 AND (id = ?2 OR provider_id = ?2)")
                 .map_err(|e| map_harness_resp(map_sqlite_error(e, "lookup_vault_key"), "delete"))?;
-            let rows_res = stmt.query_map(params![principal.tenant_id, key_lookup], |r| {
-                r.get::<_, String>(0)
-            });
-            if let Ok(rows) = rows_res {
-                for p in rows.flatten() {
-                    providers.push(p);
-                }
+            let rows = stmt
+                .query_map(params![tenant_for_db, key_lookup], |r| {
+                    r.get::<_, String>(0)
+                })
+                .map_err(|e| map_harness_resp(map_sqlite_error(e, "lookup_vault_key"), "delete"))?;
+            for row_res in rows {
+                let p = row_res.map_err(|e| {
+                    map_harness_resp(map_sqlite_error(e, "lookup_vault_key_row"), "delete")
+                })?;
+                providers.push(p);
             }
         }
         let cnt = retry_on_busy("delete_vault_key", || {
-            let tx = conn.transaction()?;
+            let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
             let c = tx.execute(
                 "UPDATE agent_settings SET credential_ref = '' WHERE tenant_id = ?1 AND (id = ?2 OR provider_id = ?2)",
-                params![principal.tenant_id, key_lookup],
+                params![tenant_for_db, key_lookup],
             )?;
             tx.commit()?;
             Ok::<usize, rusqlite::Error>(c)
@@ -1084,9 +1127,19 @@ pub async fn handle_delete_vault_key(
         ));
     }
 
-    for pid in matched_providers {
-        let _ = store.delete_secret(&pid, None);
+    for pid in &matched_providers {
+        state.ram_vault.remove(&principal.tenant_id, pid);
     }
+    let store_clone = store.clone();
+    tokio::task::spawn_blocking(move || -> Result<(), String> {
+        for pid in matched_providers {
+            store_clone.delete_secret(&pid, None)?;
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| json_err(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_IO", e.to_string()))?
+    .map_err(|e| json_err(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_IO", e))?;
 
     Ok(Json(DeleteVaultKeyResponse {
         deleted: true,
@@ -1149,16 +1202,17 @@ pub async fn handle_update_vault_settings(
         .map_err(|e| json_err(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_IO", e))?;
     }
 
+    let tenant_for_settings = principal.tenant_id.clone();
     let vm_clone = vault_mode.clone();
     let pool = state.registry.pool().clone();
     run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
         let now_ms = Utc::now().timestamp_millis();
         retry_on_busy("update_vault_settings", || {
-            let tx = conn.transaction()?;
+            let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
             tx.execute(
                 "UPDATE agent_settings SET vault_mode = ?1, updated_at = ?2 WHERE tenant_id = ?3",
-                params![vm_clone, now_ms, principal.tenant_id],
+                params![vm_clone, now_ms, tenant_for_settings],
             )?;
             tx.commit()?;
             Ok::<(), rusqlite::Error>(())
@@ -1166,6 +1220,10 @@ pub async fn handle_update_vault_settings(
         .map_err(|e| map_harness_resp(e, "update_vault_settings"))
     })
     .await?;
+
+    if vault_mode != "ram_only" {
+        state.ram_vault.clear_tenant(&principal.tenant_id);
+    }
 
     Ok(Json(UpdateVaultSettingsResponse {
         vault_mode,

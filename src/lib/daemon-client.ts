@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { logger } from "./logger";
+import { logger } from "./logger.ts";
 
 /**
  * Local workspace bootstrap default IDs.
@@ -94,7 +94,7 @@ function readValidLock(workspaceRoot: string): DaemonLockRecord | null {
       !parsed.hmac_key_hex ||
       typeof parsed.schema_version !== "number" ||
       !Number.isFinite(parsed.schema_version) ||
-      parsed.schema_version < 7
+      parsed.schema_version < 8
     ) {
       return null;
     }
@@ -175,7 +175,7 @@ async function verifyHealthAndSeedDefaultProject(lock: DaemonLockRecord, workspa
     throw new Error(`Daemon health check failed (${healthRes.status})`);
   }
   const health = (await healthRes.json()) as { service?: string; schema_version?: number };
-  if (health.service !== "cowok-design-harness-daemon" || (health.schema_version ?? 0) < 7) {
+  if (health.service !== "cowok-design-harness-daemon" || (health.schema_version ?? 0) < 8) {
     throw new Error("Unexpected daemon health identity or schema_version");
   }
   const seedingPromises = getSeededWorkspacePromises();
@@ -386,7 +386,7 @@ export function forwardFromGuardedContext(
     principal: {
       tenantId: ctx.tenantId || "local-default",
       userId: ctx.userId || "local-operator",
-      role: ctx.role || (req.method === "GET" || req.method === "HEAD" ? "viewer" : "editor"),
+      role: ctx.role || "viewer",
     },
     correlationId: ctx.correlationId,
   });

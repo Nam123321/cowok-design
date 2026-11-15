@@ -9,7 +9,7 @@ export default function App() {
       (import.meta.env.VITE_WATCHMEN_NONCE ||
         import.meta.env.VITE_QA_NONCE ||
         import.meta.env.WATCHMEN_NONCE)) ||
-    "default-watchmen-nonce";
+    "";
 
   return (
     <div id="cowok-app-container">

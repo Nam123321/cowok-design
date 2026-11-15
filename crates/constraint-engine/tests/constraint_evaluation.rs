@@ -365,3 +365,66 @@ fn test_malformed_html_fragment() {
     let res = AstLinter::lint_source(malformed_html, &rules);
     assert!(res.is_err());
 }
+
+#[test]
+fn test_wave1a_ast_bypasses_and_css_var_contrast_fixed() {
+    let rules = vec![
+        ActiveConstraint {
+            rule_code: "BAN_TAILWIND".to_string(),
+            severity: "BLOCKER".to_string(),
+            config_json: "{}".to_string(),
+        },
+        ActiveConstraint {
+            rule_code: "ENFORCE_TYPOGRAPHY".to_string(),
+            severity: "BLOCKER".to_string(),
+            config_json: "{}".to_string(),
+        },
+    ];
+
+    // TemplateLiteral expressions, ObjectExpression clsx, BinaryExpression, !important, negative spacing, /opacity, unsafe tag
+    let bypass_tsx = r#"
+        export class LegacyWidget {
+            render(active: boolean) {
+                return (
+                    <div>
+                        <span className={`base ${active ? "!p-4 -mt-2 border/50" : "hover:[color:red]"}`}>A</span>
+                        <span className={clsx({ "bg-red-500/80": active })}>B</span>
+                        <span className={"card " + "w-full"}>C</span>
+                        <iframe src="/embed" />
+                    </div>
+                );
+            }
+        }
+    "#;
+    let violations = AstLinter::lint_source(bypass_tsx, &rules).expect("lint");
+    assert!(violations.iter().any(|v| v.message.contains("!p-4")));
+    assert!(violations.iter().any(|v| v.message.contains("-mt-2")));
+    assert!(violations.iter().any(|v| v.message.contains("border/50")));
+    assert!(violations
+        .iter()
+        .any(|v| v.message.contains("hover:[color:red]")));
+    assert!(violations
+        .iter()
+        .any(|v| v.message.contains("bg-red-500/80")));
+    assert!(violations.iter().any(|v| v.message.contains("w-full")));
+    assert!(violations
+        .iter()
+        .any(|v| v.rule_code == "FORBID_UNSAFE_JSX_TAG"));
+
+    // tokens.css variable contrast resolution (catches low contrast without falling back blindly to pass)
+    let tokens_css = ":root { --fg-muted: #999999; --bg-surface: #aaaaaa; }";
+    let css_var_tsx = r#"<span style={{ fontFamily: "Geist", color: "var(--fg-muted)", backgroundColor: "var(--bg-surface)" }}>Var</span>"#;
+    let typo = constraint_engine::TypographyContract::default();
+    let var_violations = AstLinter::lint_source_with_design_context(
+        css_var_tsx,
+        &rules,
+        None,
+        Some(&typo),
+        None,
+        Some(tokens_css),
+    )
+    .expect("lint css vars");
+    assert!(var_violations
+        .iter()
+        .any(|v| v.rule_code == "ENFORCE_TYPOGRAPHY" && v.message.contains("WCAG")));
+}

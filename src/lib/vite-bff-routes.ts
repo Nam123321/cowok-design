@@ -4,19 +4,6 @@ import { z, type ZodSchema } from "zod";
 import { guardedRoute } from "./api-guard";
 import { forwardToDaemonFlow } from "./daemon-client";
 import {
-  ApplyProposalSchema,
-  CreateProposalSchema,
-  RejectProposalSchema,
-  ValidateProposalSchema,
-} from "./validations/change-proposal";
-import {
-  CreateSnapshotSchema,
-  ExportZipSchema,
-  GitHubPRSchema,
-  RevertSnapshotSchema,
-} from "./validations/version-snapshot";
-import { ClarificationSelectSchema, CompileIntentSchema } from "./validations/sdi";
-import {
   LintSourceInputSchema,
   ProjectDesignContractsSchema,
   ValidateComponentInputSchema,
@@ -37,6 +24,7 @@ import {
   UpdateScreenFixtureSchema,
   ViewportPresetSchema,
 } from "./validations/screen-fixture";
+import * as doctorRoute from "../app/api/doctor/route";
 import * as snapshotRoute from "../app/api/projects/[id]/flow/snapshot/route";
 import * as nodesRoute from "../app/api/projects/[id]/flow/nodes/route";
 import * as positionsRoute from "../app/api/projects/[id]/flow/nodes/positions/route";
@@ -58,6 +46,18 @@ import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
 import * as commentsRoute from "../app/api/projects/[id]/flow/nodes/[nodeId]/comments/route";
 import * as fixturesRoute from "../app/api/projects/[id]/flow/nodes/[nodeId]/fixtures/route";
+import * as versionSnapshotsRoute from "../app/api/projects/[id]/snapshots/route";
+import * as exportSnapshotRoute from "../app/api/projects/[id]/snapshots/export/route";
+import * as downloadSnapshotRoute from "../app/api/projects/[id]/snapshots/export/download/route";
+import * as snapshotPrRoute from "../app/api/projects/[id]/snapshots/pr/route";
+import * as revertSnapshotRoute from "../app/api/projects/[id]/snapshots/[snapshotId]/revert/route";
+import * as proposalsRoute from "../app/api/projects/[id]/proposals/route";
+import * as singleProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/route";
+import * as validateProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/validate/route";
+import * as applyProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/apply/route";
+import * as rejectProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/reject/route";
+import * as sdiIntentRoute from "../app/api/projects/[id]/sdi/intent/route";
+import * as sdiClarificationRoute from "../app/api/projects/[id]/sdi/clarification/route";
 
 export type RouteFn = (req: Request, ctx: { params?: Record<string, string> }) => Promise<Response>;
 
@@ -99,7 +99,7 @@ function forwardGuardedDaemon<B = unknown>(
         principal: {
           tenantId: ctx.tenantId || "local-default",
           userId: ctx.userId || "local-operator",
-          role: ctx.role || (req.method === "GET" ? "viewer" : "editor"),
+          role: ctx.role || "viewer",
         },
         correlationId: ctx.correlationId,
       }),
@@ -158,7 +158,7 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/projects$/, extractParams: noParams, resolveHandler: () => projectListRoute.POST },
   proxyRoute("PATCH", /^\/api\/projects\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}`, ProjectPatchSchema),
   proxyRoute("DELETE", /^\/api\/projects\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}`),
-  proxyRoute("GET", /^\/api\/doctor$/, () => "/api/v1/doctor/cli-matrix"),
+  { method: "GET", pattern: /^\/api\/doctor$/, extractParams: noParams, resolveHandler: () => doctorRoute.GET },
   proxyRoute("GET", /^\/api\/doctor\/cli-matrix$/, () => "/api/v1/doctor/cli-matrix"),
   proxyRoute("POST", /^\/api\/doctor\/probe-cli$/, () => "/api/v1/doctor/probe-cli", ProbeCliInputSchema),
   proxyRoute("POST", /^\/api\/doctor\/verify-key$/, () => "/api/v1/doctor/verify-key", VerifyProviderKeyInputSchema),
@@ -224,25 +224,25 @@ const ROUTE_TABLE: RouteEntry[] = [
   proxyRoute("POST", /^\/api\/projects\/([^/]+)\/inject-ff-id$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/inject-ff-id`, AstInjectionInputSchema),
   proxyRoute("POST", /^\/api\/projects\/([^/]+)\/surgical-patch$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/surgical-patch`, SurgicalPatchInputSchema),
 
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/snapshots$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/snapshots`),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/snapshots$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/snapshots`, CreateSnapshotSchema),
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/snapshots\/export\/download$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/snapshots/export/download`),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/snapshots\/export$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/snapshots/export`, ExportZipSchema),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/snapshots\/pr$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/snapshots/pr`, GitHubPRSchema),
+  { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/snapshots$/, extractParams: idOnly, resolveHandler: () => versionSnapshotsRoute.GET },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/snapshots$/, extractParams: idOnly, resolveHandler: () => versionSnapshotsRoute.POST },
+  { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/snapshots\/export\/download$/, extractParams: idOnly, resolveHandler: () => downloadSnapshotRoute.GET },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/snapshots\/export$/, extractParams: idOnly, resolveHandler: () => exportSnapshotRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/snapshots\/pr$/, extractParams: idOnly, resolveHandler: () => snapshotPrRoute.POST },
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/snapshots\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/snapshots/${safeEncodeSegment(m[2])}`),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/snapshots\/([^/]+)\/revert$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/snapshots/${safeEncodeSegment(m[2])}/revert`, RevertSnapshotSchema),
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/snapshots\/([^/]+)\/revert$/, extractParams: (m) => ({ id: m[1], snapshotId: m[2] }), resolveHandler: () => revertSnapshotRoute.POST },
 
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/proposals$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals`),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/proposals$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals`, CreateProposalSchema),
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals/${safeEncodeSegment(m[2])}`),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/validate$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals/${safeEncodeSegment(m[2])}/validate`, ValidateProposalSchema),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/apply$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals/${safeEncodeSegment(m[2])}/apply`, ApplyProposalSchema),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/reject$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/proposals/${safeEncodeSegment(m[2])}/reject`, RejectProposalSchema),
+  { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/proposals$/, extractParams: idOnly, resolveHandler: () => proposalsRoute.GET },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals$/, extractParams: idOnly, resolveHandler: () => proposalsRoute.POST },
+  { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)$/, extractParams: (m) => ({ id: m[1], proposalId: m[2] }), resolveHandler: () => singleProposalRoute.GET },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/validate$/, extractParams: (m) => ({ id: m[1], proposalId: m[2] }), resolveHandler: () => validateProposalRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/apply$/, extractParams: (m) => ({ id: m[1], proposalId: m[2] }), resolveHandler: () => applyProposalRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/reject$/, extractParams: (m) => ({ id: m[1], proposalId: m[2] }), resolveHandler: () => rejectProposalRoute.POST },
 
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/sdi\/intent$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent`),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/sdi\/intent$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent`, CompileIntentSchema),
+  { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/sdi\/intent$/, extractParams: idOnly, resolveHandler: () => sdiIntentRoute.GET },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/sdi\/intent$/, extractParams: idOnly, resolveHandler: () => sdiIntentRoute.POST },
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/sdi\/intent\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent/${safeEncodeSegment(m[2])}`),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/sdi\/clarification$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/clarification`, ClarificationSelectSchema),
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/sdi\/clarification$/, extractParams: idOnly, resolveHandler: () => sdiClarificationRoute.POST },
 ];
 
 export function matchBffRoute(

@@ -2376,3 +2376,107 @@ async fn test_epic01_security_hardening_delete_spec_and_sqlite_proposals_zip_exp
     assert_eq!(&dl_bytes[..4], b"PK\x03\x04");
     assert_eq!(format!("{:x}", Sha256::digest(&dl_bytes)), expected_sha);
 }
+
+#[tokio::test]
+async fn test_apply_proposal_and_revert_snapshot_sync_disk_files() {
+    let tmp = TempDir::new().expect("temp dir");
+    let proj_ws = tmp.path().join("project-ws");
+    fs::create_dir_all(&proj_ws).expect("create project workspace");
+    let proj_ws = fs::canonicalize(&proj_ws).expect("canonicalize project workspace");
+    let (_reg, router) = setup_daemon_router(&tmp);
+
+    let (status, proj_val) = send_json_request(
+        &router,
+        "POST",
+        "/api/v1/projects",
+        &[],
+        Some(serde_json::json!({
+            "slug": "proposal-disk-sync",
+            "name": "Proposal Disk Sync",
+            "workspace_root": proj_ws.to_string_lossy(),
+            "product_brief": "Verify apply_proposal and revert_snapshot materialize and unlink real files on disk."
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let proj: ProjectDto = serde_json::from_value(proj_val).expect("project dto");
+
+    let (status, snap_base) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/snapshots", proj.id),
+        &[],
+        Some(serde_json::json!({
+            "versionTag": "v1.0.0",
+            "label": "Empty Baseline",
+            "files": []
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let base_snapshot_id = snap_base["id"]
+        .as_str()
+        .expect("baseline snapshot id")
+        .to_string();
+
+    let (status, prop_val) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/proposals", proj.id),
+        &[],
+        Some(serde_json::json!({
+            "title": "Add NewFeature",
+            "files": [{
+                "path": "src/NewFeature.tsx",
+                "status": "added",
+                "additions": 1,
+                "deletions": 0,
+                "patch": "+export const NewFeature = () => 'live';\n"
+            }]
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let prop_id = prop_val["id"].as_str().expect("proposal id").to_string();
+
+    let (status, applied_val) = send_json_request(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{}/proposals/{prop_id}/apply", proj.id),
+        &[],
+        Some(serde_json::json!({})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(applied_val["status"], "applied");
+
+    assert_eq!(
+        proj.workspace_root.as_deref(),
+        Some(proj_ws.to_string_lossy().as_ref())
+    );
+    let disk_file = proj_ws.join("src/NewFeature.tsx");
+    assert!(
+        disk_file.exists(),
+        "apply_proposal must materialize file on disk"
+    );
+    let disk_content = fs::read_to_string(&disk_file).expect("read applied disk file");
+    assert!(disk_content.contains("export const NewFeature"));
+
+    let (status, revert_val) = send_json_request(
+        &router,
+        "POST",
+        &format!(
+            "/api/v1/projects/{}/snapshots/{base_snapshot_id}/revert",
+            proj.id
+        ),
+        &[],
+        Some(serde_json::json!({ "safetyLabel": "Before revert" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(revert_val["success"], true);
+    assert!(
+        !disk_file.exists(),
+        "revert_snapshot must remove files absent from target snapshot on disk"
+    );
+}

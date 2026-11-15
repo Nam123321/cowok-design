@@ -14,8 +14,12 @@ use axum::{
 use base64::{engine::general_purpose::STANDARD as B64_STD, Engine as _};
 use chrono::Utc;
 use domain::HarnessError;
+use rand::rngs::OsRng;
+use rand::RngCore;
+use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use spec_registry::SqlitePool;
 use uuid::Uuid;
 
 use crate::lockfile::{generate_csprng_hex_32, read_daemon_lock, DaemonLockInfo};
@@ -206,10 +210,22 @@ pub struct DaemonAuthState {
     nonce_order: Mutex<VecDeque<String>>,
     nonce_set: Mutex<HashSet<String>>,
     sessions: Mutex<HashMap<String, SessionEntry>>,
+    pool: Option<SqlitePool>,
+}
+
+fn sha256_hex_token(token: &str) -> String {
+    format!("{:x}", Sha256::digest(token.as_bytes()))
 }
 
 impl DaemonAuthState {
     pub fn from_lock_info(lock: &DaemonLockInfo) -> Result<Arc<Self>, HarnessError> {
+        Self::from_lock_info_with_pool(lock, None)
+    }
+
+    pub fn from_lock_info_with_pool(
+        lock: &DaemonLockInfo,
+        pool: Option<SqlitePool>,
+    ) -> Result<Arc<Self>, HarnessError> {
         let key_bytes =
             decode_hex(lock.hmac_key_hex.trim()).ok_or_else(|| HarnessError::ValidationFailed {
                 reason: "DAEMON_LOCK_INVALID_KEY: invalid hmac_key_hex".to_string(),
@@ -220,28 +236,47 @@ impl DaemonAuthState {
                     .to_string(),
             });
         }
-        Ok(Self::with_secrets(lock.daemon_nonce.clone(), key_bytes))
+        Ok(Self::with_secrets_and_pool(
+            lock.daemon_nonce.clone(),
+            key_bytes,
+            pool,
+        ))
     }
 
     pub fn from_registry_root(workspace_root: &std::path::Path) -> Arc<Self> {
+        Self::from_registry_root_with_pool(workspace_root, None)
+    }
+
+    pub fn from_registry_root_with_pool(
+        workspace_root: &std::path::Path,
+        pool: Option<SqlitePool>,
+    ) -> Arc<Self> {
         if let Ok(lock) = read_daemon_lock(workspace_root) {
-            if let Ok(state) = Self::from_lock_info(&lock) {
+            if let Ok(state) = Self::from_lock_info_with_pool(&lock, pool.clone()) {
                 return state;
             }
         }
-        let mut key_bytes = Vec::with_capacity(32);
-        key_bytes.extend_from_slice(Uuid::new_v4().as_bytes());
-        key_bytes.extend_from_slice(Uuid::new_v4().as_bytes());
-        Self::with_secrets(generate_csprng_hex_32(), key_bytes)
+        let mut key_bytes = vec![0u8; 32];
+        OsRng.fill_bytes(&mut key_bytes);
+        Self::with_secrets_and_pool(generate_csprng_hex_32(), key_bytes, pool)
     }
 
     pub fn with_secrets(daemon_nonce: String, hmac_key: Vec<u8>) -> Arc<Self> {
+        Self::with_secrets_and_pool(daemon_nonce, hmac_key, None)
+    }
+
+    pub fn with_secrets_and_pool(
+        daemon_nonce: String,
+        hmac_key: Vec<u8>,
+        pool: Option<SqlitePool>,
+    ) -> Arc<Self> {
         Arc::new(Self {
             daemon_nonce,
             hmac_key,
             nonce_order: Mutex::new(VecDeque::new()),
             nonce_set: Mutex::new(HashSet::new()),
             sessions: Mutex::new(HashMap::new()),
+            pool,
         })
     }
 
@@ -282,18 +317,41 @@ impl DaemonAuthState {
     }
 
     pub fn record_nonce_once(&self, nonce: &str) -> bool {
-        let mut set = self.nonce_set.lock().expect("nonce_set");
-        if set.contains(nonce) {
-            return false;
-        }
-        let mut order = self.nonce_order.lock().expect("nonce_order");
-        if order.len() >= NONCE_LRU_CAPACITY {
-            if let Some(evicted) = order.pop_front() {
-                set.remove(&evicted);
+        {
+            let mut set = self.nonce_set.lock().expect("nonce_set");
+            if set.contains(nonce) {
+                return false;
             }
+            if let Some(ref pool) = self.pool {
+                let Ok(conn) = pool.connection() else {
+                    return false;
+                };
+                let now = Utc::now().timestamp();
+                let expires_at = now.saturating_add(MAX_SKEW_SECS * 2);
+                let _ = conn.execute(
+                    "DELETE FROM daemon_replay_nonces WHERE expires_at < ?1",
+                    params![now],
+                );
+                let Ok(inserted) = conn.execute(
+                    "INSERT OR IGNORE INTO daemon_replay_nonces (nonce, daemon_nonce, expires_at, seen_at)
+                     VALUES (?1, ?2, ?3, ?4)",
+                    params![nonce, self.daemon_nonce, expires_at, now],
+                ) else {
+                    return false;
+                };
+                if inserted == 0 {
+                    return false;
+                }
+            }
+            let mut order = self.nonce_order.lock().expect("nonce_order");
+            if order.len() >= NONCE_LRU_CAPACITY {
+                if let Some(evicted) = order.pop_front() {
+                    set.remove(&evicted);
+                }
+            }
+            set.insert(nonce.to_string());
+            order.push_back(nonce.to_string());
         }
-        set.insert(nonce.to_string());
-        order.push_back(nonce.to_string());
         true
     }
 
@@ -308,8 +366,29 @@ impl DaemonAuthState {
         expires_at: i64,
         max_capacity: usize,
     ) {
-        let mut sessions = self.sessions.lock().expect("sessions");
         let now = Utc::now().timestamp();
+        if let Some(ref pool) = self.pool {
+            if let Ok(conn) = pool.connection() {
+                let _ = conn.execute(
+                    "DELETE FROM daemon_sessions WHERE expires_at < ?1",
+                    params![now],
+                );
+                let token_hash = sha256_hex_token(token.trim());
+                let _ = conn.execute(
+                    "INSERT OR REPLACE INTO daemon_sessions (token_sha256, tenant_id, user_id, role, expires_at, created_at, revoked_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL)",
+                    params![
+                        token_hash,
+                        principal.tenant_id,
+                        principal.user_id,
+                        principal.role,
+                        expires_at,
+                        now
+                    ],
+                );
+            }
+        }
+        let mut sessions = self.sessions.lock().expect("sessions");
         sessions.retain(|_, entry| entry.expires_at >= now);
         while sessions.len() >= max_capacity.max(1) {
             let Some(oldest_key) = sessions
@@ -335,16 +414,50 @@ impl DaemonAuthState {
         if trimmed.is_empty() {
             return None;
         }
-        let mut sessions = self.sessions.lock().expect("sessions");
         let now = Utc::now().timestamp();
-        match sessions.get(trimmed).cloned() {
-            Some(entry) if entry.expires_at >= now => Some(entry.principal),
-            Some(_) => {
-                sessions.remove(trimmed);
-                None
+        {
+            let mut sessions = self.sessions.lock().expect("sessions");
+            match sessions.get(trimmed).cloned() {
+                Some(entry) if entry.expires_at >= now => return Some(entry.principal),
+                Some(_) => {
+                    sessions.remove(trimmed);
+                }
+                None => {}
             }
-            None => None,
         }
+        if let Some(ref pool) = self.pool {
+            if let Ok(conn) = pool.connection() {
+                let token_hash = sha256_hex_token(trimmed);
+                let db_hit: Option<(String, String, String, i64)> = conn
+                    .query_row(
+                        "SELECT tenant_id, user_id, role, expires_at
+                         FROM daemon_sessions
+                         WHERE token_sha256 = ?1 AND revoked_at IS NULL AND expires_at >= ?2",
+                        params![token_hash, now],
+                        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                    )
+                    .optional()
+                    .ok()
+                    .flatten();
+                if let Some((tenant_id, user_id, role, exp)) = db_hit {
+                    let principal = FlowPrincipal {
+                        tenant_id,
+                        user_id,
+                        role,
+                    };
+                    let mut sessions = self.sessions.lock().expect("sessions");
+                    sessions.insert(
+                        trimmed.to_string(),
+                        SessionEntry {
+                            principal: principal.clone(),
+                            expires_at: exp,
+                        },
+                    );
+                    return Some(principal);
+                }
+            }
+        }
+        None
     }
 
     pub fn active_session_count(&self) -> usize {
@@ -416,7 +529,7 @@ fn verify_loopback_headers(
             "Non-loopback or cross-port Host rejected",
         ));
     }
-    let mut sec_fetch_site_val: Option<&str> = None;
+    let mut _sec_fetch_site_val: Option<&str> = None;
     if let Some(sfs) = headers.get("sec-fetch-site").and_then(|v| v.to_str().ok()) {
         let sfs_trimmed = sfs.trim();
         if sfs_trimmed != "same-origin" && sfs_trimmed != "none" {
@@ -426,7 +539,7 @@ fn verify_loopback_headers(
                 "Cross-site Sec-Fetch-Site rejected",
             ));
         }
-        sec_fetch_site_val = Some(sfs_trimmed);
+        _sec_fetch_site_val = Some(sfs_trimmed);
     }
     if let Some(orig) = headers.get("origin").and_then(|v| v.to_str().ok()) {
         let Some(orig_host) = extract_loopback_origin_host(orig) else {
@@ -436,11 +549,11 @@ fn verify_loopback_headers(
                 "Non-loopback Origin rejected",
             ));
         };
-        if sec_fetch_site_val == Some("same-origin") && !orig_host.eq_ignore_ascii_case(host) {
+        if !orig_host.eq_ignore_ascii_case(host) {
             return Err((
                 StatusCode::FORBIDDEN,
                 "ORIGIN_REJECTED",
-                "Cross-port Origin rejected for same-origin request",
+                "Cross-port or mismatched Origin rejected",
             ));
         }
     }

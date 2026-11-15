@@ -6,13 +6,15 @@ export const FLAGSHIP_MANIFEST_SENTINEL = "builtin://flagship";
 export const MAX_MANIFEST_ICONS = 2048;
 export const MAX_IDENTIFIER_LEN = 64;
 
-export const IconManifestEntrySchema = z.object({
-  name: z.string().min(1).max(MAX_IDENTIFIER_LEN),
-  tier: z.string().default(""),
-  file: z.string().default(""),
-  source: z.string().default(""),
-  tags: z.array(z.string()).default([]),
-});
+export const IconManifestEntrySchema = z
+  .object({
+    name: z.string().min(1).max(MAX_IDENTIFIER_LEN),
+    tier: z.string().default(""),
+    file: z.string().default(""),
+    source: z.string().default(""),
+    tags: z.array(z.string()).default([]),
+  })
+  .strict();
 
 export const IconManifestSchema = z
   .object({
@@ -25,79 +27,105 @@ export const IconManifestSchema = z
     message: "Icon manifest count must match icons length",
   });
 
-export const ValidateIconInputSchema = z.object({
-  icon: z.string().max(MAX_IDENTIFIER_LEN),
-});
+export const ValidateIconInputSchema = z
+  .object({
+    icon: z.string().max(MAX_IDENTIFIER_LEN),
+  })
+  .strict();
 
-export const IconValidationReportSchema = z.object({
-  requested_icon: z.string(),
-  is_valid: z.boolean(),
-  suggestions: z.array(z.string()),
-});
+export const IconValidationReportSchema = z
+  .object({
+    requested_icon: z.string(),
+    is_valid: z.boolean(),
+    suggestions: z.array(z.string()),
+  })
+  .strict();
 
-export const TypographyContractSchema = z.object({
-  allowed_font_families: z.array(z.string().min(1)),
-  allowed_font_weights: z.array(z.number().int().positive()),
-  allowed_font_sizes: z.array(z.string().min(1)),
-  min_wcag_contrast: z.number().positive(),
-});
+export const TypographyContractSchema = z
+  .object({
+    allowed_font_families: z.array(z.string().min(1)),
+    allowed_font_weights: z.array(z.number().int().positive()),
+    allowed_font_sizes: z.array(z.string().min(1)),
+    min_wcag_contrast: z.number().positive(),
+  })
+  .strict();
 
-export const ValidateTypographyInputSchema = z.object({
-  font_family: z.string().min(1),
-  font_weight: z.number().int().positive(),
-  font_size: z.string().min(1).nullable().optional(),
-  contrast_ratio: z.number().nonnegative(),
-});
+export const ValidateTypographyInputSchema = z
+  .object({
+    font_family: z.string().min(1),
+    font_weight: z.number().int().positive(),
+    font_size: z.string().min(1).nullable().optional(),
+    contrast_ratio: z.number().nonnegative(),
+  })
+  .strict();
 
-export const TypographyValidationReportSchema = z.object({
-  is_valid: z.boolean(),
-  errors: z.array(z.string()),
-});
+export const TypographyValidationReportSchema = z
+  .object({
+    is_valid: z.boolean(),
+    errors: z.array(z.string()),
+  })
+  .strict();
 
-export const ComponentRegistryEntrySchema = z.object({
-  name: z.string().min(1).max(MAX_IDENTIFIER_LEN),
-  source_spec: z.string().nullable().optional(),
-  allowed_props: z.array(z.string()).default([]),
-});
+export const ComponentRegistryEntrySchema = z
+  .object({
+    name: z.string().min(1).max(MAX_IDENTIFIER_LEN),
+    source_spec: z.string().nullable().optional(),
+    allowed_props: z.array(z.string()).default([]),
+  })
+  .strict();
 
-export const ComponentRegistryContractSchema = z.object({
-  components: z.array(ComponentRegistryEntrySchema).default([]),
-  forbid_unregistered: z.boolean().default(false),
-});
+export const ComponentRegistryContractSchema = z
+  .object({
+    components: z.array(ComponentRegistryEntrySchema).default([]),
+    forbid_unregistered: z.boolean().default(false),
+  })
+  .strict();
 
-export const ValidateComponentInputSchema = z.object({
-  component: z.string().max(MAX_IDENTIFIER_LEN),
-});
+export const ValidateComponentInputSchema = z
+  .object({
+    component: z.string().max(MAX_IDENTIFIER_LEN),
+  })
+  .strict();
 
-export const ComponentValidationReportSchema = z.object({
-  requested_component: z.string(),
-  is_valid: z.boolean(),
-  suggestions: z.array(z.string()),
-});
+export const ComponentValidationReportSchema = z
+  .object({
+    requested_component: z.string(),
+    is_valid: z.boolean(),
+    suggestions: z.array(z.string()),
+  })
+  .strict();
 
-export const ProjectDesignContractsSchema = z.object({
-  icon_manifest_path: z.string().min(1),
-  allowed_icon_set: z.array(z.string()).default([]),
-  typography_contract: TypographyContractSchema,
-  component_registry: ComponentRegistryContractSchema,
-});
+export const ProjectDesignContractsSchema = z
+  .object({
+    icon_manifest_path: z.string().min(1),
+    allowed_icon_set: z.array(z.string()).default([]),
+    typography_contract: TypographyContractSchema,
+    component_registry: ComponentRegistryContractSchema,
+  })
+  .strict();
 
-export const ConstraintViolationSchema = z.object({
-  rule_code: z.string(),
-  severity: z.string(),
-  message: z.string(),
-  line: z.number().int().nullable().optional(),
-  column: z.number().int().nullable().optional(),
-});
+export const ConstraintViolationSchema = z
+  .object({
+    rule_code: z.string(),
+    severity: z.string(),
+    message: z.string(),
+    line: z.number().int().nonnegative().nullable().optional(),
+    column: z.number().int().nonnegative().nullable().optional(),
+  })
+  .strict();
 
-export const LintSourceInputSchema = z.object({
-  source: z.string().min(1),
-});
+export const LintSourceInputSchema = z
+  .object({
+    source: z.string().min(1),
+  })
+  .strict();
 
-export const LintSourceResponseSchema = z.object({
-  violations: z.array(ConstraintViolationSchema),
-  passed: z.boolean(),
-});
+export const LintSourceResponseSchema = z
+  .object({
+    violations: z.array(ConstraintViolationSchema),
+    passed: z.boolean(),
+  })
+  .strict();
 
 export type IconManifestEntry = z.infer<typeof IconManifestEntrySchema>;
 export type IconManifest = z.infer<typeof IconManifestSchema>;

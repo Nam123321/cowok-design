@@ -21,3 +21,7 @@
 ## 2. Adversarial Boundary Verification
 - **RPN Threshold:** All residual RPN scores <= 10 (< 100 threshold).
 - **Verdict:** **PASS / APPROVED** — `EXTENSION_PLUGIN` boundary + Vault security verified `PROVEN_SAFE`.
+---
+
+## 3. Formal-verify candidates Triage
+- **Formal-verify candidates:** None mandatory for current scope (synchronous Vault write/read + bounded single-request HTTP SSRF probe); optional future candidate `ActiveProbeWorkerCap` (`concurrency <= 4` + `-PGID` timeout reaper) is verified by deterministic Rust tests and Playwright E2E.

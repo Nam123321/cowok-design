@@ -70,6 +70,15 @@ pub fn v7_migration_checksum() -> String {
     cached_migration_sha256(&CACHE, V7_MIGRATION_SQL)
 }
 
+pub const V8_MIGRATION_SQL: &str =
+    include_str!("../migrations/V8__daemon_auth_sessions_and_nonces.sql");
+pub const V8_MIGRATION_NAME: &str = "V8__daemon_auth_sessions_and_nonces.sql";
+
+pub fn v8_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V8_MIGRATION_SQL)
+}
+
 /// Configuration for the embedded SQLite WAL connection pool.
 #[derive(Debug, Clone)]
 pub struct SqliteWalConfig {
@@ -256,6 +265,7 @@ impl SqlitePool {
                     .write(true)
                     .create(true)
                     .truncate(true)
+                    .custom_flags(libc::O_NOFOLLOW)
                     .mode(0o600)
                     .open(&config.db_path)
                     .map_err(|e| HarnessError::ValidationFailed {
@@ -322,6 +332,7 @@ impl SqlitePool {
             Self::apply_v5_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v6_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v7_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v8_migration_if_needed(&mut conn, &config.db_path)?;
         }
         harden_sqlite_files(&config.db_path)?;
 
@@ -821,6 +832,8 @@ impl SqlitePool {
         Self::apply_v7_columns(&tx)?;
         tx.execute_batch(V7_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "genesis_v7"))?;
+        tx.execute_batch(V8_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v8"))?;
 
         let now = Utc::now().timestamp_millis();
         for (version, name, sha) in [
@@ -829,6 +842,7 @@ impl SqlitePool {
             (5i64, V5_MIGRATION_NAME, v5_migration_checksum()),
             (6i64, V6_MIGRATION_NAME, v6_migration_checksum()),
             (7i64, V7_MIGRATION_NAME, v7_migration_checksum()),
+            (8i64, V8_MIGRATION_NAME, v8_migration_checksum()),
         ] {
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
@@ -1053,6 +1067,51 @@ impl SqlitePool {
                         .to_string(),
             });
         }
+        Ok(())
+    }
+
+    fn apply_v8_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v8_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 8",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v8_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V8]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v8"))?;
+        tx.execute_batch(V8_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v8_sql"))?;
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (8, ?1, ?2, ?3)",
+            params![
+                V8_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
+        )
+        .map_err(|e| map_sqlite_error(e, "insert_v8_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v8_migration"))?;
         Ok(())
     }
 

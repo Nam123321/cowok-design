@@ -64,16 +64,15 @@ pub(crate) fn provision_project_workspace_root(
         let anchor = fs_jail::inspect_path_jail(Path::new(ws_str))?;
         fs_jail::ensure_writable_target_not_home(&anchor.canonical_path)?;
         if anchor.canonical_path != canon_reg {
-            let prov = fs_jail::provision_dir_zero_toctou(&anchor.canonical_path)?;
+            let prov = fs_jail::provision_dir_zero_toctou_checked(
+                &anchor.canonical_path,
+                Some(&anchor.canonical_path.display().to_string()),
+                Some(&anchor.ancestor_dev_ino),
+            )?;
             let is_managed = managed_slug_trimmed.is_some_and(|ms| {
                 fs_jail::default_managed_root()
                     .ok()
-                    .and_then(|mr| {
-                        fs::canonicalize(&mr)
-                            .or(Ok::<_, std::io::Error>(mr))
-                            .ok()
-                            .map(|cm| cm.join(ms))
-                    })
+                    .and_then(|mr| fs::canonicalize(&mr).ok().map(|cm| cm.join(ms)))
                     .is_some_and(|exp| prov.canonical_path == exp)
             });
             let provenance = if is_managed {
@@ -87,7 +86,12 @@ pub(crate) fn provision_project_workspace_root(
     if let Some(ms) = managed_slug_trimmed {
         let target = fs_jail::default_managed_root()?.join(ms);
         fs_jail::ensure_writable_target_not_home(&target)?;
-        let anchor = fs_jail::provision_dir_zero_toctou(&target)?;
+        let pre_anchor = fs_jail::inspect_path_jail(&target)?;
+        let anchor = fs_jail::provision_dir_zero_toctou_checked(
+            &target,
+            Some(&pre_anchor.canonical_path.display().to_string()),
+            Some(&pre_anchor.ancestor_dev_ino),
+        )?;
         return Ok((anchor.canonical_path, "managed", "folder_backed"));
     }
     provision_scratch_dir(&canon_reg, project_id)
@@ -206,6 +210,7 @@ fn resolve_unique_restore_slug(
 fn restore_project_in_tx(
     tx: &rusqlite::Transaction<'_>,
     project_id: Uuid,
+    registry_ws_root: &Path,
     now_ms: i64,
 ) -> Result<RestoreProjectResponse, HarnessError> {
     let row = load_trashed_project(tx, project_id)?;
@@ -222,9 +227,15 @@ fn restore_project_in_tx(
         )
         .optional()
         .map_err(|e| map_sqlite_error(e, "load_restore_boundary_type"))?;
-    let expected_scratch_suffix = format!("/.cowok-design/projects/{project_id}");
+    let expected_scratch_dir = fs::canonicalize(registry_ws_root)
+        .unwrap_or_else(|_| registry_ws_root.to_path_buf())
+        .join(".cowok-design")
+        .join("projects")
+        .join(project_id.to_string());
+    let row_ws_canon = fs::canonicalize(&row.workspace_root).ok();
     let is_verified_managed_scratch = boundary_type.as_deref() == Some("managed_scratch")
-        && row.workspace_root.ends_with(&expected_scratch_suffix);
+        && (row_ws_canon.as_ref() == Some(&expected_scratch_dir)
+            || Path::new(&row.workspace_root) == expected_scratch_dir);
     if !is_verified_managed_scratch && !row.workspace_root.trim().is_empty() {
         let anchor = fs_jail::inspect_path_jail(Path::new(&row.workspace_root))?;
         fs_jail::ensure_writable_target_not_home(&anchor.canonical_path)?;
@@ -283,7 +294,7 @@ pub(super) async fn handle_restore_project(
         let out = retry_on_busy("restore_project_tx", || {
             domain_err = None;
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-            match restore_project_in_tx(&tx, project_id, now_ms) {
+            match restore_project_in_tx(&tx, project_id, registry.pool().workspace_root(), now_ms) {
                 Ok(restored) => {
                     tx.commit()?;
                     Ok(Some(restored))

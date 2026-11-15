@@ -88,7 +88,13 @@ export function scanExternalScriptSecurity(
       };
     }
 
-    if (lower.includes("../../../") || lower.includes("/etc/passwd") || lower.includes("/root/")) {
+    if (
+      /\.\.[/\\]/.test(lower) ||
+      lower.includes("/etc/passwd") ||
+      lower.includes("/etc/shadow") ||
+      lower.includes("/root/") ||
+      lower.includes("/.ssh/")
+    ) {
       return {
         valid: false,
         error: `Detected path traversal pattern at line ${lineNum}`,
@@ -174,7 +180,14 @@ export function repackageDirectory(params: {
   upstreamUrl?: string;
 }): RepackageReceipt {
   const { sourceDir, destDir, skillName, description, capabilities, upstreamUrl } = params;
-  const dst = path.join(destDir, skillName);
+  if (!/^[a-zA-Z0-9._-]+$/.test(skillName) || skillName === "." || skillName === "..") {
+    throw new Error(`Invalid skillName for repackaging: ${skillName}`);
+  }
+  const resolvedDestRoot = path.resolve(destDir);
+  const dst = path.resolve(resolvedDestRoot, skillName);
+  if (!dst.startsWith(resolvedDestRoot + path.sep)) {
+    throw new Error(`Path traversal denied for skill destination: ${skillName}`);
+  }
 
   fs.mkdirSync(dst, { recursive: true });
   const scriptsDir = path.join(dst, "scripts");
@@ -189,8 +202,14 @@ export function repackageDirectory(params: {
 
   const entries = fs.readdirSync(sourceDir);
   for (const entry of entries) {
+    if (entry === "." || entry === ".." || entry.includes("/") || entry.includes("\\")) {
+      throw new Error(`Unsafe entry name during repackaging: ${entry}`);
+    }
     const srcPath = path.join(sourceDir, entry);
-    const stat = fs.statSync(srcPath);
+    const stat = fs.lstatSync(srcPath);
+    if (stat.isSymbolicLink()) {
+      throw new Error(`Symlink input rejected during repackaging: ${entry}`);
+    }
 
     if (stat.isFile()) {
       const content = fs.readFileSync(srcPath, "utf8");
@@ -254,7 +273,7 @@ This skill was repackaged into standard agentskills.io layout from external sour
   fs.writeFileSync(path.join(dst, "plugin.json"), JSON.stringify(manifest, null, 2), "utf8");
   filesCount++;
 
-  // discovery-stub.json (~1.2KB) (AC-04)
+  // discovery-stub.json (AC-04) — compute real UTF-8 byte length
   const stub: DiscoveryStub = {
     name: skillName,
     version: "1.0.0",
@@ -263,9 +282,16 @@ This skill was repackaged into standard agentskills.io layout from external sour
     capabilities,
     risk_tier: 2,
     package_sha256,
-    stub_size_bytes: 1200,
+    stub_size_bytes: 0,
   };
-  fs.writeFileSync(path.join(dst, "discovery-stub.json"), JSON.stringify(stub, null, 2), "utf8");
+  stub.stub_size_bytes = Buffer.byteLength(JSON.stringify(stub, null, 2), "utf8");
+  let stubJson = JSON.stringify(stub, null, 2);
+  const measuredBytes = Buffer.byteLength(stubJson, "utf8");
+  if (measuredBytes !== stub.stub_size_bytes) {
+    stub.stub_size_bytes = measuredBytes;
+    stubJson = JSON.stringify(stub, null, 2);
+  }
+  fs.writeFileSync(path.join(dst, "discovery-stub.json"), stubJson, "utf8");
   filesCount++;
 
   return {

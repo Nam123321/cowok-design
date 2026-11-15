@@ -166,12 +166,23 @@ export class BuiltinSkillsRegistry {
   }
 
   private loadSkillFolder(folder: string): SkillManifest | null {
+    try {
+      if (fs.lstatSync(folder).isSymbolicLink()) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+
     const pluginJsonPath = path.join(folder, "plugin.json");
     const skillMdPath = path.join(folder, "SKILL.md");
 
     let manifest: Partial<SkillManifest> = {};
 
     if (fs.existsSync(skillMdPath)) {
+      if (fs.lstatSync(skillMdPath).isSymbolicLink()) {
+        return null;
+      }
       const raw = fs.readFileSync(skillMdPath, "utf8");
       const validation = validateSkillFrontmatter(raw);
       if (!validation.valid) {
@@ -186,6 +197,9 @@ export class BuiltinSkillsRegistry {
     }
 
     if (fs.existsSync(pluginJsonPath)) {
+      if (fs.lstatSync(pluginJsonPath).isSymbolicLink()) {
+        return null;
+      }
       try {
         const rawJson = fs.readFileSync(pluginJsonPath, "utf8");
         const jsonManifest = JSON.parse(rawJson);
@@ -195,7 +209,13 @@ export class BuiltinSkillsRegistry {
       }
     }
 
-    if (manifest.name && manifest.description) {
+    if (
+      manifest.name &&
+      manifest.description &&
+      /^[a-zA-Z0-9._-]+$/.test(manifest.name) &&
+      manifest.name !== "." &&
+      manifest.name !== ".."
+    ) {
       return {
         name: manifest.name,
         version: manifest.version || "1.0.0",

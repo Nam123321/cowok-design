@@ -66,12 +66,16 @@ use project_trash::handle_restore_project;
 
 impl DaemonAppState {
     pub fn new(registry: Arc<SpecRegistry>, host: String, port: u16) -> Self {
-        let auth = DaemonAuthState::from_registry_root(registry.pool().workspace_root());
+        let auth = DaemonAuthState::from_registry_root_with_pool(
+            registry.pool().workspace_root(),
+            Some(registry.pool().clone()),
+        );
         Self {
             registry,
             host,
             port,
             auth,
+            ram_vault: crate::vault::RamVaultStore::default(),
         }
     }
 
@@ -86,6 +90,7 @@ impl DaemonAppState {
             host,
             port,
             auth,
+            ram_vault: crate::vault::RamVaultStore::default(),
         }
     }
 }
@@ -96,6 +101,7 @@ pub struct DaemonAppState {
     pub host: String,
     pub port: u16,
     pub auth: Arc<DaemonAuthState>,
+    pub ram_vault: crate::vault::RamVaultStore,
 }
 
 pub(crate) fn state_auth(state: &DaemonAppState) -> Arc<DaemonAuthState> {
