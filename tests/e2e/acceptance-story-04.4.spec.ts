@@ -102,9 +102,10 @@ async function verifyPluginsAndCreateProject(page: Page, request: APIRequestCont
 }
 
 async function verifyFifoCasAndSse(request: APIRequestContext, baseUrl: string, headers: Record<string, string>, projectId: string) {
+  const testSessionId = `sess-e2e-044-${Date.now()}`;
   const enqRes = await request.post(`${baseUrl}api/projects/${projectId}/flow/jobs/enqueue`, {
     headers,
-    data: { sessionId: "sess-e2e-044", nodeIds: ["n1", "n2", "n3", "n4", "n5"], prompt: "Build screen", mode: "parallel" },
+    data: { sessionId: testSessionId, nodeIds: ["n1", "n2", "n3", "n4", "n5"], prompt: "Build screen", mode: "parallel" },
   });
   expect(enqRes.status()).toBe(201);
   const enqBody = (await enqRes.json()) as { jobs: Array<{ id: string; status: string; fencingToken: number }>; activeSlotCount: number };
@@ -142,7 +143,7 @@ async function verifyFifoCasAndSse(request: APIRequestContext, baseUrl: string, 
   const ev1Res = await request.post(`${baseUrl}api/projects/${projectId}/flow/jobs/events`, {
     headers,
     data: {
-      jobId: enqBody.jobs[2].id, sessionId: "sess-e2e-044", nodeId: "n3",
+      jobId: enqBody.jobs[2].id, sessionId: testSessionId, nodeId: "n3",
       eventKind: "chunk", payloadText: "n3 first chunk", jobStatus: "RUNNING", expectedFencingToken: enqBody.jobs[2].fencingToken,
     },
   });
@@ -153,7 +154,7 @@ async function verifyFifoCasAndSse(request: APIRequestContext, baseUrl: string, 
   const ev2Res = await request.post(`${baseUrl}api/projects/${projectId}/flow/jobs/events`, {
     headers,
     data: {
-      jobId: enqBody.jobs[2].id, sessionId: "sess-e2e-044", nodeId: "n3",
+      jobId: enqBody.jobs[2].id, sessionId: testSessionId, nodeId: "n3",
       eventKind: "completed", payloadText: "n3 done", jobStatus: "COMPLETED", expectedFencingToken: enqBody.jobs[2].fencingToken + 1,
     },
   });
