@@ -94,12 +94,18 @@ export const CreateScreenFixtureSchema = z.object({
   variant: FixtureVariantSchema,
   payloadJson: z.string().default("{}"),
   isDefault: z.boolean().default(false),
+  presetKey: z.string().optional(),
+  sampleRowsJson: z.string().optional().default("[]"),
+  revision: z.number().int().min(1).optional().default(1),
 });
-export type CreateScreenFixture = z.infer<typeof CreateScreenFixtureSchema>;
+export type CreateScreenFixture = z.input<typeof CreateScreenFixtureSchema>;
 
 export const UpdateScreenFixtureSchema = z.object({
   payloadJson: z.string().optional(),
   isDefault: z.boolean().optional(),
+  presetKey: z.string().optional(),
+  sampleRowsJson: z.string().optional(),
+  expectedRevision: z.number().int().min(1).optional(),
 });
 export type UpdateScreenFixture = z.infer<typeof UpdateScreenFixtureSchema>;
 
@@ -111,6 +117,9 @@ export const ScreenFixtureResponseSchema = z.object({
   variant: FixtureVariantSchema,
   payloadJson: z.string(),
   isDefault: z.boolean(),
+  presetKey: z.string().nullable().optional().default(null),
+  sampleRowsJson: z.string().default("[]"),
+  revision: z.number().int().min(1).default(1),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

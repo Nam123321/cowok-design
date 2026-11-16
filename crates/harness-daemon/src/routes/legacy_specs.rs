@@ -51,6 +51,16 @@ pub struct CreateProjectHttpRequest {
     pub managed_slug: Option<String>,
     #[serde(default)]
     pub provenance: Option<String>,
+    #[serde(default, alias = "entryPath")]
+    pub entry_path: Option<String>,
+    #[serde(default, alias = "templateId")]
+    pub template_id: Option<String>,
+    #[serde(default, alias = "designSourceUrl")]
+    pub design_source_url: Option<String>,
+    #[serde(default, alias = "gitRepoUrl")]
+    pub git_repo_url: Option<String>,
+    #[serde(default, alias = "gitBranch")]
+    pub git_branch: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -265,6 +275,38 @@ pub(super) async fn handle_create_project(
         .map(|Extension(v)| v.principal.tenant_id)
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| "local-default".to_string());
+
+    let entry = req.entry_path.as_deref().unwrap_or("prompt_prd").trim().to_string();
+    if !matches!(entry.as_str(), "prompt_prd" | "starter_template" | "design_import" | "git_codebase") {
+        return Err(map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("Invalid entryPath '{entry}' (expected prompt_prd | starter_template | design_import | git_codebase)"),
+        }));
+    }
+
+    if entry == "git_codebase" {
+        let repo_url = match &req.git_repo_url {
+            Some(u) if !u.trim().is_empty() => u.trim(),
+            _ => return Err(map_error_to_response(HarnessError::ValidationFailed {
+                reason: "gitRepoUrl is required for git_codebase entry path".to_string(),
+            })),
+        };
+        let lower_url = repo_url.to_ascii_lowercase();
+        if lower_url.starts_with("file:") || lower_url.starts_with("ext:") || lower_url.contains("..") {
+            return Err(map_error_to_response(HarnessError::ValidationFailed {
+                reason: format!("PROTOCOL_DENIED: Protocol or path in '{repo_url}' is forbidden"),
+            }));
+        }
+        let is_whitelisted = lower_url.starts_with("https://")
+            || lower_url.starts_with("http://")
+            || lower_url.starts_with("ssh://")
+            || lower_url.starts_with("git@");
+        if !is_whitelisted {
+            return Err(map_error_to_response(HarnessError::ValidationFailed {
+                reason: format!("PROTOCOL_DENIED: Protocol in '{repo_url}' is not in allowlist (https|http|ssh|git@)"),
+            }));
+        }
+    }
+
     let core_req = CreateProjectRequest {
         id: req.id,
         slug: req.slug,
@@ -275,14 +317,69 @@ pub(super) async fn handle_create_project(
     };
     let managed_slug = req.managed_slug;
     let provenance_override = req.provenance;
+    let git_repo_url = req.git_repo_url;
+    let git_branch = req.git_branch;
+
     let created = tokio::task::spawn_blocking(move || {
-        create_project_isolated_with_options(
+        let dto = create_project_isolated_with_options(
             &registry,
             &core_req,
             &tenant_id,
             managed_slug.as_deref(),
             provenance_override.as_deref(),
-        )
+        )?;
+
+        // Execute path-specific initialization if workspace_root is present
+        if let Some(ref ws_str) = dto.workspace_root {
+            let ws_path = PathBuf::from(ws_str);
+            if entry == "git_codebase" {
+                if let Some(ref url) = git_repo_url {
+                    let mut cmd = std::process::Command::new("git");
+                    cmd.args([
+                        "-c", "core.hooksPath=/dev/null",
+                        "-c", "core.fsmonitor=false",
+                        "-c", "protocol.file.allow=never",
+                        "clone", "--depth", "1",
+                    ]);
+                    if let Some(ref br) = git_branch {
+                        if !br.trim().is_empty() {
+                            cmd.args(["--branch", br.trim()]);
+                        }
+                    }
+                    cmd.arg(url);
+                    cmd.arg(&ws_path);
+                    let _ = cmd.output();
+
+                    // Post-canonicalization containment against TOCTOU
+                    if let Ok(canon) = std::fs::canonicalize(&ws_path) {
+                        if !canon.starts_with(&ws_path) && !ws_path.starts_with(&canon) {
+                            return Err(HarnessError::BoundaryViolation {
+                                reason: "TOCTOU_CONTAINMENT_VIOLATION: Cloned workspace escaped boundary".to_string(),
+                            });
+                        }
+                    }
+                }
+            } else if entry == "design_import" {
+                let design_md_path = ws_path.join("DESIGN.md");
+                if !design_md_path.exists() {
+                    let _ = std::fs::write(
+                        &design_md_path,
+                        "# Design Specification (Imported)\n\n## 1. Visual Style\ndesign-token-governed\n\n## 2. Viewport\ndesktop-1440\n",
+                    );
+                }
+            } else if entry == "starter_template" {
+                let spec_path = ws_path.join("specs").join("01-product-overview.md");
+                let _ = std::fs::create_dir_all(ws_path.join("specs"));
+                if !spec_path.exists() {
+                    let _ = std::fs::write(
+                        &spec_path,
+                        format!("# {}\n\nStarter template generated project.", core_req.name),
+                    );
+                }
+            }
+        }
+
+        Ok(dto)
     })
     .await
     .map_err(|e| {

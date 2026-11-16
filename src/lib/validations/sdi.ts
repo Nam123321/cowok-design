@@ -14,10 +14,29 @@ export const ClarificationVariantSchema = z.object({
   previewPayload: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
 });
 
+export const GapQuestionOptionSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().optional(),
+  previewThumbnail: z.string().optional(),
+});
+export type GapQuestionOption = z.infer<typeof GapQuestionOptionSchema>;
+
+export const GapQuestionSchema = z.object({
+  id: z.string().min(1),
+  question: z.string().min(1),
+  category: z.string().min(1),
+  options: z.array(GapQuestionOptionSchema).min(1),
+  defaultOptionId: z.string().optional(),
+});
+export type GapQuestion = z.infer<typeof GapQuestionSchema>;
+
 export const CompileIntentSchema = z.object({
   rawPrompt: z.string().min(MIN_PROMPT_LENGTH).max(MAX_PROMPT_LENGTH),
   sourceAnchorCommentId: z.string().optional(),
   targetNodeId: z.string().optional(),
+  executeImmediately: z.boolean().optional(),
+  idempotencyKey: z.string().optional(),
 });
 
 export const ClarificationSelectSchema = z.object({
@@ -31,6 +50,7 @@ export const DesignIntentResponseSchema = z.object({
   projectId: z.string().min(1),
   rawPrompt: z.string(),
   intentType: z.enum(["create_screen", "update_flow", "edit_slide", "extract_rea", "general_refactor"]),
+  routingMode: z.enum(["direct_edit", "full_plan", "clarification_required"]).default("direct_edit").optional(),
   targetScope: z.object({
     nodeIds: z.array(z.string()),
     screenKeys: z.array(z.string()),
@@ -39,7 +59,9 @@ export const DesignIntentResponseSchema = z.object({
   ambiguityScore: z.number().min(0).max(1),
   riskScore: z.number().min(0).max(1),
   clarificationVariants: z.array(ClarificationVariantSchema).max(MAX_VARIANTS_COUNT).optional(),
+  gapQuestions: z.array(GapQuestionSchema).optional(),
   status: z.enum(["clarifying", "ready", "executed"]),
+  revision: z.number().int().min(1).default(1).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

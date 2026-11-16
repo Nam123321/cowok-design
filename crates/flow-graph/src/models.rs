@@ -31,6 +31,16 @@ pub struct FlowNodeDto {
     pub layout_version: i64,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub portal_group: Option<String>,
+    #[serde(default)]
+    pub shared_app_shell_id: Option<String>,
+    #[serde(default)]
+    pub mini_skeleton_html: Option<String>,
+    #[serde(default = "default_cta_pills")]
+    pub cta_pills_json: String,
+    #[serde(default = "default_revision")]
+    pub revision: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -47,6 +57,12 @@ pub struct FlowTransitionDto {
     pub version: i64,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub source_cta_ff_id: Option<String>,
+    #[serde(default = "default_max_loop_iterations")]
+    pub max_loop_iterations: i64,
+    #[serde(default = "default_revision")]
+    pub revision: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -55,6 +71,8 @@ pub struct FlowGraphSnapshotDto {
     pub graph_id: String,
     pub graph_version: i64,
     pub layout_version: i64,
+    #[serde(default = "default_revision")]
+    pub revision: i64,
     pub nodes: Vec<FlowNodeDto>,
     pub transitions: Vec<FlowTransitionDto>,
 }
@@ -85,6 +103,16 @@ pub struct CreateFlowNodeInput {
     pub pos_x: f64,
     #[serde(default)]
     pub pos_y: f64,
+    #[serde(default)]
+    pub portal_group: Option<String>,
+    #[serde(default)]
+    pub shared_app_shell_id: Option<String>,
+    #[serde(default)]
+    pub mini_skeleton_html: Option<String>,
+    #[serde(default = "default_cta_pills")]
+    pub cta_pills_json: String,
+    #[serde(default = "default_revision")]
+    pub revision: i64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -103,6 +131,11 @@ pub struct UpdateFlowNodeInput {
     pub pos_y: Option<f64>,
     pub expected_version: Option<i64>,
     pub expected_layout_version: Option<i64>,
+    pub portal_group: Option<String>,
+    pub shared_app_shell_id: Option<String>,
+    pub mini_skeleton_html: Option<String>,
+    pub cta_pills_json: Option<String>,
+    pub expected_revision: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -155,6 +188,14 @@ pub struct CreateFlowTransitionInput {
     #[serde(default = "default_trigger_event")]
     pub trigger_event: String,
     pub guard_condition: Option<String>,
+    #[serde(default)]
+    pub source_cta_ff_id: Option<String>,
+    #[serde(default = "default_max_loop_iterations")]
+    pub max_loop_iterations: i64,
+    #[serde(default)]
+    pub allow_confirmed_loopback: Option<bool>,
+    #[serde(default = "default_revision")]
+    pub revision: i64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -166,6 +207,10 @@ pub struct UpdateFlowTransitionInput {
     pub guard_condition: Option<Option<String>>,
     pub reversed: Option<bool>,
     pub expected_version: Option<i64>,
+    pub source_cta_ff_id: Option<Option<String>>,
+    pub max_loop_iterations: Option<i64>,
+    pub allow_confirmed_loopback: Option<bool>,
+    pub expected_revision: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -212,6 +257,10 @@ pub struct DeployFlowDraftInput {
     pub updated_transitions: Vec<DraftTransitionUpdateItem>,
     #[serde(default)]
     pub deleted_transitions: Vec<DraftTransitionDeleteItem>,
+    #[serde(default)]
+    pub allow_confirmed_loopback: Option<bool>,
+    #[serde(default)]
+    pub expected_revision: Option<i64>,
 }
 
 #[derive(Debug, Clone)]
@@ -316,4 +365,73 @@ fn default_flow_type() -> String {
 }
 fn default_trigger_event() -> String {
     "onClick".to_string()
+}
+fn default_max_loop_iterations() -> i64 {
+    3
+}
+fn default_revision() -> i64 {
+    1
+}
+fn default_cta_pills() -> String {
+    "[]".to_string()
+}
+
+impl Default for CreateFlowNodeInput {
+    fn default() -> Self {
+        Self {
+            id: None,
+            portal_id: default_portal(),
+            screen_key: String::new(),
+            title: String::new(),
+            node_type: default_node_type(),
+            route_path: default_route_path(),
+            component_entry_path: String::new(),
+            fixture_ref: default_fixture_ref(),
+            fixture_json: default_fixture_json(),
+            note: String::new(),
+            viewport_preset: default_viewport(),
+            pos_x: 0.0,
+            pos_y: 0.0,
+            portal_group: None,
+            shared_app_shell_id: None,
+            mini_skeleton_html: None,
+            cta_pills_json: default_cta_pills(),
+            revision: 1,
+        }
+    }
+}
+
+impl Default for CreateFlowTransitionInput {
+    fn default() -> Self {
+        Self {
+            id: None,
+            source_node_id: String::new(),
+            target_node_id: String::new(),
+            flow_type: default_flow_type(),
+            trigger_event: default_trigger_event(),
+            guard_condition: None,
+            source_cta_ff_id: None,
+            max_loop_iterations: default_max_loop_iterations(),
+            allow_confirmed_loopback: None,
+            revision: 1,
+        }
+    }
+}
+
+impl Default for DeployFlowDraftInput {
+    fn default() -> Self {
+        Self {
+            draft_id: String::new(),
+            expected_graph_version: 1,
+            created_nodes: Vec::new(),
+            updated_nodes: Vec::new(),
+            deleted_nodes: Vec::new(),
+            updated_node_positions: Vec::new(),
+            created_transitions: Vec::new(),
+            updated_transitions: Vec::new(),
+            deleted_transitions: Vec::new(),
+            allow_confirmed_loopback: None,
+            expected_revision: None,
+        }
+    }
 }

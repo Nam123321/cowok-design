@@ -4,7 +4,7 @@ id: "05.1"
 title: "Story 05.1: Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11)"
 description: "Nâng cấp giao diện tạo dự án hỗ trợ 4 lối vào (Prompt/PRD, Starter Templates, Design/Reference Import, Codebase Mode); xây dựng Option 5 Action-Linked Vertical Storyboard 2D đồng bộ CTA <16ms; triển khai Entry-First Live Shell đắp dần trên IframeKeepAlivePool (LRU-5); Shared AppShell đa màn hình; và thanh công cụ 5-Mode Visual Canvas Toolbar kèm SDI Gap-Driven Discovery."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-05/Story-05.1/story.md"
-status: refactored
+status: completed
 risk_tier: 2
 delivery: core
 timestamp: "2026-11-12T16:00:00+07:00"
@@ -18,7 +18,7 @@ links_to:
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md"
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/DESIGN.md"
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/preview.html"
-dependencies: ["02.2", "04.5"]
+dependencies: ["04.5"]
 provides_apis:
   - "internal:epic-05/story-05.1"
 consumes_apis: []
@@ -28,7 +28,7 @@ consumes_apis: []
 
 - **FR Covered:** [FR-04, FR-05: Trình biên dịch Structured Design Intent (SDI) (DesignIntentV1) & Visual Clarification](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 05: Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-05/epic.md)
-- **Status:** refactored
+- **Status:** completed
 - **Risk Tier:** `2`
 
 ## 1. Story Description & Context
@@ -62,30 +62,30 @@ Triển khai lát cắt dọc hoàn chỉnh cho Story 05.1 theo Master Plan:
 - **[EDGE-CASE] EC-STORYBOARD-001 (Exception Branch Isolation, Dirty Editor Guard & Pure CSS Cleanup):** Thu gọn nhánh ngoại lệ không làm xô lệch tọa độ toàn đồ thị; khóa an toàn code đang gõ dở khi job nền xong; thanh tẩy 100% Tailwind utility classes trong `src/features/sdi/**` sang `tokens.css` (kế thừa `CompanionLiveHtmlRightPane` đã được chuẩn hóa ở `Story 04.5`; `src/features/preview/**` đã được giải thể ở `Story 04.1`).
 
 ## 4. Tasks
-- [ ] **Task 05.1.1**: Xây dựng luồng hiển thị Chat tối giản (`.chat-human-bubble` + `.chat-agent-prose` không avatar) và `FloatingCapsuleComposer` tinh gọn có khay `#chatAttachmentTray` (thỏa mãn `AC-01`).
-- [ ] **Task 05.1.2**: Cài đặt bộ tuần tự hóa `deployDagDraftToAgent()` sinh gói `flow-changes-draft.json` (`cowok-design.flow-diff.v1`) từ các thay đổi cấu trúc trên 2D DAG gửi sang khung Chat (thỏa mãn `AC-02`).
-- [ ] **Task 05.1.3**: Cài đặt bộ phân tích xung đột đồ thị DAG (`Conflict / Ambiguity Analyzer`) và giao diện hỏi xác nhận trực tiếp trong phản hồi của Agent trước khi thực thi (thỏa mãn `AC-03`, `AC-04`).
-- [ ] **Task 05.1.4**: Nâng cấp Project Launchpad hỗ trợ 4 lối vào tạo/nạp dự án (thỏa mãn `AC-05`).
-- [ ] **Task 05.1.5**: Cài đặt Option 5 Action-Linked 2D Storyboard với Magnetic Vertical Spine, CTA Pills, đồng bộ hover `<16ms` và loopback edge support (thỏa mãn `AC-06`).
-- [ ] **Task 05.1.6**: Xây dựng Entry-First Live Shell, IframeKeepAlivePool (LRU-5), Shared AppShell cho Portal Groups và Sample Data Studio (thỏa mãn `AC-07`).
-- [ ] **Task 05.1.7**: Hoàn thiện 5-Mode Visual Canvas Toolbar, Inline `</>` Editor và SDI Gap-Driven Discovery (thỏa mãn `AC-08`).
-- [ ] **Task 05.1.8**: Cài đặt `EC-STORYBOARD-001` và thanh tẩy 100% Tailwind classes trong `src/features/sdi/**` (thỏa mãn `EC-STORYBOARD-001`).
+- [x] **Task 05.1.1**: Xây dựng luồng hiển thị Chat tối giản (`.chat-human-bubble` + `.chat-agent-prose` không avatar) và `FloatingCapsuleComposer` tinh gọn có khay `#chatAttachmentTray` (thỏa mãn `AC-01`).
+- [x] **Task 05.1.2**: Cài đặt bộ tuần tự hóa `deployDagDraftToAgent()` sinh gói `flow-changes-draft.json` (`cowok-design.flow-diff.v1`) từ các thay đổi cấu trúc trên 2D DAG gửi sang khung Chat (thỏa mãn `AC-02`).
+- [x] **Task 05.1.3**: Cài đặt bộ phân tích xung đột đồ thị DAG (`Conflict / Ambiguity Analyzer`) và giao diện hỏi xác nhận trực tiếp trong phản hồi của Agent trước khi thực thi (thỏa mãn `AC-03`, `AC-04`).
+- [x] **Task 05.1.4**: Nâng cấp Project Launchpad hỗ trợ 4 lối vào tạo/nạp dự án (thỏa mãn `AC-05`).
+- [x] **Task 05.1.5**: Cài đặt Option 5 Action-Linked 2D Storyboard với Magnetic Vertical Spine, CTA Pills, đồng bộ hover `<16ms` và loopback edge support (thỏa mãn `AC-06`).
+- [x] **Task 05.1.6**: Xây dựng Entry-First Live Shell, IframeKeepAlivePool (LRU-5), Shared AppShell cho Portal Groups và Sample Data Studio (thỏa mãn `AC-07`).
+- [x] **Task 05.1.7**: Hoàn thiện 5-Mode Visual Canvas Toolbar, Inline `</>` Editor và SDI Gap-Driven Discovery (thỏa mãn `AC-08`).
+- [x] **Task 05.1.8**: Cài đặt `EC-STORYBOARD-001` và thanh tẩy 100% Tailwind classes trong `src/features/sdi/**` (thỏa mãn `EC-STORYBOARD-001`).
 
 ## 5. AC-to-Task Traceability Matrix
 | AC ID | Description | Mapped Implementation Tasks | Verification Method | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **AC-01** | Zero-Avatar & Open-Prose Chat | `Task 05.1.1` | DOM Inspection & CSS Token Test | pending |
-| **AC-02** | 2D DAG Draft JSON Serializer | `Task 05.1.2` | flow-changes-draft.json Schema Test | pending |
-| **AC-03** | Agent AST Conflict & Ambiguity Confirmation | `Task 05.1.3` | DAG Cycle & Ambiguity Test | pending |
-| **AC-04** | [EDGE-CASE] Conflict Block & Wide Pre Overflow | `Task 05.1.3` | Boundary Regression Test | pending |
-| **AC-05** | New Project Hub — 4 Entry Paths | `Task 05.1.4` | Launchpad 4-Path Integration Test | pending |
-| **AC-06** | Option 5 Action-Linked 2D Storyboard | `Task 05.1.5` | CTA Sync & Loopback Playwright Test | pending |
-| **AC-07** | Entry-First Live Shell & Shared AppShell | `Task 05.1.6` | LRU-5 Pool & Shell Inheritance Test | pending |
-| **AC-08** | 5-Mode Toolbar & Gap-Driven Discovery | `Task 05.1.7` | Toolbar & SDI Discovery Test | pending |
-| **EC-STORYBOARD-001** | [EDGE-CASE] Exception Branch & Tailwind Cleanup | `Task 05.1.8` | Clean Code Guardian & AST Linter Test | pending |
+| **AC-01** | Zero-Avatar & Open-Prose Chat | `Task 05.1.1` | DOM Inspection & CSS Token Test | completed |
+| **AC-02** | 2D DAG Draft JSON Serializer | `Task 05.1.2` | flow-changes-draft.json Schema Test | completed |
+| **AC-03** | Agent AST Conflict & Ambiguity Confirmation | `Task 05.1.3` | DAG Cycle & Ambiguity Test | completed |
+| **AC-04** | [EDGE-CASE] Conflict Block & Wide Pre Overflow | `Task 05.1.3` | Boundary Regression Test | completed |
+| **AC-05** | New Project Hub — 4 Entry Paths | `Task 05.1.4` | Launchpad 4-Path Integration Test | completed |
+| **AC-06** | Option 5 Action-Linked 2D Storyboard | `Task 05.1.5` | CTA Sync & Loopback Playwright Test | completed |
+| **AC-07** | Entry-First Live Shell & Shared AppShell | `Task 05.1.6` | LRU-5 Pool & Shell Inheritance Test | completed |
+| **AC-08** | 5-Mode Toolbar & Gap-Driven Discovery | `Task 05.1.7` | Toolbar & SDI Discovery Test | completed |
+| **EC-STORYBOARD-001** | [EDGE-CASE] Exception Branch & Tailwind Cleanup | `Task 05.1.8` | Clean Code Guardian & AST Linter Test | completed |
 
 ## 6. Cross-Feature Dependencies
-- **Story Dependencies:** `["02.2", "04.5"]`
+- **Story Dependencies:** `["04.5"]`
 
 ### Impacts
 - Cung cấp toàn bộ nền tảng Storyboard 2D, Entry-First Live Shell, CTA Sync và SDI Gap-Driven Discovery cho `Story 05.2`, `Story 05.3` và các Vertical Epics tiếp theo.

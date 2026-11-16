@@ -202,7 +202,7 @@ export const SettingsApiBentoPanel: React.FC<SettingsApiBentoPanelProps> = (p) =
             {t("settings.apiBentoTitle", "2. Kết nối API Providers (BYOK & Gateway)")}
           </div>
           <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "2px" }}>
-            Gemini · Claude · OpenAI · OpenRouter · DeepSeek · BYOS/Ollama
+            {t("settings.apiProvidersList", "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · BYOS/Ollama")}
             {connectedCount > 0 ? ` (${connectedCount} ${t("settings.configuredShort", "đã nhập")})` : ""}
           </div>
         </div>

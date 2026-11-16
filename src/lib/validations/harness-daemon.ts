@@ -31,8 +31,21 @@ export const ManagedProjectSlugSchema = z
 export type ManagedProjectSlug = z.infer<typeof ManagedProjectSlugSchema>;
 
 export const ProjectProvenanceSchema = z
-  .enum(["scratch", "managed", "folder-backed", "folder_backed"])
-  .transform((v) => (v === "folder_backed" ? "folder-backed" : v));
+  .enum([
+    "scratch",
+    "managed",
+    "folder-backed",
+    "folder_backed",
+    "git-codebase",
+    "git_codebase",
+    "design_import",
+    "starter_template",
+  ])
+  .transform((v) => {
+    if (v === "folder_backed") return "folder-backed";
+    if (v === "git_codebase") return "git-codebase";
+    return v;
+  });
 
 export const CreateProjectInputSchema = z.object({
   id: z.string().uuid().optional(),
@@ -43,6 +56,16 @@ export const CreateProjectInputSchema = z.object({
   inherit_brand_from_project_id: z.string().uuid().nullable().optional(),
   managed_slug: ManagedProjectSlugSchema.nullable().optional(),
   provenance: ProjectProvenanceSchema.optional(),
+  entryPath: z.enum(["prompt_prd", "starter_template", "design_import", "git_codebase"]).optional(),
+  entry_path: z.enum(["prompt_prd", "starter_template", "design_import", "git_codebase"]).optional(),
+  templateId: z.string().optional(),
+  template_id: z.string().optional(),
+  designSourceUrl: z.string().optional(),
+  design_source_url: z.string().optional(),
+  gitRepoUrl: z.string().optional(),
+  git_repo_url: z.string().optional(),
+  gitBranch: z.string().optional(),
+  git_branch: z.string().optional(),
 });
 export type CreateProjectInput = z.infer<typeof CreateProjectInputSchema>;
 

@@ -33,7 +33,9 @@ function hasSemanticEdgeChange(base: WorkbenchTransition, curr: WorkbenchTransit
     base.targetNodeId !== curr.targetNodeId ||
     base.triggerEvent !== curr.triggerEvent ||
     base.edgeType !== curr.edgeType ||
-    (base.guardCondition || null) !== (curr.guardCondition || null)
+    (base.guardCondition || null) !== (curr.guardCondition || null) ||
+    (base.sourceCtaFfId || null) !== (curr.sourceCtaFfId || null) ||
+    (base.maxLoopIterations ?? 3) !== (curr.maxLoopIterations ?? 3)
   );
 }
 
@@ -97,6 +99,9 @@ function buildUpdatedTransitionDtos(
           flowType: edgeTypeToCanonical(e.edgeType),
           triggerEvent: normalizeTriggerEvent(e.triggerEvent),
           guardCondition: e.guardCondition ?? e.conditionLabel ?? null,
+          sourceCtaFfId: e.sourceCtaFfId ?? undefined,
+          maxLoopIterations: e.maxLoopIterations ?? undefined,
+          allowConfirmedLoopback: e.edgeType === "loopback" ? true : undefined,
           reversed: reversed || undefined,
           expectedVersion: b.version,
         },
@@ -128,6 +133,9 @@ function buildCreatedTransitionDtos(transitions: WorkbenchTransition[], baseEdge
       flowType: edgeTypeToCanonical(e.edgeType),
       triggerEvent: normalizeTriggerEvent(e.triggerEvent),
       guardCondition: e.guardCondition ?? e.conditionLabel ?? null,
+      sourceCtaFfId: e.sourceCtaFfId ?? undefined,
+      maxLoopIterations: e.maxLoopIterations ?? undefined,
+      allowConfirmedLoopback: e.edgeType === "loopback" ? true : undefined,
     }));
 }
 

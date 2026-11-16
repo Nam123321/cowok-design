@@ -1,5 +1,5 @@
-// @story 04.1, 04.5
-// @implements AC-02 (Option CSP-B: DOMParser-Only Zero-Network default-src 'none')
+// @story 04.1, 04.5, 05.1
+// @implements AC-02 (Option CSP-B: DOMParser-Only Zero-Network default-src 'none' + CSPRNG Script Nonce & Real Async SHA-256)
 import {
   HostToIframeMessageSchema,
   IframeToHostMessageSchema,
@@ -9,6 +9,7 @@ import {
 import type { ScreenPreviewData, SlidePhaseItem } from "../components/companion-canvas-data";
 import {
   buildByteZeroBridgeScript,
+  computeArtifactSha256,
   computeArtifactSha256Sync,
   generateBootSecret,
   generateEpochNonce,
@@ -17,6 +18,7 @@ import {
 export {
   HostToIframeMessageSchema,
   IframeToHostMessageSchema,
+  computeArtifactSha256,
   computeArtifactSha256Sync,
   generateBootSecret,
   generateEpochNonce,
@@ -24,13 +26,19 @@ export {
 export type { HostToIframeMessage, IframeToHostMessage };
 
 export const IFRAME_SANDBOX_PERMISSIONS = "allow-scripts allow-forms" as const;
+const DOM_ANCHOR_HASH_LEN = 16;
+
+export function buildStrictOfflineCsp(scriptNonce: string): string {
+  return `default-src 'none'; base-uri 'none'; connect-src 'none'; form-action 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; script-src 'nonce-${scriptNonce}';`;
+}
 
 export const STRICT_OFFLINE_CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; script-src 'unsafe-inline'; connect-src 'none'; form-action 'none';";
+  "default-src 'none'; base-uri 'none'; connect-src 'none'; form-action 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; script-src 'unsafe-inline';";
 
 export interface WrapUserHtmlOptions {
   epoch?: number;
   bootSecret?: string;
+  scriptNonce?: string;
   artifactSha256?: string;
   domAnchorHash?: string;
   parentOrigin?: string;
@@ -48,6 +56,7 @@ const MAX_HTML_PAYLOAD_BYTES = 1_048_576;
 const SAFE_ATTR_NAME_RE = /^[a-zA-Z_:][a-zA-Z0-9_.:-]*$/;
 const INLINE_EVENT_ATTR_RE = /^on/i;
 const URL_CHECKED_ATTRS = new Set(["href", "src", "xlink:href", "action", "formaction", "poster", "data"]);
+const FORBIDDEN_TAGS = ["script", "iframe", "object", "embed", "foreignobject", "svg", "template", "noscript", "base"];
 
 export function validateUserHtmlPayload(raw: string): {
   valid: boolean;
@@ -74,8 +83,17 @@ function escapeHtmlAttr(raw: string): string {
   return raw.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+export function sanitizeCssContent(cssText: string): string {
+  if (!cssText || typeof cssText !== "string") return "";
+  let s = cssText.replace(/\/\*[\s\S]*?\*\//g, "");
+  s = s.replace(/@import\b[^;]+;?/gi, "");
+  s = s.replace(/url\s*\([^)]*\)/gi, "none");
+  s = s.replace(/url\s*\([^)]*$/gi, "none");
+  return s;
+}
+
 function hasDangerousUrlScheme(value: string): boolean {
-  const normalized = value.replace(/[\u0000-\u0020\u007f]+/g, "").toLowerCase();
+  const normalized = value.replace(/[\u0000-\u0020\u007f\\]+/g, "").toLowerCase();
   return (
     normalized.startsWith("javascript:") ||
     normalized.startsWith("vbscript:") ||
@@ -84,38 +102,50 @@ function hasDangerousUrlScheme(value: string): boolean {
   );
 }
 
+function sanitizeSingleAttribute(el: Element, attr: Attr): void {
+  const lowerName = attr.name.trim().toLowerCase();
+  if (INLINE_EVENT_ATTR_RE.test(lowerName) || lowerName === "srcdoc") {
+    el.removeAttribute(attr.name);
+    return;
+  }
+  if (lowerName === "style") {
+    const cleanStyle = sanitizeCssContent(attr.value);
+    if (cleanStyle) el.setAttribute("style", cleanStyle);
+    else el.removeAttribute("style");
+    return;
+  }
+  if (URL_CHECKED_ATTRS.has(lowerName) && hasDangerousUrlScheme(attr.value)) {
+    el.removeAttribute(attr.name);
+  }
+}
+
+function collectSafeBodyAttributes(body: Element | null): string {
+  if (!body) return "";
+  return Array.from(body.attributes)
+    .filter((a) => SAFE_ATTR_NAME_RE.test(a.name) && !INLINE_EVENT_ATTR_RE.test(a.name.trim()))
+    .map((a) => ` ${a.name}="${escapeHtmlAttr(a.value)}"`)
+    .join("");
+}
+
 function sanitizeViaDomParser(rawHtml: string, headPrefixHtml: string): string {
   if (typeof DOMParser === "undefined") {
-    // Fail closed without regex HTML fallback: render sanitized escaped text only.
     const safeText = escapeHtmlAttr(rawHtml);
     return `<!DOCTYPE html><html><head>${headPrefixHtml}</head><body><pre>${safeText}</pre></body></html>`;
   }
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(rawHtml, "text/html");
-  doc.querySelectorAll("base").forEach((el) => el.remove());
+  const doc = new DOMParser().parseFromString(rawHtml, "text/html");
+  doc.querySelectorAll(FORBIDDEN_TAGS.join(",")).forEach((el) => el.remove());
   doc.querySelectorAll("meta[http-equiv]").forEach((el) => {
     const eq = (el.getAttribute("http-equiv") || "").trim().toLowerCase();
     if (eq === "refresh" || eq === "content-security-policy") el.remove();
   });
+  doc.querySelectorAll("style").forEach((styleEl) => {
+    styleEl.textContent = sanitizeCssContent(styleEl.textContent || "");
+  });
   doc.querySelectorAll("*").forEach((el) => {
-    for (const attr of Array.from(el.attributes)) {
-      const lowerName = attr.name.trim().toLowerCase();
-      if (INLINE_EVENT_ATTR_RE.test(lowerName) || lowerName === "srcdoc") {
-        el.removeAttribute(attr.name);
-        continue;
-      }
-      if (URL_CHECKED_ATTRS.has(lowerName) && hasDangerousUrlScheme(attr.value)) {
-        el.removeAttribute(attr.name);
-      }
-    }
+    for (const attr of Array.from(el.attributes)) sanitizeSingleAttribute(el, attr);
   });
   const headHtml = doc.head ? doc.head.innerHTML : "";
-  const bodyAttrs = doc.body
-    ? Array.from(doc.body.attributes)
-        .filter((a) => SAFE_ATTR_NAME_RE.test(a.name) && !INLINE_EVENT_ATTR_RE.test(a.name.trim()))
-        .map((a) => ` ${a.name}="${escapeHtmlAttr(a.value)}"`)
-        .join("")
-    : "";
+  const bodyAttrs = collectSafeBodyAttributes(doc.body);
   const bodyHtml = doc.body ? doc.body.innerHTML : "";
   return `<!DOCTYPE html><html><head>${headPrefixHtml}${headHtml}</head><body${bodyAttrs}>${bodyHtml}</body></html>`;
 }
@@ -123,8 +153,9 @@ function sanitizeViaDomParser(rawHtml: string, headPrefixHtml: string): string {
 export function wrapUserHtmlSrcDoc(rawHtml: string, opts?: WrapUserHtmlOptions): string {
   const epoch = opts?.epoch ?? generateEpochNonce();
   const bootSecret = opts?.bootSecret ?? generateBootSecret();
+  const scriptNonce = opts?.scriptNonce ?? generateBootSecret();
   const artifactSha256 = opts?.artifactSha256 ?? computeArtifactSha256Sync(rawHtml);
-  const domAnchorHash = opts?.domAnchorHash ?? artifactSha256.slice(0, 16);
+  const domAnchorHash = opts?.domAnchorHash ?? artifactSha256.slice(0, DOM_ANCHOR_HASH_LEN);
   const parentOrigin =
     opts?.parentOrigin ??
     (typeof window !== "undefined" && window.location?.origin && window.location.origin !== "null"
@@ -134,11 +165,13 @@ export function wrapUserHtmlSrcDoc(rawHtml: string, opts?: WrapUserHtmlOptions):
   const bridgeScript = buildByteZeroBridgeScript({
     epoch,
     bootSecret,
+    scriptNonce,
     artifactSha256,
     domAnchorHash,
     parentOrigin,
   });
-  const headPrefix = `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeHtmlAttr(STRICT_OFFLINE_CSP)}">${bridgeScript}`;
+  const cspDirective = buildStrictOfflineCsp(scriptNonce);
+  const headPrefix = `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeHtmlAttr(cspDirective)}">${bridgeScript}`;
   return sanitizeViaDomParser(rawHtml, headPrefix);
 }
 

@@ -73,7 +73,7 @@ export function ensureProjectSseStream(
         };
         if (onAppendMsg) onAppendMsg(msg);
         else sharedChatStore.appendMessage(toSessionChatKey(projectId, sessionId), {
-          id: msg.id, sender: "agent", text: msg.content, timestamp: new Date().toLocaleTimeString(),
+          id: msg.id, sender: "agent", text: msg.content, timestamp: `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}:${String(new Date().getSeconds()).padStart(2, "0")}`,
           createdAtMs: msg.timestamp, nodeId: ev.nodeId, jobId: ev.jobId, projectSeq: msg.projectSeq,
         });
       }

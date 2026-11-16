@@ -204,7 +204,16 @@
     "dirtyBufferPrompt": "您有尚未应用的 HTML 更改 (dirty_buffer)。离开前要应用还是放弃？",
     "dirtyGuardApply": "立即应用",
     "dirtyGuardDiscard": "放弃更改",
-    "dirtyGuardKeep": "继续编辑"
+    "dirtyGuardKeep": "继续编辑",
+    "dirtyGuardTitle": "未保存的 HTML 更改",
+    "dirtyGuardBody": "存在未应用的内联 HTML 编辑。是否放弃更改并切换页面？",
+    "discardChangesBtn": "放弃更改",
+    "modeComment": "评论 (C)",
+    "modeInlineEditor": "内联编辑器 (E)",
+    "modeSampleData": "示例数据 (D)",
+    "pauseWalkthrough": "暂停演练",
+    "startWalkthrough": "流程演练",
+    "savePatchBtn": "保存并应用 HTML"
   },
   "settings": {
     "title": "系统设置与偏好",
@@ -321,7 +330,8 @@
     "runtimeDefaultTag": "默认",
     "customizeRuntimeBtn": "自定义",
     "vaultStorageShort": "密钥存储",
-    "permissionShort": "审批权限"
+    "permissionShort": "审批权限",
+    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · 本地/Ollama"
   },
   "flow": {
     "dagCanvas": "DAG 2D 画布",
@@ -367,7 +377,11 @@
     "draftBadge": "草稿",
     "runningBadge": "运行中",
     "queuedBadgePrefix": "排队中 #",
-    "transitionErrorPrefix": "图表转换错误"
+    "transitionErrorPrefix": "图表转换错误",
+    "dagConflictLockMessage": "DAG 冲突锁定：检测到并发版本冲突，请在部署前解决冲突。",
+    "pausedBadge": "已暂停",
+    "interruptedBadge": "已中断",
+    "appShellPrefix": "应用框架"
   },
   "brand": {
     "symbolAlt": "cowok 品牌标识"
@@ -420,7 +434,10 @@
     "steerBtn": "转向干预",
     "steerPlaceholder": "执行中动态干预指令...",
     "steerPrefix": "动态干预指令",
-    "subStateLabel": "子状态"
+    "subStateLabel": "子状态",
+    "jobInterrupted": "已中断",
+    "fenceLabel": "栅栏:",
+    "seqLabel": "序号:"
   },
   "errors": {
     "dagCanvasRender": "2D DAG 画布渲染错误",
@@ -459,7 +476,8 @@
     "consLabel": "权衡取舍:",
     "promptPlaceholder": "用自然语言描述界面更改...",
     "prosLabel": "优势:",
-    "reviewClarificationsBtn": "查看并选择澄清选项"
+    "reviewClarificationsBtn": "查看并选择澄清选项",
+    "ambiguityLockFull": "执行已锁定：歧义评分 {{score}} ≥ 0.45。请在生成代码前明确设计意图。"
   },
   "snapshots": {
     "byteSizeLabel": "大小:",
@@ -552,5 +570,27 @@
     "searchModels": "搜索模型...",
     "thinkingEffort": "推理深度",
     "manageAiAccounts": "管理 AI 账号"
+  },
+  "launchpad": {
+    "title": "项目启动台 — 初始化流程与设计工作区",
+    "subtitle": "选择以下 4 种快速启动路径之一，以初始化您的 2D DAG 页面与设计令牌。",
+    "proceedBtn": "进入工作区",
+    "prdDesc": "粘贴或上传产品需求文档 (PRD)，自动合成页面节点与交互流程。",
+    "templatesDesc": "从精选多页面交互模板开始（结账流程、SaaS 仪表盘、新手引导）。",
+    "designDesc": "导入现有 Figma 画板或参考界面截图以提取布局令牌。",
+    "gitDesc": "就地连接本地 Git 仓库以分析路由、组件与 DESIGN.md。",
+    "extractTokensBtn": "提取设计令牌",
+    "gitBranchLabel": "目标分支",
+    "loadSamplePrdBtn": "加载示例 PRD",
+    "dropPrdPrompt": "拖放或选择 PRD 文件 (.md / .txt / .pdf)",
+    "selectedFilePrefix": "已选文件:"
+  },
+  "sampleData": {
+    "title": "示例数据工作室 — 夹具数据绑定",
+    "applyBtn": "注入数据到实时预览",
+    "colKey": "属性键名",
+    "colType": "数据类型",
+    "colValue": "示例值",
+    "footerSummary": "已加载 {{count}} 个属性 • 预设: {{preset}}"
   }
 }

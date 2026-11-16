@@ -45,6 +45,10 @@ export interface HtmlPreviewToolbarProps {
   isCommentsDrawerOpen?: boolean;
   commentCount?: number;
   onToggleCommentsDrawer?: () => void;
+  isSampleDataOpen?: boolean;
+  onToggleSampleData?: () => void;
+  isWalkthroughActive?: boolean;
+  onToggleWalkthrough?: () => void;
 }
 
 const ViewportRightControls: React.FC<HtmlPreviewToolbarProps> = (p) => {
@@ -90,7 +94,17 @@ export const HtmlPreviewToolbar: React.FC<HtmlPreviewToolbarProps> = (props) => 
   return (
     <div className="html-pane-toolbar" style={{ minHeight: "36px", padding: "4px 8px", backgroundColor: "var(--bg-surface)", borderBottom: "1px solid var(--border-default)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" }}>
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "5px" }}>
-        <PointerModeGroup pointerMode={props.pointerMode} onSetPointerMode={props.onSetPointerMode} />
+        <PointerModeGroup
+          pointerMode={props.pointerMode}
+          onSetPointerMode={props.onSetPointerMode}
+          isInlineCodeOpen={props.isInlineCodeOpen}
+          onToggleInlineCode={props.onToggleInlineCode}
+          isSampleDataOpen={props.isSampleDataOpen}
+          onToggleSampleData={props.onToggleSampleData}
+          isWalkthroughActive={props.isWalkthroughActive}
+          onToggleWalkthrough={props.onToggleWalkthrough}
+          onOpenComments={props.onToggleCommentsDrawer}
+        />
         <SubStateSwitcher activeSubState={props.activeSubState} onSelectSubState={props.onSelectSubState} />
         <button type="button" data-testid="toggle-inline-code-btn" onClick={props.onToggleInlineCode} title={codeTitle} aria-label={codeTitle} style={{ position: "relative", width: "28px", height: "28px", border: "1px solid var(--border-default)", borderRadius: "var(--radius-xs)", backgroundColor: props.isInlineCodeOpen ? "var(--bg-selected)" : "var(--bg-workspace)", color: props.isInlineCodeOpen ? "var(--text-primary)" : "var(--text-secondary)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
           <BrandIcon name="code" size={ICON_SIZE_MD} color="currentColor" />
