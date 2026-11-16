@@ -1,17 +1,7 @@
-// @story 01.3, 04.1, 04.2
+// @story 01.3, 04.1, 04.2, 04.4
 // @implements AC-01, AC-02, AC-03, AC-04, AC-05, AC-06
-import { z, type ZodSchema } from "zod";
-import { guardedRoute } from "./api-guard";
-import { forwardToDaemonFlow } from "./daemon-client";
+import { z } from "zod";
 import {
-  LintSourceInputSchema,
-  ProjectDesignContractsSchema,
-  ValidateComponentInputSchema,
-  ValidateIconInputSchema,
-  ValidateTypographyInputSchema,
-} from "./validations/constraints";
-import {
-  PostJobEventInputSchema,
   ProbeCliInputSchema,
   UpsertAgentSettingInputSchema,
   UpsertMcpServerInputSchema,
@@ -19,11 +9,14 @@ import {
   VaultConfigInputSchema,
   VerifyProviderKeyInputSchema,
 } from "./validations/workbench-settings";
-import { UpdateElementCommentSchema } from "./validations/element-comment";
 import {
-  UpdateScreenFixtureSchema,
-  ViewportPresetSchema,
-} from "./validations/screen-fixture";
+  FLOW_AND_WORKBENCH_ROUTES,
+  proxyRoute,
+  safeDecodeSegment,
+  safeEncodeSegment,
+  type RouteEntry,
+  type RouteFn,
+} from "./vite-bff-flow-routes";
 import * as doctorRoute from "../app/api/doctor/route";
 import * as snapshotRoute from "../app/api/projects/[id]/flow/snapshot/route";
 import * as nodesRoute from "../app/api/projects/[id]/flow/nodes/route";
@@ -44,8 +37,6 @@ import * as projectSpecsRoute from "../app/api/projects/[id]/specs/route";
 import * as singleSpecRoute from "../app/api/projects/[id]/specs/[spec_key]/route";
 import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize/route";
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
-import * as commentsRoute from "../app/api/projects/[id]/flow/nodes/[nodeId]/comments/route";
-import * as fixturesRoute from "../app/api/projects/[id]/flow/nodes/[nodeId]/fixtures/route";
 import * as versionSnapshotsRoute from "../app/api/projects/[id]/snapshots/route";
 import * as exportSnapshotRoute from "../app/api/projects/[id]/snapshots/export/route";
 import * as downloadSnapshotRoute from "../app/api/projects/[id]/snapshots/export/download/route";
@@ -59,97 +50,11 @@ import * as rejectProposalRoute from "../app/api/projects/[id]/proposals/[propos
 import * as sdiIntentRoute from "../app/api/projects/[id]/sdi/intent/route";
 import * as sdiClarificationRoute from "../app/api/projects/[id]/sdi/clarification/route";
 
-export type RouteFn = (req: Request, ctx: { params?: Record<string, string> }) => Promise<Response>;
-
-interface RouteEntry {
-  method: string;
-  pattern: RegExp;
-  extractParams: (match: RegExpExecArray) => Record<string, string>;
-  resolveHandler: (match: RegExpExecArray) => RouteFn;
-}
-
-function safeEncodeSegment(raw: string): string {
-  try {
-    return encodeURIComponent(decodeURIComponent(raw));
-  } catch {
-    return encodeURIComponent(raw);
-  }
-}
-
-function safeDecodeSegment(raw: string): string {
-  try {
-    return decodeURIComponent(raw);
-  } catch {
-    return raw;
-  }
-}
-
-function forwardGuardedDaemon<B = unknown>(
-  daemonPath: string,
-  options: { body?: ZodSchema<B>; rawJsonPassthrough?: boolean } = {}
-): RouteFn {
-  return guardedRoute(
-    async (req, ctx, { body }) =>
-      forwardToDaemonFlow({
-        method: req.method,
-        daemonPath,
-        rawQuery: new URL(req.url).search.slice(1),
-        body,
-        inboundHeaders: req.headers,
-        principal: {
-          tenantId: ctx.tenantId || "local-default",
-          userId: ctx.userId || "local-operator",
-          role: ctx.role || "viewer",
-        },
-        correlationId: ctx.correlationId,
-      }),
-    { authMode: "strict-loopback", ...options }
-  );
-}
-
-function proxyRoute<B = unknown>(
-  method: string,
-  pattern: RegExp,
-  buildDaemonPath: (m: RegExpExecArray) => string,
-  bodyOrOptions?: ZodSchema<B> | { body?: ZodSchema<B>; rawJsonPassthrough?: boolean }
-): RouteEntry {
-  const options =
-    bodyOrOptions && "parse" in bodyOrOptions
-      ? { body: bodyOrOptions }
-      : (bodyOrOptions as { body?: ZodSchema<B>; rawJsonPassthrough?: boolean } | undefined) || {};
-  return {
-    method,
-    pattern,
-    extractParams: (m): Record<string, string> => (m[1] ? { id: m[1] } : {}),
-    resolveHandler: (m) => forwardGuardedDaemon(buildDaemonPath(m), options),
-  };
-}
-
-const ViewportPatchSchema = z.object({ viewportPreset: ViewportPresetSchema });
+export type { RouteFn };
 const ProjectPatchSchema = z.object({
   name: z.string().min(1).max(160).optional(),
   product_brief: z.string().max(4000).optional(),
 });
-const ConstraintProfileInputSchema = z.object({
-  id: z.string().uuid(),
-  project_id: z.string().uuid(),
-  max_complexity_score: z.number().int().nonnegative(),
-  enforce_clean_code: z.boolean(),
-  forbidden_patterns: z.array(z.string()),
-  target_framework: z.string(),
-});
-const AstInjectionInputSchema = z.object({
-  source: z.string(),
-  component_name: z.string().nullable().optional(),
-});
-const SurgicalPatchInputSchema = z.object({
-  ff_id: z.string().min(1),
-  patch_kind: z.enum(["text_content", "metric_value", "css_variable", "attribute_value"]),
-  new_value: z.string(),
-  source: z.string(),
-  target_attribute: z.string().nullable().optional(),
-});
-
 const idOnly = (m: RegExpExecArray): Record<string, string> => ({ id: m[1] });
 const noParams = (): Record<string, string> => ({});
 
@@ -160,7 +65,11 @@ const ROUTE_TABLE: RouteEntry[] = [
   proxyRoute("DELETE", /^\/api\/projects\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}`),
   { method: "GET", pattern: /^\/api\/doctor$/, extractParams: noParams, resolveHandler: () => doctorRoute.GET },
   proxyRoute("GET", /^\/api\/doctor\/cli-matrix$/, () => "/api/v1/doctor/cli-matrix"),
+  proxyRoute("GET", /^\/api\/doctor\/clis$/, () => "/api/v1/doctor/clis"),
+  proxyRoute("GET", /^\/api\/doctor\/usage$/, () => "/api/v1/doctor/usage"),
   proxyRoute("POST", /^\/api\/doctor\/probe-cli$/, () => "/api/v1/doctor/probe-cli", ProbeCliInputSchema),
+  proxyRoute("GET", /^\/api\/plugins$/, () => "/api/v1/plugins"),
+  proxyRoute("GET", /^\/api\/plugins\/registry$/, () => "/api/v1/plugins/registry"),
   proxyRoute("POST", /^\/api\/doctor\/verify-key$/, () => "/api/v1/doctor/verify-key", VerifyProviderKeyInputSchema),
   proxyRoute("GET", /^\/api\/vault\/keys$/, () => "/api/v1/vault/keys"),
   proxyRoute("POST", /^\/api\/vault\/keys$/, () => "/api/v1/vault/keys", UpsertVaultKeyInputSchema),
@@ -202,28 +111,6 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "DELETE", pattern: /^\/api\/projects\/([^/]+)\/flow\/transitions\/([^/]+)$/, extractParams: (m) => ({ id: m[1], transitionId: m[2] }), resolveHandler: () => singleTransitionRoute.DELETE },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/deploy-draft$/, extractParams: idOnly, resolveHandler: () => deployDraftRoute.POST },
 
-  { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/comments$/, extractParams: (m) => ({ id: m[1], nodeId: m[2] }), resolveHandler: () => commentsRoute.GET },
-  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/comments$/, extractParams: (m) => ({ id: m[1], nodeId: m[2] }), resolveHandler: () => commentsRoute.POST },
-  proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/comments\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/nodes/${safeEncodeSegment(m[2])}/comments/${safeEncodeSegment(m[3])}`, UpdateElementCommentSchema),
-  { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/fixtures$/, extractParams: (m) => ({ id: m[1], nodeId: m[2] }), resolveHandler: () => fixturesRoute.GET },
-  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/fixtures$/, extractParams: (m) => ({ id: m[1], nodeId: m[2] }), resolveHandler: () => fixturesRoute.POST },
-  proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/fixtures\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/nodes/${safeEncodeSegment(m[2])}/fixtures/${safeEncodeSegment(m[3])}`, UpdateScreenFixtureSchema),
-  proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/viewport$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/nodes/${safeEncodeSegment(m[2])}/viewport`, ViewportPatchSchema),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/flow\/jobs\/events$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/jobs/events`, PostJobEventInputSchema),
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/flow\/jobs\/stream$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/jobs/stream`),
-
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/icon-manifest$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/icon-manifest`),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/validate-icon$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/validate-icon`, ValidateIconInputSchema),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/validate-typography$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/validate-typography`, ValidateTypographyInputSchema),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/validate-component$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/validate-component`, ValidateComponentInputSchema),
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/design-contracts$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/design-contracts`),
-  proxyRoute("PUT", /^\/api\/projects\/([^/]+)\/design-contracts$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/design-contracts`, ProjectDesignContractsSchema),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/lint$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/lint`, LintSourceInputSchema),
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/constraint-profile$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/constraint-profile`),
-  proxyRoute("PUT", /^\/api\/projects\/([^/]+)\/constraint-profile$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/constraint-profile`, ConstraintProfileInputSchema),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/inject-ff-id$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/inject-ff-id`, AstInjectionInputSchema),
-  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/surgical-patch$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/surgical-patch`, SurgicalPatchInputSchema),
-
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/snapshots$/, extractParams: idOnly, resolveHandler: () => versionSnapshotsRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/snapshots$/, extractParams: idOnly, resolveHandler: () => versionSnapshotsRoute.POST },
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/snapshots\/export\/download$/, extractParams: idOnly, resolveHandler: () => downloadSnapshotRoute.GET },
@@ -243,6 +130,7 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/sdi\/intent$/, extractParams: idOnly, resolveHandler: () => sdiIntentRoute.POST },
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/sdi\/intent\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent/${safeEncodeSegment(m[2])}`),
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/sdi\/clarification$/, extractParams: idOnly, resolveHandler: () => sdiClarificationRoute.POST },
+  ...FLOW_AND_WORKBENCH_ROUTES,
 ];
 
 export function matchBffRoute(
@@ -256,10 +144,7 @@ export function matchBffRoute(
     if (entry.method !== method) continue;
     const match = entry.pattern.exec(normalizedPath);
     if (match) {
-      return {
-        handler: entry.resolveHandler(match),
-        params: entry.extractParams(match),
-      };
+      return { handler: entry.resolveHandler(match), params: entry.extractParams(match) };
     }
   }
   return null;

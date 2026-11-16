@@ -18,7 +18,7 @@ const McpHostNoticeCard: React.FC = () => {
       <div style={{ fontSize: "10.5px", color: "var(--text-muted)", lineHeight: "1.4" }}>
         {t(
           "settings.mcpHostStory043Notice",
-          "Cấp phát khóa Host MCP và kiểm tra health probe trực tiếp sẽ được kích hoạt qua Daemon Keychain ở Story 04.3. Hiện chỉ quản lý danh sách Client MCP trong SQLite V7."
+          "Cấp phát khóa Host MCP và kiểm tra health probe trực tiếp sẽ được kích hoạt qua Daemon Keychain ở Story 04.4. Hiện chỉ quản lý danh sách Client MCP trong SQLite V7."
         )}
       </div>
     </div>

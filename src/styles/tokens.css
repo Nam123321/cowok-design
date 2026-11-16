@@ -418,6 +418,15 @@ html[data-theme="night"][data-focus="low"],
   --success: #72877A;
   --warning: #8B7D68;
   --error: #8B7070;
+
+  --state-success: #45C486;
+  --state-success-soft: rgba(69, 196, 134, 0.16);
+  --state-warning: #E5A04D;
+  --state-warning-soft: rgba(229, 160, 77, 0.18);
+  --state-danger: #E87484;
+  --state-danger-soft: rgba(232, 116, 132, 0.18);
+  --state-info: #6B9DFC;
+  --state-info-soft: rgba(107, 157, 252, 0.16);
   --destructive: var(--state-danger);
 
   --action-primary: #F1F5F9;

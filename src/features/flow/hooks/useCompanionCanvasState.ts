@@ -1,14 +1,9 @@
-// @story-04.1
-// @implements AC-3
+// @story-04.1, 04.5
+// @implements AC-01, AC-03
 import React, { useState, useEffect, useCallback } from "react";
-import {
-  DEFAULT_TABS,
-  INITIAL_SLIDES,
-  SlidePhaseItem,
-  createCanvasTabByKind,
-} from "../components/companion-canvas-data";
+import { DEFAULT_TABS, INITIAL_SLIDES, SlidePhaseItem, createCanvasTabByKind } from "../components/companion-canvas-data";
 import type { CanvasTabItem } from "../components/CompanionCanvasTab";
-import type { ViewportPreset } from "../../../lib/validations/screen-fixture";
+import type { FixtureVariant, ViewportPreset } from "../../../lib/validations/screen-fixture";
 
 export const DEFAULT_LEFT_PANE_PCT = 48;
 export const MIN_LEFT_PANE_PCT = 26;
@@ -34,35 +29,22 @@ export function useInternalSplitResizer(
     const handleUp = () => setIsDraggingInternalSplit(false);
     window.addEventListener("mousemove", handleMove);
     window.addEventListener("mouseup", handleUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-    };
+    return () => { window.removeEventListener("mousemove", handleMove); window.removeEventListener("mouseup", handleUp); };
   }, [isDraggingInternalSplit, setIsDraggingInternalSplit, splitContainerRef, setLeftPanePercent]);
 }
 
-export function useTabNavigationState(
-  propActiveTabId?: string,
-  onTabChange?: (tabId: string, format: CanvasTabItem["format"]) => void
-) {
+export function useTabNavigationState(propActiveTabId?: string, onTabChange?: (tabId: string, format: CanvasTabItem["format"]) => void) {
   const [tabs, setTabs] = useState<CanvasTabItem[]>(DEFAULT_TABS);
   const [internalActiveTabId, setInternalActiveTabId] = useState<string>("tab-userflow");
   const [isNewTabMenuOpen, setIsNewTabMenuOpen] = useState(false);
-  const currentTabId = propActiveTabId || internalActiveTabId;
-  const activeTab = tabs.find((item) => item.id === currentTabId) || tabs[0];
-
-  const handleTabSelect = (tabId: string, format: CanvasTabItem["format"]) => {
-    setInternalActiveTabId(tabId);
-    onTabChange?.(tabId, format);
-  };
-
+  const activeTab = tabs.find((item) => item.id === (propActiveTabId || internalActiveTabId)) || tabs[0];
+  const handleTabSelect = (tabId: string, format: CanvasTabItem["format"]) => { setInternalActiveTabId(tabId); onTabChange?.(tabId, format); };
   const handleCreateTab = (kind: "app-flow" | "slide-deck" | "md" | "assets" | "code", customTitle?: string) => {
     const newTab = createCanvasTabByKind(kind, tabs.length, customTitle);
     setTabs((prev) => [...prev, newTab]);
     setIsNewTabMenuOpen(false);
     handleTabSelect(newTab.id, newTab.format);
   };
-
   const handleClose = (e: React.MouseEvent, tabId: string) => {
     e.stopPropagation();
     if (tabs.length <= 1) return;
@@ -70,8 +52,33 @@ export function useTabNavigationState(
     setTabs(nextTabs);
     if (activeTab.id === tabId) handleTabSelect(nextTabs[0].id, nextTabs[0].format);
   };
-
   return { tabs, activeTab, isNewTabMenuOpen, setIsNewTabMenuOpen, handleTabSelect, handleCreateTab, handleClose };
+}
+
+export function useInspectHotkeyShortcut(setPointerMode: React.Dispatch<React.SetStateAction<"interact" | "click-dom" | "drag-box">>) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) return;
+      if (e.key === "c" || e.key === "C") setPointerMode((prev) => (prev === "click-dom" ? "interact" : "click-dom"));
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [setPointerMode]);
+}
+
+function useEditorBufferState() {
+  const [isInlineCodeOpen, setIsInlineCodeOpen] = useState(false);
+  const [inlineCodeText, setInlineCodeText] = useState<string>(DEFAULT_INLINE_CODE);
+  const [htmlCodeText, setHtmlCodeText] = useState<string>("");
+  const [baselineHtmlText, setBaselineHtmlText] = useState<string>("");
+  const [showDirtyGuardPrompt, setShowDirtyGuardPrompt] = useState<boolean>(false);
+  const [customHtmlByTarget, setCustomHtmlByTarget] = useState<Record<string, string>>({});
+  const dirtyBuffer = isInlineCodeOpen && htmlCodeText !== baselineHtmlText;
+  const setCustomHtmlForTarget = useCallback((k: string, h: string) => setCustomHtmlByTarget((prev) => ({ ...prev, [k]: h })), []);
+  return { isInlineCodeOpen, setIsInlineCodeOpen, inlineCodeText, setInlineCodeText, htmlCodeText, setHtmlCodeText, baselineHtmlText, setBaselineHtmlText, dirtyBuffer, showDirtyGuardPrompt, setShowDirtyGuardPrompt, customHtmlByTarget, setCustomHtmlForTarget };
 }
 
 export function useDualPaneViewportState(activeTab: CanvasTabItem) {
@@ -81,7 +88,6 @@ export function useDualPaneViewportState(activeTab: CanvasTabItem) {
   const [isLeftStructureHidden, setIsLeftStructureHidden] = useState(false);
   const [isRightPreviewHidden, setIsRightPreviewHidden] = useState(false);
   const [pointerMode, setPointerMode] = useState<"interact" | "click-dom" | "drag-box">("interact");
-  const [isInlineCodeOpen, setIsInlineCodeOpen] = useState(false);
   const [viewportPreset, setViewportPreset] = useState<ViewportPreset>("desktop-1440");
   const [aspectRatio, setAspectRatio] = useState<"auto" | "16-9" | "16-10">("auto");
   const [isPresenting, setIsPresenting] = useState(false);
@@ -89,33 +95,22 @@ export function useDualPaneViewportState(activeTab: CanvasTabItem) {
   const [slides, setSlides] = useState<SlidePhaseItem[]>(INITIAL_SLIDES);
   const [activeSlideIndex, setActiveSlideIndex] = useState<number>(0);
   const [isCmsDrawerOpen, setIsCmsDrawerOpen] = useState<boolean>(false);
-  const [inlineCodeText, setInlineCodeText] = useState<string>(DEFAULT_INLINE_CODE);
-  const [htmlCodeText, setHtmlCodeText] = useState<string>("");
-  const [customHtmlByTarget, setCustomHtmlByTarget] = useState<Record<string, string>>({});
-  const setCustomHtmlForTarget = useCallback((targetKey: string, html: string) => {
-    setCustomHtmlByTarget((prev) => ({ ...prev, [targetKey]: html }));
-  }, []);
+  const [activeSubState, setActiveSubState] = useState<FixtureVariant>("DEFAULT");
+  const editor = useEditorBufferState();
 
+  useInspectHotkeyShortcut(setPointerMode);
   useEffect(() => {
-    if (activeTab.format === "slide-cms" || activeTab.defaultLens === "slide-cms") {
-      setStructureLens("slide-cms");
-      setAspectRatio("16-9");
-    } else if (activeTab.format === "dag" || activeTab.defaultLens === "userflow") {
-      setStructureLens("userflow");
-      setAspectRatio("auto");
-    }
+    if (activeTab.format === "slide-cms" || activeTab.defaultLens === "slide-cms") { setStructureLens("slide-cms"); setAspectRatio("16-9"); }
+    else if (activeTab.format === "dag" || activeTab.defaultLens === "userflow") { setStructureLens("userflow"); setAspectRatio("auto"); }
   }, [activeTab.id, activeTab.format, activeTab.defaultLens]);
 
   return {
     structureLens, setStructureLens, leftPanePercent, setLeftPanePercent,
     isDraggingInternalSplit, setIsDraggingInternalSplit, isLeftStructureHidden, setIsLeftStructureHidden,
     isRightPreviewHidden, setIsRightPreviewHidden, pointerMode, setPointerMode,
-    isInlineCodeOpen, setIsInlineCodeOpen, viewportPreset, setViewportPreset,
-    aspectRatio, setAspectRatio, isPresenting, setIsPresenting,
+    viewportPreset, setViewportPreset, aspectRatio, setAspectRatio, isPresenting, setIsPresenting,
     highlightedRegionId, setHighlightedRegionId, slides, setSlides,
     activeSlideIndex, setActiveSlideIndex, isCmsDrawerOpen, setIsCmsDrawerOpen,
-    inlineCodeText, setInlineCodeText,
-    htmlCodeText, setHtmlCodeText,
-    customHtmlByTarget, setCustomHtmlForTarget,
+    activeSubState, setActiveSubState, ...editor,
   };
 }

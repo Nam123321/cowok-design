@@ -5,6 +5,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useFormatter } from "@/hooks/useFormatter";
 import { BrandIcon } from "@/components/ui/BrandIcon";
 import { WorkbenchNode, SemanticNodeType } from "../store/flow-workbench-store";
+import type { NodeJobStatus } from "../store/keyed-parallel-coordinator";
 import { PortType } from "../utils/dag-algorithms";
 
 export interface PortMouseDownArgs {
@@ -72,6 +73,42 @@ const NodeContextMenu: React.FC<{
   );
 };
 
+const NodeExecutionBadge: React.FC<{ executionStatus?: { status: NodeJobStatus; queuePosition?: number } }> = ({ executionStatus }) => {
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
+  if (!executionStatus) return null;
+  if (executionStatus.status === "running") {
+    return (
+      <span className="dag-node-running-badge" style={{ fontSize: "9px", fontWeight: 700, backgroundColor: "var(--running-badge-bg)", color: "var(--action-primary)", border: "1px solid var(--action-primary)", padding: "1px 5px", borderRadius: "var(--radius-xs)", display: "flex", alignItems: "center", gap: "3px" }}>
+        <span style={{ display: "inline-block", width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "currentColor" }} />
+        {t("flow.runningBadge", "RUNNING")}
+      </span>
+    );
+  }
+  if (executionStatus.status === "queued") {
+    return (
+      <span className="dag-node-queued-badge" style={{ fontSize: "9px", fontWeight: 600, backgroundColor: "var(--state-warning-soft)", color: "var(--state-warning)", border: "1px solid var(--state-warning)", padding: "1px 5px", borderRadius: "var(--radius-xs)" }}>
+        {`${t("flow.queuedBadgePrefix", "QUEUED #")}${formatNumber(executionStatus.queuePosition ?? 1)}`}
+      </span>
+    );
+  }
+  if (executionStatus.status === "paused") {
+    return (
+      <span className="dag-node-paused-badge" style={{ fontSize: "9px", fontWeight: 600, backgroundColor: "var(--bg-subtle)", color: "var(--text-secondary)", border: "1px solid var(--border-default)", padding: "1px 5px", borderRadius: "var(--radius-xs)" }}>
+        {t("flow.pausedBadge", "PAUSED")}
+      </span>
+    );
+  }
+  if (executionStatus.status === "interrupted") {
+    return (
+      <span className="dag-node-interrupted-badge" style={{ fontSize: "9px", fontWeight: 700, backgroundColor: "var(--state-danger-soft, var(--bg-subtle))", color: "var(--state-danger)", border: "1px solid var(--state-danger)", padding: "1px 5px", borderRadius: "var(--radius-xs)" }}>
+        {t("flow.interruptedBadge", "INTERRUPTED")}
+      </span>
+    );
+  }
+  return null;
+};
+
 export const DagNodeHeader: React.FC<{
   node: WorkbenchNode;
   isDraft: boolean;
@@ -79,10 +116,9 @@ export const DagNodeHeader: React.FC<{
   onCommentOnNode?: (screenKey: string) => void;
   onDuplicateNode?: (nodeId: string) => void;
   onDeleteNode?: (nodeId: string) => void;
-  executionStatus?: { status: "running" | "queued" | "paused" | "completed" | "error" | "cancelled"; queuePosition?: number };
+  executionStatus?: { status: NodeJobStatus; queuePosition?: number };
 }> = ({ node, isDraft, onStartRename, onCommentOnNode, onDuplicateNode, onDeleteNode, executionStatus }) => {
-  const { t, locale } = useTranslation();
-  const { formatNumber } = useFormatter({ locale });
+  const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const nodeType: SemanticNodeType = node.nodeType || "screen";
 
@@ -96,42 +132,7 @@ export const DagNodeHeader: React.FC<{
         {isDraft && (
           <span className="dag-node-draft-badge" style={{ fontFamily: "var(--font-mono)", fontSize: "9px", fontWeight: 700, backgroundColor: "var(--bg-elevated)", color: "var(--text-primary)", border: "1px dashed var(--action-primary)", padding: "1px 5px", borderRadius: "var(--radius-xs)" }}>{t("flow.draftBadge", "DRAFT")}</span>
         )}
-        {executionStatus?.status === "running" && (
-          <span
-            className="dag-node-running-badge"
-            style={{
-              fontSize: "9px",
-              fontWeight: 700,
-              backgroundColor: "var(--running-badge-bg)",
-              color: "var(--action-primary)",
-              border: "1px solid var(--action-primary)",
-              padding: "1px 5px",
-              borderRadius: "var(--radius-xs)",
-              display: "flex",
-              alignItems: "center",
-              gap: "3px",
-            }}
-          >
-            <span style={{ display: "inline-block", width: "5px", height: "5px", borderRadius: "50%", backgroundColor: "currentColor" }} />
-            {t("flow.runningBadge", "RUNNING")}
-          </span>
-        )}
-        {executionStatus?.status === "queued" && (
-          <span
-            className="dag-node-queued-badge"
-            style={{
-              fontSize: "9px",
-              fontWeight: 600,
-              backgroundColor: "var(--state-warning-soft)",
-              color: "var(--state-warning)",
-              border: "1px solid var(--state-warning)",
-              padding: "1px 5px",
-              borderRadius: "var(--radius-xs)",
-            }}
-          >
-            {`${t("flow.queuedBadgePrefix", "QUEUED #")}${formatNumber(executionStatus.queuePosition ?? 1)}`}
-          </span>
-        )}
+        <NodeExecutionBadge executionStatus={executionStatus} />
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "2px", position: "relative" }}>
         {onCommentOnNode && (

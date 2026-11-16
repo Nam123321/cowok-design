@@ -214,19 +214,99 @@ export const DeployDraftSchema = z.object({
 export type DeployDraftInput = z.input<typeof DeployDraftSchema>;
 export const DeployDraftResponseSchema = FlowGraphSnapshotSchema;
 
+const RectBoxSchema = z.object({
+  left: z.number().finite(),
+  top: z.number().finite(),
+  width: z.number().finite().nonnegative(),
+  height: z.number().finite().nonnegative(),
+});
+
+export const SpatialMarqueeSelectionSchema = z.object({
+  x: z.number().finite(),
+  y: z.number().finite(),
+  width: z.number().finite().min(16),
+  height: z.number().finite().min(16),
+  elementFfIds: z.array(z.string().min(1)),
+});
+export type SpatialMarqueeSelection = z.infer<typeof SpatialMarqueeSelectionSchema>;
+
 export const HostToIframeMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("INIT_PORT"), epoch: z.number().int().min(1) }),
-  z.object({ type: z.literal("APPLY_HTML"), epoch: z.number().int().min(1), html: z.string().max(1_048_576) }),
-  z.object({ type: z.literal("FLOW_PREVIEW_HYDRATE"), epoch: z.number().int().min(1), fixtureJson: z.string().max(32768) }),
-  z.object({ type: z.literal("PING"), epoch: z.number().int().min(1) }),
+  z.object({
+    type: z.literal("INIT_PORT"),
+    epoch: z.number().int().min(1),
+    bootSecret: z.string().min(16).max(128).optional(),
+    artifactSha256: z.string().max(128).optional(),
+  }),
+  z.object({
+    type: z.literal("APPLY_HTML"),
+    epoch: z.number().int().min(1),
+    bootSecret: z.string().min(16).max(128).optional(),
+    html: z.string().max(1_048_576),
+  }),
+  z.object({
+    type: z.literal("FLOW_PREVIEW_HYDRATE"),
+    epoch: z.number().int().min(1),
+    bootSecret: z.string().min(16).max(128).optional(),
+    variant: z.enum(["DEFAULT", "EMPTY", "LOADING", "ERROR"]).optional(),
+    artifactSha256: z.string().max(128).optional(),
+    fixtureJson: z.string().max(32768),
+  }),
+  z.object({
+    type: z.literal("PING"),
+    epoch: z.number().int().min(1),
+    bootSecret: z.string().min(16).max(128).optional(),
+  }),
 ]);
 export type HostToIframeMessage = z.infer<typeof HostToIframeMessageSchema>;
 
 export const IframeToHostMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("READY"), epoch: z.number().int().min(1) }),
-  z.object({ type: z.literal("ELEMENT_CLICKED"), epoch: z.number().int().min(1), selector: z.string().max(256), tagName: z.string().max(64) }),
-  z.object({ type: z.literal("HEIGHT_CHANGED"), epoch: z.number().int().min(1), height: z.number().finite().min(0).max(100_000) }),
-  z.object({ type: z.literal("RUNTIME_ERROR"), epoch: z.number().int().min(1), message: z.string().max(1024) }),
+  z.object({
+    type: z.literal("READY"),
+    epoch: z.number().int().min(1),
+    bootSecretAck: z.string().min(16).max(128).optional(),
+  }),
+  z.object({
+    type: z.literal("PORT_ACK"),
+    epoch: z.number().int().min(1),
+    bootSecretAck: z.string().min(16).max(128),
+    artifactSha256: z.string().max(128),
+    domAnchorHash: z.string().max(128),
+  }),
+  z.object({
+    type: z.literal("ELEMENT_CLICKED"),
+    epoch: z.number().int().min(1),
+    bootSecretAck: z.string().min(16).max(128).optional(),
+    selector: z.string().max(256),
+    elementFfId: z.string().max(200).optional(),
+    tagName: z.string().max(64),
+    domHash: z.string().max(64).optional(),
+    rect: RectBoxSchema.optional(),
+  }),
+  z.object({
+    type: z.literal("ELEMENT_RECTS"),
+    epoch: z.number().int().min(1),
+    bootSecretAck: z.string().min(16).max(128).optional(),
+    rects: z.record(z.string().max(200), RectBoxSchema),
+  }),
+  z.object({
+    type: z.literal("TEXT_QUOTE"),
+    epoch: z.number().int().min(1),
+    bootSecretAck: z.string().min(16).max(128).optional(),
+    text: z.string().min(1).max(2000),
+    rect: RectBoxSchema.optional(),
+  }),
+  z.object({
+    type: z.literal("HEIGHT_CHANGED"),
+    epoch: z.number().int().min(1),
+    bootSecretAck: z.string().min(16).max(128).optional(),
+    height: z.number().finite().min(0).max(100_000),
+  }),
+  z.object({
+    type: z.literal("RUNTIME_ERROR"),
+    epoch: z.number().int().min(1),
+    bootSecretAck: z.string().min(16).max(128).optional(),
+    message: z.string().max(1024),
+  }),
 ]);
 export type IframeToHostMessage = z.infer<typeof IframeToHostMessageSchema>;
 

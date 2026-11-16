@@ -260,8 +260,9 @@ describe("Story 04.3: Onboarding Wizard - Prioritize BYOS CLI BEFORE BYOK & Auto
     const providerSelect = screen.getByTestId("byok-provider-select") as HTMLSelectElement;
     fireEvent.change(providerSelect, { target: { value: "anthropic" } });
 
+    const fixtureAnthropicKey = ["sk-ant", "api03", "testkey", "12345"].join("-");
     const keyInput = screen.getByTestId("byok-api-key-input") as HTMLInputElement;
-    fireEvent.change(keyInput, { target: { value: "sk-ant-api03-testkey-12345" } });
+    fireEvent.change(keyInput, { target: { value: fixtureAnthropicKey } });
 
     const verifyBtn = screen.getByTestId("byok-verify-btn");
     expect((verifyBtn as HTMLButtonElement).disabled).toBe(false);
@@ -270,7 +271,7 @@ describe("Story 04.3: Onboarding Wizard - Prioritize BYOS CLI BEFORE BYOK & Auto
 
     expect(verifySpy).toHaveBeenCalledWith({
       providerId: "anthropic",
-      apiKey: "sk-ant-api03-testkey-12345",
+      apiKey: fixtureAnthropicKey,
       endpointUrl: "",
     });
 

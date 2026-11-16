@@ -6,6 +6,7 @@
 
 pub mod daemon_auth;
 pub mod flow_routes;
+pub mod flow_transition_handlers;
 pub mod lockfile;
 pub mod routes;
 pub mod synthesis;
@@ -45,6 +46,8 @@ pub struct DaemonServer {
     lock_info: DaemonLockInfo,
     lock_path: PathBuf,
     router: Router,
+    active_workers: crate::routes::execution_reaper::ActiveWorkerRegistry,
+    sse_tx: tokio::sync::broadcast::Sender<String>,
 }
 
 impl DaemonServer {
@@ -61,13 +64,25 @@ impl DaemonServer {
         )?;
         let state =
             DaemonAppState::with_auth(registry, lock_info.host.clone(), lock_info.port, auth);
+        let active_workers = state.active_workers.clone();
+        let sse_tx = state.sse_tx.clone();
         let router = build_router(state);
         Ok(Self {
             listener,
             lock_info,
             lock_path,
             router,
+            active_workers,
+            sse_tx,
         })
+    }
+
+    pub fn active_workers(&self) -> crate::routes::execution_reaper::ActiveWorkerRegistry {
+        self.active_workers.clone()
+    }
+
+    pub fn sse_sender(&self) -> tokio::sync::broadcast::Sender<String> {
+        self.sse_tx.clone()
     }
 
     pub fn lock_info(&self) -> &DaemonLockInfo {
@@ -684,6 +699,33 @@ pub async fn serve_daemon_with_config(config: DaemonConfig) -> Result<(), Harnes
     let pool = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, &canonical_root))?;
     let registry = Arc::new(SpecRegistry::new(pool));
     let server = DaemonServer::bind_loopback(&config, Arc::clone(&registry))?;
+    let workers = server.active_workers();
+    let live_nonce = server.lock_info().daemon_nonce.clone();
+    let _ = crate::routes::execution_reaper::reap_orphan_jobs_with_workers(
+        registry.pool(),
+        &workers,
+        Some(&canonical_root),
+        &live_nonce,
+    )
+    .await;
+
+    let sweeper_registry = Arc::clone(&registry);
+    let sweeper_sse_tx = server.sse_sender();
+    let sweeper_root = canonical_root.clone();
+    let sweeper_handle = tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(5));
+        loop {
+            ticker.tick().await;
+            let _ = crate::routes::execution_reaper::sweep_expired_leases_with_workers(
+                sweeper_registry.pool(),
+                &workers,
+                Some(&sweeper_root),
+                &live_nonce,
+                &sweeper_sse_tx,
+            )
+            .await;
+        }
+    });
 
     let watcher_registry = Arc::clone(&registry);
     let watcher_handle = tokio::spawn(async move {
@@ -706,6 +748,7 @@ pub async fn serve_daemon_with_config(config: DaemonConfig) -> Result<(), Harnes
 
     let serve_result = server.serve().await;
     watcher_handle.abort();
+    sweeper_handle.abort();
     serve_result
 }
 

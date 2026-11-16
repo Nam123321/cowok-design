@@ -1,25 +1,18 @@
 // @story 04.2
 // @implements V6 SQLite Workbench Endpoints (Comments, Fixtures, Viewport, Settings, MCP, Job SSE, Key Verify)
 
-use std::convert::Infallible;
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
-use std::time::Duration;
-
 use axum::{
-    extract::{Extension, Path as AxumPath, Query, State},
-    http::{HeaderMap, StatusCode},
-    response::{
-        sse::{Event, KeepAlive, Sse},
-        IntoResponse, Response,
-    },
+    extract::{Extension, Path as AxumPath, State},
+    http::StatusCode,
+    response::{IntoResponse, Response},
     Json,
 };
 use chrono::{DateTime, Utc};
 use domain::HarnessError;
-use futures_util::stream::Stream;
 use rusqlite::{params, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
-use spec_registry::{map_sqlite_error, retry_on_busy, SqlitePool};
+use spec_registry::{map_sqlite_error, retry_on_busy};
+use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use uuid::Uuid;
 
 use crate::daemon_auth::FlowPrincipal;
@@ -31,18 +24,27 @@ pub(crate) fn epoch_ms_to_iso(ms: i64) -> String {
         .unwrap_or_else(|| Utc::now().to_rfc3339())
 }
 
-pub(crate) fn json_err(status: StatusCode, code: &str, message: impl Into<String>) -> Response {
+pub(crate) fn json_err_with_details(
+    status: StatusCode,
+    code: &str,
+    message: impl Into<String>,
+    details: serde_json::Value,
+) -> Response {
     let body = HttpErrorBody {
         code: code.to_string(),
         kind: Some(code.to_string()),
         message: message.into(),
-        details: serde_json::Value::Null,
+        details,
         request_id: Uuid::new_v4().to_string(),
     };
     (status, Json(body)).into_response()
 }
 
-fn check_project_uuid(raw: &str) -> Result<String, Response> {
+pub(crate) fn json_err(status: StatusCode, code: &str, message: impl Into<String>) -> Response {
+    json_err_with_details(status, code, message, serde_json::Value::Null)
+}
+
+pub(crate) fn check_project_uuid(raw: &str) -> Result<String, Response> {
     Uuid::parse_str(raw.trim())
         .map(|u| u.to_string())
         .map_err(|_| {
@@ -66,7 +68,7 @@ pub(crate) fn check_non_empty_id(raw: &str, label: &str) -> Result<String, Respo
     Ok(trimmed.to_string())
 }
 
-fn verify_project_ownership(
+pub(crate) fn verify_project_ownership(
     conn: &rusqlite::Connection,
     tenant_id: &str,
     project_id: &str,
@@ -128,6 +130,51 @@ pub(crate) fn map_harness_resp(err: HarnessError, op: &str) -> Response {
 // 1. Element Comments (V6 element_comments)
 // -----------------------------------------------------------------------------
 
+fn default_anchor_kind() -> String {
+    "html_element".to_string()
+}
+
+fn validate_anchor_kind(raw: &str) -> Result<String, Response> {
+    let k = raw.trim();
+    if matches!(
+        k,
+        "html_element" | "marquee_box" | "node_card" | "text_quote"
+    ) {
+        Ok(k.to_string())
+    } else {
+        Err(json_err(
+            StatusCode::BAD_REQUEST,
+            "VALIDATION_ERROR",
+            "Invalid anchorKind",
+        ))
+    }
+}
+
+fn lookup_live_artifact_sha256(
+    conn: &rusqlite::Connection,
+    node_id: &str,
+) -> rusqlite::Result<Option<String>> {
+    conn.query_row(
+        "SELECT content_hash FROM screen_artifacts WHERE node_id = ?1 ORDER BY created_at DESC, rowid DESC LIMIT 1",
+        params![node_id],
+        |r| r.get(0),
+    )
+    .optional()
+}
+
+fn stale_mapping_response(current_sha: &str, current_dom_hash: &str) -> Response {
+    json_err_with_details(
+        StatusCode::CONFLICT,
+        "STALE_MAPPING",
+        "Comment anchor no longer matches live artifact/DOM digest (STALE_MAPPING). Re-anchor before committing.",
+        serde_json::json!({
+            "error": "STALE_MAPPING",
+            "currentArtifactSha256": current_sha,
+            "currentDomHash": current_dom_hash,
+        }),
+    )
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ElementCommentDto {
@@ -139,6 +186,10 @@ pub struct ElementCommentDto {
     pub author: String,
     pub content: String,
     pub dom_hash: String,
+    #[serde(default)]
+    pub artifact_sha256: String,
+    #[serde(default = "default_anchor_kind")]
+    pub anchor_kind: String,
     pub anchor_status: String,
     pub created_at: String,
     pub updated_at: String,
@@ -151,6 +202,12 @@ pub struct CreateElementCommentInput {
     pub author: String,
     pub content: String,
     pub dom_hash: String,
+    #[serde(default)]
+    pub artifact_sha256: String,
+    #[serde(default = "default_anchor_kind")]
+    pub anchor_kind: String,
+    pub expected_artifact_sha256: Option<String>,
+    pub expected_dom_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -160,6 +217,11 @@ pub struct UpdateElementCommentInput {
     pub anchor_status: Option<String>,
     pub element_ff_id: Option<String>,
     pub dom_hash: Option<String>,
+    pub artifact_sha256: Option<String>,
+    pub anchor_kind: Option<String>,
+    pub expected_artifact_sha256: Option<String>,
+    pub expected_dom_hash: Option<String>,
+    pub reanchor: Option<bool>,
 }
 
 fn map_comment_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ElementCommentDto> {
@@ -172,9 +234,11 @@ fn map_comment_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ElementCommentDt
         author: row.get(5)?,
         content: row.get(6)?,
         dom_hash: row.get(7)?,
-        anchor_status: row.get(8)?,
-        created_at: epoch_ms_to_iso(row.get(9)?),
-        updated_at: epoch_ms_to_iso(row.get(10)?),
+        artifact_sha256: row.get(8)?,
+        anchor_kind: row.get(9)?,
+        anchor_status: row.get(10)?,
+        created_at: epoch_ms_to_iso(row.get(11)?),
+        updated_at: epoch_ms_to_iso(row.get(12)?),
     })
 }
 
@@ -193,7 +257,7 @@ pub async fn handle_list_comments(
         let mut stmt = conn
             .prepare(
                 "SELECT id, tenant_id, project_id, node_id, element_ff_id, author, content,
-                        dom_hash, anchor_status, created_at, updated_at
+                        dom_hash, artifact_sha256, anchor_kind, anchor_status, created_at, updated_at
                  FROM element_comments
                  WHERE tenant_id = ?1 AND project_id = ?2 AND node_id = ?3
                  ORDER BY created_at ASC",
@@ -236,21 +300,45 @@ pub async fn handle_create_comment(
         ));
     }
     let dom_hash = check_non_empty_id(&req.dom_hash, "domHash")?;
+    let artifact_sha256 = req.artifact_sha256.trim().to_string();
+    let anchor_kind = validate_anchor_kind(&req.anchor_kind)?;
+    let expected_sha = req.expected_artifact_sha256.map(|s| s.trim().to_string());
+    let expected_dom = req.expected_dom_hash.map(|s| s.trim().to_string());
     let pool = state.registry.pool().clone();
 
     let created = run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
         verify_project_ownership(&conn, &principal.tenant_id, &pid)?;
+        if let Some(ref exp_dom) = expected_dom {
+            if !exp_dom.is_empty() && exp_dom != &dom_hash {
+                return Err(stale_mapping_response(&artifact_sha256, &dom_hash));
+            }
+        }
+        if let Some(ref exp_sha) = expected_sha {
+            if !exp_sha.is_empty() && !artifact_sha256.is_empty() && exp_sha != &artifact_sha256 {
+                return Err(stale_mapping_response(&artifact_sha256, &dom_hash));
+            }
+        }
         let now_ms = Utc::now().timestamp_millis();
         let comment_id = Uuid::new_v4().to_string();
+        let mut cas_conflict: Option<String> = None;
 
         retry_on_busy("insert_element_comment", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            if let Some(live_sha) = lookup_live_artifact_sha256(&tx, &nid)? {
+                if !live_sha.is_empty()
+                    && !artifact_sha256.is_empty()
+                    && live_sha != artifact_sha256
+                {
+                    cas_conflict = Some(live_sha);
+                    return tx.rollback();
+                }
+            }
             tx.execute(
                 "INSERT INTO element_comments (
                     id, tenant_id, project_id, node_id, element_ff_id, author, content,
-                    dom_hash, anchor_status, created_at, updated_at
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', ?9, ?9)",
+                    dom_hash, artifact_sha256, anchor_kind, anchor_status, created_at, updated_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'active', ?11, ?11)",
                 params![
                     comment_id,
                     principal.tenant_id,
@@ -260,12 +348,18 @@ pub async fn handle_create_comment(
                     author,
                     content,
                     dom_hash,
+                    artifact_sha256,
+                    anchor_kind,
                     now_ms
                 ],
             )?;
             tx.commit()
         })
         .map_err(|e| map_harness_resp(e, "insert_element_comment"))?;
+
+        if let Some(live_sha) = cas_conflict {
+            return Err(stale_mapping_response(&live_sha, &dom_hash));
+        }
 
         let iso = epoch_ms_to_iso(now_ms);
         Ok(ElementCommentDto {
@@ -277,6 +371,8 @@ pub async fn handle_create_comment(
             author,
             content,
             dom_hash,
+            artifact_sha256,
+            anchor_kind,
             anchor_status: "active".to_string(),
             created_at: iso.clone(),
             updated_at: iso,
@@ -305,6 +401,9 @@ pub async fn handle_update_comment(
             ));
         }
     }
+    if let Some(ref ak) = req.anchor_kind {
+        validate_anchor_kind(ak)?;
+    }
     if let Some(ref c) = req.content {
         let t = c.trim();
         if t.is_empty() || t.len() > 2000 {
@@ -315,58 +414,110 @@ pub async fn handle_update_comment(
             ));
         }
     }
+    if let Some(ref ff) = req.element_ff_id {
+        check_non_empty_id(ff, "element_ff_id")?;
+    }
+    if let Some(ref h) = req.dom_hash {
+        check_non_empty_id(h, "dom_hash")?;
+    }
     let pool = state.registry.pool().clone();
 
     let updated = run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
         verify_project_ownership(&conn, &principal.tenant_id, &pid)?;
 
-        let existing = conn
-            .query_row(
-                "SELECT id, tenant_id, project_id, node_id, element_ff_id, author, content,
-                        dom_hash, anchor_status, created_at, updated_at
-                 FROM element_comments
-                 WHERE id = ?1 AND tenant_id = ?2 AND project_id = ?3 AND node_id = ?4",
-                params![cid, principal.tenant_id, pid, nid],
-                map_comment_row,
-            )
-            .optional()
-            .map_err(|e| map_harness_resp(map_sqlite_error(e, "get_comment"), "update_comment"))?;
-
-        let Some(mut dto) = existing else {
-            return Err(json_err(
-                StatusCode::NOT_FOUND,
-                "COMMENT_NOT_FOUND",
-                format!("Comment '{cid}' was not found"),
-            ));
-        };
-
-        if let Some(c) = req.content {
-            dto.content = c.trim().to_string();
-        }
-        if let Some(st) = req.anchor_status {
-            dto.anchor_status = st;
-        }
-        if let Some(ff) = req.element_ff_id {
-            dto.element_ff_id = ff.trim().to_string();
-        }
-        if let Some(h) = req.dom_hash {
-            dto.dom_hash = h.trim().to_string();
-        }
+        let is_reanchor = req.reanchor.unwrap_or(false);
         let now_ms = Utc::now().timestamp_millis();
-        dto.updated_at = epoch_ms_to_iso(now_ms);
+        let mut stale_conflict: Option<(String, String)> = None;
+        let mut not_found = false;
+        let mut updated_dto: Option<ElementCommentDto> = None;
 
         retry_on_busy("update_element_comment", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let existing = tx
+                .query_row(
+                    "SELECT id, tenant_id, project_id, node_id, element_ff_id, author, content,
+                            dom_hash, artifact_sha256, anchor_kind, anchor_status, created_at, updated_at
+                     FROM element_comments
+                     WHERE id = ?1 AND tenant_id = ?2 AND project_id = ?3 AND node_id = ?4",
+                    params![cid, principal.tenant_id, pid, nid],
+                    map_comment_row,
+                )
+                .optional()?;
+
+            let Some(mut dto) = existing else {
+                not_found = true;
+                return Ok(());
+            };
+
+            let live_sha = lookup_live_artifact_sha256(&tx, &nid)?;
+
+            if !is_reanchor {
+                let sha_mismatch = req
+                    .expected_artifact_sha256
+                    .as_deref()
+                    .map(str::trim)
+                    .is_some_and(|exp| !exp.is_empty() && exp != dto.artifact_sha256)
+                    || live_sha.as_deref().is_some_and(|live| {
+                        !live.is_empty() && !dto.artifact_sha256.is_empty() && live != dto.artifact_sha256
+                    });
+                let dom_mismatch = req
+                    .expected_dom_hash
+                    .as_deref()
+                    .map(str::trim)
+                    .is_some_and(|exp| !exp.is_empty() && exp != dto.dom_hash);
+                let already_stale_mutation =
+                    dto.anchor_status == "stale" && req.anchor_status.as_deref() != Some("resolved");
+
+                if sha_mismatch || dom_mismatch || already_stale_mutation {
+                    tx.execute(
+                        "UPDATE element_comments SET anchor_status = 'stale', updated_at = ?1
+                         WHERE id = ?2 AND tenant_id = ?3 AND project_id = ?4 AND node_id = ?5",
+                        params![now_ms, cid, principal.tenant_id, pid, nid],
+                    )?;
+                    tx.commit()?;
+                    stale_conflict = Some((
+                        live_sha.unwrap_or_else(|| dto.artifact_sha256.clone()),
+                        dto.dom_hash.clone(),
+                    ));
+                    return Ok(());
+                }
+            }
+
+            if let Some(ref c) = req.content {
+                dto.content = c.trim().to_string();
+            }
+            if is_reanchor {
+                dto.anchor_status = "active".to_string();
+            } else if let Some(ref st) = req.anchor_status {
+                dto.anchor_status = st.clone();
+            }
+            if let Some(ref ff) = req.element_ff_id {
+                dto.element_ff_id = ff.trim().to_string();
+            }
+            if let Some(ref h) = req.dom_hash {
+                dto.dom_hash = h.trim().to_string();
+            }
+            if let Some(ref sha) = req.artifact_sha256 {
+                dto.artifact_sha256 = sha.trim().to_string();
+            }
+            if let Some(ref ak) = req.anchor_kind {
+                dto.anchor_kind = ak.trim().to_string();
+            }
+            dto.updated_at = epoch_ms_to_iso(now_ms);
+
             tx.execute(
                 "UPDATE element_comments
-                 SET content = ?1, anchor_status = ?2, element_ff_id = ?3, dom_hash = ?4, updated_at = ?5
-                 WHERE id = ?6 AND tenant_id = ?7 AND project_id = ?8 AND node_id = ?9",
+                 SET content = ?1, anchor_status = ?2, element_ff_id = ?3, dom_hash = ?4,
+                     artifact_sha256 = ?5, anchor_kind = ?6, updated_at = ?7
+                 WHERE id = ?8 AND tenant_id = ?9 AND project_id = ?10 AND node_id = ?11",
                 params![
                     dto.content,
                     dto.anchor_status,
                     dto.element_ff_id,
                     dto.dom_hash,
+                    dto.artifact_sha256,
+                    dto.anchor_kind,
                     now_ms,
                     cid,
                     principal.tenant_id,
@@ -374,11 +525,25 @@ pub async fn handle_update_comment(
                     nid
                 ],
             )?;
-            tx.commit()
+            tx.commit()?;
+            updated_dto = Some(dto);
+            Ok(())
         })
         .map_err(|e| map_harness_resp(e, "update_element_comment"))?;
 
-        Ok(dto)
+        if not_found {
+            return Err(json_err(
+                StatusCode::NOT_FOUND,
+                "COMMENT_NOT_FOUND",
+                format!("Comment '{cid}' was not found"),
+            ));
+        }
+
+        if let Some((live_sha, dom_h)) = stale_conflict {
+            return Err(stale_mapping_response(&live_sha, &dom_h));
+        }
+
+        updated_dto.ok_or_else(|| json_err(StatusCode::INTERNAL_SERVER_ERROR, "UPDATE_FAILED", "Comment update did not return row"))
     })
     .await?;
 
@@ -615,36 +780,35 @@ pub async fn handle_update_fixture(
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
         verify_project_ownership(&conn, &principal.tenant_id, &pid)?;
 
-        let existing = conn
-            .query_row(
-                "SELECT id, tenant_id, project_id, node_id, variant, payload_json, is_default, created_at, updated_at
-                 FROM screen_fixtures
-                 WHERE id = ?1 AND tenant_id = ?2 AND project_id = ?3 AND node_id = ?4",
-                params![fid, principal.tenant_id, pid, nid],
-                map_fixture_row,
-            )
-            .optional()
-            .map_err(|e| map_harness_resp(map_sqlite_error(e, "get_fixture"), "update_fixture"))?;
-
-        let Some(mut dto) = existing else {
-            return Err(json_err(
-                StatusCode::NOT_FOUND,
-                "FIXTURE_NOT_FOUND",
-                format!("Fixture '{fid}' was not found"),
-            ));
-        };
-
-        if let Some(pj) = req.payload_json {
-            dto.payload_json = pj;
-        }
-        if let Some(is_def) = req.is_default {
-            dto.is_default = is_def;
-        }
         let now_ms = Utc::now().timestamp_millis();
-        dto.updated_at = epoch_ms_to_iso(now_ms);
+        let mut not_found = false;
+        let mut updated_dto: Option<ScreenFixtureDto> = None;
 
         retry_on_busy("update_screen_fixture", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let existing = tx
+                .query_row(
+                    "SELECT id, tenant_id, project_id, node_id, variant, payload_json, is_default, created_at, updated_at
+                     FROM screen_fixtures
+                     WHERE id = ?1 AND tenant_id = ?2 AND project_id = ?3 AND node_id = ?4",
+                    params![fid, principal.tenant_id, pid, nid],
+                    map_fixture_row,
+                )
+                .optional()?;
+
+            let Some(mut dto) = existing else {
+                not_found = true;
+                return Ok(());
+            };
+
+            if let Some(ref pj) = req.payload_json {
+                dto.payload_json = pj.clone();
+            }
+            if let Some(is_def) = req.is_default {
+                dto.is_default = is_def;
+            }
+            dto.updated_at = epoch_ms_to_iso(now_ms);
+
             if dto.is_default {
                 tx.execute(
                     "UPDATE screen_fixtures SET is_default = 0
@@ -665,11 +829,21 @@ pub async fn handle_update_fixture(
                     nid
                 ],
             )?;
-            tx.commit()
+            tx.commit()?;
+            updated_dto = Some(dto);
+            Ok(())
         })
         .map_err(|e| map_harness_resp(e, "update_screen_fixture"))?;
 
-        Ok(dto)
+        if not_found {
+            return Err(json_err(
+                StatusCode::NOT_FOUND,
+                "FIXTURE_NOT_FOUND",
+                format!("Fixture '{fid}' was not found"),
+            ));
+        }
+
+        updated_dto.ok_or_else(|| json_err(StatusCode::INTERNAL_SERVER_ERROR, "UPDATE_FAILED", "Fixture update did not return row"))
     })
     .await?;
 
@@ -1147,6 +1321,16 @@ fn validate_ipv4_ssrf(
             "Carrier-grade NAT {context}target '{v4}' is blocked (SSRF prevention)"
         ));
     }
+    if octets[0] == 198 && (octets[1] == 18 || octets[1] == 19) {
+        return Err(format!(
+            "Benchmarking RFC2544 {context}target '{v4}' is blocked (SSRF prevention)"
+        ));
+    }
+    if v4.is_multicast() || octets[0] >= 224 {
+        return Err(format!(
+            "Multicast/reserved {context}target '{v4}' is blocked (SSRF prevention)"
+        ));
+    }
     if v4.is_loopback() {
         if !allow_loopback_policy {
             return Err(format!(
@@ -1201,9 +1385,25 @@ fn validate_ip_ssrf(
                     && segments[3] == 0
                     && segments[4] == 0
                     && (segments[5] == 0xffff || segments[5] == 0);
+                let is_nat64_embedded = segments[0] == 0x0064
+                    && segments[1] == 0xff9b
+                    && segments[2] == 0
+                    && segments[3] == 0
+                    && segments[4] == 0
+                    && segments[5] == 0;
 
-                if is_v4_embedded {
-                    if let Some(v4) = v6.to_ipv4() {
+                if is_v4_embedded || is_nat64_embedded {
+                    let embedded_v4 = if is_v4_embedded {
+                        v6.to_ipv4()
+                    } else {
+                        Some(std::net::Ipv4Addr::new(
+                            (segments[6] >> 8) as u8,
+                            (segments[6] & 0xff) as u8,
+                            (segments[7] >> 8) as u8,
+                            (segments[7] & 0xff) as u8,
+                        ))
+                    };
+                    if let Some(v4) = embedded_v4 {
                         validate_ipv4_ssrf(
                             v4,
                             port,
@@ -1669,423 +1869,7 @@ pub async fn handle_delete_mcp_server(
 // 5. Execution Job Events & SSE Stream (V4 node_execution_jobs + V6 execution_events)
 // -----------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExecutionEventDto {
-    pub id: String,
-    pub job_id: String,
-    pub project_id: String,
-    pub node_id: String,
-    pub event_kind: String,
-    pub payload_text: String,
-    pub seq_no: i64,
-    pub project_seq: i64,
-    pub composite_scope_key: String,
-    pub job_status: String,
-    pub created_at: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PostJobEventInput {
-    pub job_id: String,
-    pub node_id: String,
-    pub session_id: Option<String>,
-    pub event_kind: String,
-    #[serde(default)]
-    pub payload_text: String,
-    pub job_status: Option<String>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StreamJobEventsQuery {
-    pub job_id: Option<String>,
-    pub node_id: Option<String>,
-    pub after_seq: Option<i64>,
-}
-
-pub async fn handle_post_job_event(
-    State(state): State<DaemonAppState>,
-    Extension(principal): Extension<FlowPrincipal>,
-    AxumPath(id): AxumPath<String>,
-    Json(req): Json<PostJobEventInput>,
-) -> Result<(StatusCode, Json<ExecutionEventDto>), Response> {
-    let pid = check_project_uuid(&id)?;
-    let job_id = check_non_empty_id(&req.job_id, "jobId")?;
-    let node_id = check_non_empty_id(&req.node_id, "nodeId")?;
-    let event_kind = check_non_empty_id(&req.event_kind, "eventKind")?;
-    let next_status = match req.job_status.as_deref() {
-        Some(
-            st @ ("QUEUED" | "RUNNING" | "PAUSED" | "INTERRUPTED" | "COMPLETED" | "FAILED"
-            | "CANCELLED"),
-        ) => Some(st.to_string()),
-        Some(_) => {
-            return Err(json_err(
-                StatusCode::BAD_REQUEST,
-                "VALIDATION_ERROR",
-                "Invalid jobStatus",
-            ))
-        }
-        None => None,
-    };
-    let session_id_req = req
-        .session_id
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or_else(|| format!("sess-{pid}"));
-    let scope_key = format!("{pid}::{session_id_req}::{node_id}");
-    let pool = state.registry.pool().clone();
-
-    let created = run_db(move || {
-        let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
-        verify_project_ownership(&conn, &principal.tenant_id, &pid)?;
-        let now_ms = Utc::now().timestamp_millis();
-        let event_id = Uuid::new_v4().to_string();
-
-        let mut cross_scope_err: Option<(StatusCode, &'static str, String)> = None;
-        let outcome = retry_on_busy("append_execution_event", || {
-            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-            let existing_sess: Option<(String, String)> = tx
-                .query_row(
-                    "SELECT project_id, tenant_id FROM chat_sessions WHERE id = ?1",
-                    params![session_id_req],
-                    |r| Ok((r.get(0)?, r.get(1)?)),
-                )
-                .optional()?;
-            match existing_sess {
-                Some((_, sess_tid)) if sess_tid != principal.tenant_id => {
-                    cross_scope_err = Some((
-                        StatusCode::FORBIDDEN,
-                        "TENANT_ISOLATION_BREACH",
-                        "Session belongs to another tenant".to_string(),
-                    ));
-                    return Ok(None);
-                }
-                Some((sess_pid, _)) if sess_pid != pid => {
-                    cross_scope_err = Some((
-                        StatusCode::NOT_FOUND,
-                        "PROJECT_NOT_FOUND",
-                        format!("Session '{session_id_req}' does not belong to project '{pid}'"),
-                    ));
-                    return Ok(None);
-                }
-                Some(_) => {}
-                None => {
-                    tx.execute(
-                        "INSERT INTO chat_sessions (id, tenant_id, project_id, title, model_provider, created_at, updated_at)
-                         VALUES (?1, ?2, ?3, 'Execution Stream Session', 'default', ?4, ?4)",
-                        params![session_id_req, principal.tenant_id, pid, now_ms],
-                    )?;
-                }
-            }
-
-            let cur_job: Option<(String, String, String)> = tx
-                .query_row(
-                    "SELECT project_id, tenant_id, status FROM node_execution_jobs WHERE id = ?1",
-                    params![job_id],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-                )
-                .optional()?;
-
-            let eff_status = match cur_job {
-                Some((_, job_tid, _)) if job_tid != principal.tenant_id => {
-                    cross_scope_err = Some((
-                        StatusCode::FORBIDDEN,
-                        "TENANT_ISOLATION_BREACH",
-                        "Job belongs to another tenant".to_string(),
-                    ));
-                    return Ok(None);
-                }
-                Some((job_pid, _, _)) if job_pid != pid => {
-                    cross_scope_err = Some((
-                        StatusCode::NOT_FOUND,
-                        "PROJECT_NOT_FOUND",
-                        format!("Job '{job_id}' does not belong to project '{pid}'"),
-                    ));
-                    return Ok(None);
-                }
-                Some((_, _, cur)) => {
-                    let target = next_status.clone().unwrap_or(cur);
-                    tx.execute(
-                        "UPDATE node_execution_jobs
-                         SET status = ?1,
-                             fencing_token = fencing_token + 1,
-                             composite_scope_key = CASE WHEN composite_scope_key = '' THEN ?2 ELSE composite_scope_key END,
-                             started_at = COALESCE(started_at, ?3),
-                             completed_at = CASE WHEN ?1 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?3 ELSE completed_at END,
-                             updated_at = ?3
-                         WHERE id = ?4 AND project_id = ?5 AND tenant_id = ?6",
-                        params![target, scope_key, now_ms, job_id, pid, principal.tenant_id],
-                    )?;
-                    target
-                }
-                None => {
-                    let target = next_status
-                        .clone()
-                        .unwrap_or_else(|| "RUNNING".to_string());
-                    tx.execute(
-                        "INSERT INTO node_execution_jobs (
-                            id, tenant_id, project_id, session_id, node_id, composite_scope_key,
-                            daemon_nonce, status, fencing_token, priority,
-                            created_at, started_at, completed_at, updated_at
-                         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, '', ?7, 1, 10, ?8, ?8, CASE WHEN ?7 IN ('COMPLETED', 'FAILED', 'CANCELLED') THEN ?8 ELSE NULL END, ?8)",
-                        params![
-                            job_id,
-                            principal.tenant_id,
-                            pid,
-                            session_id_req,
-                            node_id,
-                            scope_key,
-                            target,
-                            now_ms
-                        ],
-                    )?;
-                    target
-                }
-            };
-
-            let max_seq: i64 = tx.query_row(
-                "SELECT COALESCE(MAX(seq_no), 0) FROM execution_events WHERE job_id = ?1",
-                params![job_id],
-                |r| r.get(0),
-            )?;
-            let max_proj_seq: i64 = tx.query_row(
-                "SELECT COALESCE(MAX(project_seq), 0) FROM execution_events WHERE project_id = ?1",
-                params![pid],
-                |r| r.get(0),
-            )?;
-            let next_seq = max_seq + 1;
-            let next_proj_seq = max_proj_seq + 1;
-            tx.execute(
-                "INSERT INTO execution_events (
-                    id, tenant_id, project_id, job_id, node_id, composite_scope_key,
-                    event_kind, payload_text, seq_no, project_seq, created_at
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                params![
-                    event_id,
-                    principal.tenant_id,
-                    pid,
-                    job_id,
-                    node_id,
-                    scope_key,
-                    event_kind,
-                    req.payload_text,
-                    next_seq,
-                    next_proj_seq,
-                    now_ms
-                ],
-            )?;
-            tx.commit()?;
-            Ok::<Option<(i64, i64, String)>, rusqlite::Error>(Some((next_seq, next_proj_seq, eff_status)))
-        })
-        .map_err(|e| map_harness_resp(e, "append_execution_event"))?;
-        let Some((seq_no, project_seq, final_status)) = outcome else {
-            let (st, code, msg) = cross_scope_err.unwrap_or((
-                StatusCode::NOT_FOUND,
-                "PROJECT_NOT_FOUND",
-                format!("Resource does not belong to project '{pid}'"),
-            ));
-            return Err(json_err(st, code, msg));
-        };
-
-        Ok(ExecutionEventDto {
-            id: event_id,
-            job_id,
-            project_id: pid,
-            node_id,
-            event_kind,
-            payload_text: req.payload_text,
-            seq_no,
-            project_seq,
-            composite_scope_key: scope_key,
-            job_status: final_status,
-            created_at: epoch_ms_to_iso(now_ms),
-        })
-    })
-    .await?;
-
-    Ok((StatusCode::CREATED, Json(created)))
-}
-
-struct SsePollState {
-    pool: SqlitePool,
-    tenant_id: String,
-    project_id: String,
-    job_id: Option<String>,
-    node_id: Option<String>,
-    last_seq: i64,
-    ticks: u32,
-    closed: bool,
-}
-
-fn fetch_pending_events(
-    state: &SsePollState,
-) -> Result<(Vec<ExecutionEventDto>, bool), HarnessError> {
-    let conn = state.pool.connection()?;
-    let mut sql = String::from(
-        "SELECT e.id, e.job_id, e.project_id, e.node_id, e.event_kind, e.payload_text,
-                e.seq_no, COALESCE(e.project_seq, e.seq_no) AS eff_proj_seq,
-                e.composite_scope_key, COALESCE(j.status, 'RUNNING'), e.created_at
-         FROM execution_events e
-         LEFT JOIN node_execution_jobs j ON j.id = e.job_id
-         WHERE e.tenant_id = ?1 AND e.project_id = ?2
-           AND COALESCE(e.project_seq, e.seq_no) > ?3",
-    );
-    if state.job_id.is_some() {
-        sql.push_str(" AND e.job_id = ?4");
-    } else if state.node_id.is_some() {
-        sql.push_str(" AND e.node_id = ?4");
-    }
-    sql.push_str(" ORDER BY eff_proj_seq ASC, e.created_at ASC LIMIT 50");
-
-    let mut stmt = conn
-        .prepare(&sql)
-        .map_err(|e| map_sqlite_error(e, "prep_sse_events"))?;
-
-    let map_row = |row: &rusqlite::Row<'_>| -> rusqlite::Result<ExecutionEventDto> {
-        Ok(ExecutionEventDto {
-            id: row.get(0)?,
-            job_id: row.get(1)?,
-            project_id: row.get(2)?,
-            node_id: row.get(3)?,
-            event_kind: row.get(4)?,
-            payload_text: row.get(5)?,
-            seq_no: row.get(6)?,
-            project_seq: row.get(7)?,
-            composite_scope_key: row.get(8)?,
-            job_status: row.get(9)?,
-            created_at: epoch_ms_to_iso(row.get(10)?),
-        })
-    };
-
-    let rows = if let Some(ref jid) = state.job_id {
-        stmt.query_map(
-            params![state.tenant_id, state.project_id, state.last_seq, jid],
-            map_row,
-        )
-    } else if let Some(ref nid) = state.node_id {
-        stmt.query_map(
-            params![state.tenant_id, state.project_id, state.last_seq, nid],
-            map_row,
-        )
-    } else {
-        stmt.query_map(
-            params![state.tenant_id, state.project_id, state.last_seq],
-            map_row,
-        )
-    }
-    .map_err(|e| map_sqlite_error(e, "query_sse_events"))?;
-
-    let mut events = Vec::new();
-    for r in rows {
-        events.push(r.map_err(|e| map_sqlite_error(e, "row_sse_events"))?);
-    }
-
-    let is_terminal = if let Some(ref jid) = state.job_id {
-        conn.query_row(
-            "SELECT status FROM node_execution_jobs WHERE id = ?1 AND project_id = ?2 AND tenant_id = ?3",
-            params![jid, state.project_id, state.tenant_id],
-            |r| r.get::<_, String>(0),
-        )
-        .optional()
-        .map_err(|e| map_sqlite_error(e, "sse_job_status"))?
-        .is_some_and(|st| matches!(st.as_str(), "COMPLETED" | "FAILED" | "CANCELLED"))
-    } else {
-        false
-    };
-
-    Ok((events, is_terminal))
-}
-
-pub async fn handle_stream_job_events(
-    State(state): State<DaemonAppState>,
-    Extension(principal): Extension<FlowPrincipal>,
-    AxumPath(id): AxumPath<String>,
-    headers: HeaderMap,
-    Query(q): Query<StreamJobEventsQuery>,
-) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, Response> {
-    let pid = check_project_uuid(&id)?;
-    let pool = state.registry.pool().clone();
-    let tid = principal.tenant_id.clone();
-    let pid_check = pid.clone();
-
-    run_db(move || {
-        let conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
-        verify_project_ownership(&conn, &tid, &pid_check)
-    })
-    .await?;
-
-    let last_event_id = headers
-        .get("last-event-id")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.trim().parse::<i64>().ok());
-
-    let init = SsePollState {
-        pool: state.registry.pool().clone(),
-        tenant_id: principal.tenant_id,
-        project_id: pid,
-        job_id: q.job_id.filter(|s| !s.trim().is_empty()),
-        node_id: q.node_id.filter(|s| !s.trim().is_empty()),
-        last_seq: q.after_seq.or(last_event_id).unwrap_or(0),
-        ticks: 0,
-        closed: false,
-    };
-
-    let max_ticks: u32 = std::env::var("COWOK_SSE_MAX_TICKS")
-        .ok()
-        .and_then(|v| v.parse::<u32>().ok())
-        .filter(|&v| v > 0)
-        .unwrap_or(250);
-
-    let stream = futures_util::stream::unfold(init, move |mut st| async move {
-        if st.closed || st.ticks >= max_ticks {
-            return None;
-        }
-        loop {
-            if st.ticks > 0 {
-                tokio::time::sleep(Duration::from_millis(120)).await;
-            }
-            st.ticks += 1;
-
-            let snapshot = SsePollState {
-                pool: st.pool.clone(),
-                tenant_id: st.tenant_id.clone(),
-                project_id: st.project_id.clone(),
-                job_id: st.job_id.clone(),
-                node_id: st.node_id.clone(),
-                last_seq: st.last_seq,
-                ticks: st.ticks,
-                closed: st.closed,
-            };
-            let res = tokio::task::spawn_blocking(move || fetch_pending_events(&snapshot)).await;
-            match res {
-                Ok(Ok((events, is_terminal))) => {
-                    if let Some(last) = events.last() {
-                        st.last_seq = last.project_seq.max(last.seq_no);
-                    }
-                    if !events.is_empty() {
-                        if is_terminal {
-                            st.closed = true;
-                        }
-                        let payload =
-                            serde_json::to_string(&events).unwrap_or_else(|_| "[]".into());
-                        let ev = Event::default()
-                            .id(st.last_seq.to_string())
-                            .event("execution_events")
-                            .data(payload);
-                        return Some((Ok(ev), st));
-                    }
-                    if is_terminal || st.ticks >= max_ticks {
-                        return None;
-                    }
-                }
-                _ => return None,
-            }
-        }
-    });
-
-    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
-}
+pub use super::execution_events::*;
 
 // -----------------------------------------------------------------------------
 // 6. Provider Key Verification (`POST /api/v1/doctor/verify-key`) -> Extracted to doctor_vault.rs (Story 04.3 Gate H6)

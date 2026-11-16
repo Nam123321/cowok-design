@@ -1,89 +1,40 @@
-// @story 04.3
-// @implements AC-01 (Reactive Hook for KeyedParallelCoordinator)
+// @story 04.3, 04.4
+// @implements AC-01 (Reactive Hook + Daemon Sync for KeyedParallelCoordinator)
 import { useState, useEffect, useCallback } from "react";
+import { apiFlowExecution } from "@/api/flow-execution";
 import {
   globalKeyedParallelCoordinator,
-  NodeExecutionJob,
-  NodeQueueSummary,
-  NodeJobStatus,
+  type NodeExecutionJob,
+  type NodeQueueSummary,
+  type NodeStatusSnapshot,
+  type ScopeFilter,
 } from "../store/keyed-parallel-coordinator";
+import type { NodeExecutionJobDto } from "@/lib/validations/flow-execution";
 
 export function useKeyedParallelCoordinator() {
-  const [summary, setSummary] = useState<NodeQueueSummary>(() =>
-    globalKeyedParallelCoordinator.getSummary()
-  );
+  const [summary, setSummary] = useState<NodeQueueSummary>(() => globalKeyedParallelCoordinator.getSummary());
 
-  useEffect(() => {
-    return globalKeyedParallelCoordinator.subscribe((latestSummary) => {
-      setSummary(latestSummary);
-    });
+  useEffect(() => globalKeyedParallelCoordinator.subscribe(setSummary), []);
+
+  const enqueueJob = useCallback((args: { projectId: string; sessionId: string; nodeId: string; prompt: string }) => globalKeyedParallelCoordinator.enqueueJob(args), []);
+  const steerJob = useCallback((jobId: string, instruction: string, nextToken?: number) => globalKeyedParallelCoordinator.steerJob(jobId, instruction, nextToken), []);
+  const pauseJob = useCallback((jobId: string, nextToken?: number) => globalKeyedParallelCoordinator.pauseJob(jobId, nextToken), []);
+  const resumeJob = useCallback((jobId: string, nextToken?: number) => globalKeyedParallelCoordinator.resumeJob(jobId, nextToken), []);
+  const cancelJob = useCallback((jobId: string, reason?: string) => globalKeyedParallelCoordinator.cancelJob(jobId, reason), []);
+  const failJob = useCallback((jobId: string, reason?: string) => globalKeyedParallelCoordinator.failJob(jobId, reason), []);
+  const completeJob = useCallback((jobId: string, outputSha256?: string) => globalKeyedParallelCoordinator.completeJob(jobId, outputSha256), []);
+  const reconcileSingleJob = useCallback((dto: NodeExecutionJobDto, projectSeq?: number) => globalKeyedParallelCoordinator.reconcileSingleJob(dto, projectSeq), []);
+
+  const syncFromDaemon = useCallback(async (projectId: string, sessionId?: string) => {
+    const res = await apiFlowExecution.listNodeSessions(projectId, sessionId);
+    globalKeyedParallelCoordinator.reconcileFromDaemon(res.jobs, apiFlowExecution.getLastProjectSeq(projectId), { projectId, sessionId });
+    return res;
   }, []);
 
-  const enqueueJob = useCallback(
-    (args: {
-      projectId: string;
-      sessionId: string;
-      nodeId: string;
-      prompt: string;
-    }) => {
-      return globalKeyedParallelCoordinator.enqueueJob(args);
-    },
-    []
-  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const getNodeStatus = useCallback((nodeId: string, scope?: ScopeFilter): NodeStatusSnapshot | null => globalKeyedParallelCoordinator.getNodeStatus(nodeId, scope), [summary]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const getActiveJobs = useCallback((): NodeExecutionJob[] => globalKeyedParallelCoordinator.getActiveJobs(), [summary]);
 
-  const steerJob = useCallback((jobId: string, instruction: string) => {
-    return globalKeyedParallelCoordinator.steerJob(jobId, instruction);
-  }, []);
-
-  const pauseJob = useCallback((jobId: string) => {
-    return globalKeyedParallelCoordinator.pauseJob(jobId);
-  }, []);
-
-  const resumeJob = useCallback((jobId: string) => {
-    return globalKeyedParallelCoordinator.resumeJob(jobId);
-  }, []);
-
-  const cancelJob = useCallback((jobId: string, reason?: string) => {
-    return globalKeyedParallelCoordinator.cancelJob(jobId, reason);
-  }, []);
-
-  const failJob = useCallback((jobId: string, reason?: string) => {
-    return globalKeyedParallelCoordinator.failJob(jobId, reason);
-  }, []);
-
-  const completeJob = useCallback((jobId: string, outputSha256?: string) => {
-    return globalKeyedParallelCoordinator.completeJob(jobId, outputSha256);
-  }, []);
-
-  const getNodeStatus = useCallback(
-    (
-      nodeId: string
-    ): {
-      status: NodeJobStatus;
-      queuePosition: number;
-      jobId?: string;
-    } | null => {
-      return globalKeyedParallelCoordinator.getNodeStatus(nodeId);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [summary]
-  );
-
-  const getActiveJobs = useCallback((): NodeExecutionJob[] => {
-    return globalKeyedParallelCoordinator.getActiveJobs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [summary]);
-
-  return {
-    summary,
-    enqueueJob,
-    steerJob,
-    pauseJob,
-    resumeJob,
-    cancelJob,
-    failJob,
-    completeJob,
-    getNodeStatus,
-    getActiveJobs,
-  };
+  return { summary, enqueueJob, steerJob, pauseJob, resumeJob, cancelJob, failJob, completeJob, reconcileSingleJob, syncFromDaemon, getNodeStatus, getActiveJobs };
 }

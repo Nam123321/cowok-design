@@ -27,11 +27,12 @@ export function savePersistedSettings(patch: Partial<PersistedWorkbenchSettings>
       theme: patch.theme ?? prev.theme ?? "warm",
       locale: patch.locale ?? prev.locale ?? "vi",
       fontSize: patch.fontSize ?? prev.fontSize ?? "13px",
-      defaultModel: patch.defaultModel ?? prev.defaultModel ?? "claude-sonnet-4-6",
+      defaultModel: patch.defaultModel ?? prev.defaultModel ?? "cowok-swarm",
       byosEndpoint: patch.byosEndpoint ?? prev.byosEndpoint ?? defaultByos,
       autoContextSlice: patch.autoContextSlice ?? prev.autoContextSlice ?? true,
     };
     window.localStorage.setItem(WORKBENCH_SETTINGS_STORAGE_KEY, JSON.stringify(safeNext));
+    window.dispatchEvent(new CustomEvent("cowok:settings-changed", { detail: safeNext }));
   } catch {
     // Storage restricted in test sandbox
   }

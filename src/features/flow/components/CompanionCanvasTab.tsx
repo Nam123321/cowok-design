@@ -4,6 +4,7 @@ import React, { useRef } from "react";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { useFormatter } from "../../../hooks/useFormatter";
 import type { ConflictState, WorkbenchNode } from "../store/flow-workbench-types";
+import { normalizeFixtureRef, type FixtureVariant, type ViewportPreset } from "../../../lib/validations/screen-fixture";
 import { resolveScreenPreviewData } from "./companion-canvas-data";
 import { buildPreviewDocumentHtml } from "../utils/html-sandbox-wrapper";
 import { CompanionTabBar } from "./CompanionTabBar";
@@ -26,6 +27,7 @@ export interface CanvasTabItem {
 }
 
 export interface CompanionCanvasTabProps {
+  projectId?: string;
   activeTabId?: string;
   onTabChange?: (tabId: string, format: CanvasTabItem["format"]) => void;
   selectedNodeId?: string | null;
@@ -37,6 +39,9 @@ export interface CompanionCanvasTabProps {
   onDiscardDraft?: () => void;
   onResolveConflict?: (choice: "keep_mine" | "take_agent" | "inspect_collisions") => void;
   onAttachRegionToChat?: (chipLabel: string) => void;
+  onQuoteText?: (text: string) => void;
+  onSelectNodeSubState?: (nodeId: string, subState: FixtureVariant) => void;
+  onUpdateNodeViewport?: (nodeId: string, vp: ViewportPreset) => void;
   children: React.ReactNode;
 }
 
@@ -83,33 +88,6 @@ interface StageProps extends CompanionCanvasTabProps {
   activeTab: CanvasTabItem;
   vp: ReturnType<typeof useDualPaneViewportState>;
   splitContainerRef: React.RefObject<HTMLDivElement | null>;
-}
-
-function buildSeedInlineHtml(params: {
-  customRawHtml?: string;
-  structureLens: "userflow" | "slide-cms";
-  activeSlide: ReturnType<typeof useDualPaneViewportState>["slides"][number];
-  activeScreenData: ReturnType<typeof resolveScreenPreviewData>;
-  formatCurrency: (amount: number, currency: string) => string;
-  locale: string;
-  t: (k: string, d?: string) => string;
-}): string {
-  if (params.customRawHtml) return params.customRawHtml;
-  const seedRaw = params.structureLens === "slide-cms" ? params.activeSlide.kpi1 : params.activeScreenData.amount;
-  const formattedAmount = typeof seedRaw === "number" ? params.formatCurrency(seedRaw, "USD") : String(seedRaw);
-  return buildPreviewDocumentHtml({
-    structureLens: params.structureLens,
-    activeSlide: params.activeSlide,
-    activeScreenData: params.activeScreenData,
-    formattedAmount,
-    labels: {
-      lang: params.locale,
-      kpi1Label: params.t("canvas.previewKpiLimitLabel", "Transaction Limit"),
-      kpi2Label: params.t("canvas.previewKpiSecurityLabel", "Security Status"),
-      kpi3Label: params.t("canvas.previewKpiLatencyLabel", "Response Time"),
-      actionHint: params.t("canvas.previewFallbackHint", "Auto-synced live HTML preview from current graph state."),
-    },
-  });
 }
 
 const StageLeftStructureSection: React.FC<{ p: StageProps }> = ({ p }) => {
@@ -168,12 +146,33 @@ const DualPaneHtmlStage: React.FC<StageProps> = (p) => {
   const customRawHtml = vp.customHtmlByTarget[targetKey];
   const showSplitter = !vp.isLeftStructureHidden && !vp.isRightPreviewHidden && !vp.isPresenting;
 
+  const seedLabels = {
+    lang: locale,
+    kpi1Label: t("canvas.previewKpiLimitLabel", "Transaction Limit"),
+    kpi2Label: t("canvas.previewKpiSecurityLabel", "Security Status"),
+    kpi3Label: t("canvas.previewKpiLatencyLabel", "Response Time"),
+    actionHint: t("canvas.previewFallbackHint", "Auto-synced live HTML preview from current graph state."),
+  };
+  const nextSeedHtml = buildPreviewDocumentHtml({
+    structureLens: vp.structureLens,
+    activeSlide,
+    activeScreenData,
+    formattedAmount: typeof (vp.structureLens === "slide-cms" ? activeSlide.kpi1 : activeScreenData.amount) === "number"
+      ? formatCurrency(Number(vp.structureLens === "slide-cms" ? activeSlide.kpi1 : activeScreenData.amount), "USD")
+      : String(vp.structureLens === "slide-cms" ? activeSlide.kpi1 : activeScreenData.amount),
+    labels: seedLabels,
+  });
+  const activeSubState = normalizeFixtureRef(selectedNode?.activeSubState ?? vp.activeSubState);
+
   const handleToggleInlineCode = () => {
-    if (!vp.isInlineCodeOpen) {
-      vp.setHtmlCodeText(
-        buildSeedInlineHtml({ customRawHtml, structureLens: vp.structureLens, activeSlide, activeScreenData, formatCurrency, locale, t })
-      );
+    if (vp.isInlineCodeOpen && vp.dirtyBuffer) {
+      vp.setShowDirtyGuardPrompt(true);
+      return;
     }
+    const seed = customRawHtml || nextSeedHtml;
+    vp.setHtmlCodeText(seed);
+    vp.setBaselineHtmlText(seed);
+    vp.setShowDirtyGuardPrompt(false);
     vp.setIsInlineCodeOpen((prev) => !prev);
   };
 
@@ -183,16 +182,47 @@ const DualPaneHtmlStage: React.FC<StageProps> = (p) => {
       {showSplitter && <StageSplitter isDragging={vp.isDraggingInternalSplit} onDragStart={() => vp.setIsDraggingInternalSplit(true)} />}
       {!vp.isRightPreviewHidden && (
         <CompanionLiveHtmlRightPane
+          projectId={p.projectId}
           activeTab={activeTab} structureLens={vp.structureLens} selectedNodeId={p.selectedNodeId}
           selectedNodeKey={selectedNode?.screenKey || undefined} activeSlide={activeSlide} activeScreenData={activeScreenData}
-          pointerMode={vp.pointerMode} onSetPointerMode={vp.setPointerMode} isInlineCodeOpen={vp.isInlineCodeOpen}
-          onToggleInlineCode={handleToggleInlineCode} inlineCodeText={vp.htmlCodeText} onChangeInlineCode={vp.setHtmlCodeText}
-          viewportPreset={vp.viewportPreset} onSetViewportPreset={vp.setViewportPreset} aspectRatio={vp.aspectRatio}
+          activeSubState={activeSubState}
+          onSelectSubState={(v) => {
+            vp.setActiveSubState(v);
+            if (p.selectedNodeId) p.onSelectNodeSubState?.(p.selectedNodeId, v);
+          }}
+          pointerMode={vp.pointerMode} onSetPointerMode={vp.setPointerMode}
+          isInlineCodeOpen={vp.isInlineCodeOpen} dirtyBuffer={vp.dirtyBuffer} showDirtyGuardPrompt={vp.showDirtyGuardPrompt}
+          onToggleInlineCode={handleToggleInlineCode}
+          onConfirmDiscardDirty={() => {
+            vp.setHtmlCodeText(vp.baselineHtmlText);
+            vp.setShowDirtyGuardPrompt(false);
+            vp.setIsInlineCodeOpen(false);
+          }}
+          onCancelCloseEditor={() => vp.setShowDirtyGuardPrompt(false)}
+          inlineCodeText={vp.htmlCodeText} onChangeInlineCode={vp.setHtmlCodeText}
+          viewportPreset={vp.viewportPreset}
+          onSetViewportPreset={(nextVp) => {
+            vp.setViewportPreset(nextVp);
+            if (p.selectedNodeId) p.onUpdateNodeViewport?.(p.selectedNodeId, nextVp);
+          }}
+          aspectRatio={vp.aspectRatio}
           onSetAspectRatio={vp.setAspectRatio} isPresenting={vp.isPresenting} onTogglePresenting={() => vp.setIsPresenting((prev) => !prev)}
           isLeftStructureHidden={vp.isLeftStructureHidden} onToggleLeftStructureHidden={() => vp.setIsLeftStructureHidden((prev) => !prev)}
           highlightedRegionId={vp.highlightedRegionId} customRawHtml={customRawHtml}
-          onApplyHtml={(html) => vp.setCustomHtmlForTarget(targetKey, html)}
-          onRegionClick={(id, label) => { vp.setHighlightedRegionId(id); if (vp.pointerMode !== "interact") p.onAttachRegionToChat?.(`[${label}]`); }}
+          onApplyHtml={(html) => {
+            vp.setBaselineHtmlText(html);
+            vp.setShowDirtyGuardPrompt(false);
+            vp.setCustomHtmlForTarget(targetKey, html);
+            vp.setIsInlineCodeOpen(false);
+          }}
+          onQuoteText={p.onQuoteText}
+          onRegionClick={(id, label) => {
+            vp.setHighlightedRegionId(id);
+            if (vp.pointerMode !== "interact") {
+              const formatted = label.startsWith("@[") ? label : `[${label}]`;
+              p.onAttachRegionToChat?.(formatted);
+            }
+          }}
         />
       )}
     </div>

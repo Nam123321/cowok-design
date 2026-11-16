@@ -1,0 +1,49 @@
+{
+  "id": "cli-doctor-extension",
+  "slug": "cli-doctor-extension",
+  "name": "CLI Doctor & BYOK Vault Extension",
+  "version": "1.0.0",
+  "delivery": "hybrid",
+  "packaging": "EXTENSION_PLUGIN",
+  "storyId": "04.3",
+  "description": "Passive 16+ local CLI/IDE doctor, bounded -PGID active auth probe, SSRF-guarded BYOK verification, and 0o600 vault custody controls.",
+  "entryPoint": "src/app/api/doctor/route.ts",
+  "skillKit": {
+    "entry": "skills/cli-doctor/SKILL.md",
+    "skills": [
+      {
+        "id": "cli-doctor",
+        "path": "skills/cli-doctor/SKILL.md",
+        "riskTier": 2
+      }
+    ]
+  },
+  "permissions": [
+    "doctor:passive_scan",
+    "doctor:active_probe",
+    "vault:custody_read_write"
+  ],
+  "contracts": {
+    "provides": [
+      "GET /api/doctor",
+      "POST /api/doctor/probe-cli",
+      "POST /api/doctor/verify-key",
+      "PUT /api/settings/vault",
+      "GET /api/plugins"
+    ],
+    "consumes": [
+      "GET /api/v1/health",
+      "GET /api/v1/projects",
+      "GET /api/v1/agent-settings",
+      "PUT /api/v1/agent-settings"
+    ],
+    "upstreamStories": [
+      "04.2"
+    ],
+    "downstreamStories": [
+      "04.4",
+      "04.5"
+    ]
+  },
+  "sha256": "979c43e21df20b50a8dbf99195232f36f61dcfb59d73cb0da04898e82b254943"
+}

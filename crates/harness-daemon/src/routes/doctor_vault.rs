@@ -16,10 +16,10 @@ use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use spec_registry::{map_sqlite_error, retry_on_busy};
-use tokio::process::Command;
 use uuid::Uuid;
 
 use crate::daemon_auth::FlowPrincipal;
+use crate::routes::doctor_usage::{enrich_cli_tool_dto, DoctorModelOptionDto};
 use crate::routes::legacy_workbench_v6::{
     check_non_empty_id, check_ssrf_socket_addr, epoch_ms_to_iso, json_err, map_harness_resp,
     run_db, sanitize_credential_ref, validate_ssrf_safe_url,
@@ -419,6 +419,12 @@ pub struct CliDoctorToolDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auth_reason: Option<String>,
     pub latency_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_group: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<DoctorModelOptionDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -431,14 +437,16 @@ pub struct DoctorCliMatrixResponse {
 }
 
 #[derive(Clone, Copy)]
-struct CliTargetDefinition {
-    id: &'static str,
-    name: &'static str,
-    command: &'static str,
-    category: &'static str,
-    env_keys: &'static [&'static str],
-    config_subpaths: &'static [&'static str],
+pub struct CliTargetDefinition {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub command: &'static str,
+    pub category: &'static str,
+    pub env_keys: &'static [&'static str],
+    pub config_subpaths: &'static [&'static str],
 }
+
+pub const SUPPORTED_CLI_DEFINITIONS_PUB: &[CliTargetDefinition] = SUPPORTED_CLI_DEFINITIONS;
 
 const SUPPORTED_CLI_DEFINITIONS: &[CliTargetDefinition] = &[
     CliTargetDefinition {
@@ -465,6 +473,7 @@ const SUPPORTED_CLI_DEFINITIONS: &[CliTargetDefinition] = &[
         env_keys: &["GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTIGRAVITY_API_KEY"],
         config_subpaths: &[
             ".gemini/oauth_creds.json",
+            ".gemini/google_accounts.json",
             ".gemini/antigravity/mcp_config.json",
         ],
     },
@@ -476,6 +485,7 @@ const SUPPORTED_CLI_DEFINITIONS: &[CliTargetDefinition] = &[
         env_keys: &["GEMINI_API_KEY", "GOOGLE_API_KEY"],
         config_subpaths: &[
             ".gemini/oauth_creds.json",
+            ".gemini/google_accounts.json",
             ".config/gemini/oauth_creds.json",
         ],
     },
@@ -509,7 +519,18 @@ const SUPPORTED_CLI_DEFINITIONS: &[CliTargetDefinition] = &[
         command: "opencode",
         category: "cli",
         env_keys: &["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENCODE_API_KEY"],
-        config_subpaths: &[".local/share/opencode/auth.json"],
+        config_subpaths: &[
+            ".local/share/opencode/auth.json",
+            ".config/opencode/opencode.jsonc",
+        ],
+    },
+    CliTargetDefinition {
+        id: "pi",
+        name: "Pi Coding Agent",
+        command: "pi",
+        category: "cli",
+        env_keys: &["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "PI_API_KEY"],
+        config_subpaths: &[".pi/agent/auth.json", ".pi/agent/settings.json"],
     },
     CliTargetDefinition {
         id: "omp",
@@ -608,6 +629,10 @@ const SUPPORTED_CLI_DEFINITIONS: &[CliTargetDefinition] = &[
         config_subpaths: &[".kiro/settings.json"],
     },
 ];
+
+pub fn resolve_cli_binary_path_pub(cmd: &str) -> Option<std::path::PathBuf> {
+    resolve_cli_binary_path(cmd)
+}
 
 fn resolve_cli_binary_path(cmd: &str) -> Option<std::path::PathBuf> {
     if let Ok(path_var) = std::env::var("PATH") {
@@ -711,31 +736,119 @@ async fn check_ollama_live_health() -> (bool, Option<String>, Option<String>) {
     }
 }
 
-async fn probe_cli_version_bounded(bin_path: &Path) -> Option<String> {
-    let mut cmd = Command::new(bin_path);
-    cmd.arg("--version")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        cmd.as_std_mut().process_group(0);
-    }
-    let child = cmd.spawn().ok()?;
-    let output = tokio::time::timeout(Duration::from_millis(1500), child.wait_with_output())
-        .await
-        .ok()?
-        .ok()?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let line = stdout
+const MAX_PROBE_CONCURRENCY: usize = 4;
+const MAX_PROBE_TIMEOUT_MS: u64 = 1500;
+static ACTIVE_PROBE_SEMAPHORE: tokio::sync::Semaphore =
+    tokio::sync::Semaphore::const_new(MAX_PROBE_CONCURRENCY);
+
+fn ide_extension_installed(id: &str, config_subpaths: &[&str]) -> bool {
+    let Some(home) = std::env::var_os("HOME").map(std::path::PathBuf::from) else {
+        return false;
+    };
+    let prefix = match id {
+        "cline" => Some("saoudrizwan.claude-dev"),
+        "roo" => Some("rooveterinaryinc.roo-cline"),
+        "continue" => Some("continue.continue"),
+        _ => None,
+    };
+    let in_vscode = prefix.is_some_and(|pfx| {
+        std::fs::read_dir(home.join(".vscode/extensions"))
+            .ok()
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e.ok())
+            .any(|e| e.file_name().to_string_lossy().starts_with(pfx))
+    });
+    in_vscode || config_subpaths.iter().any(|rel| home.join(rel).is_file())
+}
+
+fn spawn_bounded_pipe_drain<R: std::io::Read + Send + 'static>(
+    mut reader: R,
+) -> std::thread::JoinHandle<String> {
+    std::thread::spawn(move || {
+        let mut out = Vec::new();
+        let mut buf = [0u8; 4096];
+        while let Ok(n) = reader.read(&mut buf) {
+            if n == 0 {
+                break;
+            }
+            if out.len() < 8192 {
+                let take = (8192 - out.len()).min(n);
+                out.extend_from_slice(&buf[..take]);
+            }
+        }
+        String::from_utf8_lossy(&out).to_string()
+    })
+}
+
+fn first_version_line(stdout: &str, stderr: &str) -> Option<String> {
+    stdout
         .lines()
         .chain(stderr.lines())
         .map(str::trim)
-        .find(|l| !l.is_empty())?;
-    Some(line.chars().take(64).collect())
+        .find(|l| !l.is_empty())
+        .map(|l| l.chars().take(64).collect())
+}
+
+async fn probe_cli_version_bounded(bin_path: &Path) -> (Option<String>, bool) {
+    let Ok(_permit) = ACTIVE_PROBE_SEMAPHORE.acquire().await else {
+        return (None, false);
+    };
+    let bin = bin_path.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        let mut cmd = std::process::Command::new(&bin);
+        cmd.arg("--version")
+            .env("CI", "1")
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            cmd.process_group(0);
+        }
+        let Ok(mut child) = cmd.spawn() else {
+            return (None, false);
+        };
+        let pid = child.id();
+        let out_drain = child.stdout.take().map(spawn_bounded_pipe_drain);
+        let err_drain = child.stderr.take().map(spawn_bounded_pipe_drain);
+        let deadline = Instant::now() + Duration::from_millis(MAX_PROBE_TIMEOUT_MS);
+        loop {
+            match child.try_wait() {
+                Ok(Some(_status)) => {
+                    let stdout = out_drain.and_then(|h| h.join().ok()).unwrap_or_default();
+                    let stderr = err_drain.and_then(|h| h.join().ok()).unwrap_or_default();
+                    return (first_version_line(&stdout, &stderr), false);
+                }
+                Ok(None) => {
+                    if Instant::now() >= deadline {
+                        #[cfg(unix)]
+                        unsafe {
+                            libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
+                        }
+                        #[cfg(not(unix))]
+                        {
+                            let _ = child.kill();
+                        }
+                        let _ = child.wait();
+                        if let Some(h) = out_drain {
+                            let _ = h.join();
+                        }
+                        if let Some(h) = err_drain {
+                            let _ = h.join();
+                        }
+                        return (None, true);
+                    }
+                    std::thread::sleep(Duration::from_millis(15));
+                }
+                Err(_) => return (None, false),
+            }
+        }
+    })
+    .await
+    .unwrap_or((None, false))
 }
 
 async fn evaluate_cli_target(def: CliTargetDefinition, active_probe: bool) -> CliDoctorToolDto {
@@ -747,7 +860,29 @@ async fn evaluate_cli_target(def: CliTargetDefinition, active_probe: bool) -> Cl
         .flatten();
 
     let Some(bin_path) = bin_opt else {
-        return CliDoctorToolDto {
+        if matches!(def.id, "cline" | "roo" | "continue") {
+            let has_ext = ide_extension_installed(def.id, def.config_subpaths);
+            return enrich_cli_tool_dto(CliDoctorToolDto {
+                id: def.id.to_string(),
+                name: def.name.to_string(),
+                command: def.command.to_string(),
+                category: def.category.to_string(),
+                scan_mode: scan_mode.to_string(),
+                installed: has_ext,
+                version: None,
+                authenticated: false,
+                status: "manual_ide_setup".to_string(),
+                auth_reason: Some(
+                    "IDE extension requires manual provider setup inside host editor".to_string(),
+                ),
+                latency_ms: start.elapsed().as_millis() as u64,
+                account_label: None,
+                provider_group: None,
+                models: Vec::new(),
+            })
+            .await;
+        }
+        return enrich_cli_tool_dto(CliDoctorToolDto {
             id: def.id.to_string(),
             name: def.name.to_string(),
             command: def.command.to_string(),
@@ -759,29 +894,44 @@ async fn evaluate_cli_target(def: CliTargetDefinition, active_probe: bool) -> Cl
             status: "not_installed".to_string(),
             auth_reason: Some(format!("Command '{}' not found in PATH", def.command)),
             latency_ms: start.elapsed().as_millis() as u64,
-        };
+            account_label: None,
+            provider_group: None,
+            models: Vec::new(),
+        })
+        .await;
     };
 
-    let (authenticated, auth_reason, passive_hint) = if def.id == "ollama" {
+    let (mut authenticated, mut auth_reason, passive_hint) = if def.id == "ollama" {
         check_ollama_live_health().await
     } else {
         let (ok, reason) = check_cli_passive_auth(&def);
         (ok, reason, None)
     };
 
-    let version = if active_probe {
-        probe_cli_version_bounded(&bin_path).await.or(passive_hint)
+    let (version, timed_out) = if active_probe {
+        let (v, to) = probe_cli_version_bounded(&bin_path).await;
+        (v.or(passive_hint), to)
     } else {
-        passive_hint
+        (passive_hint, false)
     };
 
-    let status = if authenticated {
+    let status = if timed_out {
+        authenticated = false;
+        auth_reason = Some("Active probe exceeded 1500ms PGID budget".to_string());
+        "timeout".to_string()
+    } else if authenticated {
         "ready".to_string()
+    } else if matches!(def.id, "cline" | "roo" | "continue")
+        && ide_extension_installed(def.id, def.config_subpaths)
+    {
+        auth_reason =
+            Some("IDE extension requires manual provider setup inside host editor".to_string());
+        "manual_ide_setup".to_string()
     } else {
         "auth_needed".to_string()
     };
 
-    CliDoctorToolDto {
+    enrich_cli_tool_dto(CliDoctorToolDto {
         id: def.id.to_string(),
         name: def.name.to_string(),
         command: def.command.to_string(),
@@ -793,7 +943,11 @@ async fn evaluate_cli_target(def: CliTargetDefinition, active_probe: bool) -> Cl
         status,
         auth_reason,
         latency_ms: start.elapsed().as_millis() as u64,
-    }
+        account_label: None,
+        provider_group: None,
+        models: Vec::new(),
+    })
+    .await
 }
 
 pub async fn handle_get_doctor_cli_matrix(
@@ -1231,4 +1385,85 @@ pub async fn handle_update_vault_settings(
         encrypted_vault_present: store.vault_path().exists(),
         updated_at: Utc::now().to_rfc3339(),
     }))
+}
+
+// -----------------------------------------------------------------------------
+// 5. Skill Plugins Registry (`GET /api/v1/plugins`)
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListPluginsQuery {
+    pub enabled: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillPluginDto {
+    pub id: String,
+    pub project_id: String,
+    pub plugin_slug: String,
+    pub version: String,
+    pub lifecycle_state: String,
+    pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_repo_url: Option<String>,
+    pub manifest_json: serde_json::Value,
+    pub updated_at: String,
+}
+
+pub async fn handle_list_plugins(
+    State(state): State<DaemonAppState>,
+    Extension(principal): Extension<FlowPrincipal>,
+    Query(query): Query<ListPluginsQuery>,
+) -> Result<Json<Vec<SkillPluginDto>>, Response> {
+    let pool = state.registry.pool().clone();
+    let only_enabled = query.enabled.as_deref() == Some("true");
+    let tenant_id = principal.tenant_id;
+    let rows = run_db(move || {
+        let conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT sp.id, sp.project_id, sp.plugin_slug, sp.version, sp.lifecycle_state, sp.source_repo_url, sp.manifest_json, sp.updated_at \
+                 FROM skill_plugins sp LEFT JOIN projects pr ON pr.id = sp.project_id \
+                 WHERE (pr.tenant_id = ?1 OR pr.tenant_id IS NULL OR pr.tenant_id = 'local-default' OR pr.tenant_id = 'default') \
+                 ORDER BY sp.updated_at DESC",
+            )
+            .map_err(|e| json_err(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
+        let mapped = stmt
+            .query_map(params![tenant_id], |r| {
+                let state_str: String = r.get(4)?;
+                let raw_manifest: String = r.get(6)?;
+                let parsed = serde_json::from_str::<serde_json::Value>(&raw_manifest)
+                    .unwrap_or_else(|_| serde_json::json!({}));
+                let enabled = matches!(state_str.to_ascii_uppercase().as_str(), "ENABLED" | "ACTIVE");
+                let updated_ms: i64 = r.get(7)?;
+                Ok(SkillPluginDto {
+                    id: r.get(0)?,
+                    project_id: r.get(1)?,
+                    plugin_slug: r.get(2)?,
+                    version: r.get(3)?,
+                    lifecycle_state: state_str,
+                    enabled,
+                    source_repo_url: r.get(5)?,
+                    manifest_json: parsed,
+                    updated_at: chrono::DateTime::from_timestamp_millis(updated_ms)
+                        .map(|d| d.to_rfc3339())
+                        .unwrap_or_default(),
+                })
+            })
+            .map_err(|e| json_err(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
+        let mut out = Vec::new();
+        for item in mapped {
+            let dto = item.map_err(|e| {
+                json_err(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string())
+            })?;
+            if !only_enabled || dto.enabled {
+                out.push(dto);
+            }
+        }
+        Ok::<Vec<SkillPluginDto>, Response>(out)
+    })
+    .await?;
+    Ok(Json(rows))
 }
