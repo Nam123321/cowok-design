@@ -75,6 +75,21 @@ export class ElementCommentClient extends HarnessDaemonTransport {
       anchorStatus: "resolved",
     });
   }
+
+  reanchorComment(
+    projectId: string,
+    nodeId: string,
+    commentId: string,
+    anchor: { elementFfId: string; domHash: string; artifactSha256?: string }
+  ): Promise<ElementCommentResponse> {
+    return this.updateComment(projectId, nodeId, commentId, {
+      elementFfId: anchor.elementFfId,
+      domHash: anchor.domHash,
+      artifactSha256: anchor.artifactSha256 ?? "",
+      anchorStatus: "active",
+      reanchor: true,
+    });
+  }
 }
 
 export const apiElementComment = new ElementCommentClient();

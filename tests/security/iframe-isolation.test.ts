@@ -5,11 +5,12 @@ import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, fireEvent } from "@testing-library/react";
 import {
-  DESIGN_CDN_CSP,
   HostToIframeMessageSchema,
   IFRAME_SANDBOX_PERMISSIONS,
   IframeToHostMessageSchema,
   STRICT_OFFLINE_CSP,
+  computeArtifactSha256Sync,
+  generateBootSecret,
   validateUserHtmlPayload,
   wrapUserHtmlSrcDoc,
 } from "../../src/features/flow/utils/html-sandbox-wrapper";
@@ -60,7 +61,7 @@ describe("Option CSP-B Sandboxed HTML Preview Security Gate (SEC-IFRAME-01..08)"
 
   it("SEC-IFRAME-02: wrapUserHtmlSrcDoc injects zero host wrapper CSS and preserves user styles 100%", () => {
     const userHtml = `<!DOCTYPE html><html><head><style>.hero{color:#123456;margin:0}</style></head><body class="dark-landing"><h1 class="hero">Hello</h1></body></html>`;
-    const wrapped = wrapUserHtmlSrcDoc(userHtml, { allowDesignCdn: false, epoch: 1 });
+    const wrapped = wrapUserHtmlSrcDoc(userHtml, { epoch: 1 });
 
     expect(wrapped).toContain(".hero{color:#123456;margin:0}");
     expect(wrapped).toContain('class="dark-landing"');
@@ -77,7 +78,7 @@ describe("Option CSP-B Sandboxed HTML Preview Security Gate (SEC-IFRAME-01..08)"
       <title>Test</title>
     </head><body><p>Content</p></body></html>`;
 
-    const wrapped = wrapUserHtmlSrcDoc(hostileHtml, { allowDesignCdn: false, epoch: 2 });
+    const wrapped = wrapUserHtmlSrcDoc(hostileHtml, { epoch: 2 });
     expect(wrapped.toLowerCase()).not.toContain("<base");
     expect(wrapped.toLowerCase()).not.toContain("evil.attacker.example");
     expect(wrapped.toLowerCase()).not.toContain("unsafe-eval");
@@ -86,7 +87,7 @@ describe("Option CSP-B Sandboxed HTML Preview Security Gate (SEC-IFRAME-01..08)"
 
   it("SEC-IFRAME-04: Byte-0 <head> places CSP meta + MessagePort.prototype freeze + capture-phase submit block before user scripts", () => {
     const userHtml = `<html><head><script>window.__USER_RAN = true;</script></head><body><form action="https://exfil.example"><button>Go</button></form></body></html>`;
-    const wrapped = wrapUserHtmlSrcDoc(userHtml, { allowDesignCdn: false, epoch: 3 });
+    const wrapped = wrapUserHtmlSrcDoc(userHtml, { epoch: 3 });
 
     const cspIdx = wrapped.indexOf('http-equiv="Content-Security-Policy"');
     const bridgeIdx = wrapped.indexOf('data-cowok-sandbox-bridge="v1"');
@@ -110,15 +111,27 @@ describe("Option CSP-B Sandboxed HTML Preview Security Gate (SEC-IFRAME-01..08)"
     expect(STRICT_OFFLINE_CSP).not.toContain("https://");
   });
 
-  it("SEC-IFRAME-06: 1-click Design CDN allowlist permits read-only Fonts/Tailwind/unpkg/jsDelivr while keeping connect-src 'none' & form-action 'none'", () => {
-    expect(DESIGN_CDN_CSP).toContain("https://fonts.googleapis.com");
-    expect(DESIGN_CDN_CSP).toContain("https://fonts.gstatic.com");
-    expect(DESIGN_CDN_CSP).toContain("https://cdn.tailwindcss.com");
-    expect(DESIGN_CDN_CSP).toContain("https://unpkg.com");
-    expect(DESIGN_CDN_CSP).toContain("https://cdn.jsdelivr.net");
-    expect(DESIGN_CDN_CSP).toContain("https://cdnjs.cloudflare.com");
-    expect(DESIGN_CDN_CSP).toContain("connect-src 'none'");
-    expect(DESIGN_CDN_CSP).toContain("form-action 'none'");
+  it("SEC-IFRAME-06: Story 04.5 zero-network convergence enforces default-src 'none' with zero external CDN script/style hosts", () => {
+    const wrapped = wrapUserHtmlSrcDoc('<html><body><div data-ff-id="c1">Offline</div></body></html>');
+    expect(wrapped).toContain("default-src 'none'");
+    expect(wrapped).not.toContain("cdn.tailwindcss.com");
+    expect(wrapped).not.toContain("unpkg.com");
+    expect(wrapped).not.toContain("cdn.jsdelivr.net");
+    expect(wrapped).not.toContain("https://fonts.googleapis.com");
+    expect(wrapped).toContain("var BOOT_SECRET =");
+    expect(generateBootSecret().length).toBe(32);
+    expect(computeArtifactSha256Sync("<div>Offline</div>").length).toBe(64);
+  });
+
+  it("SEC-IFRAME-06B: DOMParser immune to HTML comment-trap fake <head> injection (no regex fallback)", () => {
+    const commentTrapHtml = `<!-- <head><script>evil()</script></head> --><html><head><title>Real</title></head><body><p>OK</p></body></html>`;
+    const wrapped = wrapUserHtmlSrcDoc(commentTrapHtml, { epoch: 42 });
+    const cspIdx = wrapped.indexOf('http-equiv="Content-Security-Policy"');
+    const headCloseIdx = wrapped.indexOf("</head>");
+    expect(cspIdx).toBeGreaterThan(0);
+    expect(cspIdx).toBeLessThan(headCloseIdx);
+    expect(wrapped).toContain("addEventListener(\"message\"");
+    expect(wrapped).toContain("}, true);");
   });
 
   it("SEC-IFRAME-07: directional MessageChannel schemas reject inbound APPLY_HTML from iframe to host", () => {
@@ -148,7 +161,7 @@ describe("Option CSP-B Sandboxed HTML Preview Security Gate (SEC-IFRAME-01..08)"
     ).toBe(true);
   });
 
-  it("SEC-IFRAME-08: rotates epoch and closes previous MessagePort on node/CDN switch", () => {
+  it("SEC-IFRAME-08: rotates CSPRNG epoch and closes previous MessagePort on node/substate switch", () => {
     const closeSpy = vi.fn();
     const OrigMessageChannel = globalThis.MessageChannel;
     class MockChannel {
@@ -169,10 +182,8 @@ describe("Option CSP-B Sandboxed HTML Preview Security Gate (SEC-IFRAME-01..08)"
       });
       fireEvent.load(iframe);
 
-      fireEvent.click(getByTestId("toggle-design-cdn-btn"));
-      expect(closeSpy).toHaveBeenCalled();
-
       rerender(React.createElement(CompanionLiveHtmlRightPane, buildPaneProps("node-scr-02")));
+      expect(closeSpy).toHaveBeenCalled();
     } finally {
       vi.stubGlobal("MessageChannel", OrigMessageChannel);
     }

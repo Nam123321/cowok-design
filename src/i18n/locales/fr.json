@@ -128,7 +128,7 @@
     "toggleStructurePane": "Basculer le panneau de structure (Userflow / Diaporama)",
     "togglePreviewPane": "Basculer le panneau d'aperçu HTML en direct",
     "modeInteract": "Interagir directement avec le HTML",
-    "modeClickComponent": "Cliquez sur le composant (data-ff-id) pour commenter",
+    "modeClickComponent": "Inspecter et commenter l'élément (C)",
     "modeMarqueeBox": "Faites glisser la zone de sélection pour joindre la région au chat",
     "toggleCodeEditor": "Basculer l'éditeur de code intégré",
     "draftNotice": "Modifications de structure du graphe non publiées",
@@ -197,7 +197,14 @@
     "previewSynthActionHint": "Aperçu en direct synthétisé à partir des métadonnées WorkbenchNode.",
     "previewSynthCtaOpen": "Ouvrir",
     "orphanDeployConfirmPrompt": "écran(s) isolé(s) restant(s). Déployer quand même ?",
-    "confirmDeployAnyway": "Confirmer le déploiement"
+    "confirmDeployAnyway": "Confirmer le déploiement",
+    "modeInteractShort": "Interagir",
+    "modeInspectShort": "Inspecter / Commenter (C)",
+    "dirtyBufferBadge": "Non enregistré (dirty_buffer)",
+    "dirtyBufferPrompt": "Modifications HTML non appliquées (dirty_buffer). Appliquer ou ignorer avant de quitter ?",
+    "dirtyGuardApply": "Appliquer maintenant",
+    "dirtyGuardDiscard": "Ignorer",
+    "dirtyGuardKeep": "Continuer l'édition"
   },
   "settings": {
     "title": "Paramètres et préférences système",
@@ -391,9 +398,14 @@
   },
   "comments": {
     "pinPlaceholder": "Épingler un commentaire sur data-ff-id...",
-    "staleAnchorWarning": "Structure de l'élément modifiée (Obsolète)",
+    "staleAnchorWarning": "Structure de l'élément modifiée (STALE_MAPPING)",
     "reanchorBtn": "Réancrer",
-    "resolveBtn": "✓ Marquer comme résolu"
+    "resolveBtn": "✓ Marquer comme résolu",
+    "zeroRectWarning": "Zone cible invisible (rect 0)",
+    "drawerCollapsedRect": "Tiroir 0×0",
+    "drawerTitle": "Commentaires épinglés sur éléments",
+    "emptyThread": "Aucun commentaire sur ce nœud pour l'instant.",
+    "reanchorFullBtn": "Réancrer l'élément"
   },
   "proposals": {
     "applyBlockedHint": "L'application est verrouillée jusqu'à validation des contrôles de sécurité [AC-03]",

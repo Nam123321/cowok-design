@@ -128,7 +128,7 @@
     "toggleStructurePane": "Attiva/disattiva pannello struttura (Userflow / Slide)",
     "togglePreviewPane": "Attiva/disattiva pannello di anteprima HTML live",
     "modeInteract": "Interagisci direttamente con l'HTML",
-    "modeClickComponent": "Fai clic sul componente (data-ff-id) per commentare",
+    "modeClickComponent": "Ispeziona e commenta elemento (C)",
     "modeMarqueeBox": "Trascina il riquadro di selezione per allegare l'area alla chat",
     "toggleCodeEditor": "Attiva/disattiva editor di codice in linea",
     "draftNotice": "Modifiche alla struttura del grafo non pubblicate",
@@ -197,7 +197,14 @@
     "previewSynthActionHint": "Anteprima live sintetizzata dai metadati di WorkbenchNode.",
     "previewSynthCtaOpen": "Apri",
     "orphanDeployConfirmPrompt": "schermo/i isolato/i rimanente/i. Vuoi distribuire comunque?",
-    "confirmDeployAnyway": "Conferma distribuzione"
+    "confirmDeployAnyway": "Conferma distribuzione",
+    "modeInteractShort": "Interagisci",
+    "modeInspectShort": "Ispeziona / Commenta (C)",
+    "dirtyBufferBadge": "Non salvato (dirty_buffer)",
+    "dirtyBufferPrompt": "Modifiche HTML non applicate (dirty_buffer). Applicare o scartare prima di uscire?",
+    "dirtyGuardApply": "Applica ora",
+    "dirtyGuardDiscard": "Scarta",
+    "dirtyGuardKeep": "Continua modifica"
   },
   "settings": {
     "title": "Impostazioni e preferenze di sistema",
@@ -391,9 +398,14 @@
   },
   "comments": {
     "pinPlaceholder": "Fissa commento su data-ff-id...",
-    "staleAnchorWarning": "Struttura dell'elemento modificata (Obsoleto)",
+    "staleAnchorWarning": "Struttura elemento modificata (STALE_MAPPING)",
     "reanchorBtn": "Riancora",
-    "resolveBtn": "✓ Segna come risolto"
+    "resolveBtn": "✓ Segna come risolto",
+    "zeroRectWarning": "Riquadro di destinazione non visibile (rect 0)",
+    "drawerCollapsedRect": "Cassetto 0×0",
+    "drawerTitle": "Commenti ancorati agli elementi",
+    "emptyThread": "Nessun commento ancora su questo nodo.",
+    "reanchorFullBtn": "Riancora elemento"
   },
   "proposals": {
     "applyBlockedHint": "L'applicazione è bloccata finché non vengono superati i controlli di sicurezza [AC-03]",

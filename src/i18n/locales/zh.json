@@ -128,7 +128,7 @@
     "toggleStructurePane": "切换结构面板 (Userflow / 幻灯片)",
     "togglePreviewPane": "切换实时 HTML 预览面板",
     "modeInteract": "直接与 HTML 交互",
-    "modeClickComponent": "点击组件 (data-ff-id) 发表评论",
+    "modeClickComponent": "检查并评论元素 (C)",
     "modeMarqueeBox": "拖动画框以将选区附加到聊天",
     "toggleCodeEditor": "切换内嵌代码编辑器",
     "draftNotice": "有未发布的图表结构更改",
@@ -197,7 +197,14 @@
     "previewSynthActionHint": "根据 WorkbenchNode 元数据合成的实时预览。",
     "previewSynthCtaOpen": "打开",
     "orphanDeployConfirmPrompt": "个孤立的屏幕状态。仍要部署吗？",
-    "confirmDeployAnyway": "确认部署"
+    "confirmDeployAnyway": "确认部署",
+    "modeInteractShort": "交互",
+    "modeInspectShort": "检查 / 评论 (C)",
+    "dirtyBufferBadge": "未保存 (dirty_buffer)",
+    "dirtyBufferPrompt": "您有尚未应用的 HTML 更改 (dirty_buffer)。离开前要应用还是放弃？",
+    "dirtyGuardApply": "立即应用",
+    "dirtyGuardDiscard": "放弃更改",
+    "dirtyGuardKeep": "继续编辑"
   },
   "settings": {
     "title": "系统设置与偏好",
@@ -391,9 +398,14 @@
   },
   "comments": {
     "pinPlaceholder": "在 data-ff-id 上固定评论...",
-    "staleAnchorWarning": "元素结构已变更 (已过期)",
+    "staleAnchorWarning": "元素结构已变更 (STALE_MAPPING)",
     "reanchorBtn": "重新锚定",
-    "resolveBtn": "✓ 标记为已解决"
+    "resolveBtn": "✓ 标记为已解决",
+    "zeroRectWarning": "目标边界框不可见 (rect 0)",
+    "drawerCollapsedRect": "抽屉 0×0",
+    "drawerTitle": "元素锚点评论",
+    "emptyThread": "此节点暂无元素评论。",
+    "reanchorFullBtn": "重新锚定元素"
   },
   "proposals": {
     "applyBlockedHint": "在安全检查通过前应用处于锁定状态 [AC-03]",

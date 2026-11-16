@@ -128,7 +128,7 @@
     "toggleStructurePane": "Alternar panel de estructura (Userflow / Presentación)",
     "togglePreviewPane": "Alternar panel de vista previa HTML en vivo",
     "modeInteract": "Interactuar directamente con HTML",
-    "modeClickComponent": "Haga clic en el componente (data-ff-id) para comentar",
+    "modeClickComponent": "Inspeccionar y comentar elemento (C)",
     "modeMarqueeBox": "Arrastre el recuadro para adjuntar el área al chat",
     "toggleCodeEditor": "Alternar editor de código integrado",
     "draftNotice": "Cambios de estructura de gráfico sin publicar",
@@ -197,7 +197,14 @@
     "previewSynthActionHint": "Vista previa en vivo sintetizada a partir de metadatos de WorkbenchNode.",
     "previewSynthCtaOpen": "Abrir",
     "orphanDeployConfirmPrompt": "pantalla(s) aislada(s) restante(s). ¿Desplegar de todos modos?",
-    "confirmDeployAnyway": "Confirmar despliegue"
+    "confirmDeployAnyway": "Confirmar despliegue",
+    "modeInteractShort": "Interactuar",
+    "modeInspectShort": "Inspeccionar / Comentar (C)",
+    "dirtyBufferBadge": "Sin guardar (dirty_buffer)",
+    "dirtyBufferPrompt": "Tienes cambios HTML sin aplicar (dirty_buffer). ¿Aplicar o descartar antes de salir?",
+    "dirtyGuardApply": "Aplicar ahora",
+    "dirtyGuardDiscard": "Descartar",
+    "dirtyGuardKeep": "Seguir editando"
   },
   "settings": {
     "title": "Configuración y preferencias del sistema",
@@ -391,9 +398,14 @@
   },
   "comments": {
     "pinPlaceholder": "Fijar comentario en data-ff-id...",
-    "staleAnchorWarning": "La estructura del elemento cambió (Obsoleto)",
+    "staleAnchorWarning": "La estructura del elemento cambió (STALE_MAPPING)",
     "reanchorBtn": "Reanclar",
-    "resolveBtn": "✓ Marcar como resuelto"
+    "resolveBtn": "✓ Marcar como resuelto",
+    "zeroRectWarning": "Cuadro de destino no visible (rect 0)",
+    "drawerCollapsedRect": "Cajón 0×0",
+    "drawerTitle": "Comentarios fijados en elementos",
+    "emptyThread": "Aún no hay comentarios en este nodo.",
+    "reanchorFullBtn": "Reanclar elemento"
   },
   "proposals": {
     "applyBlockedHint": "La aplicación está bloqueada hasta que pasen las comprobaciones de seguridad [AC-03]",
