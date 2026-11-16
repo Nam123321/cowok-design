@@ -169,8 +169,9 @@ export const DEFAULT_SESSIONS: ChatSession[] = [
   { id: "session-9", title: "Khảo sát kiến trúc Design Tokens", isPinned: false, updatedAt: "4d" },
 ];
 
-export function getConditionLabel(edgeType: "main" | "branch" | "fallback"): string {
+export function getConditionLabel(edgeType: "main" | "branch" | "fallback" | "loopback"): string {
   if (edgeType === "branch") return "IF Condition";
   if (edgeType === "fallback") return "IF NOT";
+  if (edgeType === "loopback") return "Loopback Retry";
   return "Next";
 }

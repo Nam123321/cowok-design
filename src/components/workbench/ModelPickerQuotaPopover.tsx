@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { BrandIcon } from "@/components/ui/BrandIcon";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useFormatter } from "@/hooks/useFormatter";
 import { collectSelectableModels, useDoctorProvidersUsage } from "@/hooks/useDoctorProvidersUsage";
 import type { ProviderUsageDto, QuotaWindowDto } from "@/lib/validations/workbench-settings";
 
@@ -21,18 +22,15 @@ function formatCheckedAge(checkedAtMs: number | null, t: (k: string, f: string, 
   return t("quota.checkedMinutesAgo", `đã kiểm tra ${diffMin} phút trước`, { minutes: diffMin });
 }
 
-function formatResetClock(window: QuotaWindowDto, locale: string): string | null {
+function formatResetClock(
+  window: QuotaWindowDto,
+  formatDate: (d: number) => string,
+  formatTime: (d: number) => string
+): string | null {
   if (!window.resetsAtEpochMs) return null;
-  try {
-    return new Intl.DateTimeFormat(locale, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(new Date(window.resetsAtEpochMs));
-  } catch {
-    return window.resetsAt ?? null;
-  }
+  const dateLabel = formatDate(window.resetsAtEpochMs);
+  const timeLabel = formatTime(window.resetsAtEpochMs);
+  return dateLabel ? `${dateLabel} ${timeLabel}` : timeLabel;
 }
 
 function barFillColor(usedPercent: number): string {
@@ -46,9 +44,10 @@ const QuotaWindowBar: React.FC<{
   window: QuotaWindowDto;
 }> = ({ label, window }) => {
   const { t, locale } = useTranslation();
+  const { formatDate, formatTime } = useFormatter({ locale });
   const used = Math.min(100, Math.max(0, Math.round(window.usedPercent ?? 0)));
   const left = Math.min(100, Math.max(0, Math.round(window.remainingPercent ?? 100 - used)));
-  const resetStr = formatResetClock(window, locale);
+  const resetStr = formatResetClock(window, formatDate, formatTime);
   const atLimit = used >= 100 && !window.resetPassed;
   const statusHeadline = atLimit
     ? t("quota.atLimit", "Đã chạm hạn mức")

@@ -23,7 +23,8 @@ pub(crate) fn load_transition_by_id_in_tx(
 ) -> Result<Option<FlowTransitionDto>, FlowServiceError> {
     tx.query_row(
         "SELECT id, tenant_id, project_id, source_node_id, target_node_id, flow_type, \
-                trigger_event, guard_condition, version, created_at, updated_at \
+                trigger_event, guard_condition, version, created_at, updated_at, \
+                source_cta_ff_id, max_loop_iterations, revision \
          FROM flow_edges WHERE id = ?1 AND tenant_id = ?2 AND project_id = ?3",
         params![transition_id, tenant_id, project_id],
         map_transition_row,
@@ -49,6 +50,32 @@ pub(crate) fn insert_transition_in_tx(
             "VALIDATION_ERROR",
             "triggerEvent is required",
         ));
+    }
+
+    if flow_type == "loopback" {
+        if !(1..=10).contains(&input.max_loop_iterations) {
+            return Err(FlowServiceError::new(
+                400,
+                "VALIDATION_ERROR",
+                format!("maxLoopIterations must be between 1 and 10, got {}", input.max_loop_iterations),
+            ));
+        }
+        if input.allow_confirmed_loopback != Some(true) {
+            return Err(FlowServiceError::new(
+                422,
+                "UNCONFIRMED_LOOPBACK",
+                "Loopback transition requires explicit allowConfirmedLoopback: true confirmation",
+            ));
+        }
+    }
+    if let Some(ref cta) = input.source_cta_ff_id {
+        if cta.trim().is_empty() {
+            return Err(FlowServiceError::new(
+                400,
+                "VALIDATION_ERROR",
+                "sourceCtaFfId cannot be empty string",
+            ));
+        }
     }
 
     let hdr = ensure_project_and_graph(tx, tenant_id, project_id, true)?;
@@ -79,8 +106,8 @@ pub(crate) fn insert_transition_in_tx(
     tx.execute(
         "INSERT INTO flow_edges ( \
             id, graph_id, tenant_id, project_id, source_node_id, target_node_id, \
-            flow_type, trigger_event, guard_condition, version, created_at, updated_at \
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10, ?10)",
+            flow_type, trigger_event, guard_condition, version, source_cta_ff_id, max_loop_iterations, revision, created_at, updated_at \
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10, ?11, ?12, ?13, ?13)",
         params![
             edge_id,
             hdr.id,
@@ -91,6 +118,9 @@ pub(crate) fn insert_transition_in_tx(
             flow_type,
             trigger_event,
             input.guard_condition,
+            input.source_cta_ff_id.as_deref().map(str::trim),
+            input.max_loop_iterations,
+            input.revision.max(1),
             now_ms
         ],
     )
@@ -101,7 +131,7 @@ pub(crate) fn insert_transition_in_tx(
     }
     if bump_graph {
         tx.execute(
-            "UPDATE flow_graphs SET version = version + 1, updated_at = ?1 WHERE id = ?2",
+            "UPDATE flow_graphs SET version = version + 1, revision = revision + 1, updated_at = ?1 WHERE id = ?2",
             params![now_ms, hdr.id],
         )
         .map_err(|e| FlowServiceError::from_harness(map_sqlite_error(e, "bump_edge_create_gv")))?;
@@ -142,6 +172,18 @@ pub(crate) fn update_transition_in_tx(
             ),
         ));
     }
+    if let Some(exp_rev) = input.expected_revision {
+        if existing.revision != exp_rev {
+            return Err(FlowServiceError::new(
+                409,
+                "STALE_REVISION",
+                format!(
+                    "Transition '{transition_id}' revision mismatch (expected {exp_rev}, actual {})",
+                    existing.revision
+                ),
+            ));
+        }
+    }
 
     let (src_id, dst_id) = if input.reversed.unwrap_or(false) {
         (
@@ -163,6 +205,36 @@ pub(crate) fn update_transition_in_tx(
             .unwrap_or(&existing.flow_type)
             .trim(),
     )?;
+    let max_loop_iter = input.max_loop_iterations.unwrap_or(existing.max_loop_iterations);
+    if flow_type == "loopback" {
+        if !(1..=10).contains(&max_loop_iter) {
+            return Err(FlowServiceError::new(
+                400,
+                "VALIDATION_ERROR",
+                format!("maxLoopIterations must be between 1 and 10, got {max_loop_iter}"),
+            ));
+        }
+        if input.allow_confirmed_loopback != Some(true) && existing.flow_type != "loopback" {
+            return Err(FlowServiceError::new(
+                422,
+                "UNCONFIRMED_LOOPBACK",
+                "Loopback transition requires explicit allowConfirmedLoopback: true confirmation",
+            ));
+        }
+    }
+    let source_cta_id = match &input.source_cta_ff_id {
+        Some(opt) => opt.as_deref().map(str::trim).map(str::to_string),
+        None => existing.source_cta_ff_id.clone(),
+    };
+    if let Some(ref cta) = source_cta_id {
+        if cta.trim().is_empty() {
+            return Err(FlowServiceError::new(
+                400,
+                "VALIDATION_ERROR",
+                "sourceCtaFfId cannot be empty string",
+            ));
+        }
+    }
     let trigger_event = input
         .trigger_event
         .as_deref()
@@ -183,14 +255,17 @@ pub(crate) fn update_transition_in_tx(
 
     tx.execute(
         "UPDATE flow_edges SET source_node_id = ?1, target_node_id = ?2, flow_type = ?3, \
-         trigger_event = ?4, guard_condition = ?5, version = version + 1, updated_at = ?6 \
-         WHERE id = ?7 AND tenant_id = ?8 AND project_id = ?9 AND version = ?10",
+         trigger_event = ?4, guard_condition = ?5, source_cta_ff_id = ?6, max_loop_iterations = ?7, \
+         version = version + 1, revision = revision + 1, updated_at = ?8 \
+         WHERE id = ?9 AND tenant_id = ?10 AND project_id = ?11 AND version = ?12",
         params![
             src_id,
             dst_id,
             flow_type,
             trigger_event,
             guard_cond,
+            source_cta_id,
+            max_loop_iter,
             now_ms,
             transition_id,
             tenant_id,
@@ -205,7 +280,7 @@ pub(crate) fn update_transition_in_tx(
     }
     if bump_graph {
         tx.execute(
-            "UPDATE flow_graphs SET version = version + 1, updated_at = ?1 WHERE id = ?2",
+            "UPDATE flow_graphs SET version = version + 1, revision = revision + 1, updated_at = ?1 WHERE id = ?2",
             params![now_ms, hdr.id],
         )
         .map_err(|e| FlowServiceError::from_harness(map_sqlite_error(e, "bump_edge_update_gv")))?;
@@ -255,7 +330,7 @@ pub(crate) fn delete_transition_in_tx(
     let next_gv = if bump_graph {
         let now_ms = Utc::now().timestamp_millis();
         tx.execute(
-            "UPDATE flow_graphs SET version = version + 1, updated_at = ?1 WHERE id = ?2",
+            "UPDATE flow_graphs SET version = version + 1, revision = revision + 1, updated_at = ?1 WHERE id = ?2",
             params![now_ms, hdr.id],
         )
         .map_err(|e| FlowServiceError::from_harness(map_sqlite_error(e, "bump_edge_delete_gv")))?;
@@ -281,6 +356,7 @@ pub(crate) fn assert_current_graph_acyclic(
     let node_ids: Vec<String> = nodes.into_iter().map(|n| n.id).collect();
     let edge_pairs: Vec<(String, String)> = edges
         .into_iter()
+        .filter(|e| e.flow_type != "loopback")
         .map(|e| (e.source_node_id, e.target_node_id))
         .collect();
     validate_acyclic_dag(&node_ids, &edge_pairs)

@@ -73,11 +73,32 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  // Mirror pool.rs idempotent V9 column guards prior to V9 12-step rebuild
+  db.exec(`
+    ALTER TABLE sdi_intents ADD COLUMN routing_mode TEXT NOT NULL DEFAULT 'direct_edit';
+    ALTER TABLE sdi_intents ADD COLUMN gap_questions_json TEXT;
+    ALTER TABLE sdi_intents ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE flow_nodes ADD COLUMN portal_group TEXT;
+    ALTER TABLE flow_nodes ADD COLUMN shared_app_shell_id TEXT;
+    ALTER TABLE flow_nodes ADD COLUMN mini_skeleton_html TEXT;
+    ALTER TABLE flow_nodes ADD COLUMN cta_pills_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE flow_nodes ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE screen_fixtures ADD COLUMN preset_key TEXT;
+    ALTER TABLE screen_fixtures ADD COLUMN sample_rows_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE screen_fixtures ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE flow_graphs ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V9__epic05_storyboard_proposals_handoff.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
 
-describe("P1 Persistence Contract & SQLite WAL V1-V8 Mirror Verification (ADR-091)", () => {
+describe("P1 Persistence Contract & SQLite WAL V1-V9 Mirror Verification (ADR-091)", () => {
   const schemaPath = path.resolve(__dirname, "schema.prisma");
   const migrationsDir = path.resolve(__dirname, "../crates/spec-registry/migrations");
 
@@ -95,10 +116,11 @@ describe("P1 Persistence Contract & SQLite WAL V1-V8 Mirror Verification (ADR-09
     expect(mappedTables).toContain("daemon_sessions");
     expect(mappedTables).toContain("daemon_replay_nonces");
     expect(mappedTables).toContain("workspace_sync_intents");
-    expect(mappedTables).toHaveLength(42);
+    expect(mappedTables).toContain("idempotency_records");
+    expect(mappedTables).toHaveLength(43);
   });
 
-  it("UT-DB-02: executes V1-V8 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V9 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 

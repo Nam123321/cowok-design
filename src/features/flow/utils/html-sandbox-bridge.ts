@@ -1,11 +1,12 @@
-// @story 04.5
-// @implements AC-02, AC-03 (128-bit CSPRNG bootSecret, Monotonic Epoch & Capture-Phase Bridge)
+// @story 04.5, 05.1
+// @implements AC-02, AC-03 (128-bit CSPRNG bootSecret, Monotonic Epoch, Real Async SHA-256 & Capture-Phase Bridge)
 
 const MAX_SAFE_EPOCH_INT32 = 0x7fffffff;
 const EPOCH_JITTER_MARGIN = 1024;
 const EPOCH_PRIME_STEP = 7919;
 const BOOT_SECRET_BYTES = 16;
-const KNUTH_HASH_PRIME = 0x9e3779b1;
+const HEX_RADIX = 16;
+const HEX_WORD_PAD = 8;
 const SHA_WORDS = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
 let lastEpochCounter = 1;
 
@@ -29,7 +30,17 @@ export function generateBootSecret(): string {
   }
   const bytes = new Uint8Array(BOOT_SECRET_BYTES);
   globalThis.crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(bytes, (b) => b.toString(HEX_RADIX).padStart(2, "0")).join("");
+}
+
+export async function computeArtifactSha256(rawHtml: string): Promise<string> {
+  if (typeof globalThis.crypto?.subtle?.digest !== "function") {
+    throw new Error("fail_closed: crypto.subtle.digest is required for SHA-256 computation");
+  }
+  const utf8 = new TextEncoder().encode(rawHtml);
+  const hashBuffer = await globalThis.crypto.subtle.digest("SHA-256", utf8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(HEX_RADIX).padStart(2, "0")).join("");
 }
 
 export function computeArtifactSha256Sync(input: string): string {
@@ -54,12 +65,21 @@ export interface BridgeScriptOptions {
   bootSecret: string;
   artifactSha256: string;
   domAnchorHash: string;
+  scriptNonce?: string;
   parentOrigin?: string;
 }
 
 function buildUrlAndDomHashSnippet(): string {
-  return `  function hasBadUrlScheme(v) {
-    var s = String(v || "").replace(/[\\u0000-\\u0020\\u007f]+/g, "").toLowerCase();
+  return `  function sanitizeCss(cssText) {
+    if (!cssText || typeof cssText !== "string") return "";
+    var s = cssText.replace(/\\/\\*[\\s\\S]*?\\*\\//g, "");
+    s = s.replace(/@import\\b[^;]+;?/gi, "");
+    s = s.replace(/url\\s*\\([^)]*\\)/gi, "none");
+    s = s.replace(/url\\s*\\([^)]*$/gi, "none");
+    return s;
+  }
+  function hasBadUrlScheme(v) {
+    var s = String(v || "").replace(/[\\u0000-\\u0020\\u007f\\\\]+/g, "").toLowerCase();
     return s.indexOf("javascript:") === 0 || s.indexOf("vbscript:") === 0 || s.indexOf("data:text/html") === 0 || s.indexOf("data:image/svg+xml") === 0;
   }
   function sanitizeDomTreeAttrs(root) {
@@ -68,7 +88,14 @@ function buildUrlAndDomHashSnippet(): string {
       Array.from(el.attributes).forEach(function(attr){
         var n = attr.name.trim().toLowerCase();
         if (/^on/i.test(n) || n === "srcdoc") { el.removeAttribute(attr.name); return; }
-        if (/^(href|src|xlink:href|action|formaction|poster|data)$/.test(n) && hasBadUrlScheme(attr.value)) el.removeAttribute(attr.name);
+        if (n === "style") {
+          var cleanStyle = sanitizeCss(attr.value);
+          if (cleanStyle) el.setAttribute("style", cleanStyle); else el.removeAttribute("style");
+          return;
+        }
+        if (/^(href|src|xlink:href|action|formaction|poster|data)$/.test(n) && hasBadUrlScheme(attr.value)) {
+          el.removeAttribute(attr.name);
+        }
       });
     });
   }
@@ -80,18 +107,21 @@ function buildUrlAndDomHashSnippet(): string {
   }`;
 }
 
-function buildApplyAndHydrateSnippet(): string {
+function buildHtmlPatchSnippet(): string {
   return `  function applySanitizedHtml(raw) {
     if (typeof raw !== "string" || !document.body || typeof DOMParser === "undefined") return;
     var parsed = new DOMParser().parseFromString(raw, "text/html");
-    parsed.querySelectorAll("base,script").forEach(function(el){ el.remove(); });
+    parsed.querySelectorAll("base,script,iframe,object,embed,foreignobject,svg,template,noscript").forEach(function(el){ el.remove(); });
     parsed.querySelectorAll("meta[http-equiv]").forEach(function(el){
       var eq = (el.getAttribute("http-equiv") || "").trim().toLowerCase();
       if (eq === "refresh" || eq === "content-security-policy") el.remove();
     });
+    parsed.querySelectorAll("style").forEach(function(styleEl){
+      styleEl.textContent = sanitizeCss(styleEl.textContent || "");
+    });
     if (parsed.body) { sanitizeDomTreeAttrs(parsed.body); document.body.innerHTML = parsed.body.innerHTML; }
     var h = document.documentElement ? document.documentElement.scrollHeight : 0;
-    if (bridgePort) bridgePort.postMessage({ type: "HEIGHT_CHANGED", epoch: EPOCH, bootSecretAck: BOOT_SECRET, height: h });
+    if (bridgePort) bridgePort.postMessage({ type: "HEIGHT_CHANGED", epoch: EPOCH, bootSecretAck: BOOT_SECRET, channelSecret: BOOT_SECRET, seq: ++localSeq, height: h });
     publishElementRects();
   }
   function applyFixtureHydration(variant, fixtureJson) {
@@ -99,6 +129,41 @@ function buildApplyAndHydrateSnippet(): string {
     document.body.setAttribute("data-ff-substate", String(variant || "DEFAULT"));
     document.querySelectorAll("[data-ff-fixture-slot]").forEach(function(el){ el.textContent = String(variant || "DEFAULT") + " " + String(fixtureJson || "").slice(0, 160); });
     publishElementRects();
+  }`;
+}
+
+function buildFfIdPatchAndRectsSnippet(): string {
+  return `  function applyCtaHoverSync(ffId, hovered) {
+    if (!ffId || !document.querySelectorAll) return;
+    try {
+      var target = document.querySelector('[data-ff-id="' + CSS.escape(ffId) + '"]');
+      if (!target) return;
+      if (hovered) {
+        target.setAttribute("data-ff-hovered", "true");
+        target.style.outline = "2px solid var(--action-primary)";
+        target.style.outlineOffset = "2px";
+      } else {
+        target.removeAttribute("data-ff-hovered");
+        target.style.outline = "";
+        target.style.outlineOffset = "";
+      }
+    } catch (_) {}
+  }
+  function applyPatchByFfId(ffId, textContent, safeStyles) {
+    if (!ffId || !document.querySelectorAll) return;
+    try {
+      var target = document.querySelector('[data-ff-id="' + CSS.escape(ffId) + '"]');
+      if (!target) return;
+      if (typeof textContent === "string") target.textContent = textContent;
+      if (safeStyles && typeof safeStyles === "object") {
+        var ALLOWED_STYLES = ["color", "backgroundColor", "fontSize", "fontWeight", "padding", "margin", "borderRadius", "opacity", "display", "visibility"];
+        for (var k in safeStyles) {
+          var val = ALLOWED_STYLES.indexOf(k) !== -1 ? String(safeStyles[k] || "") : "";
+          if (val && val.indexOf("url(") === -1 && val.indexOf("@import") === -1 && val.indexOf("javascript:") === -1) target.style[k] = val;
+        }
+      }
+      publishElementRects();
+    } catch (_) {}
   }
   function publishElementRects() {
     if (!bridgePort || !document.querySelectorAll) return;
@@ -112,7 +177,7 @@ function buildApplyAndHydrateSnippet(): string {
       var r = el.getBoundingClientRect();
       rects[id] = { left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) };
     }
-    bridgePort.postMessage({ type: "ELEMENT_RECTS", epoch: EPOCH, bootSecretAck: BOOT_SECRET, rects: rects });
+    bridgePort.postMessage({ type: "ELEMENT_RECTS", epoch: EPOCH, bootSecretAck: BOOT_SECRET, channelSecret: BOOT_SECRET, seq: ++localSeq, rects: rects });
   }`;
 }
 
@@ -120,21 +185,30 @@ function buildBridgeListenersSnippet(): string {
   return `  window.addEventListener("message", function(event) {
     if (channelBound || !event || event.source !== window.parent || !event.data || event.data.type !== "INIT_PORT") return;
     if (EXPECTED_PARENT_ORIGIN && event.origin !== EXPECTED_PARENT_ORIGIN) return;
-    if (event.data.epoch !== EPOCH || event.data.bootSecret !== BOOT_SECRET || !event.ports || !event.ports[0]) return;
+    var secret = event.data.bootSecret || event.data.channelSecret;
+    if (event.data.epoch !== EPOCH || secret !== BOOT_SECRET || !event.ports || !event.ports[0]) return;
     event.stopImmediatePropagation();
     event.preventDefault();
     channelBound = true;
     bridgePort = event.ports[0];
     bridgePort.onmessage = function(pe) {
-      if (!pe || !pe.data || pe.data.epoch !== EPOCH || pe.data.bootSecret !== BOOT_SECRET) return;
+      if (!pe || !pe.data) return;
+      var peSecret = pe.data.bootSecret || pe.data.channelSecret;
+      if (pe.data.epoch !== EPOCH || peSecret !== BOOT_SECRET) return;
+      if (typeof pe.data.seq === "number") {
+        if (pe.data.seq <= lastAcceptedSeq) return;
+        lastAcceptedSeq = pe.data.seq;
+      }
       if (pe.data.type === "APPLY_HTML") applySanitizedHtml(pe.data.html);
       if (pe.data.type === "FLOW_PREVIEW_HYDRATE") applyFixtureHydration(pe.data.variant, pe.data.fixtureJson);
+      if (pe.data.type === "CTA_HOVER_SYNC") applyCtaHoverSync(pe.data.ffId, pe.data.hovered);
+      if (pe.data.type === "PATCH_BY_FF_ID") applyPatchByFfId(pe.data.ffId, pe.data.textContent, pe.data.safeStyles);
     };
-    bridgePort.postMessage({ type: "PORT_ACK", epoch: EPOCH, bootSecretAck: BOOT_SECRET, artifactSha256: ARTIFACT_SHA256, domAnchorHash: DOM_ANCHOR_HASH });
-    bridgePort.postMessage({ type: "READY", epoch: EPOCH, bootSecretAck: BOOT_SECRET });
+    bridgePort.postMessage({ type: "PORT_ACK", epoch: EPOCH, bootSecretAck: BOOT_SECRET, channelSecret: BOOT_SECRET, seq: ++localSeq, artifactSha256: ARTIFACT_SHA256, domAnchorHash: DOM_ANCHOR_HASH });
+    bridgePort.postMessage({ type: "READY", epoch: EPOCH, bootSecretAck: BOOT_SECRET, channelSecret: BOOT_SECRET, seq: ++localSeq });
     publishElementRects();
     var h = document.documentElement ? document.documentElement.scrollHeight : 0;
-    bridgePort.postMessage({ type: "HEIGHT_CHANGED", epoch: EPOCH, bootSecretAck: BOOT_SECRET, height: h });
+    bridgePort.postMessage({ type: "HEIGHT_CHANGED", epoch: EPOCH, bootSecretAck: BOOT_SECRET, channelSecret: BOOT_SECRET, seq: ++localSeq, height: h });
   }, true);
   window.addEventListener("click", function(event) {
     if (!event.isTrusted || !bridgePort) return;
@@ -142,7 +216,7 @@ function buildBridgeListenersSnippet(): string {
     if (!el) return;
     var id = String(el.getAttribute("data-ff-id") || "").slice(0, 200);
     var r = el.getBoundingClientRect ? el.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
-    bridgePort.postMessage({ type: "ELEMENT_CLICKED", epoch: EPOCH, bootSecretAck: BOOT_SECRET, selector: '[data-ff-id="' + id + '"]', elementFfId: id, tagName: String(el.tagName || "DIV").toLowerCase().slice(0, 64), domHash: hashElementDom(el), rect: { left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) } });
+    bridgePort.postMessage({ type: "ELEMENT_CLICKED", epoch: EPOCH, bootSecretAck: BOOT_SECRET, channelSecret: BOOT_SECRET, seq: ++localSeq, selector: '[data-ff-id="' + id + '"]', elementFfId: id, tagName: String(el.tagName || "DIV").toLowerCase().slice(0, 64), domHash: hashElementDom(el), rect: { left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) } });
   }, true);
   window.addEventListener("mouseup", function(event) {
     if (!event.isTrusted || !bridgePort || !window.getSelection) return;
@@ -151,10 +225,10 @@ function buildBridgeListenersSnippet(): string {
     var text = String(sel.toString() || "").trim();
     if (text.length <= 2) return;
     var rect = sel.rangeCount > 0 ? sel.getRangeAt(0).getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
-    bridgePort.postMessage({ type: "TEXT_QUOTE", epoch: EPOCH, bootSecretAck: BOOT_SECRET, text: text.slice(0, 2000), rect: { left: Math.round(rect.left), top: Math.round(rect.top), width: Math.round(rect.width), height: Math.round(rect.height) } });
+    bridgePort.postMessage({ type: "TEXT_QUOTE", epoch: EPOCH, bootSecretAck: BOOT_SECRET, channelSecret: BOOT_SECRET, seq: ++localSeq, text: text.slice(0, 2000), rect: { left: Math.round(rect.left), top: Math.round(rect.top), width: Math.round(rect.width), height: Math.round(rect.height) } });
   }, true);
   window.addEventListener("error", function(err) {
-    if (bridgePort) bridgePort.postMessage({ type: "RUNTIME_ERROR", epoch: EPOCH, bootSecretAck: BOOT_SECRET, message: String(err && err.message || "runtime_error").slice(0, 1024) });
+    if (bridgePort) bridgePort.postMessage({ type: "RUNTIME_ERROR", epoch: EPOCH, bootSecretAck: BOOT_SECRET, channelSecret: BOOT_SECRET, seq: ++localSeq, message: String(err && err.message || "runtime_error").slice(0, 1024) });
   }, true);`;
 }
 
@@ -164,8 +238,9 @@ export function buildByteZeroBridgeScript(opts: BridgeScriptOptions): string {
     typeof opts.parentOrigin === "string" && opts.parentOrigin.length > 0 && opts.parentOrigin !== "null"
       ? JSON.stringify(opts.parentOrigin)
       : "null";
+  const nonceAttr = opts.scriptNonce ? ` nonce="${opts.scriptNonce}"` : "";
 
-  return `<script data-cowok-sandbox-bridge="v1">(function(){
+  return `<script data-cowok-sandbox-bridge="v1"${nonceAttr}>(function(){
   "use strict";
   var EPOCH = ${safeEpoch};
   var BOOT_SECRET = ${JSON.stringify(opts.bootSecret)};
@@ -174,10 +249,13 @@ export function buildByteZeroBridgeScript(opts: BridgeScriptOptions): string {
   var EXPECTED_PARENT_ORIGIN = ${safeOrigin};
   var channelBound = false;
   var bridgePort = null;
+  var lastAcceptedSeq = 0;
+  var localSeq = 0;
   if (typeof MessagePort !== "undefined" && MessagePort.prototype) Object.freeze(MessagePort.prototype);
   window.addEventListener("submit", function(e) { e.preventDefault(); e.stopImmediatePropagation(); }, true);
 ${buildUrlAndDomHashSnippet()}
-${buildApplyAndHydrateSnippet()}
+${buildHtmlPatchSnippet()}
+${buildFfIdPatchAndRectsSnippet()}
 ${buildBridgeListenersSnippet()}
 })();</script>`;
 }

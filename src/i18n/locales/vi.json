@@ -204,7 +204,16 @@
     "previewSynthActionHint": "Bản xem trước được tổng hợp trực tiếp từ dữ liệu WorkbenchNode.",
     "previewSynthCtaOpen": "Mở",
     "orphanDeployConfirmPrompt": "ScreenState cô lập chưa nối luồng. Vẫn triển khai?",
-    "confirmDeployAnyway": "Xác nhận triển khai"
+    "confirmDeployAnyway": "Xác nhận triển khai",
+    "dirtyGuardTitle": "Thay đổi HTML chưa lưu",
+    "dirtyGuardBody": "Bạn có chỉnh sửa HTML trực tiếp chưa áp dụng. Hủy thay đổi và chuyển màn hình?",
+    "discardChangesBtn": "Hủy thay đổi",
+    "modeComment": "Bình luận (C)",
+    "modeInlineEditor": "Sửa trực tiếp (E)",
+    "modeSampleData": "Dữ liệu mẫu (D)",
+    "pauseWalkthrough": "Tạm dừng duyệt luồng",
+    "startWalkthrough": "Duyệt luồng",
+    "savePatchBtn": "Lưu & Áp dụng HTML"
   },
   "settings": {
     "title": "Cài đặt & Tùy biến Hệ thống",
@@ -321,7 +330,8 @@
     "runtimeDefaultTag": "Mặc định",
     "customizeRuntimeBtn": "Tùy chỉnh",
     "vaultStorageShort": "Cơ chế lưu trữ",
-    "permissionShort": "Cơ chế phê duyệt"
+    "permissionShort": "Cơ chế phê duyệt",
+    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · Cục bộ/Ollama"
   },
   "flow": {
     "dagCanvas": "Khung đồ thị DAG 2D",
@@ -367,7 +377,11 @@
     "draftBadge": "BẢN NHÁP",
     "runningBadge": "ĐANG CHẠY",
     "queuedBadgePrefix": "TRONG HÀNG ĐỢI #",
-    "transitionErrorPrefix": "Lỗi liên kết đồ thị"
+    "transitionErrorPrefix": "Lỗi liên kết đồ thị",
+    "dagConflictLockMessage": "Khóa Xung Đột DAG: Phát hiện xung đột phiên bản đồng thời. Vui lòng xử lý trước khi triển khai.",
+    "pausedBadge": "TẠM DỪNG",
+    "interruptedBadge": "GIÁN ĐOẠN",
+    "appShellPrefix": "Khung ứng dụng"
   },
   "brand": {
     "symbolAlt": "biểu tượng thương hiệu cowok"
@@ -420,7 +434,10 @@
     "steerBtn": "Điều hướng",
     "steerPlaceholder": "Chỉ dẫn điều hướng giữa phiên (Steer)...",
     "steerPrefix": "Chỉ dẫn thêm (Steer)",
-    "subStateLabel": "Trạng thái con"
+    "subStateLabel": "Trạng thái con",
+    "jobInterrupted": "Bị gián đoạn",
+    "fenceLabel": "khóa:",
+    "seqLabel": "stt:"
   },
   "errors": {
     "dagCanvasRender": "Lỗi hiển thị Canvas 2D DAG",
@@ -459,7 +476,8 @@
     "consLabel": "Đánh đổi:",
     "promptPlaceholder": "Mô tả thay đổi bằng ngôn ngữ tự nhiên...",
     "prosLabel": "Ưu điểm:",
-    "reviewClarificationsBtn": "Xem & Chọn Phương Án Làm Rõ"
+    "reviewClarificationsBtn": "Xem & Chọn Phương Án Làm Rõ",
+    "ambiguityLockFull": "Khóa Thực Thi: Điểm mơ hồ {{score}} ≥ 0.45. Cần làm rõ ý định trước khi sinh mã."
   },
   "snapshots": {
     "byteSizeLabel": "Dung lượng:",
@@ -552,5 +570,27 @@
     "searchModels": "Tìm mô hình...",
     "thinkingEffort": "Mức suy luận",
     "manageAiAccounts": "Quản lý tài khoản AI"
+  },
+  "launchpad": {
+    "title": "Khởi Tạo Dự Án — Không Gian Thiết Kế & Luồng Tương Tác",
+    "subtitle": "Chọn 1 trong 4 hướng khởi tạo nhanh để dựng sơ đồ 2D DAG và hệ thống Design Tokens.",
+    "proceedBtn": "Mở Không Gian Làm Việc",
+    "prdDesc": "Dán hoặc tải lên tài liệu yêu cầu (PRD) để tự động tổng hợp các màn hình và luồng.",
+    "templatesDesc": "Bắt đầu từ bộ mẫu đa màn hình tương tác có sẵn (Thanh toán, Bảng điều khiển SaaS, Hướng dẫn).",
+    "designDesc": "Nhập khung thiết kế Figma hoặc ảnh giao diện mẫu để trích xuất bộ token bố cục.",
+    "gitDesc": "Liên kết trực tiếp thư mục Git cục bộ để phân tích route, component và DESIGN.md.",
+    "extractTokensBtn": "Trích Xuất Design Tokens",
+    "gitBranchLabel": "Nhánh mục tiêu",
+    "loadSamplePrdBtn": "Nạp PRD mẫu",
+    "dropPrdPrompt": "Kéo thả hoặc chọn file PRD (.md / .txt / .pdf)",
+    "selectedFilePrefix": "Đã chọn file:"
+  },
+  "sampleData": {
+    "title": "Xưởng Dữ Liệu Mẫu — Liên Kết Fixture",
+    "applyBtn": "Nạp Fixture vào Live Preview",
+    "colKey": "Khóa Thuộc Tính",
+    "colType": "Kiểu Dữ Liệu",
+    "colValue": "Giá Trị Mẫu",
+    "footerSummary": "Đã nạp {{count}} thuộc tính • Bộ mẫu: {{preset}}"
   }
 }

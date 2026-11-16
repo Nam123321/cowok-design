@@ -204,7 +204,16 @@
     "dirtyBufferPrompt": "Modifiche HTML non applicate (dirty_buffer). Applicare o scartare prima di uscire?",
     "dirtyGuardApply": "Applica ora",
     "dirtyGuardDiscard": "Scarta",
-    "dirtyGuardKeep": "Continua modifica"
+    "dirtyGuardKeep": "Continua modifica",
+    "dirtyGuardTitle": "Modifiche HTML non salvate",
+    "dirtyGuardBody": "Hai modifiche HTML inline non applicate. Scartare le modifiche e cambiare schermata?",
+    "discardChangesBtn": "Scarta modifiche",
+    "modeComment": "Commenta (C)",
+    "modeInlineEditor": "Editor inline (E)",
+    "modeSampleData": "Dati di esempio (D)",
+    "pauseWalkthrough": "Sospendi guida",
+    "startWalkthrough": "Tour guidato",
+    "savePatchBtn": "Salva e applica HTML"
   },
   "settings": {
     "title": "Impostazioni e preferenze di sistema",
@@ -321,7 +330,8 @@
     "runtimeDefaultTag": "Predefinito",
     "customizeRuntimeBtn": "Personalizza",
     "vaultStorageShort": "Archiviazione",
-    "permissionShort": "Approvazione"
+    "permissionShort": "Approvazione",
+    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · Locale/Ollama"
   },
   "flow": {
     "dagCanvas": "Area di disegno DAG 2D",
@@ -367,7 +377,11 @@
     "draftBadge": "BOZZA",
     "runningBadge": "IN ESECUZIONE",
     "queuedBadgePrefix": "IN CODA #",
-    "transitionErrorPrefix": "Errore di transizione del grafo"
+    "transitionErrorPrefix": "Errore di transizione del grafo",
+    "dagConflictLockMessage": "Blocco conflitto DAG: Rilevata revisione concorrente. Risolvi le collisioni prima del deploy.",
+    "pausedBadge": "IN PAUSA",
+    "interruptedBadge": "INTERROTTO",
+    "appShellPrefix": "Guscio"
   },
   "brand": {
     "symbolAlt": "simbolo del marchio cowok"
@@ -420,7 +434,10 @@
     "steerBtn": "Guida",
     "steerPlaceholder": "Istruzione di guida durante l'esecuzione...",
     "steerPrefix": "Istruzione di guida",
-    "subStateLabel": "Sotto-stato"
+    "subStateLabel": "Sotto-stato",
+    "jobInterrupted": "Interrotto",
+    "fenceLabel": "barriera:",
+    "seqLabel": "seq.:"
   },
   "errors": {
     "dagCanvasRender": "Errore di rendering dell'area di disegno DAG 2D",
@@ -459,7 +476,8 @@
     "consLabel": "Compromessi:",
     "promptPlaceholder": "Descrivi la modifica dell'interfaccia in linguaggio naturale...",
     "prosLabel": "Vantaggi:",
-    "reviewClarificationsBtn": "Visualizza e seleziona opzione di chiarimento"
+    "reviewClarificationsBtn": "Visualizza e seleziona opzione di chiarimento",
+    "ambiguityLockFull": "Esecuzione bloccata: Punteggio ambiguità {{score}} ≥ 0.45. Chiarisci l'intento prima di generare codice."
   },
   "snapshots": {
     "byteSizeLabel": "Dimensione:",
@@ -552,5 +570,27 @@
     "searchModels": "Cerca modelli...",
     "thinkingEffort": "Ragionamento",
     "manageAiAccounts": "Gestisci account AI"
+  },
+  "launchpad": {
+    "title": "Avvio Progetto — Inizializza Area Flusso e Design",
+    "subtitle": "Scegli uno dei 4 percorsi rapidi per avviare schermate DAG 2D e design token.",
+    "proceedBtn": "Avvia Area",
+    "prdDesc": "Incolla o carica un documento PRD per sintetizzare automaticamente schermate e flussi.",
+    "templatesDesc": "Inizia da modelli interattivi multi-schermata (Checkout, Dashboard SaaS, Onboarding).",
+    "designDesc": "Importa frame Figma o schermate di riferimento per estrarre i token di layout.",
+    "gitDesc": "Collega un repository Git locale per analizzare rotte, componenti e DESIGN.md.",
+    "extractTokensBtn": "Estrai Design Token",
+    "gitBranchLabel": "Branch di destinazione",
+    "loadSamplePrdBtn": "Carica PRD di esempio",
+    "dropPrdPrompt": "Trascina o sfoglia un file PRD (.md / .txt / .pdf)",
+    "selectedFilePrefix": "File selezionato:"
+  },
+  "sampleData": {
+    "title": "Studio Dati di Esempio — Associazione Fixture",
+    "applyBtn": "Inietta Fixture nell'Anteprima Live",
+    "colKey": "Chiave Attributo",
+    "colType": "Tipo Dato",
+    "colValue": "Valore di Esempio",
+    "footerSummary": "{{count}} attributi caricati • Preset: {{preset}}"
   }
 }

@@ -204,7 +204,16 @@
     "dirtyBufferPrompt": "Modifications HTML non appliquées (dirty_buffer). Appliquer ou ignorer avant de quitter ?",
     "dirtyGuardApply": "Appliquer maintenant",
     "dirtyGuardDiscard": "Ignorer",
-    "dirtyGuardKeep": "Continuer l'édition"
+    "dirtyGuardKeep": "Continuer l'édition",
+    "dirtyGuardTitle": "Modifications HTML non enregistrées",
+    "dirtyGuardBody": "Vous avez des modifications HTML en ligne non appliquées. Ignorer et changer d'écran ?",
+    "discardChangesBtn": "Ignorer les modifications",
+    "modeComment": "Commenter (C)",
+    "modeInlineEditor": "Éditeur en ligne (E)",
+    "modeSampleData": "Données d'exemple (D)",
+    "pauseWalkthrough": "Mettre la visite en pause",
+    "startWalkthrough": "Visite guidée",
+    "savePatchBtn": "Enregistrer et appliquer HTML"
   },
   "settings": {
     "title": "Paramètres et préférences système",
@@ -321,7 +330,8 @@
     "runtimeDefaultTag": "Par défaut",
     "customizeRuntimeBtn": "Personnaliser",
     "vaultStorageShort": "Stockage",
-    "permissionShort": "Approbation"
+    "permissionShort": "Approbation",
+    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · Locales/Ollama"
   },
   "flow": {
     "dagCanvas": "Canevas DAG 2D",
@@ -367,7 +377,11 @@
     "draftBadge": "BROUILLON",
     "runningBadge": "EN COURS",
     "queuedBadgePrefix": "EN FILE #",
-    "transitionErrorPrefix": "Erreur de transition de graphe"
+    "transitionErrorPrefix": "Erreur de transition de graphe",
+    "dagConflictLockMessage": "Verrou de conflit DAG : Révision concurrente détectée. Résolvez les conflits avant de déployer.",
+    "pausedBadge": "EN PAUSE",
+    "interruptedBadge": "INTERROMPU",
+    "appShellPrefix": "Cadre app"
   },
   "brand": {
     "symbolAlt": "symbole de la marque cowok"
@@ -420,7 +434,10 @@
     "steerBtn": "Orienter",
     "steerPlaceholder": "Instruction d'orientation en cours d'exécution...",
     "steerPrefix": "Instruction d'orientation",
-    "subStateLabel": "Sous-état"
+    "subStateLabel": "Sous-état",
+    "jobInterrupted": "Interrompu",
+    "fenceLabel": "verrou:",
+    "seqLabel": "séqu:"
   },
   "errors": {
     "dagCanvasRender": "Erreur de rendu du canevas DAG 2D",
@@ -459,7 +476,8 @@
     "consLabel": "Compromis :",
     "promptPlaceholder": "Décrivez la modification d'interface en langage naturel...",
     "prosLabel": "Avantages :",
-    "reviewClarificationsBtn": "Voir et sélectionner une option de clarification"
+    "reviewClarificationsBtn": "Voir et sélectionner une option de clarification",
+    "ambiguityLockFull": "Exécution verrouillée : Score d'ambiguïté {{score}} ≥ 0.45. Clarifiez l'intention avant de générer le code."
   },
   "snapshots": {
     "byteSizeLabel": "Taille :",
@@ -552,5 +570,27 @@
     "searchModels": "Rechercher des modèles...",
     "thinkingEffort": "Réflexion",
     "manageAiAccounts": "Gérer les comptes IA"
+  },
+  "launchpad": {
+    "title": "Lanceur de Projet — Initialiser l'Espace Flux & Design",
+    "subtitle": "Choisissez l'un des 4 parcours rapides pour amorcer vos écrans DAG 2D et jetons de design.",
+    "proceedBtn": "Lancer l'Espace",
+    "prdDesc": "Collez ou importez un cahier des charges (PRD) pour synthétiser écrans et flux automatiquement.",
+    "templatesDesc": "Démarrez depuis des modèles interactifs multi-écrans (Paiement, Tableau SaaS, Accueil).",
+    "designDesc": "Importez des cadres Figma ou captures d'interface pour extraire les jetons de mise en page.",
+    "gitDesc": "Connectez un dépôt Git local pour analyser routes, composants et DESIGN.md.",
+    "extractTokensBtn": "Extraire les Jetons de Design",
+    "gitBranchLabel": "Branche cible",
+    "loadSamplePrdBtn": "Charger un PRD exemple",
+    "dropPrdPrompt": "Déposez ou parcourez un fichier PRD (.md / .txt / .pdf)",
+    "selectedFilePrefix": "Fichier sélectionné :"
+  },
+  "sampleData": {
+    "title": "Studio de Données d'Exemple — Liaison Fixture",
+    "applyBtn": "Injecter la Fixture dans l'Aperçu",
+    "colKey": "Clé d'Attribut",
+    "colType": "Type de Donnée",
+    "colValue": "Valeur d'Exemple",
+    "footerSummary": "{{count}} attributs chargés • Préréglage : {{preset}}"
   }
 }

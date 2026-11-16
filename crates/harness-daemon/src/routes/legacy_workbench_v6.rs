@@ -104,6 +104,37 @@ pub(crate) fn verify_project_ownership(
     }
 }
 
+pub(crate) fn verify_project_ownership_anti_idor(
+    conn: &rusqlite::Connection,
+    tenant_id: &str,
+    project_id: &str,
+) -> Result<(), Response> {
+    let row: Option<String> = conn
+        .query_row(
+            "SELECT tenant_id FROM projects WHERE id = ?1 AND trash_deleted_at IS NULL",
+            params![project_id],
+            |r| r.get(0),
+        )
+        .optional()
+        .map_err(|e| {
+            let err = map_sqlite_error(e, "verify_project_ownership_anti_idor");
+            json_err(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "DB_ERROR",
+                err.to_string(),
+            )
+        })?;
+
+    match row {
+        Some(owner_tenant) if owner_tenant == tenant_id => Ok(()),
+        _ => Err(json_err(
+            StatusCode::NOT_FOUND,
+            "PROJECT_NOT_FOUND",
+            format!("Project '{project_id}' was not found"),
+        )),
+    }
+}
+
 pub(crate) async fn run_db<T, F>(op: F) -> Result<T, Response>
 where
     T: Send + 'static,
@@ -253,7 +284,7 @@ pub async fn handle_list_comments(
 
     let list = run_db(move || {
         let conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
-        verify_project_ownership(&conn, &principal.tenant_id, &pid)?;
+        verify_project_ownership_anti_idor(&conn, &principal.tenant_id, &pid)?;
         let mut stmt = conn
             .prepare(
                 "SELECT id, tenant_id, project_id, node_id, element_ff_id, author, content,
@@ -566,6 +597,12 @@ pub struct ScreenFixtureDto {
     pub is_default: bool,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub preset_key: Option<String>,
+    #[serde(default = "default_sample_rows_json")]
+    pub sample_rows_json: String,
+    #[serde(default = "default_fixture_revision")]
+    pub revision: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -576,6 +613,12 @@ pub struct CreateScreenFixtureInput {
     pub payload_json: String,
     #[serde(default)]
     pub is_default: bool,
+    #[serde(default)]
+    pub preset_key: Option<String>,
+    #[serde(default = "default_sample_rows_json")]
+    pub sample_rows_json: String,
+    #[serde(default = "default_fixture_revision")]
+    pub revision: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -583,6 +626,9 @@ pub struct CreateScreenFixtureInput {
 pub struct UpdateScreenFixtureInput {
     pub payload_json: Option<String>,
     pub is_default: Option<bool>,
+    pub preset_key: Option<String>,
+    pub sample_rows_json: Option<String>,
+    pub expected_revision: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -602,8 +648,19 @@ fn default_payload_json() -> String {
     "{}".to_string()
 }
 
+fn default_sample_rows_json() -> String {
+    "[]".to_string()
+}
+
+fn default_fixture_revision() -> i64 {
+    1
+}
+
 fn map_fixture_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ScreenFixtureDto> {
     let is_def: i64 = row.get(6)?;
+    let preset_key: Option<String> = row.get(9).unwrap_or(None);
+    let sample_rows_json: String = row.get(10).unwrap_or_else(|_| "[]".to_string());
+    let revision: i64 = row.get(11).unwrap_or(1);
     Ok(ScreenFixtureDto {
         id: row.get(0)?,
         tenant_id: row.get(1)?,
@@ -614,6 +671,9 @@ fn map_fixture_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ScreenFixtureDto
         is_default: is_def != 0,
         created_at: epoch_ms_to_iso(row.get(7)?),
         updated_at: epoch_ms_to_iso(row.get(8)?),
+        preset_key,
+        sample_rows_json,
+        revision,
     })
 }
 
@@ -628,11 +688,11 @@ pub async fn handle_list_fixtures(
 
     let list = run_db(move || {
         let conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
-        verify_project_ownership(&conn, &principal.tenant_id, &pid)?;
+        verify_project_ownership_anti_idor(&conn, &principal.tenant_id, &pid)?;
         let mut stmt = conn
             .prepare(
                 "SELECT id, tenant_id, project_id, node_id, variant, payload_json, is_default,
-                        created_at, updated_at
+                        created_at, updated_at, preset_key, sample_rows_json, revision
                  FROM screen_fixtures
                  WHERE tenant_id = ?1 AND project_id = ?2 AND node_id = ?3
                  ORDER BY created_at ASC",
@@ -685,7 +745,7 @@ pub async fn handle_create_fixture(
 
     let created = run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
-        verify_project_ownership(&conn, &principal.tenant_id, &pid)?;
+        verify_project_ownership_anti_idor(&conn, &principal.tenant_id, &pid)?;
         let now_ms = Utc::now().timestamp_millis();
         let new_id = Uuid::new_v4().to_string();
 
@@ -710,11 +770,14 @@ pub async fn handle_create_fixture(
             let final_id = if let Some(ex_id) = existing_id {
                 tx.execute(
                     "UPDATE screen_fixtures
-                     SET payload_json = ?1, is_default = ?2, updated_at = ?3
-                     WHERE id = ?4",
+                     SET payload_json = ?1, is_default = ?2, preset_key = COALESCE(?3, preset_key),
+                         sample_rows_json = COALESCE(?4, sample_rows_json), revision = revision + 1, updated_at = ?5
+                     WHERE id = ?6",
                     params![
                         req.payload_json,
                         if req.is_default { 1 } else { 0 },
+                        req.preset_key.as_deref(),
+                        req.sample_rows_json,
                         now_ms,
                         ex_id
                     ],
@@ -723,8 +786,9 @@ pub async fn handle_create_fixture(
             } else {
                 tx.execute(
                     "INSERT INTO screen_fixtures (
-                        id, tenant_id, project_id, node_id, variant, payload_json, is_default, created_at, updated_at
-                     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)",
+                        id, tenant_id, project_id, node_id, variant, payload_json, is_default,
+                        preset_key, sample_rows_json, revision, created_at, updated_at
+                     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)",
                     params![
                         new_id,
                         principal.tenant_id,
@@ -733,13 +797,17 @@ pub async fn handle_create_fixture(
                         req.variant,
                         req.payload_json,
                         if req.is_default { 1 } else { 0 },
+                        req.preset_key.as_deref(),
+                        req.sample_rows_json,
+                        req.revision.max(1),
                         now_ms
                     ],
                 )?;
                 new_id.clone()
             };
             let dto = tx.query_row(
-                "SELECT id, tenant_id, project_id, node_id, variant, payload_json, is_default, created_at, updated_at
+                "SELECT id, tenant_id, project_id, node_id, variant, payload_json, is_default,
+                        created_at, updated_at, preset_key, sample_rows_json, revision
                  FROM screen_fixtures WHERE id = ?1",
                 params![final_id],
                 map_fixture_row,
@@ -754,6 +822,36 @@ pub async fn handle_create_fixture(
     .await?;
 
     Ok((StatusCode::CREATED, Json(created)))
+}
+
+pub async fn handle_get_fixture(
+    State(state): State<DaemonAppState>,
+    Extension(principal): Extension<FlowPrincipal>,
+    AxumPath((id, node_id, fixture_id)): AxumPath<(String, String, String)>,
+) -> Result<Json<ScreenFixtureDto>, Response> {
+    let pid = check_project_uuid(&id)?;
+    let nid = check_non_empty_id(&node_id, "node_id")?;
+    let fid = check_non_empty_id(&fixture_id, "fixture_id")?;
+    let pool = state.registry.pool().clone();
+
+    let fixture = run_db(move || {
+        let conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
+        verify_project_ownership_anti_idor(&conn, &principal.tenant_id, &pid)?;
+        conn.query_row(
+            "SELECT id, tenant_id, project_id, node_id, variant, payload_json, is_default,
+                    created_at, updated_at, preset_key, sample_rows_json, revision
+             FROM screen_fixtures
+             WHERE id = ?1 AND tenant_id = ?2 AND project_id = ?3 AND node_id = ?4",
+            params![fid, principal.tenant_id, pid, nid],
+            map_fixture_row,
+        )
+        .optional()
+        .map_err(|e| map_harness_resp(map_sqlite_error(e, "get_fixture"), "get_fixture"))?
+        .ok_or_else(|| json_err(StatusCode::NOT_FOUND, "FIXTURE_NOT_FOUND", format!("Fixture '{fid}' was not found")))
+    })
+    .await?;
+
+    Ok(Json(fixture))
 }
 
 pub async fn handle_update_fixture(
@@ -778,17 +876,19 @@ pub async fn handle_update_fixture(
 
     let updated = run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
-        verify_project_ownership(&conn, &principal.tenant_id, &pid)?;
+        verify_project_ownership_anti_idor(&conn, &principal.tenant_id, &pid)?;
 
         let now_ms = Utc::now().timestamp_millis();
         let mut not_found = false;
+        let mut stale_revision: Option<(i64, i64)> = None;
         let mut updated_dto: Option<ScreenFixtureDto> = None;
 
         retry_on_busy("update_screen_fixture", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
             let existing = tx
                 .query_row(
-                    "SELECT id, tenant_id, project_id, node_id, variant, payload_json, is_default, created_at, updated_at
+                    "SELECT id, tenant_id, project_id, node_id, variant, payload_json, is_default,
+                            created_at, updated_at, preset_key, sample_rows_json, revision
                      FROM screen_fixtures
                      WHERE id = ?1 AND tenant_id = ?2 AND project_id = ?3 AND node_id = ?4",
                     params![fid, principal.tenant_id, pid, nid],
@@ -801,12 +901,26 @@ pub async fn handle_update_fixture(
                 return Ok(());
             };
 
+            if let Some(exp_rev) = req.expected_revision {
+                if dto.revision != exp_rev {
+                    stale_revision = Some((exp_rev, dto.revision));
+                    return Ok(());
+                }
+            }
+
             if let Some(ref pj) = req.payload_json {
                 dto.payload_json = pj.clone();
             }
             if let Some(is_def) = req.is_default {
                 dto.is_default = is_def;
             }
+            if let Some(ref pk) = req.preset_key {
+                dto.preset_key = Some(pk.clone());
+            }
+            if let Some(ref sr) = req.sample_rows_json {
+                dto.sample_rows_json = sr.clone();
+            }
+            dto.revision += 1;
             dto.updated_at = epoch_ms_to_iso(now_ms);
 
             if dto.is_default {
@@ -817,11 +931,14 @@ pub async fn handle_update_fixture(
                 )?;
             }
             tx.execute(
-                "UPDATE screen_fixtures SET payload_json = ?1, is_default = ?2, updated_at = ?3
-                 WHERE id = ?4 AND tenant_id = ?5 AND project_id = ?6 AND node_id = ?7",
+                "UPDATE screen_fixtures SET payload_json = ?1, is_default = ?2, preset_key = ?3, sample_rows_json = ?4, revision = ?5, updated_at = ?6
+                 WHERE id = ?7 AND tenant_id = ?8 AND project_id = ?9 AND node_id = ?10",
                 params![
                     dto.payload_json,
                     if dto.is_default { 1 } else { 0 },
+                    dto.preset_key.as_deref(),
+                    dto.sample_rows_json,
+                    dto.revision,
                     now_ms,
                     fid,
                     principal.tenant_id,
@@ -841,6 +958,18 @@ pub async fn handle_update_fixture(
                 "FIXTURE_NOT_FOUND",
                 format!("Fixture '{fid}' was not found"),
             ));
+        }
+
+        if let Some((exp, act)) = stale_revision {
+            return Err((
+                StatusCode::CONFLICT,
+                Json(serde_json::json!({
+                    "code": "STALE_REVISION",
+                    "error": "STALE_REVISION",
+                    "message": format!("Screen fixture '{fid}' revision mismatch (expected {exp}, actual {act})"),
+                    "currentRevision": act
+                })),
+            ).into_response());
         }
 
         updated_dto.ok_or_else(|| json_err(StatusCode::INTERNAL_SERVER_ERROR, "UPDATE_FAILED", "Fixture update did not return row"))

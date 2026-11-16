@@ -204,7 +204,16 @@
     "dirtyBufferPrompt": "未適用のHTML変更があります (dirty_buffer)。閉じる前に適用または破棄しますか？",
     "dirtyGuardApply": "今すぐ適用",
     "dirtyGuardDiscard": "破棄",
-    "dirtyGuardKeep": "編集を続ける"
+    "dirtyGuardKeep": "編集を続ける",
+    "dirtyGuardTitle": "未保存のHTML変更",
+    "dirtyGuardBody": "未適用のインラインHTML編集があります。変更を破棄して画面を切り替えますか？",
+    "discardChangesBtn": "変更を破棄",
+    "modeComment": "コメント (C)",
+    "modeInlineEditor": "インライン編集 (E)",
+    "modeSampleData": "サンプルデータ (D)",
+    "pauseWalkthrough": "ウォークスルー停止",
+    "startWalkthrough": "ウォークスルー",
+    "savePatchBtn": "HTMLを保存して適用"
   },
   "settings": {
     "title": "システム設定と環境設定",
@@ -321,7 +330,8 @@
     "runtimeDefaultTag": "既定",
     "customizeRuntimeBtn": "カスタマイズ",
     "vaultStorageShort": "保存方式",
-    "permissionShort": "承認レベル"
+    "permissionShort": "承認レベル",
+    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · ローカル/Ollama"
   },
   "flow": {
     "dagCanvas": "DAG 2D キャンバス",
@@ -367,7 +377,11 @@
     "draftBadge": "下書き",
     "runningBadge": "実行中",
     "queuedBadgePrefix": "待機中 #",
-    "transitionErrorPrefix": "グラフ遷移エラー"
+    "transitionErrorPrefix": "グラフ遷移エラー",
+    "dagConflictLockMessage": "DAG競合ロック：同時リビジョン競合を検出しました。デプロイ前に解消してください。",
+    "pausedBadge": "一時停止",
+    "interruptedBadge": "中断",
+    "appShellPrefix": "シェル"
   },
   "brand": {
     "symbolAlt": "cowok ブランドシンボル"
@@ -420,7 +434,10 @@
     "steerBtn": "指示",
     "steerPlaceholder": "実行途中の制御指示...",
     "steerPrefix": "制御指示",
-    "subStateLabel": "サブ状態"
+    "subStateLabel": "サブ状態",
+    "jobInterrupted": "中断されました",
+    "fenceLabel": "フェンス:",
+    "seqLabel": "連番:"
   },
   "errors": {
     "dagCanvasRender": "2D DAG キャンバスの描画エラー",
@@ -459,7 +476,8 @@
     "consLabel": "トレードオフ:",
     "promptPlaceholder": "自然言語でUIの変更を記述してください...",
     "prosLabel": "メリット:",
-    "reviewClarificationsBtn": "明確化オプションの確認と選択"
+    "reviewClarificationsBtn": "明確化オプションの確認と選択",
+    "ambiguityLockFull": "実行ロック：曖昧さスコア {{score}} ≥ 0.45。コード生成前に意図を明確化してください。"
   },
   "snapshots": {
     "byteSizeLabel": "サイズ:",
@@ -552,5 +570,27 @@
     "searchModels": "モデルを検索...",
     "thinkingEffort": "思考レベル",
     "manageAiAccounts": "AI アカウント管理"
+  },
+  "launchpad": {
+    "title": "プロジェクト起動 — フロー＆デザインワークスペース初期化",
+    "subtitle": "4つのクイックスタート方法から選択して2D DAG画面とデザイントークンを構築します。",
+    "proceedBtn": "ワークスペースを開く",
+    "prdDesc": "要件定義書（PRD）を貼り付けまたはアップロードし、画面ノードとフローを自動生成します。",
+    "templatesDesc": "厳選されたマルチ画面テンプレート（決済、SaaSダッシュボード、オンボーディング）から開始。",
+    "designDesc": "既存のFigmaフレームやUIスクリーンショットを取り込み、レイアウトトークンを抽出します。",
+    "gitDesc": "ローカルGitリポジトリを接続し、ルート・コンポーネント・DESIGN.mdを解析します。",
+    "extractTokensBtn": "デザイントークン抽出",
+    "gitBranchLabel": "対象ブランチ",
+    "loadSamplePrdBtn": "サンプルPRDを読み込む",
+    "dropPrdPrompt": "PRDファイルをドロップまたは選択 (.md / .txt / .pdf)",
+    "selectedFilePrefix": "選択済みファイル:"
+  },
+  "sampleData": {
+    "title": "サンプルデータスタジオ — フィクスチャ連携",
+    "applyBtn": "ライブプレビューにフィクスチャを適用",
+    "colKey": "属性キー",
+    "colType": "データ型",
+    "colValue": "サンプル値",
+    "footerSummary": "{{count}} 件の属性を読み込み • プリセット: {{preset}}"
   }
 }

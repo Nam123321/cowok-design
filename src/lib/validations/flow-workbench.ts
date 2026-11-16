@@ -14,7 +14,7 @@ export type { FixtureRef, ViewportPreset };
 export const SemanticNodeTypeSchema = z.enum(["screen", "modal", "condition", "action"]);
 export type SemanticNodeType = z.infer<typeof SemanticNodeTypeSchema>;
 
-export const EdgeFlowTypeSchema = z.enum(["main", "if_else", "if_not"]);
+export const EdgeFlowTypeSchema = z.enum(["main", "if_else", "if_not", "loopback"]);
 export type EdgeFlowType = z.infer<typeof EdgeFlowTypeSchema>;
 
 export const TriggerEventSchema = z.enum(["onClick", "onSubmit", "onNavigate", "onTimeout", "custom"]);
@@ -47,6 +47,11 @@ export const CreateFlowNodeSchema = z.object({
   viewportPreset: ViewportPresetSchema.default("desktop-1440"),
   posX: FiniteCoordSchema.default(0.0),
   posY: FiniteCoordSchema.default(0.0),
+  portalGroup: z.string().trim().optional(),
+  sharedAppShellId: z.string().trim().nullable().optional(),
+  miniSkeletonHtml: z.string().nullable().optional(),
+  ctaPillsJson: z.string().default("[]"),
+  revision: z.number().int().min(1).default(1),
 });
 export type CreateFlowNodeInput = z.input<typeof CreateFlowNodeSchema>;
 export type CreateFlowNodePayload = z.infer<typeof CreateFlowNodeSchema>;
@@ -66,6 +71,11 @@ export const UpdateFlowNodeSchema = z
     posY: FiniteCoordSchema.optional(),
     expectedVersion: z.number().int().min(1).optional(),
     expectedLayoutVersion: z.number().int().min(1).optional(),
+    portalGroup: z.string().trim().nullable().optional(),
+    sharedAppShellId: z.string().trim().nullable().optional(),
+    miniSkeletonHtml: z.string().nullable().optional(),
+    ctaPillsJson: z.string().optional(),
+    expectedRevision: z.number().int().min(1).optional(),
   })
   .refine(
     (v) => !(v.expectedVersion !== undefined && v.expectedLayoutVersion !== undefined),
@@ -90,8 +100,13 @@ export const FlowNodeResponseSchema = z.object({
   viewportPreset: ViewportPresetSchema.default("desktop-1440"),
   posX: FiniteCoordSchema,
   posY: FiniteCoordSchema,
+  portalGroup: z.string().nullable().optional().default(null),
+  sharedAppShellId: z.string().nullable().optional().default(null),
+  miniSkeletonHtml: z.string().nullable().optional().default(null),
+  ctaPillsJson: z.string().default("[]"),
   version: z.number().int().min(1).default(1),
   layoutVersion: z.number().int().min(1).default(1),
+  revision: z.number().int().min(1).default(1),
   createdAt: TimestampStringSchema,
   updatedAt: TimestampStringSchema,
 });
@@ -135,6 +150,10 @@ export const CreateFlowTransitionSchema = z
     flowType: EdgeFlowTypeSchema.default("main"),
     triggerEvent: TriggerEventSchema.default("onClick"),
     guardCondition: z.string().max(1000).nullable().optional(),
+    sourceCtaFfId: z.string().trim().min(1).nullable().optional(),
+    maxLoopIterations: z.number().int().min(1).max(10).default(3),
+    allowConfirmedLoopback: z.boolean().optional(),
+    revision: z.number().int().min(1).optional(),
   })
   .refine((v) => v.sourceNodeId !== v.targetNodeId, {
     message: "Self-loop transitions (sourceNodeId === targetNodeId) are forbidden",
@@ -149,6 +168,10 @@ export const UpdateFlowTransitionSchema = z.object({
   guardCondition: z.string().max(1000).nullable().optional(),
   reversed: z.boolean().optional(),
   expectedVersion: z.number().int().min(1).optional(),
+  sourceCtaFfId: z.string().trim().min(1).nullable().optional(),
+  maxLoopIterations: z.number().int().min(1).max(10).optional(),
+  allowConfirmedLoopback: z.boolean().optional(),
+  expectedRevision: z.number().int().min(1).optional(),
 });
 export type UpdateFlowTransitionInput = z.input<typeof UpdateFlowTransitionSchema>;
 export type UpdateFlowTransitionPayload = z.infer<typeof UpdateFlowTransitionSchema>;
@@ -162,7 +185,10 @@ export const FlowTransitionResponseSchema = z.object({
   flowType: EdgeFlowTypeSchema.default("main"),
   triggerEvent: z.string().min(1),
   guardCondition: z.string().nullable().optional().default(null),
+  sourceCtaFfId: z.string().nullable().optional().default(null),
+  maxLoopIterations: z.number().int().min(1).max(10).default(3),
   version: z.number().int().min(1).default(1),
+  revision: z.number().int().min(1).default(1),
   createdAt: TimestampStringSchema,
   updatedAt: TimestampStringSchema,
 });
@@ -183,6 +209,7 @@ export const FlowGraphSnapshotSchema = z.object({
   graphId: z.string().min(1),
   graphVersion: z.number().int().min(1),
   layoutVersion: z.number().int().min(1),
+  revision: z.number().int().min(1).default(1),
   nodes: z.array(FlowNodeResponseSchema),
   transitions: z.array(FlowTransitionResponseSchema),
 });
@@ -210,6 +237,8 @@ export const DeployDraftSchema = z.object({
     .array(z.object({ transitionId: z.string().uuid(), expectedVersion: z.number().int().min(1) }))
     .max(500)
     .default([]),
+  allowConfirmedLoopback: z.boolean().optional(),
+  expectedRevision: z.number().int().min(1).optional(),
 });
 export type DeployDraftInput = z.input<typeof DeployDraftSchema>;
 export const DeployDraftResponseSchema = FlowGraphSnapshotSchema;

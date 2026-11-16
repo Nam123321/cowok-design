@@ -151,12 +151,24 @@ export class FlowWorkbenchClient {
     return FlowNodeResponseDTOSchema.parse(raw);
   }
 
-  async updateNode(projectId: string, nodeId: string, input: UpdateFlowNodeInput): Promise<FlowNodeResponse> {
+  async updateNode(
+    projectId: string,
+    nodeId: string,
+    input: UpdateFlowNodeInput,
+    options?: { ifMatch?: string | number }
+  ): Promise<FlowNodeResponse> {
     const validated = UpdateFlowNodePayloadSchema.parse(input);
+    const headers: Record<string, string> = {};
+    if (options?.ifMatch !== undefined) {
+      headers["If-Match"] = String(options.ifMatch);
+    } else if (validated.expectedRevision !== undefined) {
+      headers["If-Match"] = String(validated.expectedRevision);
+    }
     const raw = await this.request<unknown>(
       `/api/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}`,
       {
         method: "PATCH",
+        headers,
         body: JSON.stringify(validated),
       }
     );
@@ -198,12 +210,24 @@ export class FlowWorkbenchClient {
     return FlowTransitionResponseDTOSchema.parse(raw);
   }
 
-  async updateTransition(projectId: string, transitionId: string, input: UpdateFlowTransitionInput): Promise<FlowTransitionResponse> {
+  async updateTransition(
+    projectId: string,
+    transitionId: string,
+    input: UpdateFlowTransitionInput,
+    options?: { ifMatch?: string | number }
+  ): Promise<FlowTransitionResponse> {
     const validated = UpdateFlowTransitionPayloadSchema.parse(input);
+    const headers: Record<string, string> = {};
+    if (options?.ifMatch !== undefined) {
+      headers["If-Match"] = String(options.ifMatch);
+    } else if (validated.expectedRevision !== undefined) {
+      headers["If-Match"] = String(validated.expectedRevision);
+    }
     const raw = await this.request<unknown>(
       `/api/projects/${encodeURIComponent(projectId)}/flow/transitions/${encodeURIComponent(transitionId)}`,
       {
         method: "PATCH",
+        headers,
         body: JSON.stringify(validated),
       }
     );
@@ -219,10 +243,24 @@ export class FlowWorkbenchClient {
     return DeleteTransitionResponseSchema.parse(raw);
   }
 
-  async deployDraft(projectId: string, input: DeployDraftInput): Promise<FlowGraphSnapshot> {
+  async deployDraft(
+    projectId: string,
+    input: DeployDraftInput,
+    options?: { ifMatch?: string | number; idempotencyKey?: string }
+  ): Promise<FlowGraphSnapshot> {
     const validated = DeployFlowDraftPayloadSchema.parse(input);
+    const headers: Record<string, string> = {};
+    if (options?.ifMatch !== undefined) {
+      headers["If-Match"] = String(options.ifMatch);
+    } else if (validated.expectedRevision !== undefined) {
+      headers["If-Match"] = String(validated.expectedRevision);
+    }
+    if (options?.idempotencyKey) {
+      headers["Idempotency-Key"] = options.idempotencyKey;
+    }
     const raw = await this.request<unknown>(`/api/projects/${encodeURIComponent(projectId)}/flow/deploy-draft`, {
       method: "POST",
+      headers,
       body: JSON.stringify(validated),
     });
     return DeployDraftResponseSchema.parse(raw);
@@ -235,8 +273,12 @@ export const apiFlowWorkbench = {
   getSnapshot: (projectId: string) => defaultFlowClient.getSnapshot(projectId),
   getNodes: (projectId: string) => defaultFlowClient.getNodes(projectId),
   createNode: (projectId: string, input: CreateFlowNodeInput) => defaultFlowClient.createNode(projectId, input),
-  updateNode: (projectId: string, nodeId: string, input: UpdateFlowNodeInput) =>
-    defaultFlowClient.updateNode(projectId, nodeId, input),
+  updateNode: (
+    projectId: string,
+    nodeId: string,
+    input: UpdateFlowNodeInput,
+    options?: { ifMatch?: string | number }
+  ) => defaultFlowClient.updateNode(projectId, nodeId, input, options),
   batchUpdateNodePositions: (projectId: string, input: BatchUpdateNodePositionsInput) =>
     defaultFlowClient.batchUpdateNodePositions(projectId, input),
   deleteNode: (projectId: string, nodeId: string, query?: { expectedVersion?: number; expectedGraphVersion?: number }) =>
@@ -244,9 +286,17 @@ export const apiFlowWorkbench = {
   getTransitions: (projectId: string) => defaultFlowClient.getTransitions(projectId),
   createTransition: (projectId: string, input: CreateFlowTransitionInput) =>
     defaultFlowClient.createTransition(projectId, input),
-  updateTransition: (projectId: string, transitionId: string, input: UpdateFlowTransitionInput) =>
-    defaultFlowClient.updateTransition(projectId, transitionId, input),
+  updateTransition: (
+    projectId: string,
+    transitionId: string,
+    input: UpdateFlowTransitionInput,
+    options?: { ifMatch?: string | number }
+  ) => defaultFlowClient.updateTransition(projectId, transitionId, input, options),
   deleteTransition: (projectId: string, transitionId: string, query?: { expectedVersion?: number }) =>
     defaultFlowClient.deleteTransition(projectId, transitionId, query),
-  deployDraft: (projectId: string, input: DeployDraftInput) => defaultFlowClient.deployDraft(projectId, input),
+  deployDraft: (
+    projectId: string,
+    input: DeployDraftInput,
+    options?: { ifMatch?: string | number; idempotencyKey?: string }
+  ) => defaultFlowClient.deployDraft(projectId, input, options),
 };

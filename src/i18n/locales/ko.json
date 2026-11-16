@@ -204,7 +204,16 @@
     "dirtyBufferPrompt": "적용되지 않은 HTML 변경 사항(dirty_buffer)이 있습니다. 나가기 전에 적용하거나 취소하시겠습니까?",
     "dirtyGuardApply": "지금 적용",
     "dirtyGuardDiscard": "변경 취소",
-    "dirtyGuardKeep": "계속 편집"
+    "dirtyGuardKeep": "계속 편집",
+    "dirtyGuardTitle": "저장되지 않은 HTML 변경사항",
+    "dirtyGuardBody": "적용되지 않은 인라인 HTML 편집이 있습니다. 변경사항을 버리고 화면을 전환할까요?",
+    "discardChangesBtn": "변경사항 버리기",
+    "modeComment": "댓글 (C)",
+    "modeInlineEditor": "인라인 편집기 (E)",
+    "modeSampleData": "샘플 데이터 (D)",
+    "pauseWalkthrough": "워크스루 일시 중지",
+    "startWalkthrough": "워크스루",
+    "savePatchBtn": "HTML 저장 및 적용"
   },
   "settings": {
     "title": "시스템 설정 및 환경설정",
@@ -321,7 +330,8 @@
     "runtimeDefaultTag": "기본값",
     "customizeRuntimeBtn": "사용자 지정",
     "vaultStorageShort": "저장 방식",
-    "permissionShort": "승인 수준"
+    "permissionShort": "승인 수준",
+    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · 로컬/Ollama"
   },
   "flow": {
     "dagCanvas": "DAG 2D 캔버스",
@@ -367,7 +377,11 @@
     "draftBadge": "초안",
     "runningBadge": "실행 중",
     "queuedBadgePrefix": "대기열 #",
-    "transitionErrorPrefix": "그래프 전환 오류"
+    "transitionErrorPrefix": "그래프 전환 오류",
+    "dagConflictLockMessage": "DAG 충돌 잠금: 동시 리비전 충돌이 감지되었습니다. 배포 전에 충돌을 해결하세요.",
+    "pausedBadge": "일시 중지",
+    "interruptedBadge": "중단됨",
+    "appShellPrefix": "앱 셸"
   },
   "brand": {
     "symbolAlt": "cowok 브랜드 심볼"
@@ -420,7 +434,10 @@
     "steerBtn": "방향 지시",
     "steerPlaceholder": "실행 중 지시 사항...",
     "steerPrefix": "방향 지시",
-    "subStateLabel": "하위 상태"
+    "subStateLabel": "하위 상태",
+    "jobInterrupted": "중단됨",
+    "fenceLabel": "펜스:",
+    "seqLabel": "순번:"
   },
   "errors": {
     "dagCanvasRender": "2D DAG 캔버스 렌더링 오류",
@@ -459,7 +476,8 @@
     "consLabel": "절충점:",
     "promptPlaceholder": "자연어로 UI 변경 사항을 설명하세요...",
     "prosLabel": "장점:",
-    "reviewClarificationsBtn": "명확화 옵션 확인 및 선택"
+    "reviewClarificationsBtn": "명확화 옵션 확인 및 선택",
+    "ambiguityLockFull": "실행 잠금: 모호성 점수 {{score}} ≥ 0.45. 코드 생성 전에 의도를 명확히 하세요."
   },
   "snapshots": {
     "byteSizeLabel": "크기:",
@@ -552,5 +570,27 @@
     "searchModels": "모델 검색...",
     "thinkingEffort": "추론 수준",
     "manageAiAccounts": "AI 계정 관리"
+  },
+  "launchpad": {
+    "title": "프로젝트 런치패드 — 플로우 및 디자인 워크스페이스 초기화",
+    "subtitle": "2D DAG 화면과 디자인 토큰을 빠르게 시작할 4가지 경로 중 하나를 선택하세요.",
+    "proceedBtn": "워크스페이스 실행",
+    "prdDesc": "제품 요구사항 문서(PRD)를 붙여넣거나 업로드해 화면 노드와 플로우를 자동 생성합니다.",
+    "templatesDesc": "엄선된 인터랙티브 다중 화면 템플릿(결제, SaaS 대시보드, 온보딩)으로 시작합니다.",
+    "designDesc": "기존 Figma 프레임이나 참조 UI 스크린샷을 가져와 레이아웃 토큰을 추출합니다.",
+    "gitDesc": "로컬 Git 저장소를 연결해 라우트, 컴포넌트 및 DESIGN.md를 분석합니다.",
+    "extractTokensBtn": "디자인 토큰 추출",
+    "gitBranchLabel": "대상 브랜치",
+    "loadSamplePrdBtn": "샘플 PRD 불러오기",
+    "dropPrdPrompt": "PRD 파일을 드롭하거나 찾아보기 (.md / .txt / .pdf)",
+    "selectedFilePrefix": "선택된 파일:"
+  },
+  "sampleData": {
+    "title": "샘플 데이터 스튜디오 — 픽스처 바인딩",
+    "applyBtn": "라이브 미리보기에 픽스처 주입",
+    "colKey": "속성 키",
+    "colType": "데이터 유형",
+    "colValue": "샘플 값",
+    "footerSummary": "{{count}}개 속성 로드됨 • 프리셋: {{preset}}"
   }
 }

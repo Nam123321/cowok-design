@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-01"
 title: "Epic 01: Cargo Workspace, Domain Contracts (ts-rs) & 16-Table SQLite Registry"
-status: planned
+status: completed
 track: "Stream-1"
 wave: 1
 provides: ["crates/domain", "crates/spec-registry", "16 SQLite WAL Tables", "9 Foundational Specs Vault"]

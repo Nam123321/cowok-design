@@ -56,18 +56,34 @@ export class ScreenFixtureClient extends HarnessDaemonTransport {
     );
   }
 
-  updateFixture(
-    projectId: string,
-    nodeId: string,
-    fixtureId: string,
-    input: UpdateScreenFixture
-  ): Promise<ScreenFixtureResponse> {
-    const validated = UpdateScreenFixtureSchema.parse(input);
+  getFixture(projectId: string, nodeId: string, fixtureId: string): Promise<ScreenFixtureResponse> {
     return this.request(
       `/api/projects/${encodeURIComponent(projectId)}/flow/nodes/${encodeURIComponent(nodeId)}/fixtures/${encodeURIComponent(fixtureId)}`,
       ScreenFixtureResponseSchema,
+      { method: "GET" }
+    );
+  }
+
+  updateFixture(params: {
+    projectId: string;
+    nodeId: string;
+    fixtureId: string;
+    input: UpdateScreenFixture;
+    ifMatch?: string | number;
+  }): Promise<ScreenFixtureResponse> {
+    const validated = UpdateScreenFixtureSchema.parse(params.input);
+    const headers: Record<string, string> = {};
+    if (params.ifMatch !== undefined) {
+      headers["If-Match"] = String(params.ifMatch);
+    } else if (validated.expectedRevision !== undefined) {
+      headers["If-Match"] = String(validated.expectedRevision);
+    }
+    return this.request(
+      `/api/projects/${encodeURIComponent(params.projectId)}/flow/nodes/${encodeURIComponent(params.nodeId)}/fixtures/${encodeURIComponent(params.fixtureId)}`,
+      ScreenFixtureResponseSchema,
       {
         method: "PATCH",
+        headers,
         body: JSON.stringify(validated),
       }
     );

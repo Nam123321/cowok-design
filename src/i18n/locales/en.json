@@ -204,7 +204,16 @@
     "previewSynthActionHint": "Synthesized live preview from WorkbenchNode metadata.",
     "previewSynthCtaOpen": "Open",
     "orphanDeployConfirmPrompt": "isolated ScreenState(s) remaining. Deploy anyway?",
-    "confirmDeployAnyway": "Confirm Deploy"
+    "confirmDeployAnyway": "Confirm Deploy",
+    "dirtyGuardTitle": "Unsaved HTML Changes",
+    "dirtyGuardBody": "You have unapplied inline HTML edits. Discard changes and switch screen?",
+    "discardChangesBtn": "Discard Changes",
+    "modeComment": "Comment (C)",
+    "modeInlineEditor": "Inline Editor (E)",
+    "modeSampleData": "Sample Data (D)",
+    "pauseWalkthrough": "Pause Walkthrough",
+    "startWalkthrough": "Walkthrough",
+    "savePatchBtn": "Save & Apply HTML"
   },
   "settings": {
     "title": "System Settings & Preferences",
@@ -321,7 +330,8 @@
     "runtimeDefaultTag": "Default",
     "customizeRuntimeBtn": "Customize",
     "vaultStorageShort": "Storage",
-    "permissionShort": "Approval"
+    "permissionShort": "Approval",
+    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · BYOS/Ollama"
   },
   "flow": {
     "dagCanvas": "DAG 2D Canvas",
@@ -367,7 +377,11 @@
     "draftBadge": "DRAFT",
     "runningBadge": "RUNNING",
     "queuedBadgePrefix": "QUEUED #",
-    "transitionErrorPrefix": "Graph transition error"
+    "transitionErrorPrefix": "Graph transition error",
+    "dagConflictLockMessage": "DAG Conflict Lock: Concurrent revision conflict detected. Resolve collisions before deploying.",
+    "pausedBadge": "PAUSED",
+    "interruptedBadge": "INTERRUPTED",
+    "appShellPrefix": "Shell"
   },
   "brand": {
     "symbolAlt": "cowok brand symbol"
@@ -420,7 +434,10 @@
     "steerBtn": "Steer",
     "steerPlaceholder": "Steer instruction mid-run...",
     "steerPrefix": "Steer instruction",
-    "subStateLabel": "Sub-State"
+    "subStateLabel": "Sub-State",
+    "jobInterrupted": "Interrupted",
+    "fenceLabel": "fence:",
+    "seqLabel": "seq:"
   },
   "errors": {
     "dagCanvasRender": "2D DAG Canvas render error",
@@ -459,7 +476,8 @@
     "consLabel": "Trade-offs:",
     "promptPlaceholder": "Describe the UI change in natural language...",
     "prosLabel": "Pros:",
-    "reviewClarificationsBtn": "View & Select Clarification Option"
+    "reviewClarificationsBtn": "View & Select Clarification Option",
+    "ambiguityLockFull": "Execution Locked: Ambiguity score {{score}} ≥ 0.45. Clarify intent before generating code."
   },
   "snapshots": {
     "byteSizeLabel": "Size:",
@@ -552,5 +570,27 @@
     "searchModels": "Search models...",
     "thinkingEffort": "Thinking",
     "manageAiAccounts": "Manage AI accounts"
+  },
+  "launchpad": {
+    "title": "Project Launchpad — Initialize Flow & Design Workspace",
+    "subtitle": "Choose one of 4 fast-start paths to bootstrap your 2D DAG screens and design tokens.",
+    "proceedBtn": "Launch Workspace",
+    "prdDesc": "Paste or upload a Product Requirements Document (PRD) to auto-synthesize screen nodes and flows.",
+    "templatesDesc": "Start from curated interactive multi-screen templates (Checkout, SaaS Dashboard, Onboarding).",
+    "designDesc": "Import existing Figma frames or reference UI screenshots to extract layout tokens.",
+    "gitDesc": "Connect a local Git repository in-place to analyze routes, components, and DESIGN.md.",
+    "extractTokensBtn": "Extract Design Tokens",
+    "gitBranchLabel": "Target Branch",
+    "loadSamplePrdBtn": "Load Sample PRD",
+    "dropPrdPrompt": "Drop or browse PRD file (.md / .txt / .pdf)",
+    "selectedFilePrefix": "Selected file:"
+  },
+  "sampleData": {
+    "title": "Sample Data Studio — Fixture Binding",
+    "applyBtn": "Inject Fixture into Live Preview",
+    "colKey": "Attribute Key",
+    "colType": "Data Type",
+    "colValue": "Sample Value",
+    "footerSummary": "{{count}} attributes loaded • Preset: {{preset}}"
   }
 }

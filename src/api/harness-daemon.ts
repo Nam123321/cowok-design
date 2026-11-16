@@ -67,6 +67,10 @@ export class HarnessDaemonClient extends HarnessDaemonTransport {
     });
   }
 
+  createProjectFromLaunchpad(input: CreateProjectInput): Promise<ProjectDto> {
+    return this.createProject(input);
+  }
+
   updateProject(
     projectId: string,
     input: { name?: string; product_brief?: string }

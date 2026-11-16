@@ -204,7 +204,16 @@
     "dirtyBufferPrompt": "Tienes cambios HTML sin aplicar (dirty_buffer). ¿Aplicar o descartar antes de salir?",
     "dirtyGuardApply": "Aplicar ahora",
     "dirtyGuardDiscard": "Descartar",
-    "dirtyGuardKeep": "Seguir editando"
+    "dirtyGuardKeep": "Seguir editando",
+    "dirtyGuardTitle": "Cambios HTML sin guardar",
+    "dirtyGuardBody": "Tienes ediciones HTML en línea sin aplicar. ¿Descartar cambios y cambiar de pantalla?",
+    "discardChangesBtn": "Descartar cambios",
+    "modeComment": "Comentar (C)",
+    "modeInlineEditor": "Editor en línea (E)",
+    "modeSampleData": "Datos de muestra (D)",
+    "pauseWalkthrough": "Pausar recorrido",
+    "startWalkthrough": "Recorrido",
+    "savePatchBtn": "Guardar y aplicar HTML"
   },
   "settings": {
     "title": "Configuración y preferencias del sistema",
@@ -321,7 +330,8 @@
     "runtimeDefaultTag": "Predeterminado",
     "customizeRuntimeBtn": "Personalizar",
     "vaultStorageShort": "Almacenamiento",
-    "permissionShort": "Aprobación"
+    "permissionShort": "Aprobación",
+    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · Local/Ollama"
   },
   "flow": {
     "dagCanvas": "Lienzo DAG 2D",
@@ -367,7 +377,11 @@
     "draftBadge": "BORRADOR",
     "runningBadge": "EN EJECUCIÓN",
     "queuedBadgePrefix": "EN COLA #",
-    "transitionErrorPrefix": "Error de transición del gráfico"
+    "transitionErrorPrefix": "Error de transición del gráfico",
+    "dagConflictLockMessage": "Bloqueo por conflicto DAG: Se detectó revisión concurrente. Resuelve colisiones antes de desplegar.",
+    "pausedBadge": "PAUSADO",
+    "interruptedBadge": "INTERRUMPIDO",
+    "appShellPrefix": "Contenedor"
   },
   "brand": {
     "symbolAlt": "símbolo de la marca cowok"
@@ -420,7 +434,10 @@
     "steerBtn": "Dirigir",
     "steerPlaceholder": "Instrucción de control a mitad de ejecución...",
     "steerPrefix": "Instrucción de control",
-    "subStateLabel": "Subestado"
+    "subStateLabel": "Subestado",
+    "jobInterrupted": "Interrumpido",
+    "fenceLabel": "cerrojo:",
+    "seqLabel": "sec:"
   },
   "errors": {
     "dagCanvasRender": "Error de renderizado del lienzo DAG 2D",
@@ -459,7 +476,8 @@
     "consLabel": "Compromisos:",
     "promptPlaceholder": "Describa el cambio de interfaz en lenguaje natural...",
     "prosLabel": "Ventajas:",
-    "reviewClarificationsBtn": "Ver y seleccionar opción de clarificación"
+    "reviewClarificationsBtn": "Ver y seleccionar opción de clarificación",
+    "ambiguityLockFull": "Ejecución bloqueada: Puntuación de ambigüedad {{score}} ≥ 0.45. Aclara la intención antes de generar código."
   },
   "snapshots": {
     "byteSizeLabel": "Tamaño:",
@@ -552,5 +570,27 @@
     "searchModels": "Buscar modelos...",
     "thinkingEffort": "Razonamiento",
     "manageAiAccounts": "Administrar cuentas AI"
+  },
+  "launchpad": {
+    "title": "Lanzador de Proyecto — Inicializar Espacio de Flujo y Diseño",
+    "subtitle": "Elige una de 4 rutas rápidas para crear tus pantallas DAG 2D y tokens de diseño.",
+    "proceedBtn": "Abrir Espacio",
+    "prdDesc": "Pega o sube un documento de requisitos (PRD) para sintetizar pantallas y flujos automáticamente.",
+    "templatesDesc": "Comienza con plantillas interactivas multipantalla (Pago, Panel SaaS, Bienvenida).",
+    "designDesc": "Importa marcos de Figma o capturas de referencia para extraer tokens de diseño.",
+    "gitDesc": "Conecta un repositorio Git local para analizar rutas, componentes y DESIGN.md.",
+    "extractTokensBtn": "Extraer Tokens de Diseño",
+    "gitBranchLabel": "Rama de destino",
+    "loadSamplePrdBtn": "Cargar PRD de ejemplo",
+    "dropPrdPrompt": "Suelta o busca un archivo PRD (.md / .txt / .pdf)",
+    "selectedFilePrefix": "Archivo seleccionado:"
+  },
+  "sampleData": {
+    "title": "Estudio de Datos de Muestra — Enlace de Fixture",
+    "applyBtn": "Inyectar Fixture en Vista Previa",
+    "colKey": "Clave de Atributo",
+    "colType": "Tipo de Dato",
+    "colValue": "Valor de Muestra",
+    "footerSummary": "{{count}} atributos cargados • Plantilla: {{preset}}"
   }
 }
