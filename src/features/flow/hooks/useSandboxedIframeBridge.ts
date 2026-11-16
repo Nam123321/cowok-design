@@ -58,6 +58,10 @@ function dispatchVerifiedIframeMessage(args: {
     return;
   }
   if (msg.type === "READY") return;
+  if (msg.type === "ELEMENT_RECTS") {
+    args.setElementRects((prev) => ({ ...prev, ...msg.rects }));
+    return;
+  }
   if (msg.type === "ELEMENT_CLICKED") {
     const ffId = msg.elementFfId || msg.selector;
     if (msg.rect) args.setElementRects((prev) => ({ ...prev, [ffId]: msg.rect! }));

@@ -1,9 +1,17 @@
 // @story 04.1, 04.2
 // @implements AC-04 (Settings Models Pane with Live BYOK Verifier, Storage Mode & Permissions)
 import React, { useEffect, useState } from "react";
-import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "../../../hooks/useTranslation";
+import { useDoctorProvidersUsage } from "../../../hooks/useDoctorProvidersUsage";
 import { apiWorkbenchSettings } from "../../../api/workbench-settings";
+import type { CliDiagnosticItem } from "../../../lib/validations/workbench-settings";
+import { SettingsDetectedProvidersPanel } from "./SettingsDetectedProvidersPanel";
+import {
+  SettingsApiBentoPanel,
+  type ApiBentoProviderId,
+  type ApiVerifyStatus,
+} from "./SettingsApiBentoPanel";
+import { SettingsRuntimeSummaryBento } from "./SettingsRuntimeSummaryBento";
 import type { ThemeMode } from "./WorkbenchTopNav";
 
 export const SUPPORTED_LOCALES = [
@@ -149,23 +157,6 @@ const GeneralAppearanceSection: React.FC<
   );
 };
 
-interface VerifyState {
-  status: "idle" | "verifying" | "success" | "error";
-  latencyMs?: number;
-  message?: string;
-}
-
-const PROVIDER_KEY_FIELDS: Array<{
-  id: "gemini" | "claude" | "openai";
-  labelKey: string;
-  defaultLabel: string;
-  placeholder: string;
-}> = [
-  { id: "gemini", labelKey: "settings.geminiKeyLabel", defaultLabel: "Google Gemini API Key", placeholder: "AIzaSy..." },
-  { id: "claude", labelKey: "settings.claudeKeyLabel", defaultLabel: "Anthropic Claude API Key", placeholder: "sk-ant-api03-..." },
-  { id: "openai", labelKey: "settings.openaiKeyLabel", defaultLabel: "OpenAI API Key", placeholder: "sk-..." },
-];
-
 const ModelsByosSection: React.FC<
   Omit<
     SettingsGeneralModelsPaneProps,
@@ -173,12 +164,15 @@ const ModelsByosSection: React.FC<
   >
 > = (p) => {
   const { t } = useTranslation();
-  const inputType = p.showKeys ? "text" : "password";
-
   const [storageMode, setStorageMode] = useState<string>("vault_0600");
   const [permissionLevel, setPermissionLevel] = useState<string>("auto_sandbox");
-  const [verifyStates, setVerifyStates] = useState<Record<string, VerifyState>>({});
+  const [verifyStates, setVerifyStates] = useState<Record<string, ApiVerifyStatus>>({});
   const [daemonNotice, setDaemonNotice] = useState<string | null>(null);
+  const [disconnectedIds, setDisconnectedIds] = useState<string[]>([]);
+  const doctor = useDoctorProvidersUsage(true);
+  const connectedIds = doctor.readyTools
+    .map((tool) => tool.id)
+    .filter((id) => !disconnectedIds.includes(id));
 
   useEffect(() => {
     let active = true;
@@ -260,7 +254,7 @@ const ModelsByosSection: React.FC<
   };
 
   const verifyEndpoint = async (
-    provider: "gemini" | "claude" | "openai" | "byos",
+    provider: ApiBentoProviderId,
     endpointOrKey: string,
     optionalToken?: string
   ) => {
@@ -301,14 +295,25 @@ const ModelsByosSection: React.FC<
     }
   };
 
+  const handleToggleConnectTool = (tool: CliDiagnosticItem) => {
+    const isCurrentlyConnected = connectedIds.includes(tool.id);
+    setDisconnectedIds((prev) =>
+      isCurrentlyConnected ? [...prev, tool.id] : prev.filter((id) => id !== tool.id)
+    );
+    const primaryModel = tool.models?.[0]?.id;
+    if (!isCurrentlyConnected && primaryModel) {
+      p.onDefaultModelChange(primaryModel);
+    }
+  };
+
   return (
     <>
       <div>
-        <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "3px" }}>
-          {t("settings.modelsTitle", "Khóa API & Tự cấp gói thuê bao (BYOS)")}
+        <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "2px" }}>
+          {t("settings.modelsTitle", "Kết nối AI, BYOS & Quyền Runtime")}
         </div>
-        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "8px", lineHeight: "1.4" }}>
-          {t("settings.modelsDesc", "Cấu hình quyền hạn thực thi và xác thực trực tiếp Key/Endpoint qua Upstream Probe")}
+        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "4px", lineHeight: "1.4" }}>
+          {t("settings.modelsDesc", "Kết nối tự động CLI trên máy, API Providers và chính sách Runtime. Việc chọn model theo tác vụ thực hiện trực tiếp tại khung Chat.")}
         </div>
         {daemonNotice && (
           <div
@@ -316,7 +321,7 @@ const ModelsByosSection: React.FC<
             data-testid="settings-models-daemon-notice"
             style={{
               padding: "6px 10px",
-              marginBottom: "8px",
+              marginTop: "6px",
               borderRadius: "var(--radius-xs)",
               backgroundColor: "var(--bg-subtle)",
               border: "1px solid var(--state-warning)",
@@ -329,193 +334,35 @@ const ModelsByosSection: React.FC<
         )}
       </div>
 
-      {/* Model Selection */}
-      <div>
-        <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px" }}>
-          {t("settings.defaultModelLabel", "Mô hình mặc định cho Cowok Agent")}
-        </label>
-        <select
-          data-testid="settings-default-model-select"
-          value={p.defaultModel}
-          onChange={(e) => {
-            p.onDefaultModelChange(e.target.value);
-            void persistAgentPrefs({ nextStorage: storageMode, nextPerm: permissionLevel, modelId: e.target.value, endpoint: p.byosEndpoint });
-          }}
-          className="cowok-input"
-          style={{
-            width: "100%",
-            height: "32px",
-            padding: "0 10px",
-            fontSize: "11.5px",
-            borderRadius: "var(--radius-xs)",
-            backgroundColor: "var(--bg-workspace)",
-            color: "var(--text-primary)",
-            border: "1px solid var(--border-default)",
-          }}
-        >
-          <option value="cowok-swarm">{t("settings.modelOptionCowokSwarm", "Cowok Swarm · Multi-Agent High Fidelity (Antigravity 2.0)")}</option>
-          <option value="claude-37">{t("settings.modelOptionClaude37", "Claude 3.7 Sonnet (Anthropic)")}</option>
-          <option value="gemini-25">{t("settings.modelOptionGemini25", "Gemini 2.5 Pro (Google DeepMind)")}</option>
-          <option value="openai-gpt4o">{t("settings.modelOptionOpenAi4o", "GPT-4o / o3-mini (OpenAI)")}</option>
-          <option value="deepseek-r1">{t("settings.modelOptionDeepseekR1", "DeepSeek R1 Reasoning (Ollama / Local)")}</option>
-          <option value="byos-custom">{t("settings.modelOptionByos", "Custom BYOS Endpoint")}</option>
-        </select>
-      </div>
+      <SettingsDetectedProvidersPanel
+        readyTools={doctor.readyTools}
+        setupTools={doctor.setupTools}
+        moreTools={doctor.moreTools}
+        connectedIds={connectedIds}
+        loading={doctor.loading}
+        probingId={doctor.probingId}
+        onToggleConnect={handleToggleConnectTool}
+        onRecheckAll={() => { void doctor.refresh({ active: true, refreshUsage: true }); }}
+        onProbeTool={(cliId) => { void doctor.probeTool(cliId); }}
+      />
 
-      {/* Storage Mode Selector */}
-      <div style={{ padding: "10px 12px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
-        <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "6px" }}>
-          {t("settings.vaultStorageLabel", "Cơ chế lưu trữ Secret & Vault:")}
-        </label>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-          <button type="button" onClick={() => handleStorageModeChange("vault_0600")} style={choiceBtnStyle(storageMode === "vault_0600")}>
-            {t("settings.vaultStorageOsKeychain", "OS Keychain / Daemon 0600 Vault")}
-          </button>
-          <button type="button" onClick={() => handleStorageModeChange("ram_only")} style={choiceBtnStyle(storageMode === "ram_only")}>
-            {t("settings.vaultStorageRamOnly", "RAM Only (Chỉ giữ trong phiên)")}
-          </button>
-        </div>
-      </div>
+      <SettingsApiBentoPanel
+        ephemeralApiKeys={p.ephemeralApiKeys}
+        onEphemeralKeyChange={p.onEphemeralKeyChange}
+        byosEndpoint={p.byosEndpoint}
+        onByosEndpointChange={p.onByosEndpointChange}
+        showKeys={p.showKeys}
+        onToggleShowKeys={p.onToggleShowKeys}
+        verifyStates={verifyStates}
+        onVerifyProvider={(provider, val, tok) => { void verifyEndpoint(provider, val, tok); }}
+      />
 
-      {/* Permission Approval Level */}
-      <div style={{ padding: "10px 12px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
-        <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "6px" }}>
-          {t("settings.permissionLabel", "Cấp độ phê duyệt tự động (Permission Approval):")}
-        </label>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
-          {[
-            { id: "auto_sandbox", label: t("settings.permAutoSandbox", "Auto in Sandbox") },
-            { id: "ask_risky", label: t("settings.permAskRisky", "Ask Risky Only") },
-            { id: "ask_all", label: t("settings.permAskAll", "Ask All") },
-          ].map((lvl) => (
-            <button key={lvl.id} type="button" onClick={() => handlePermissionLevelChange(lvl.id)} style={choiceBtnStyle(permissionLevel === lvl.id)}>
-              {lvl.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 1. Prioritized BYOS / Custom Gateway (Bring Your Own Subscription) */}
-      <div style={{ padding: "10px 12px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-          <div style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-primary)" }}>
-            {t("settings.byosTitle", "Tùy biến Endpoint (BYOS / Custom Gateway)")}
-          </div>
-          <button
-            type="button"
-            data-testid="verify-byos-btn"
-            onClick={() => void verifyEndpoint("byos", p.byosEndpoint, p.ephemeralApiKeys.byosToken)}
-            style={{
-              border: "none",
-              background: "transparent",
-              fontSize: "10.5px",
-              color: "var(--action-primary)",
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              lineHeight: 1,
-              gap: "4px",
-            }}
-          >
-            <BrandIcon name="play" size={10} color="currentColor" />
-            <span>{t("settings.verifyConnection", "Kiểm tra kết nối")}</span>
-          </button>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          <input
-            type="text"
-            value={p.byosEndpoint}
-            onChange={(e) => p.onByosEndpointChange(e.target.value)}
-            placeholder="http://localhost:11434/v1"
-            className="cowok-input"
-            style={INPUT_STYLE}
-          />
-          <input
-            type={inputType}
-            value={p.ephemeralApiKeys.byosToken}
-            onChange={(e) => p.onEphemeralKeyChange("byosToken", e.target.value)}
-            placeholder={t("settings.bearerPlaceholder", "Bearer token (chỉ giữ trong phiên)")}
-            className="cowok-input"
-            style={INPUT_STYLE}
-          />
-        </div>
-        {verifyStates["byos"] && (
-          <div
-            style={{
-              fontSize: "10.5px",
-              marginTop: "6px",
-              color: verifyStates["byos"].status === "success" ? "var(--state-success)" : "var(--state-danger)",
-            }}
-          >
-            {verifyStates["byos"].message ||
-              (verifyStates["byos"].status === "verifying" ? t("settings.verifyingEndpointShort", "Đang kiểm tra endpoint (<3s)...") : "")}
-          </div>
-        )}
-      </div>
-
-      {/* 2. Direct Provider API Keys (BYOK) */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {PROVIDER_KEY_FIELDS.map((field, idx) => (
-          <div key={field.id}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}>
-              <label style={{ fontSize: "11px", fontWeight: 500, color: "var(--text-secondary)" }}>
-                {t(field.labelKey, field.defaultLabel)}
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <button
-                  type="button"
-                  onClick={() => void verifyEndpoint(field.id, p.ephemeralApiKeys[field.id])}
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    fontSize: "10.5px",
-                    color: "var(--action-primary)",
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    lineHeight: 1,
-                    gap: "4px",
-                  }}
-                >
-                  <BrandIcon name="play" size={10} color="currentColor" />
-                  <span>{t("settings.verifyConnection", "Kiểm tra kết nối")}</span>
-                </button>
-                {idx === 0 && (
-                  <button
-                    type="button"
-                    onClick={p.onToggleShowKeys}
-                    style={{ border: "none", background: "transparent", fontSize: "10px", color: "var(--text-muted)", cursor: "pointer" }}
-                  >
-                    {p.showKeys ? t("settings.hideKeys", "Ẩn khóa") : t("settings.showKeys", "Hiện khóa")}
-                  </button>
-                )}
-              </div>
-            </div>
-            <input
-              type={inputType}
-              value={p.ephemeralApiKeys[field.id]}
-              onChange={(e) => p.onEphemeralKeyChange(field.id, e.target.value)}
-              placeholder={field.placeholder}
-              className="cowok-input"
-              style={INPUT_STYLE}
-            />
-            {verifyStates[field.id] && (
-              <div
-                style={{
-                  fontSize: "10.5px",
-                  marginTop: "4px",
-                  color: verifyStates[field.id].status === "success" ? "var(--state-success)" : "var(--state-danger)",
-                }}
-              >
-                {verifyStates[field.id].message ||
-                  (verifyStates[field.id].status === "verifying" ? t("settings.verifyingShort", "Đang kiểm tra kết nối (<3s)...") : "")}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      <SettingsRuntimeSummaryBento
+        storageMode={storageMode}
+        permissionLevel={permissionLevel}
+        onChangeStorageMode={handleStorageModeChange}
+        onChangePermissionLevel={handlePermissionLevelChange}
+      />
     </>
   );
 };

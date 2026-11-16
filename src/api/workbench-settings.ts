@@ -10,6 +10,8 @@ import {
   DeleteVaultKeyResponseSchema,
   DoctorScanResponse,
   DoctorScanResponseSchema,
+  DoctorUsageResponse,
+  DoctorUsageResponseSchema,
   ExecutionEventDto,
   ExecutionEventDtoSchema,
   McpServerDto,
@@ -90,6 +92,11 @@ export class WorkbenchSettingsClient extends HarnessDaemonTransport {
 
   probeCli(cliId: string): Promise<CliDiagnosticItem> {
     return this.probeCliTool(cliId);
+  }
+
+  getDoctorUsage(refresh = false): Promise<DoctorUsageResponse> {
+    const qs = refresh ? "?refresh=1" : "";
+    return this.request(`/api/doctor/usage${qs}`, DoctorUsageResponseSchema, { method: "GET" });
   }
 
   listPlugins(opts?: { enabled?: boolean }): Promise<SkillPluginDto[]> {

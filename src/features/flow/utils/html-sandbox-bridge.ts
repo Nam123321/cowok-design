@@ -92,11 +92,27 @@ function buildApplyAndHydrateSnippet(): string {
     if (parsed.body) { sanitizeDomTreeAttrs(parsed.body); document.body.innerHTML = parsed.body.innerHTML; }
     var h = document.documentElement ? document.documentElement.scrollHeight : 0;
     if (bridgePort) bridgePort.postMessage({ type: "HEIGHT_CHANGED", epoch: EPOCH, bootSecretAck: BOOT_SECRET, height: h });
+    publishElementRects();
   }
   function applyFixtureHydration(variant, fixtureJson) {
     if (!document.body) return;
     document.body.setAttribute("data-ff-substate", String(variant || "DEFAULT"));
     document.querySelectorAll("[data-ff-fixture-slot]").forEach(function(el){ el.textContent = String(variant || "DEFAULT") + " " + String(fixtureJson || "").slice(0, 160); });
+    publishElementRects();
+  }
+  function publishElementRects() {
+    if (!bridgePort || !document.querySelectorAll) return;
+    var rects = {};
+    var nodes = document.querySelectorAll("[data-ff-id]");
+    var count = Math.min(nodes.length, 128);
+    for (var i = 0; i < count; i++) {
+      var el = nodes[i];
+      var id = String(el.getAttribute("data-ff-id") || "").slice(0, 200);
+      if (!id || !el.getBoundingClientRect) continue;
+      var r = el.getBoundingClientRect();
+      rects[id] = { left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) };
+    }
+    bridgePort.postMessage({ type: "ELEMENT_RECTS", epoch: EPOCH, bootSecretAck: BOOT_SECRET, rects: rects });
   }`;
 }
 
@@ -116,6 +132,7 @@ function buildBridgeListenersSnippet(): string {
     };
     bridgePort.postMessage({ type: "PORT_ACK", epoch: EPOCH, bootSecretAck: BOOT_SECRET, artifactSha256: ARTIFACT_SHA256, domAnchorHash: DOM_ANCHOR_HASH });
     bridgePort.postMessage({ type: "READY", epoch: EPOCH, bootSecretAck: BOOT_SECRET });
+    publishElementRects();
     var h = document.documentElement ? document.documentElement.scrollHeight : 0;
     bridgePort.postMessage({ type: "HEIGHT_CHANGED", epoch: EPOCH, bootSecretAck: BOOT_SECRET, height: h });
   }, true);

@@ -66,6 +66,7 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "GET", pattern: /^\/api\/doctor$/, extractParams: noParams, resolveHandler: () => doctorRoute.GET },
   proxyRoute("GET", /^\/api\/doctor\/cli-matrix$/, () => "/api/v1/doctor/cli-matrix"),
   proxyRoute("GET", /^\/api\/doctor\/clis$/, () => "/api/v1/doctor/clis"),
+  proxyRoute("GET", /^\/api\/doctor\/usage$/, () => "/api/v1/doctor/usage"),
   proxyRoute("POST", /^\/api\/doctor\/probe-cli$/, () => "/api/v1/doctor/probe-cli", ProbeCliInputSchema),
   proxyRoute("GET", /^\/api\/plugins$/, () => "/api/v1/plugins"),
   proxyRoute("GET", /^\/api\/plugins\/registry$/, () => "/api/v1/plugins/registry"),

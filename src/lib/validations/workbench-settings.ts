@@ -61,6 +61,45 @@ export const DeleteMcpServerResponseSchema = z.object({
   id: z.string(),
 });
 
+export const DoctorModelOptionSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  providerId: z.string().optional(),
+  recommended: z.boolean().optional().default(false),
+});
+
+export const QuotaWindowSchema = z.object({
+  available: z.boolean(),
+  usedPercent: z.number().nullable().optional(),
+  remainingPercent: z.number().nullable().optional(),
+  resetsAt: z.string().nullable().optional(),
+  resetsAtEpochMs: z.number().nullable().optional(),
+  windowMinutes: z.number().nullable().optional(),
+  resetPassed: z.boolean().optional().default(false),
+});
+
+export const ProviderUsageDtoSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  providerGroup: z.string().optional().default("byos"),
+  status: z.string(),
+  accountLabel: z.string().nullable().optional(),
+  plan: z.string().nullable().optional(),
+  ok: z.boolean(),
+  note: z.string().nullable().optional(),
+  checkedAt: z.string(),
+  checkedAtEpochMs: z.number(),
+  fiveHour: QuotaWindowSchema.nullable().optional(),
+  weekly: QuotaWindowSchema.nullable().optional(),
+  models: z.array(DoctorModelOptionSchema).optional().default([]),
+});
+
+export const DoctorUsageResponseSchema = z.object({
+  providers: z.array(ProviderUsageDtoSchema),
+  checkedAt: z.string(),
+  checkedAtEpochMs: z.number(),
+});
+
 export const CliDiagnosticItemSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -74,6 +113,9 @@ export const CliDiagnosticItemSchema = z.object({
   authReason: z.string().nullable().optional(),
   timedOut: z.boolean().optional(),
   latencyMs: z.number(),
+  accountLabel: z.string().nullable().optional(),
+  providerGroup: z.string().nullable().optional(),
+  models: z.array(DoctorModelOptionSchema).optional(),
 });
 
 export const SkillPluginDtoSchema = z.object({
@@ -94,7 +136,7 @@ export const DoctorScanResponseSchema = z.object({
   clis: z.array(CliDiagnosticItemSchema).optional().default([]),
   tools: z.array(CliDiagnosticItemSchema).optional().default([]),
   scanMode: z.enum(["passive", "active"]).optional(),
-  scannedAt: z.string(),
+  scannedAt: z.string().optional().default(""),
 }).transform((data): {
   clis: z.infer<typeof CliDiagnosticItemSchema>[];
   tools: z.infer<typeof CliDiagnosticItemSchema>[];
@@ -191,6 +233,10 @@ export type UpsertAgentSettingInput = z.infer<typeof UpsertAgentSettingInputSche
 export type McpServerDto = z.infer<typeof McpServerDtoSchema>;
 export type UpsertMcpServerInput = z.infer<typeof UpsertMcpServerInputSchema>;
 export type CliDiagnosticItem = z.infer<typeof CliDiagnosticItemSchema>;
+export type DoctorModelOption = z.infer<typeof DoctorModelOptionSchema>;
+export type QuotaWindowDto = z.infer<typeof QuotaWindowSchema>;
+export type ProviderUsageDto = z.infer<typeof ProviderUsageDtoSchema>;
+export type DoctorUsageResponse = z.infer<typeof DoctorUsageResponseSchema>;
 export type DoctorScanResponse = z.infer<typeof DoctorScanResponseSchema>;
 export type VerifyProviderKeyInput = z.input<typeof VerifyProviderKeyInputSchema>;
 export type VerifyProviderKeyResponse = z.infer<typeof VerifyProviderKeyResponseSchema>;

@@ -12,8 +12,9 @@ export interface ElementCommentThreadProps {
   prefillFfId?: string;
   collapsedCommentIds?: string[];
   staleToastMessage?: string | null;
+  toastTone?: "warning" | "danger";
   onDismissStaleToast?: () => void;
-  onAddComment?: (content: string, elementFfId: string) => void;
+  onAddComment?: (content: string, elementFfId: string) => Promise<boolean | void> | boolean | void;
   onResolveComment?: (commentId: string) => void;
   onReanchorComment?: (commentId: string) => void;
 }
@@ -23,6 +24,7 @@ export const ElementCommentThread: React.FC<ElementCommentThreadProps> = ({
   prefillFfId,
   collapsedCommentIds = [],
   staleToastMessage,
+  toastTone = "warning",
   onDismissStaleToast,
   onAddComment,
   onResolveComment,
@@ -30,11 +32,14 @@ export const ElementCommentThread: React.FC<ElementCommentThreadProps> = ({
 }) => {
   const { t } = useTranslation();
   const collapsedSet = new Set(collapsedCommentIds);
+  const isDanger = toastTone === "danger";
+  const toastBg = isDanger ? "var(--state-danger-soft)" : "var(--state-warning-soft)";
+  const toastBorder = isDanger ? "var(--state-danger)" : "var(--state-warning)";
 
   return (
     <div className="element-comment-thread" data-testid="element-comment-thread" style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%", boxSizing: "border-box" }}>
       {staleToastMessage && (
-        <div role="alert" data-testid="stale-mapping-toast" style={{ padding: "8px 10px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--state-warning-soft)", border: "1px solid var(--agent-accent)", color: "var(--text-primary)", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+        <div role="alert" data-testid="stale-mapping-toast" style={{ padding: "8px 10px", borderRadius: "var(--radius-xs)", backgroundColor: toastBg, border: `1px solid ${toastBorder}`, color: "var(--text-primary)", fontSize: "11px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", lineHeight: 1.4 }}>
           <span>{staleToastMessage}</span>
           {onDismissStaleToast && (
             <button type="button" onClick={onDismissStaleToast} aria-label={t("common.close", "Đóng")} style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", fontWeight: 700 }}>×</button>

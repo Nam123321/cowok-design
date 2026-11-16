@@ -283,6 +283,12 @@ export const IframeToHostMessageSchema = z.discriminatedUnion("type", [
     rect: RectBoxSchema.optional(),
   }),
   z.object({
+    type: z.literal("ELEMENT_RECTS"),
+    epoch: z.number().int().min(1),
+    bootSecretAck: z.string().min(16).max(128).optional(),
+    rects: z.record(z.string().max(200), RectBoxSchema),
+  }),
+  z.object({
     type: z.literal("TEXT_QUOTE"),
     epoch: z.number().int().min(1),
     bootSecretAck: z.string().min(16).max(128).optional(),

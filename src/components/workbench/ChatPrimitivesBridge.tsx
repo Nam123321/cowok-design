@@ -3,7 +3,10 @@
 import React, { useRef, useState } from "react";
 import { BrandIcon } from "@/components/ui/BrandIcon";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useSyncedDefaultModel } from "@/hooks/useDoctorProvidersUsage";
+import { loadPersistedSettings, savePersistedSettings } from "@/pages/workbench/hooks/useWorkbenchSettingsStorage";
 import { AVAILABLE_CHAT_MODELS, ChatStreamItem, type ChatMessage } from "./ChatStreamPrimitives";
+import { ModelPickerQuotaPopover } from "./ModelPickerQuotaPopover";
 
 export { AVAILABLE_CHAT_MODELS, ChatStreamItem, type ChatMessage };
 
@@ -71,9 +74,7 @@ const ComposerFooterBar: React.FC<{
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
 }> = ({ selectedModel, onSelectModel, isSendDisabled, onSend, onAttachClick, onOpenSettings }) => {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
   const attachLabel = t("chat.attachContext", "Đính kèm tệp hoặc vùng chọn");
-  const modelLabel = t("chat.selectModel", "Chọn mô hình AI");
   const sendLabel = t("chat.sendPrompt", "Gửi chỉ thị (Enter)");
 
   return (
@@ -82,24 +83,14 @@ const ComposerFooterBar: React.FC<{
         <button type="button" onClick={onAttachClick} title={attachLabel} aria-label={attachLabel} className="cowok-btn-ghost" style={{ width: "24px", height: "24px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-subtle)", color: "var(--text-secondary)", cursor: "pointer" }}>
           <BrandIcon name="plus" size={13} color="currentColor" />
         </button>
-        <button type="button" onClick={() => setOpen((v) => !v)} title={modelLabel} aria-label={modelLabel} style={{ height: "24px", padding: "0 8px", display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", fontWeight: 500, borderRadius: "var(--radius-pill)", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)", cursor: "pointer" }}>
-          <span>{selectedModel.label}</span>
-          <BrandIcon name="chevron-down" size={10} color="var(--text-muted)" />
-        </button>
-        {open && (
-          <div style={{ position: "absolute", bottom: "30px", left: "28px", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)", boxShadow: "var(--shadow-md)", padding: "4px", zIndex: 20, minWidth: "160px" }}>
-            {AVAILABLE_CHAT_MODELS.map((m) => (
-              <div key={m.id} role="button" onClick={() => { onSelectModel(m); setOpen(false); }} style={{ padding: "6px 8px", fontSize: "11px", borderRadius: "var(--radius-xs)", cursor: "pointer", backgroundColor: selectedModel.id === m.id ? "var(--bg-selected)" : "transparent", color: "var(--text-primary)", borderLeft: selectedModel.id === m.id ? "2px solid var(--action-primary)" : "2px solid transparent", fontWeight: selectedModel.id === m.id ? 600 : 400 }}>
-                {m.label}
-              </div>
-            ))}
-            <div style={{ height: "1px", backgroundColor: "var(--border-subtle)", margin: "4px 0" }} />
-            <div role="button" onClick={() => { setOpen(false); onOpenSettings?.("models"); }} style={{ padding: "6px 8px", fontSize: "11px", borderRadius: "var(--radius-xs)", cursor: "pointer", color: "var(--action-primary)", fontWeight: 500, display: "flex", alignItems: "center", gap: "5px" }}>
-              <BrandIcon name="settings" size={11} color="currentColor" />
-              <span>{t("chat.configureModels", "Cấu hình API & BYOS...")}</span>
-            </div>
-          </div>
-        )}
+        <ModelPickerQuotaPopover
+          selectedModel={selectedModel}
+          onSelectModel={(next) => {
+            onSelectModel(next);
+            savePersistedSettings({ defaultModel: next.id });
+          }}
+          onOpenSettings={onOpenSettings}
+        />
       </div>
       <button type="button" onClick={onSend} disabled={isSendDisabled} title={sendLabel} aria-label={sendLabel} className="cowok-btn-primary" style={{ width: "26px", height: "26px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", backgroundColor: isSendDisabled ? "var(--bg-subtle)" : "var(--action-primary)", color: isSendDisabled ? "var(--text-muted)" : "var(--action-primary-fg)", border: "none", cursor: isSendDisabled ? "not-allowed" : "pointer", transition: "all var(--duration-fast)" }}>
         <BrandIcon name="send" size={12} color="currentColor" />
@@ -110,7 +101,11 @@ const ComposerFooterBar: React.FC<{
 
 export const AgentChatComposer: React.FC<AgentChatComposerProps> = (props) => {
   const { t } = useTranslation();
-  const [selectedModel, setSelectedModel] = useState(AVAILABLE_CHAT_MODELS[0]);
+  const [selectedModel, setSelectedModel] = useSyncedDefaultModel(
+    AVAILABLE_CHAT_MODELS[0],
+    loadPersistedSettings,
+    AVAILABLE_CHAT_MODELS
+  );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isSendDisabled = !props.inputValue.trim() && props.attachmentChips.length === 0;
   const placeholder =

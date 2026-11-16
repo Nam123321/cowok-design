@@ -175,7 +175,7 @@ export const CompanionLiveHtmlRightPane: React.FC<CompanionLiveHtmlRightPaneProp
         )}
         {isCommentsDrawerOpen && !props.isInlineCodeOpen && (
           <aside data-testid="comments-right-drawer" style={{ width: "280px", flexShrink: 0, backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", padding: "12px", overflowY: "auto" }}>
-            <ElementCommentThread nodeId={props.selectedNodeId || "SCR-02"} comments={actions.comments} prefillFfId={actions.prefillFfId} collapsedCommentIds={actions.collapsedCommentIds} staleToastMessage={actions.staleToastMessage} onDismissStaleToast={() => actions.setStaleToastMessage(null)} onAddComment={(c, ffId) => { void actions.handleAddComment(c, ffId); }} onResolveComment={(id) => { void actions.handleResolveComment(id); }} onReanchorComment={(id) => { void actions.handleReanchorComment(id); }} />
+            <ElementCommentThread nodeId={props.selectedNodeId || "SCR-02"} comments={actions.comments} prefillFfId={actions.prefillFfId} collapsedCommentIds={actions.collapsedCommentIds} staleToastMessage={actions.staleToastMessage} toastTone={actions.toastTone} onDismissStaleToast={() => actions.setStaleToastMessage(null)} onAddComment={(c, ffId) => actions.handleAddComment(c, ffId)} onResolveComment={(id) => { void actions.handleResolveComment(id); }} onReanchorComment={(id) => { void actions.handleReanchorComment(id); }} />
           </aside>
         )}
       </div>

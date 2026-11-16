@@ -32,6 +32,7 @@ export function savePersistedSettings(patch: Partial<PersistedWorkbenchSettings>
       autoContextSlice: patch.autoContextSlice ?? prev.autoContextSlice ?? true,
     };
     window.localStorage.setItem(WORKBENCH_SETTINGS_STORAGE_KEY, JSON.stringify(safeNext));
+    window.dispatchEvent(new CustomEvent("cowok:settings-changed", { detail: safeNext }));
   } catch {
     // Storage restricted in test sandbox
   }
