@@ -38,6 +38,7 @@ use crate::routes::legacy_workbench_v6::{
     handle_upsert_agent_setting, handle_upsert_mcp_server,
 };
 
+use crate::routes::doctor_usage::handle_get_doctor_usage;
 use crate::routes::{DaemonAppState, HttpErrorBody};
 
 #[derive(Debug, Default, Deserialize)]
@@ -169,6 +170,7 @@ fn flow_workbench_routes() -> Router<DaemonAppState> {
         )
         .route("/api/v1/doctor/clis", get(handle_get_doctor_cli_matrix))
         .route("/api/v1/doctor/probe-cli", post(handle_probe_cli_tool))
+        .route("/api/v1/doctor/usage", get(handle_get_doctor_usage))
         .route(
             "/api/v1/vault/keys",
             get(handle_list_vault_keys).post(handle_upsert_vault_key),

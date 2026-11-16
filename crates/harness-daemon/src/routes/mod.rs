@@ -1,5 +1,6 @@
 // @story 04.1
 // @implements AC-01, AC-03, AC-04, AC-06
+pub mod doctor_usage;
 pub mod doctor_vault;
 pub mod execution_coordinator;
 pub mod execution_coordinator_sql;
@@ -34,6 +35,7 @@ use crate::daemon_auth::{
 use crate::flow_routes::build_flow_subrouter;
 use crate::lockfile::CURRENT_SCHEMA_VERSION;
 
+pub use doctor_usage::*;
 pub use doctor_vault::*;
 pub use fs_jail::{FsBrowseEntry, FsBrowseQuery, FsBrowseResponse};
 

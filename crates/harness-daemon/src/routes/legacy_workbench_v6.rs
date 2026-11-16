@@ -155,7 +155,7 @@ fn lookup_live_artifact_sha256(
     node_id: &str,
 ) -> rusqlite::Result<Option<String>> {
     conn.query_row(
-        "SELECT content_hash FROM screen_artifacts WHERE node_id = ?1 ORDER BY created_at DESC LIMIT 1",
+        "SELECT content_hash FROM screen_artifacts WHERE node_id = ?1 ORDER BY created_at DESC, rowid DESC LIMIT 1",
         params![node_id],
         |r| r.get(0),
     )
@@ -326,7 +326,10 @@ pub async fn handle_create_comment(
         retry_on_busy("insert_element_comment", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
             if let Some(live_sha) = lookup_live_artifact_sha256(&tx, &nid)? {
-                if !live_sha.is_empty() && !artifact_sha256.is_empty() && live_sha != artifact_sha256 {
+                if !live_sha.is_empty()
+                    && !artifact_sha256.is_empty()
+                    && live_sha != artifact_sha256
+                {
                     cas_conflict = Some(live_sha);
                     return tx.rollback();
                 }

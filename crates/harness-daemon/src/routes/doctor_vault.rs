@@ -19,6 +19,7 @@ use spec_registry::{map_sqlite_error, retry_on_busy};
 use uuid::Uuid;
 
 use crate::daemon_auth::FlowPrincipal;
+use crate::routes::doctor_usage::{enrich_cli_tool_dto, DoctorModelOptionDto};
 use crate::routes::legacy_workbench_v6::{
     check_non_empty_id, check_ssrf_socket_addr, epoch_ms_to_iso, json_err, map_harness_resp,
     run_db, sanitize_credential_ref, validate_ssrf_safe_url,
@@ -418,6 +419,12 @@ pub struct CliDoctorToolDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auth_reason: Option<String>,
     pub latency_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_group: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<DoctorModelOptionDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -430,14 +437,16 @@ pub struct DoctorCliMatrixResponse {
 }
 
 #[derive(Clone, Copy)]
-struct CliTargetDefinition {
-    id: &'static str,
-    name: &'static str,
-    command: &'static str,
-    category: &'static str,
-    env_keys: &'static [&'static str],
-    config_subpaths: &'static [&'static str],
+pub struct CliTargetDefinition {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub command: &'static str,
+    pub category: &'static str,
+    pub env_keys: &'static [&'static str],
+    pub config_subpaths: &'static [&'static str],
 }
+
+pub const SUPPORTED_CLI_DEFINITIONS_PUB: &[CliTargetDefinition] = SUPPORTED_CLI_DEFINITIONS;
 
 const SUPPORTED_CLI_DEFINITIONS: &[CliTargetDefinition] = &[
     CliTargetDefinition {
@@ -464,6 +473,7 @@ const SUPPORTED_CLI_DEFINITIONS: &[CliTargetDefinition] = &[
         env_keys: &["GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTIGRAVITY_API_KEY"],
         config_subpaths: &[
             ".gemini/oauth_creds.json",
+            ".gemini/google_accounts.json",
             ".gemini/antigravity/mcp_config.json",
         ],
     },
@@ -475,6 +485,7 @@ const SUPPORTED_CLI_DEFINITIONS: &[CliTargetDefinition] = &[
         env_keys: &["GEMINI_API_KEY", "GOOGLE_API_KEY"],
         config_subpaths: &[
             ".gemini/oauth_creds.json",
+            ".gemini/google_accounts.json",
             ".config/gemini/oauth_creds.json",
         ],
     },
@@ -508,7 +519,18 @@ const SUPPORTED_CLI_DEFINITIONS: &[CliTargetDefinition] = &[
         command: "opencode",
         category: "cli",
         env_keys: &["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENCODE_API_KEY"],
-        config_subpaths: &[".local/share/opencode/auth.json"],
+        config_subpaths: &[
+            ".local/share/opencode/auth.json",
+            ".config/opencode/opencode.jsonc",
+        ],
+    },
+    CliTargetDefinition {
+        id: "pi",
+        name: "Pi Coding Agent",
+        command: "pi",
+        category: "cli",
+        env_keys: &["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "PI_API_KEY"],
+        config_subpaths: &[".pi/agent/auth.json", ".pi/agent/settings.json"],
     },
     CliTargetDefinition {
         id: "omp",
@@ -607,6 +629,10 @@ const SUPPORTED_CLI_DEFINITIONS: &[CliTargetDefinition] = &[
         config_subpaths: &[".kiro/settings.json"],
     },
 ];
+
+pub fn resolve_cli_binary_path_pub(cmd: &str) -> Option<std::path::PathBuf> {
+    resolve_cli_binary_path(cmd)
+}
 
 fn resolve_cli_binary_path(cmd: &str) -> Option<std::path::PathBuf> {
     if let Ok(path_var) = std::env::var("PATH") {
@@ -836,7 +862,7 @@ async fn evaluate_cli_target(def: CliTargetDefinition, active_probe: bool) -> Cl
     let Some(bin_path) = bin_opt else {
         if matches!(def.id, "cline" | "roo" | "continue") {
             let has_ext = ide_extension_installed(def.id, def.config_subpaths);
-            return CliDoctorToolDto {
+            return enrich_cli_tool_dto(CliDoctorToolDto {
                 id: def.id.to_string(),
                 name: def.name.to_string(),
                 command: def.command.to_string(),
@@ -850,9 +876,13 @@ async fn evaluate_cli_target(def: CliTargetDefinition, active_probe: bool) -> Cl
                     "IDE extension requires manual provider setup inside host editor".to_string(),
                 ),
                 latency_ms: start.elapsed().as_millis() as u64,
-            };
+                account_label: None,
+                provider_group: None,
+                models: Vec::new(),
+            })
+            .await;
         }
-        return CliDoctorToolDto {
+        return enrich_cli_tool_dto(CliDoctorToolDto {
             id: def.id.to_string(),
             name: def.name.to_string(),
             command: def.command.to_string(),
@@ -864,7 +894,11 @@ async fn evaluate_cli_target(def: CliTargetDefinition, active_probe: bool) -> Cl
             status: "not_installed".to_string(),
             auth_reason: Some(format!("Command '{}' not found in PATH", def.command)),
             latency_ms: start.elapsed().as_millis() as u64,
-        };
+            account_label: None,
+            provider_group: None,
+            models: Vec::new(),
+        })
+        .await;
     };
 
     let (mut authenticated, mut auth_reason, passive_hint) = if def.id == "ollama" {
@@ -897,7 +931,7 @@ async fn evaluate_cli_target(def: CliTargetDefinition, active_probe: bool) -> Cl
         "auth_needed".to_string()
     };
 
-    CliDoctorToolDto {
+    enrich_cli_tool_dto(CliDoctorToolDto {
         id: def.id.to_string(),
         name: def.name.to_string(),
         command: def.command.to_string(),
@@ -909,7 +943,11 @@ async fn evaluate_cli_target(def: CliTargetDefinition, active_probe: bool) -> Cl
         status,
         auth_reason,
         latency_ms: start.elapsed().as_millis() as u64,
-    }
+        account_label: None,
+        provider_group: None,
+        models: Vec::new(),
+    })
+    .await
 }
 
 pub async fn handle_get_doctor_cli_matrix(
