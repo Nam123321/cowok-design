@@ -128,7 +128,7 @@
     "toggleStructurePane": "구조 패널 토글 (Userflow / 슬라이드 덱)",
     "togglePreviewPane": "라이브 HTML 미리보기 패널 토글",
     "modeInteract": "HTML과 직접 상호작용",
-    "modeClickComponent": "컴포넌트(data-ff-id)를 클릭하여 댓글 달기",
+    "modeClickComponent": "요소 검사 및 댓글 (C)",
     "modeMarqueeBox": "선택 상자를 드래그하여 영역을 채팅에 첨부",
     "toggleCodeEditor": "인라인 코드 편집기 토글",
     "draftNotice": "게시되지 않은 그래프 구조 변경 사항이 있습니다",
@@ -197,7 +197,14 @@
     "previewSynthActionHint": "WorkbenchNode 메타데이터에서 합성된 라이브 미리보기입니다.",
     "previewSynthCtaOpen": "열기",
     "orphanDeployConfirmPrompt": "개의 고립된 화면이 남아 있습니다. 그래도 배포하시겠습니까?",
-    "confirmDeployAnyway": "배포 확인"
+    "confirmDeployAnyway": "배포 확인",
+    "modeInteractShort": "상호작용",
+    "modeInspectShort": "검사 / 댓글 (C)",
+    "dirtyBufferBadge": "저장되지 않음 (dirty_buffer)",
+    "dirtyBufferPrompt": "적용되지 않은 HTML 변경 사항(dirty_buffer)이 있습니다. 나가기 전에 적용하거나 취소하시겠습니까?",
+    "dirtyGuardApply": "지금 적용",
+    "dirtyGuardDiscard": "변경 취소",
+    "dirtyGuardKeep": "계속 편집"
   },
   "settings": {
     "title": "시스템 설정 및 환경설정",
@@ -391,9 +398,14 @@
   },
   "comments": {
     "pinPlaceholder": "data-ff-id에 댓글 고정...",
-    "staleAnchorWarning": "요소 구조가 변경되었습니다 (만료됨)",
+    "staleAnchorWarning": "요소 구조가 변경되었습니다 (STALE_MAPPING)",
     "reanchorBtn": "다시 고정",
-    "resolveBtn": "✓ 해결됨으로 표시"
+    "resolveBtn": "✓ 해결됨으로 표시",
+    "zeroRectWarning": "대상 영역이 표시되지 않습니다 (rect 0)",
+    "drawerCollapsedRect": "서랍 0×0",
+    "drawerTitle": "고정된 요소 댓글",
+    "emptyThread": "이 노드에 아직 댓글이 없습니다.",
+    "reanchorFullBtn": "요소 다시 고정"
   },
   "proposals": {
     "applyBlockedHint": "보안 검사를 통과할 때까지 적용이 잠깁니다 [AC-03]",

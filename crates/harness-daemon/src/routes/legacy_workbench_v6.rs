@@ -24,15 +24,24 @@ pub(crate) fn epoch_ms_to_iso(ms: i64) -> String {
         .unwrap_or_else(|| Utc::now().to_rfc3339())
 }
 
-pub(crate) fn json_err(status: StatusCode, code: &str, message: impl Into<String>) -> Response {
+pub(crate) fn json_err_with_details(
+    status: StatusCode,
+    code: &str,
+    message: impl Into<String>,
+    details: serde_json::Value,
+) -> Response {
     let body = HttpErrorBody {
         code: code.to_string(),
         kind: Some(code.to_string()),
         message: message.into(),
-        details: serde_json::Value::Null,
+        details,
         request_id: Uuid::new_v4().to_string(),
     };
     (status, Json(body)).into_response()
+}
+
+pub(crate) fn json_err(status: StatusCode, code: &str, message: impl Into<String>) -> Response {
+    json_err_with_details(status, code, message, serde_json::Value::Null)
 }
 
 pub(crate) fn check_project_uuid(raw: &str) -> Result<String, Response> {
@@ -121,6 +130,51 @@ pub(crate) fn map_harness_resp(err: HarnessError, op: &str) -> Response {
 // 1. Element Comments (V6 element_comments)
 // -----------------------------------------------------------------------------
 
+fn default_anchor_kind() -> String {
+    "html_element".to_string()
+}
+
+fn validate_anchor_kind(raw: &str) -> Result<String, Response> {
+    let k = raw.trim();
+    if matches!(
+        k,
+        "html_element" | "marquee_box" | "node_card" | "text_quote"
+    ) {
+        Ok(k.to_string())
+    } else {
+        Err(json_err(
+            StatusCode::BAD_REQUEST,
+            "VALIDATION_ERROR",
+            "Invalid anchorKind",
+        ))
+    }
+}
+
+fn lookup_live_artifact_sha256(
+    conn: &rusqlite::Connection,
+    node_id: &str,
+) -> rusqlite::Result<Option<String>> {
+    conn.query_row(
+        "SELECT content_hash FROM screen_artifacts WHERE node_id = ?1 ORDER BY created_at DESC LIMIT 1",
+        params![node_id],
+        |r| r.get(0),
+    )
+    .optional()
+}
+
+fn stale_mapping_response(current_sha: &str, current_dom_hash: &str) -> Response {
+    json_err_with_details(
+        StatusCode::CONFLICT,
+        "STALE_MAPPING",
+        "Comment anchor no longer matches live artifact/DOM digest (STALE_MAPPING). Re-anchor before committing.",
+        serde_json::json!({
+            "error": "STALE_MAPPING",
+            "currentArtifactSha256": current_sha,
+            "currentDomHash": current_dom_hash,
+        }),
+    )
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ElementCommentDto {
@@ -132,6 +186,10 @@ pub struct ElementCommentDto {
     pub author: String,
     pub content: String,
     pub dom_hash: String,
+    #[serde(default)]
+    pub artifact_sha256: String,
+    #[serde(default = "default_anchor_kind")]
+    pub anchor_kind: String,
     pub anchor_status: String,
     pub created_at: String,
     pub updated_at: String,
@@ -144,6 +202,12 @@ pub struct CreateElementCommentInput {
     pub author: String,
     pub content: String,
     pub dom_hash: String,
+    #[serde(default)]
+    pub artifact_sha256: String,
+    #[serde(default = "default_anchor_kind")]
+    pub anchor_kind: String,
+    pub expected_artifact_sha256: Option<String>,
+    pub expected_dom_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -153,6 +217,11 @@ pub struct UpdateElementCommentInput {
     pub anchor_status: Option<String>,
     pub element_ff_id: Option<String>,
     pub dom_hash: Option<String>,
+    pub artifact_sha256: Option<String>,
+    pub anchor_kind: Option<String>,
+    pub expected_artifact_sha256: Option<String>,
+    pub expected_dom_hash: Option<String>,
+    pub reanchor: Option<bool>,
 }
 
 fn map_comment_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ElementCommentDto> {
@@ -165,9 +234,11 @@ fn map_comment_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ElementCommentDt
         author: row.get(5)?,
         content: row.get(6)?,
         dom_hash: row.get(7)?,
-        anchor_status: row.get(8)?,
-        created_at: epoch_ms_to_iso(row.get(9)?),
-        updated_at: epoch_ms_to_iso(row.get(10)?),
+        artifact_sha256: row.get(8)?,
+        anchor_kind: row.get(9)?,
+        anchor_status: row.get(10)?,
+        created_at: epoch_ms_to_iso(row.get(11)?),
+        updated_at: epoch_ms_to_iso(row.get(12)?),
     })
 }
 
@@ -186,7 +257,7 @@ pub async fn handle_list_comments(
         let mut stmt = conn
             .prepare(
                 "SELECT id, tenant_id, project_id, node_id, element_ff_id, author, content,
-                        dom_hash, anchor_status, created_at, updated_at
+                        dom_hash, artifact_sha256, anchor_kind, anchor_status, created_at, updated_at
                  FROM element_comments
                  WHERE tenant_id = ?1 AND project_id = ?2 AND node_id = ?3
                  ORDER BY created_at ASC",
@@ -229,21 +300,42 @@ pub async fn handle_create_comment(
         ));
     }
     let dom_hash = check_non_empty_id(&req.dom_hash, "domHash")?;
+    let artifact_sha256 = req.artifact_sha256.trim().to_string();
+    let anchor_kind = validate_anchor_kind(&req.anchor_kind)?;
+    let expected_sha = req.expected_artifact_sha256.map(|s| s.trim().to_string());
+    let expected_dom = req.expected_dom_hash.map(|s| s.trim().to_string());
     let pool = state.registry.pool().clone();
 
     let created = run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
         verify_project_ownership(&conn, &principal.tenant_id, &pid)?;
+        if let Some(ref exp_dom) = expected_dom {
+            if !exp_dom.is_empty() && exp_dom != &dom_hash {
+                return Err(stale_mapping_response(&artifact_sha256, &dom_hash));
+            }
+        }
+        if let Some(ref exp_sha) = expected_sha {
+            if !exp_sha.is_empty() && !artifact_sha256.is_empty() && exp_sha != &artifact_sha256 {
+                return Err(stale_mapping_response(&artifact_sha256, &dom_hash));
+            }
+        }
         let now_ms = Utc::now().timestamp_millis();
         let comment_id = Uuid::new_v4().to_string();
+        let mut cas_conflict: Option<String> = None;
 
         retry_on_busy("insert_element_comment", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            if let Some(live_sha) = lookup_live_artifact_sha256(&tx, &nid)? {
+                if !live_sha.is_empty() && !artifact_sha256.is_empty() && live_sha != artifact_sha256 {
+                    cas_conflict = Some(live_sha);
+                    return tx.rollback();
+                }
+            }
             tx.execute(
                 "INSERT INTO element_comments (
                     id, tenant_id, project_id, node_id, element_ff_id, author, content,
-                    dom_hash, anchor_status, created_at, updated_at
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', ?9, ?9)",
+                    dom_hash, artifact_sha256, anchor_kind, anchor_status, created_at, updated_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'active', ?11, ?11)",
                 params![
                     comment_id,
                     principal.tenant_id,
@@ -253,12 +345,18 @@ pub async fn handle_create_comment(
                     author,
                     content,
                     dom_hash,
+                    artifact_sha256,
+                    anchor_kind,
                     now_ms
                 ],
             )?;
             tx.commit()
         })
         .map_err(|e| map_harness_resp(e, "insert_element_comment"))?;
+
+        if let Some(live_sha) = cas_conflict {
+            return Err(stale_mapping_response(&live_sha, &dom_hash));
+        }
 
         let iso = epoch_ms_to_iso(now_ms);
         Ok(ElementCommentDto {
@@ -270,6 +368,8 @@ pub async fn handle_create_comment(
             author,
             content,
             dom_hash,
+            artifact_sha256,
+            anchor_kind,
             anchor_status: "active".to_string(),
             created_at: iso.clone(),
             updated_at: iso,
@@ -298,6 +398,9 @@ pub async fn handle_update_comment(
             ));
         }
     }
+    if let Some(ref ak) = req.anchor_kind {
+        validate_anchor_kind(ak)?;
+    }
     if let Some(ref c) = req.content {
         let t = c.trim();
         if t.is_empty() || t.len() > 2000 {
@@ -308,58 +411,110 @@ pub async fn handle_update_comment(
             ));
         }
     }
+    if let Some(ref ff) = req.element_ff_id {
+        check_non_empty_id(ff, "element_ff_id")?;
+    }
+    if let Some(ref h) = req.dom_hash {
+        check_non_empty_id(h, "dom_hash")?;
+    }
     let pool = state.registry.pool().clone();
 
     let updated = run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
         verify_project_ownership(&conn, &principal.tenant_id, &pid)?;
 
-        let existing = conn
-            .query_row(
-                "SELECT id, tenant_id, project_id, node_id, element_ff_id, author, content,
-                        dom_hash, anchor_status, created_at, updated_at
-                 FROM element_comments
-                 WHERE id = ?1 AND tenant_id = ?2 AND project_id = ?3 AND node_id = ?4",
-                params![cid, principal.tenant_id, pid, nid],
-                map_comment_row,
-            )
-            .optional()
-            .map_err(|e| map_harness_resp(map_sqlite_error(e, "get_comment"), "update_comment"))?;
-
-        let Some(mut dto) = existing else {
-            return Err(json_err(
-                StatusCode::NOT_FOUND,
-                "COMMENT_NOT_FOUND",
-                format!("Comment '{cid}' was not found"),
-            ));
-        };
-
-        if let Some(c) = req.content {
-            dto.content = c.trim().to_string();
-        }
-        if let Some(st) = req.anchor_status {
-            dto.anchor_status = st;
-        }
-        if let Some(ff) = req.element_ff_id {
-            dto.element_ff_id = ff.trim().to_string();
-        }
-        if let Some(h) = req.dom_hash {
-            dto.dom_hash = h.trim().to_string();
-        }
+        let is_reanchor = req.reanchor.unwrap_or(false);
         let now_ms = Utc::now().timestamp_millis();
-        dto.updated_at = epoch_ms_to_iso(now_ms);
+        let mut stale_conflict: Option<(String, String)> = None;
+        let mut not_found = false;
+        let mut updated_dto: Option<ElementCommentDto> = None;
 
         retry_on_busy("update_element_comment", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let existing = tx
+                .query_row(
+                    "SELECT id, tenant_id, project_id, node_id, element_ff_id, author, content,
+                            dom_hash, artifact_sha256, anchor_kind, anchor_status, created_at, updated_at
+                     FROM element_comments
+                     WHERE id = ?1 AND tenant_id = ?2 AND project_id = ?3 AND node_id = ?4",
+                    params![cid, principal.tenant_id, pid, nid],
+                    map_comment_row,
+                )
+                .optional()?;
+
+            let Some(mut dto) = existing else {
+                not_found = true;
+                return Ok(());
+            };
+
+            let live_sha = lookup_live_artifact_sha256(&tx, &nid)?;
+
+            if !is_reanchor {
+                let sha_mismatch = req
+                    .expected_artifact_sha256
+                    .as_deref()
+                    .map(str::trim)
+                    .is_some_and(|exp| !exp.is_empty() && exp != dto.artifact_sha256)
+                    || live_sha.as_deref().is_some_and(|live| {
+                        !live.is_empty() && !dto.artifact_sha256.is_empty() && live != dto.artifact_sha256
+                    });
+                let dom_mismatch = req
+                    .expected_dom_hash
+                    .as_deref()
+                    .map(str::trim)
+                    .is_some_and(|exp| !exp.is_empty() && exp != dto.dom_hash);
+                let already_stale_mutation =
+                    dto.anchor_status == "stale" && req.anchor_status.as_deref() != Some("resolved");
+
+                if sha_mismatch || dom_mismatch || already_stale_mutation {
+                    tx.execute(
+                        "UPDATE element_comments SET anchor_status = 'stale', updated_at = ?1
+                         WHERE id = ?2 AND tenant_id = ?3 AND project_id = ?4 AND node_id = ?5",
+                        params![now_ms, cid, principal.tenant_id, pid, nid],
+                    )?;
+                    tx.commit()?;
+                    stale_conflict = Some((
+                        live_sha.unwrap_or_else(|| dto.artifact_sha256.clone()),
+                        dto.dom_hash.clone(),
+                    ));
+                    return Ok(());
+                }
+            }
+
+            if let Some(ref c) = req.content {
+                dto.content = c.trim().to_string();
+            }
+            if is_reanchor {
+                dto.anchor_status = "active".to_string();
+            } else if let Some(ref st) = req.anchor_status {
+                dto.anchor_status = st.clone();
+            }
+            if let Some(ref ff) = req.element_ff_id {
+                dto.element_ff_id = ff.trim().to_string();
+            }
+            if let Some(ref h) = req.dom_hash {
+                dto.dom_hash = h.trim().to_string();
+            }
+            if let Some(ref sha) = req.artifact_sha256 {
+                dto.artifact_sha256 = sha.trim().to_string();
+            }
+            if let Some(ref ak) = req.anchor_kind {
+                dto.anchor_kind = ak.trim().to_string();
+            }
+            dto.updated_at = epoch_ms_to_iso(now_ms);
+
             tx.execute(
                 "UPDATE element_comments
-                 SET content = ?1, anchor_status = ?2, element_ff_id = ?3, dom_hash = ?4, updated_at = ?5
-                 WHERE id = ?6 AND tenant_id = ?7 AND project_id = ?8 AND node_id = ?9",
+                 SET content = ?1, anchor_status = ?2, element_ff_id = ?3, dom_hash = ?4,
+                     artifact_sha256 = ?5, anchor_kind = ?6, updated_at = ?7
+                 WHERE id = ?8 AND tenant_id = ?9 AND project_id = ?10 AND node_id = ?11",
                 params![
                     dto.content,
                     dto.anchor_status,
                     dto.element_ff_id,
                     dto.dom_hash,
+                    dto.artifact_sha256,
+                    dto.anchor_kind,
                     now_ms,
                     cid,
                     principal.tenant_id,
@@ -367,11 +522,25 @@ pub async fn handle_update_comment(
                     nid
                 ],
             )?;
-            tx.commit()
+            tx.commit()?;
+            updated_dto = Some(dto);
+            Ok(())
         })
         .map_err(|e| map_harness_resp(e, "update_element_comment"))?;
 
-        Ok(dto)
+        if not_found {
+            return Err(json_err(
+                StatusCode::NOT_FOUND,
+                "COMMENT_NOT_FOUND",
+                format!("Comment '{cid}' was not found"),
+            ));
+        }
+
+        if let Some((live_sha, dom_h)) = stale_conflict {
+            return Err(stale_mapping_response(&live_sha, &dom_h));
+        }
+
+        updated_dto.ok_or_else(|| json_err(StatusCode::INTERNAL_SERVER_ERROR, "UPDATE_FAILED", "Comment update did not return row"))
     })
     .await?;
 
@@ -608,36 +777,35 @@ pub async fn handle_update_fixture(
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
         verify_project_ownership(&conn, &principal.tenant_id, &pid)?;
 
-        let existing = conn
-            .query_row(
-                "SELECT id, tenant_id, project_id, node_id, variant, payload_json, is_default, created_at, updated_at
-                 FROM screen_fixtures
-                 WHERE id = ?1 AND tenant_id = ?2 AND project_id = ?3 AND node_id = ?4",
-                params![fid, principal.tenant_id, pid, nid],
-                map_fixture_row,
-            )
-            .optional()
-            .map_err(|e| map_harness_resp(map_sqlite_error(e, "get_fixture"), "update_fixture"))?;
-
-        let Some(mut dto) = existing else {
-            return Err(json_err(
-                StatusCode::NOT_FOUND,
-                "FIXTURE_NOT_FOUND",
-                format!("Fixture '{fid}' was not found"),
-            ));
-        };
-
-        if let Some(pj) = req.payload_json {
-            dto.payload_json = pj;
-        }
-        if let Some(is_def) = req.is_default {
-            dto.is_default = is_def;
-        }
         let now_ms = Utc::now().timestamp_millis();
-        dto.updated_at = epoch_ms_to_iso(now_ms);
+        let mut not_found = false;
+        let mut updated_dto: Option<ScreenFixtureDto> = None;
 
         retry_on_busy("update_screen_fixture", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let existing = tx
+                .query_row(
+                    "SELECT id, tenant_id, project_id, node_id, variant, payload_json, is_default, created_at, updated_at
+                     FROM screen_fixtures
+                     WHERE id = ?1 AND tenant_id = ?2 AND project_id = ?3 AND node_id = ?4",
+                    params![fid, principal.tenant_id, pid, nid],
+                    map_fixture_row,
+                )
+                .optional()?;
+
+            let Some(mut dto) = existing else {
+                not_found = true;
+                return Ok(());
+            };
+
+            if let Some(ref pj) = req.payload_json {
+                dto.payload_json = pj.clone();
+            }
+            if let Some(is_def) = req.is_default {
+                dto.is_default = is_def;
+            }
+            dto.updated_at = epoch_ms_to_iso(now_ms);
+
             if dto.is_default {
                 tx.execute(
                     "UPDATE screen_fixtures SET is_default = 0
@@ -658,11 +826,21 @@ pub async fn handle_update_fixture(
                     nid
                 ],
             )?;
-            tx.commit()
+            tx.commit()?;
+            updated_dto = Some(dto);
+            Ok(())
         })
         .map_err(|e| map_harness_resp(e, "update_screen_fixture"))?;
 
-        Ok(dto)
+        if not_found {
+            return Err(json_err(
+                StatusCode::NOT_FOUND,
+                "FIXTURE_NOT_FOUND",
+                format!("Fixture '{fid}' was not found"),
+            ));
+        }
+
+        updated_dto.ok_or_else(|| json_err(StatusCode::INTERNAL_SERVER_ERROR, "UPDATE_FAILED", "Fixture update did not return row"))
     })
     .await?;
 

@@ -224,16 +224,14 @@ test.describe("Story 04.1: Direct Browser Acceptance Suite with Video & Screensh
         await page.screenshot({ path: shotPreview, fullPage: true });
         s3.screenshots.push("05-sandboxed-preview-iframe.png");
 
-        const cdnToggle = page.getByTestId("toggle-design-cdn-btn");
-        await expect(cdnToggle).toBeVisible({ timeout: 5000 });
-        await expect(cdnToggle).toHaveAttribute("aria-pressed", "false");
-        await cdnToggle.click();
-        await expect(cdnToggle).toHaveAttribute("aria-pressed", "true");
-        s3.assertions.push("Toggle Design CDN button toggled from aria-pressed false to true");
+        await expect(page.getByTestId("toggle-design-cdn-btn")).toHaveCount(0);
+        await expect(page.getByTestId("pointer-mode-inspect")).toBeVisible({ timeout: 5000 });
+        await page.getByTestId("pointer-mode-inspect").click();
+        s3.assertions.push("Zero-network Option CSP-B verified (toggle-design-cdn-btn retired) and Inspect / Comment (C) active");
 
-        const shotCdn = path.join(mediaDir, "06-design-cdn-toggled.png");
+        const shotCdn = path.join(mediaDir, "06-inspect-mode-toggled.png");
         await page.screenshot({ path: shotCdn, fullPage: true });
-        s3.screenshots.push("06-design-cdn-toggled.png");
+        s3.screenshots.push("06-inspect-mode-toggled.png");
 
         // Verify Present button is compact 28x28 icon button with tooltip & BrandIcon SVG
         const presentBtn = page.getByTestId("toggle-present-btn");

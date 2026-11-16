@@ -105,7 +105,8 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
         <WorkbenchCanvasTabArea
           state={p.state} store={p.store} projectId={resolvedProjectId} sessionId={p.activeSessionId}
           activeTabId={p.activeTabId} onTabChange={p.onTabChange} graphHandlers={p.graphHandlers}
-          onCommentOnNode={p.attachments.handleCommentOnNode} isLeftChatCollapsed={p.splitter.isChatShortened}
+          onCommentOnNode={p.attachments.handleCommentOnNode} onAddQuoteChip={p.attachments.handleAddQuoteChip}
+          isLeftChatCollapsed={p.splitter.isChatShortened}
           onOpenSettings={p.onOpenSettings}
           onOpenLeftChat={p.splitter.isChatShortened ? p.splitter.handleToggleShortenChat : undefined}
         />

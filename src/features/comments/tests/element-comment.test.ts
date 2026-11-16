@@ -73,6 +73,8 @@ describe("Story 04.3: Element-Anchored Comments & Stale Anchor Detection", () =>
         author: "Lead Designer",
         content: "Please change the button variant to solid",
         domHash: "a1b2c3d4",
+        artifactSha256: "sha256-000",
+        anchorKind: "html_element",
       });
       expect(valid.success).toBe(true);
 
@@ -153,6 +155,8 @@ describe("Story 04.3: Element-Anchored Comments & Stale Anchor Detection", () =>
       author: "UX Auditor",
       content: "Header contrast ratio fails WCAG AA",
       domHash: computeDomHash("h3", "font-bold text-gray-400", "Analytics Dashboard"),
+      artifactSha256: "sha256-000",
+      anchorKind: "html_element",
       anchorStatus: "active",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

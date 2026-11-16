@@ -128,7 +128,7 @@
     "toggleStructurePane": "構造パネルの切り替え (Userflow / スライドデッキ)",
     "togglePreviewPane": "ライブ HTML プレビューパネルの切り替え",
     "modeInteract": "HTML と直接インタラクション",
-    "modeClickComponent": "コンポーネント (data-ff-id) をクリックしてコメント",
+    "modeClickComponent": "要素を検証してコメント (C)",
     "modeMarqueeBox": "選択ボックスをドラッグして領域をチャットに添付",
     "toggleCodeEditor": "インラインコードエディタの切り替え",
     "draftNotice": "未公開のグラフ構造変更があります",
@@ -197,7 +197,14 @@
     "previewSynthActionHint": "WorkbenchNode メタデータから合成されたライブプレビュー。",
     "previewSynthCtaOpen": "開く",
     "orphanDeployConfirmPrompt": "個の孤立した画面が残っています。それでも展開しますか？",
-    "confirmDeployAnyway": "展開を確認"
+    "confirmDeployAnyway": "展開を確認",
+    "modeInteractShort": "操作",
+    "modeInspectShort": "検証 / コメント (C)",
+    "dirtyBufferBadge": "未保存 (dirty_buffer)",
+    "dirtyBufferPrompt": "未適用のHTML変更があります (dirty_buffer)。閉じる前に適用または破棄しますか？",
+    "dirtyGuardApply": "今すぐ適用",
+    "dirtyGuardDiscard": "破棄",
+    "dirtyGuardKeep": "編集を続ける"
   },
   "settings": {
     "title": "システム設定と環境設定",
@@ -391,9 +398,14 @@
   },
   "comments": {
     "pinPlaceholder": "data-ff-id にコメントをピン留め...",
-    "staleAnchorWarning": "要素の構造が変更されました (古くなっています)",
+    "staleAnchorWarning": "要素構造が変更されました (STALE_MAPPING)",
     "reanchorBtn": "再アンカー",
-    "resolveBtn": "✓ 解決済みにする"
+    "resolveBtn": "✓ 解決済みにする",
+    "zeroRectWarning": "対象領域が非表示です (rect 0)",
+    "drawerCollapsedRect": "ドロワー 0×0",
+    "drawerTitle": "要素ピン留めコメント",
+    "emptyThread": "このノードにコメントはまだありません。",
+    "reanchorFullBtn": "要素を再アンカー"
   },
   "proposals": {
     "applyBlockedHint": "安全チェックが完了するまで適用はロックされています [AC-03]",

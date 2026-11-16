@@ -66,16 +66,16 @@ export const FixtureVariantSchema = z.enum(["DEFAULT", "EMPTY", "LOADING", "ERRO
 export type FixtureVariant = z.infer<typeof FixtureVariantSchema>;
 export type FixtureRef = FixtureVariant;
 
-const FIXTURE_REF_MAP = new Map<string, FixtureRef>([
-  ["DEFAULT", "DEFAULT"],
-  ["LOADING", "LOADING"],
-  ["EMPTY", "EMPTY"],
-  ["ERROR", "ERROR"],
-]);
+const FIXTURE_REF_RECORD: Record<string, FixtureRef> = {
+  DEFAULT: "DEFAULT",
+  LOADING: "LOADING",
+  EMPTY: "EMPTY",
+  ERROR: "ERROR",
+};
 
 export function normalizeFixtureRef(raw?: string | null): FixtureRef {
   const upper = (raw ?? "DEFAULT").trim().toUpperCase();
-  return FIXTURE_REF_MAP.get(upper || "DEFAULT") ?? "DEFAULT";
+  return FIXTURE_REF_RECORD[upper || "DEFAULT"] ?? "DEFAULT";
 }
 
 export const FixtureRefSchema = z.preprocess(
@@ -83,11 +83,11 @@ export const FixtureRefSchema = z.preprocess(
   FixtureVariantSchema
 );
 
-export const FIXTURE_VARIANTS: { variant: FixtureVariant; label: string; badgeClass: string }[] = [
-  { variant: "DEFAULT", label: "Default", badgeClass: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
-  { variant: "EMPTY", label: "Empty", badgeClass: "bg-secondary text-secondary-foreground border-border" },
-  { variant: "LOADING", label: "Loading", badgeClass: "bg-purple-500/10 text-purple-600 border-purple-500/20" },
-  { variant: "ERROR", label: "Error", badgeClass: "bg-red-500/10 text-red-600 border-red-500/20" },
+export const FIXTURE_VARIANTS: { variant: FixtureVariant; label: string; tokenClass: string }[] = [
+  { variant: "DEFAULT", label: "DEFAULT", tokenClass: "cowok-fixture-pill cowok-fixture-default" },
+  { variant: "EMPTY", label: "EMPTY", tokenClass: "cowok-fixture-pill cowok-fixture-empty" },
+  { variant: "LOADING", label: "LOADING", tokenClass: "cowok-fixture-pill cowok-fixture-loading" },
+  { variant: "ERROR", label: "ERROR", tokenClass: "cowok-fixture-pill cowok-fixture-error" },
 ];
 
 export const CreateScreenFixtureSchema = z.object({
@@ -118,6 +118,9 @@ export type ScreenFixtureResponse = z.infer<typeof ScreenFixtureResponseSchema>;
 
 export const PreviewHydrationMessageSchema = z.object({
   type: z.literal("FLOW_PREVIEW_HYDRATE"),
+  epoch: z.number().int().min(1).optional(),
+  bootSecret: z.string().min(16).optional(),
+  artifactSha256: z.string().optional(),
   nodeId: z.string(),
   screenKey: z.string(),
   routePath: z.string(),
