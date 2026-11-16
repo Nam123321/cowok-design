@@ -91,3 +91,8 @@ Tự động dò tìm và điều phối codex, claude, agy, ollama qua file des
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 11.1 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
 | 2026-11-12 | 2.0.0 | [refactor-story] Bổ sung AC-04 Zero-Global-Pollution $COWOK_SESSION_DIR (O_NOFOLLOW) & 26+ Agent Adapters theo Master Plan | /refactor-story |
+
+## 9. Upstream FE Handoff & Wave Boundary Notes (Synced 2026-11-16)
+- **Pre-Staged Settings Bento UI (from Epic 04 / Story 04.3 Reconciliation):**
+  - Bento 1 (`src/pages/workbench/components/SettingsDetectedProvidersPanel.tsx`) & Bento 2 (`src/pages/workbench/components/SettingsApiBentoPanel.tsx`) already render the 2-column auto-detected BYOS/CLI catalog (`readyTools` auto-connected + inline setup flow) and the 6-provider API Bento Grid (`gemini`, `claude`, `openai`, `openrouter`, `deepseek`, `byos`) wired to `GET /api/v1/doctor/cli-matrix`, `GET /api/v1/doctor/usage`, and `POST /api/v1/doctor/verify-key`.
+  - **Remaining Backend Execution Scope Owned Strictly by Story 11.1:** Isolated `$COWOK_SESSION_DIR` (`O_NOFOLLOW` + `setpgid`/`killpg`) process execution across 26+ CLI adapters, live cross-provider quota aggregation where providers require authenticated runtime calls, and the Unified BYOK HTTP Gateway router.
