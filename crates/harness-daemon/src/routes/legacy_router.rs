@@ -10,9 +10,9 @@ use crate::daemon_auth::legacy_project_auth_middleware;
 use crate::routes::fs_jail;
 use crate::routes::legacy_proposals::{
     handle_apply_proposal, handle_create_pr, handle_create_proposal, handle_create_snapshot,
-    handle_download_export, handle_export_snapshots, handle_get_proposal, handle_get_snapshot,
-    handle_list_proposals, handle_list_snapshots, handle_reject_proposal, handle_revert_snapshot,
-    handle_validate_proposal,
+    handle_decide_tradeoff, handle_diff_proposal, handle_download_export, handle_export_snapshots,
+    handle_get_proposal, handle_get_snapshot, handle_list_proposals, handle_list_snapshots,
+    handle_reject_proposal, handle_revert_snapshot, handle_validate_proposal,
 };
 use crate::routes::legacy_sdi::{
     handle_get_constraint_profile, handle_get_design_contracts, handle_get_icon_manifest,
@@ -147,6 +147,14 @@ fn legacy_sdi_proposal_routes() -> Router<DaemonAppState> {
         .route(
             "/api/v1/projects/:id/proposals/:proposal_id/reject",
             post(handle_reject_proposal),
+        )
+        .route(
+            "/api/v1/projects/:id/proposals/:proposal_id/diff",
+            post(handle_diff_proposal),
+        )
+        .route(
+            "/api/v1/projects/:id/proposals/:proposal_id/tradeoffs/:tradeoff_id/decide",
+            post(handle_decide_tradeoff),
         )
 }
 

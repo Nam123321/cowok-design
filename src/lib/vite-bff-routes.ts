@@ -47,6 +47,8 @@ import * as singleProposalRoute from "../app/api/projects/[id]/proposals/[propos
 import * as validateProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/validate/route";
 import * as applyProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/apply/route";
 import * as rejectProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/reject/route";
+import * as diffProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/diff/route";
+import * as decideTradeoffRoute from "../app/api/projects/[id]/proposals/[proposalId]/tradeoffs/[tradeoffId]/decide/route";
 import * as sdiIntentRoute from "../app/api/projects/[id]/sdi/intent/route";
 import * as sdiClarificationRoute from "../app/api/projects/[id]/sdi/clarification/route";
 
@@ -125,6 +127,8 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/validate$/, extractParams: (m) => ({ id: m[1], proposalId: m[2] }), resolveHandler: () => validateProposalRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/apply$/, extractParams: (m) => ({ id: m[1], proposalId: m[2] }), resolveHandler: () => applyProposalRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/reject$/, extractParams: (m) => ({ id: m[1], proposalId: m[2] }), resolveHandler: () => rejectProposalRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/diff$/, extractParams: (m) => ({ id: m[1], proposalId: m[2] }), resolveHandler: () => diffProposalRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/tradeoffs\/([^/]+)\/decide$/, extractParams: (m) => ({ id: m[1], proposalId: m[2], tradeoffId: m[3] }), resolveHandler: () => decideTradeoffRoute.POST },
 
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/sdi\/intent$/, extractParams: idOnly, resolveHandler: () => sdiIntentRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/sdi\/intent$/, extractParams: idOnly, resolveHandler: () => sdiIntentRoute.POST },

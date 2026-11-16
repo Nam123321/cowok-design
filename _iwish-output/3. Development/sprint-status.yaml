@@ -39,7 +39,7 @@ start_date: '2026-07-24'
 # Epic 05: Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR
 "Epic 05 - Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR": in-progress
 "Story 05.1 - Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11)": completed
-"Story 05.2 - Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup": refactored
+"Story 05.2 - Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup": completed
 "Story 05.3 - Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17)": refactored
 
 # ==================================================

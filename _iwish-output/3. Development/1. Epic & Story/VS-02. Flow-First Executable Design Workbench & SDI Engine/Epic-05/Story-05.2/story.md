@@ -4,7 +4,7 @@ id: "05.2"
 title: "Story 05.2: Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup"
 description: "Hỗ trợ duyệt và áp dụng ChangeProposal độc lập theo từng Node (hoặc theo lô Batch); tích hợp động cơ so khớp thị giác cowok-design-diff (pixelmatch + SSIM + changed_bbox); huy hiệu Designer Talk ghi nhận quyết định đánh đổi (phím tắt T); chốt chặn Unverified Gate Claim Guard; và thanh tẩy 100% Tailwind trong src/features/proposals/**."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-05/Story-05.2/story.md"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: core
 timestamp: "2026-11-12T16:05:00+07:00"
@@ -28,7 +28,7 @@ consumes_apis: []
 
 - **FR Covered:** [FR-07, FR-08: Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 05: Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-05/epic.md)
-- **Status:** refactored
+- **Status:** completed
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context
@@ -55,24 +55,24 @@ consumes_apis: []
 - **[EDGE-CASE] EC-PROPOSAL-002 (Unverified Gate Claim Guard & Pure CSS Cleanup):** Chặn tuyệt đối trường hợp Agent tự nhận đã qua cổng kiểm định (`Unverified Gate Claim Guard` — Daemon Rust đối chiếu biên nhận chạy Linter thật); và thanh tẩy 100% class Tailwind trong `src/features/proposals/**` sang `tokens.css`.
 
 ## 4. Tasks
-- [ ] **Task 05.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho ChangeProposal Diff và Validation Gate (thỏa mãn `AC-01`).
-- [ ] **Task 05.2.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu SQLite WAL (thỏa mãn `AC-02`).
-- [ ] **Task 05.2.3**: Cài đặt chốt chặn xử lý tình huống biên khóa nút Apply khi có lỗi kiểm định (thỏa mãn `AC-03`).
-- [ ] **Task 05.2.4**: Bổ sung cổng xác nhận tường minh Explicit Confirmation Gate kết nối từ `flow-changes-draft.json` và Tournament Options (thỏa mãn `AC-04`).
-- [ ] **Task 05.2.5**: Xây dựng cơ chế duyệt Proposal độc lập theo từng Node và động cơ so khớp thị giác `cowok-design-diff` (thỏa mãn `AC-05`).
-- [ ] **Task 05.2.6**: Cài đặt giao diện huy hiệu Designer Talk đánh đổi (phím T) hỗ trợ kích hoạt phương án `instead` (thỏa mãn `AC-06`).
-- [ ] **Task 05.2.7**: Cài đặt chốt chặn `EC-PROPOSAL-002` (Unverified Gate Claim Guard) và thanh tẩy 100% Tailwind trong `src/features/proposals/**` (thỏa mãn `EC-PROPOSAL-002`).
+- [x] **Task 05.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho ChangeProposal Diff và Validation Gate (thỏa mãn `AC-01`).
+- [x] **Task 05.2.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu SQLite WAL (thỏa mãn `AC-02`).
+- [x] **Task 05.2.3**: Cài đặt chốt chặn xử lý tình huống biên khóa nút Apply khi có lỗi kiểm định (thỏa mãn `AC-03`).
+- [x] **Task 05.2.4**: Bổ sung cổng xác nhận tường minh Explicit Confirmation Gate kết nối từ `flow-changes-draft.json` và Tournament Options (thỏa mãn `AC-04`).
+- [x] **Task 05.2.5**: Xây dựng cơ chế duyệt Proposal độc lập theo từng Node và động cơ so khớp thị giác `cowok-design-diff` (thỏa mãn `AC-05`).
+- [x] **Task 05.2.6**: Cài đặt giao diện huy hiệu Designer Talk đánh đổi (phím T) hỗ trợ kích hoạt phương án `instead` (thỏa mãn `AC-06`).
+- [x] **Task 05.2.7**: Cài đặt chốt chặn `EC-PROPOSAL-002` (Unverified Gate Claim Guard) và thanh tẩy 100% Tailwind trong `src/features/proposals/**` (thỏa mãn `EC-PROPOSAL-002`).
 
 ## 5. AC-to-Task Traceability Matrix
 | AC ID | Description | Mapped Implementation Tasks | Verification Method | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **AC-01** | Core ChangeProposal Capability | `Task 05.2.1` | Unit & Integration Test | pending |
-| **AC-02** | Spec Registry & SQLite WAL Integration | `Task 05.2.2` | Contract & Schema Verification | pending |
-| **AC-03** | [EDGE-CASE] Lock Apply on Gate Failure | `Task 05.2.3` | Boundary Regression Test | pending |
-| **AC-04** | Explicit Confirmation Gate | `Task 05.2.4` | UI Confirmation Gate & E2E Test | pending |
-| **AC-05** | Per-Node Apply/Reject & cowok-design-diff | `Task 05.2.5` | Pixelmatch & Node Isolation Test | pending |
-| **AC-06** | Designer Talk Anchored Badges (T) | `Task 05.2.6` | Trade-Off Interaction Test | pending |
-| **EC-PROPOSAL-002** | [EDGE-CASE] Unverified Claim Guard & Tailwind Clean | `Task 05.2.7` | Gate Claim Check & Clean Code Test | pending |
+| **AC-01** | Core ChangeProposal Capability | `Task 05.2.1` | Unit & Integration Test | completed |
+| **AC-02** | Spec Registry & SQLite WAL Integration | `Task 05.2.2` | Contract & Schema Verification | completed |
+| **AC-03** | [EDGE-CASE] Lock Apply on Gate Failure | `Task 05.2.3` | Boundary Regression Test | completed |
+| **AC-04** | Explicit Confirmation Gate | `Task 05.2.4` | UI Confirmation Gate & E2E Test | completed |
+| **AC-05** | Per-Node Apply/Reject & cowok-design-diff | `Task 05.2.5` | Pixelmatch & Node Isolation Test | completed |
+| **AC-06** | Designer Talk Anchored Badges (T) | `Task 05.2.6` | Trade-Off Interaction Test | completed |
+| **EC-PROPOSAL-002** | [EDGE-CASE] Unverified Claim Guard & Tailwind Clean | `Task 05.2.7` | Gate Claim Check & Clean Code Test | completed |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** ["05.1"]

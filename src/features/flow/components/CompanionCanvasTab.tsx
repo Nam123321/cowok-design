@@ -7,7 +7,15 @@ import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { useFormatter } from "../../../hooks/useFormatter";
 import type { ConflictState, WorkbenchNode } from "../store/flow-workbench-types";
+import type { ChangeProposalResponse, DecideTradeoffInput } from "../../../lib/validations/change-proposal";
 import { normalizeFixtureRef, type FixtureVariant, type ViewportPreset } from "../../../lib/validations/screen-fixture";
+import { DesignerTalkOverlay } from "../../proposals/components/DesignerTalkOverlay";
+import {
+  CanvasProposalDrawerHost,
+  CanvasProposalToolbar,
+  PROPOSAL_DRAWER_WIDTH_PX,
+} from "../../proposals/components/CanvasProposalControls";
+import { useNodeProposalController } from "../../proposals/hooks/useNodeProposalController";
 import { resolveScreenPreviewData } from "./companion-canvas-data";
 import { buildPreviewDocumentHtml } from "../utils/html-sandbox-wrapper";
 import { CompanionTabBar } from "./CompanionTabBar";
@@ -218,6 +226,12 @@ interface StageProps extends CompanionCanvasTabProps {
   onCloseSampleData: () => void;
   isWalkthroughActive: boolean;
   onToggleWalkthrough: () => void;
+  isDesignerTalkOpen: boolean;
+  onCloseDesignerTalk: () => void;
+  isProposalDrawerOpen: boolean;
+  isModalOpen: boolean;
+  activeProposal: ChangeProposalResponse | null;
+  onDecideTradeoff: (tradeoffId: string, input: DecideTradeoffInput) => Promise<void>;
   onGuardedNodeSelect: (nodeId: string) => void;
   onGuardedSubStateSelect: (subState: FixtureVariant) => void;
   onGuardedModeSelect: (mode: "interact" | "click-dom" | "drag-box") => void;
@@ -351,388 +365,230 @@ const DualPaneHtmlStage: React.FC<StageProps> = (p) => {
         />
       )}
       {!vp.isRightPreviewHidden && (
-        <CompanionLiveHtmlRightPane
-          projectId={p.projectId}
-          activeTab={activeTab}
-          structureLens={vp.structureLens}
-          selectedNodeId={p.selectedNodeId}
-          selectedNodeKey={selectedNode?.screenKey || undefined}
-          activeSlide={activeSlide}
-          activeScreenData={activeScreenData}
-          activeSubState={activeSubState}
-          onSelectSubState={(v) => {
-            p.onGuardedSubStateSelect(v);
-          }}
-          pointerMode={vp.pointerMode}
-          onSetPointerMode={(m) => {
-            p.onGuardedModeSelect(m);
-          }}
-          isInlineCodeOpen={vp.isInlineCodeOpen}
-          dirtyBuffer={vp.dirtyBuffer}
-          showDirtyGuardPrompt={vp.showDirtyGuardPrompt}
-          onToggleInlineCode={handleToggleInlineCode}
-          onConfirmDiscardDirty={() => {
-            vp.setHtmlCodeText(vp.baselineHtmlText);
-            vp.setShowDirtyGuardPrompt(false);
-            vp.setIsInlineCodeOpen(false);
-          }}
-          onCancelCloseEditor={() => vp.setShowDirtyGuardPrompt(false)}
-          inlineCodeText={vp.htmlCodeText}
-          onChangeInlineCode={vp.setHtmlCodeText}
-          viewportPreset={vp.viewportPreset}
-          onSetViewportPreset={(nextVp) => {
-            vp.setViewportPreset(nextVp);
-            if (p.selectedNodeId) p.onUpdateNodeViewport?.(p.selectedNodeId, nextVp);
-          }}
-          aspectRatio={vp.aspectRatio}
-          onSetAspectRatio={vp.setAspectRatio}
-          isPresenting={vp.isPresenting}
-          onTogglePresenting={() => vp.setIsPresenting((prev) => !prev)}
-          isSampleDataOpen={p.isSampleDataOpen}
-          onToggleSampleData={p.isSampleDataOpen ? p.onCloseSampleData : p.onOpenSampleData}
-          isWalkthroughActive={p.isWalkthroughActive}
-          onToggleWalkthrough={p.onToggleWalkthrough}
-          isLeftStructureHidden={vp.isLeftStructureHidden}
-          onToggleLeftStructureHidden={() => vp.setIsLeftStructureHidden((prev) => !prev)}
-          highlightedRegionId={vp.highlightedRegionId}
-          customRawHtml={customRawHtml}
-          onApplyHtml={(html) => {
-            vp.setBaselineHtmlText(html);
-            vp.setShowDirtyGuardPrompt(false);
-            vp.setCustomHtmlForTarget(targetKey, html);
-            vp.setIsInlineCodeOpen(false);
-          }}
-          onQuoteText={p.onQuoteText}
-          onRegionClick={(id, label) => {
-            vp.setHighlightedRegionId(id);
-            if (vp.pointerMode !== "interact") {
-              const formatted = label.startsWith("@[") ? label : `[${label}]`;
-              p.onAttachRegionToChat?.(formatted);
-            }
-          }}
-        />
+        <div style={{ position: "relative", flex: 1, display: "flex", minWidth: "280px", height: "100%", overflow: "hidden" }}>
+          <CompanionLiveHtmlRightPane
+            projectId={p.projectId}
+            activeTab={activeTab}
+            structureLens={vp.structureLens}
+            selectedNodeId={p.selectedNodeId}
+            selectedNodeKey={selectedNode?.screenKey || undefined}
+            activeSlide={activeSlide}
+            activeScreenData={activeScreenData}
+            activeSubState={activeSubState}
+            onSelectSubState={(v) => {
+              p.onGuardedSubStateSelect(v);
+            }}
+            pointerMode={vp.pointerMode}
+            onSetPointerMode={(m) => {
+              p.onGuardedModeSelect(m);
+            }}
+            isInlineCodeOpen={vp.isInlineCodeOpen}
+            dirtyBuffer={vp.dirtyBuffer}
+            showDirtyGuardPrompt={vp.showDirtyGuardPrompt}
+            onToggleInlineCode={handleToggleInlineCode}
+            onConfirmDiscardDirty={() => {
+              vp.setHtmlCodeText(vp.baselineHtmlText);
+              vp.setShowDirtyGuardPrompt(false);
+              vp.setIsInlineCodeOpen(false);
+            }}
+            onCancelCloseEditor={() => vp.setShowDirtyGuardPrompt(false)}
+            inlineCodeText={vp.htmlCodeText}
+            onChangeInlineCode={vp.setHtmlCodeText}
+            viewportPreset={vp.viewportPreset}
+            onSetViewportPreset={(nextVp) => {
+              vp.setViewportPreset(nextVp);
+              if (p.selectedNodeId) p.onUpdateNodeViewport?.(p.selectedNodeId, nextVp);
+            }}
+            aspectRatio={vp.aspectRatio}
+            onSetAspectRatio={vp.setAspectRatio}
+            isPresenting={vp.isPresenting}
+            onTogglePresenting={() => vp.setIsPresenting((prev) => !prev)}
+            isSampleDataOpen={p.isSampleDataOpen}
+            onToggleSampleData={p.isSampleDataOpen ? p.onCloseSampleData : p.onOpenSampleData}
+            isWalkthroughActive={p.isWalkthroughActive}
+            onToggleWalkthrough={p.onToggleWalkthrough}
+            isLeftStructureHidden={vp.isLeftStructureHidden}
+            onToggleLeftStructureHidden={() => vp.setIsLeftStructureHidden((prev) => !prev)}
+            highlightedRegionId={vp.highlightedRegionId}
+            customRawHtml={customRawHtml}
+            onApplyHtml={(html) => {
+              vp.setBaselineHtmlText(html);
+              vp.setShowDirtyGuardPrompt(false);
+              vp.setCustomHtmlForTarget(targetKey, html);
+              vp.setIsInlineCodeOpen(false);
+            }}
+            onQuoteText={p.onQuoteText}
+            onRegionClick={(id, label) => {
+              vp.setHighlightedRegionId(id);
+              if (vp.pointerMode !== "interact") {
+                const formatted = label.startsWith("@[") ? label : `[${label}]`;
+                p.onAttachRegionToChat?.(formatted);
+              }
+            }}
+          />
+          <DesignerTalkOverlay
+            isOpen={p.isDesignerTalkOpen}
+            tradeoffs={p.activeProposal?.tradeoffs ?? []}
+            elementRects={{}}
+            drawerWidth={p.isProposalDrawerOpen ? PROPOSAL_DRAWER_WIDTH_PX : 0}
+            isModalOpen={p.isModalOpen}
+            isInlineEditorOpen={vp.isInlineCodeOpen}
+            onClose={p.onCloseDesignerTalk}
+            onDecide={p.onDecideTradeoff}
+          />
+        </div>
       )}
     </div>
   );
 };
 
-export const CompanionCanvasTab: React.FC<CompanionCanvasTabProps> = (props) => {
+const WALKTHROUGH_INTERVAL_MS = 2500;
+const AMBIGUITY_LOCK_THRESHOLD = 0.45;
+
+const CompanionLockBanners: React.FC<{ ambiguityScore?: number; conflictState?: ConflictState | null }> = ({ ambiguityScore, conflictState }) => {
   const { t } = useTranslation();
+  const isAmbiguityLocked = ambiguityScore !== undefined && ambiguityScore >= AMBIGUITY_LOCK_THRESHOLD;
+  if (!isAmbiguityLocked && !conflictState) return null;
+
+  return (
+    <>
+      {isAmbiguityLocked && (
+        <div data-testid="ambiguity-execution-lock" style={{ padding: "5px 14px", backgroundColor: "var(--state-warning-soft)", color: "var(--state-warning)", borderBottom: "1px solid var(--state-warning)", fontSize: "11px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <BrandIcon name="lock" size={13} strokeWidth={1.85} color="currentColor" />
+            <span>{t("sdi.ambiguityLockFull", "Khóa Thực Thi: Điểm mơ hồ {{score}} ≥ 0.45. Cần làm rõ ý định trước khi sinh mã.").replace("{{score}}", String(ambiguityScore))}</span>
+          </div>
+        </div>
+      )}
+      {Boolean(conflictState) && (
+        <div data-testid="dag-conflict-lock" style={{ padding: "5px 14px", backgroundColor: "var(--state-danger-soft)", color: "var(--state-danger)", borderBottom: "1px solid var(--state-danger)", fontSize: "11px", fontWeight: 600, display: "flex", alignItems: "center", gap: "6px", zIndex: 20 }}>
+          <BrandIcon name="warning" size={13} strokeWidth={1.85} color="currentColor" />
+          <span>{t("flow.dagConflictLockMessage", "Cảnh báo Xung Đột DAG Chưa Giải Quyết: Các thao tác triển khai bị khóa tạm thời.")}</span>
+        </div>
+      )}
+    </>
+  );
+};
+
+const CompanionDirtyGuardModal: React.FC<{ isOpen: boolean; onCancel: () => void; onDiscard: () => void; onSave: () => void }> = ({ isOpen, onCancel, onDiscard, onSave }) => {
+  const { t } = useTranslation();
+  if (!isOpen) return null;
+  return (
+    <div role="dialog" aria-modal="true" data-testid="dirty-buffer-guard-modal" style={{ position: "absolute", inset: 0, zIndex: 60, backgroundColor: "var(--bg-overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+      <div style={{ width: "100%", maxWidth: "420px", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-lg)", padding: "18px 20px", boxShadow: "var(--shadow-lg)", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <BrandIcon name="warning" size={18} strokeWidth={1.85} color="var(--state-warning)" />
+          <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>{t("canvas.dirtyGuardTitle", "Thay Đổi Chưa Lưu Trong Trình Sửa Mã")}</h3>
+        </div>
+        <p style={{ margin: 0, fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.5" }}>{t("canvas.dirtyGuardBody", "Bạn có thay đổi chưa lưu trong Inline </> Editor. Bạn muốn Lưu bản vá (Save Patch) hay Hủy bỏ thay đổi (Discard Changes) trước khi chuyển đổi?")}</p>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
+          <button type="button" data-testid="dirty-guard-cancel-btn" onClick={onCancel} style={{ padding: "6px 12px", fontSize: "11px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>{t("common.cancel", "Hủy Bỏ")}</button>
+          <button type="button" data-testid="dirty-guard-discard-btn" onClick={onDiscard} style={{ padding: "6px 12px", fontSize: "11px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-subtle)", color: "var(--state-danger)", cursor: "pointer" }}>{t("canvas.discardChangesBtn", "Hủy Thay Đổi (Discard)")}</button>
+          <button type="button" data-testid="dirty-guard-save-btn" onClick={onSave} style={{ padding: "6px 14px", fontSize: "11px", fontWeight: 600, borderRadius: "var(--radius-xs)", border: "none", backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)", cursor: "pointer" }}>{t("canvas.savePatchBtn", "Lưu Bản Vá (Save Patch)")}</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+function useCanvasGuardedActions(
+  vp: ReturnType<typeof useDualPaneViewportState>,
+  nav: ReturnType<typeof useTabNavigationState>,
+  props: Pick<CompanionCanvasTabProps, "selectedNodeId" | "onSelectNode" | "onSelectNodeSubState">
+) {
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+
+  const runWithDirtyGuard = useCallback((action: () => void) => {
+    if (vp.dirtyBuffer) {
+      setPendingAction(() => action);
+      vp.setShowDirtyGuardPrompt(true);
+    } else {
+      action();
+    }
+  }, [vp]);
+
+  const flushPending = useCallback((savePatch: boolean) => {
+    if (savePatch) vp.setBaselineHtmlText(vp.htmlCodeText);
+    else vp.setHtmlCodeText(vp.baselineHtmlText);
+    vp.setShowDirtyGuardPrompt(false);
+    vp.setIsInlineCodeOpen(false);
+    if (pendingAction) {
+      pendingAction();
+      setPendingAction(null);
+    }
+  }, [pendingAction, vp]);
+
+  return {
+    handleGuardedTabSelect: useCallback((tabId: string, format: CanvasTabItem["format"]) => runWithDirtyGuard(() => nav.handleTabSelect(tabId, format)), [nav, runWithDirtyGuard]),
+    handleGuardedNodeSelect: useCallback((nodeId: string) => runWithDirtyGuard(() => props.onSelectNode?.(nodeId)), [props, runWithDirtyGuard]),
+    handleGuardedSubStateSelect: useCallback((subState: FixtureVariant) => runWithDirtyGuard(() => {
+      vp.setActiveSubState(subState);
+      if (props.selectedNodeId) props.onSelectNodeSubState?.(props.selectedNodeId, subState);
+    }), [props, runWithDirtyGuard, vp]),
+    handleGuardedModeSelect: useCallback((mode: "interact" | "click-dom" | "drag-box") => runWithDirtyGuard(() => vp.setPointerMode(mode)), [runWithDirtyGuard, vp]),
+    handleConfirmSavePatch: useCallback(() => flushPending(true), [flushPending]),
+    handleConfirmDiscardChanges: useCallback(() => flushPending(false), [flushPending]),
+    handleCancelDirtyGuard: useCallback(() => { vp.setShowDirtyGuardPrompt(false); setPendingAction(null); }, [vp]),
+  };
+}
+
+function useWalkthroughPlaybackEffect(
+  isWalkthroughActive: boolean,
+  nodes: CompanionCanvasTabProps["nodes"],
+  onSelectNode: CompanionCanvasTabProps["onSelectNode"]
+) {
+  const [, setWalkthroughIndex] = useState(0);
+  useEffect(() => {
+    if (!isWalkthroughActive || !nodes || nodes.length === 0) return;
+    const timer = setInterval(() => {
+      setWalkthroughIndex((prev) => {
+        const next = (prev + 1) % nodes.length;
+        const targetNode = nodes[next];
+        if (targetNode && onSelectNode) onSelectNode(targetNode.id);
+        return next;
+      });
+    }, WALKTHROUGH_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [isWalkthroughActive, nodes, onSelectNode]);
+}
+
+export const CompanionCanvasTab: React.FC<CompanionCanvasTabProps> = (props) => {
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const nav = useTabNavigationState(props.activeTabId, props.onTabChange);
   const vp = useDualPaneViewportState(nav.activeTab);
   useInternalSplitResizer(vp.isDraggingInternalSplit, vp.setIsDraggingInternalSplit, splitContainerRef, vp.setLeftPanePercent);
 
-  // Modal states
   const [isLaunchpadOpen, setIsLaunchpadOpen] = useState(false);
   const [isSampleDataOpen, setIsSampleDataOpen] = useState(false);
   const [isWalkthroughActive, setIsWalkthroughActive] = useState(false);
-  const [walkthroughIndex, setWalkthroughIndex] = useState(0);
-
-  // [EC-STORYBOARD-001] Pending Guarded Action for Dirty Buffer Guard
-  const [pendingGuardedAction, setPendingGuardedAction] = useState<(() => void) | null>(null);
 
   const isHtmlDesignTab = nav.activeTab.format === "dag" || nav.activeTab.format === "slide-cms";
+  const proposalCtrl = useNodeProposalController({
+    projectId: props.projectId,
+    selectedNodeId: props.selectedNodeId,
+    isModalOpen: isLaunchpadOpen || isSampleDataOpen || vp.showDirtyGuardPrompt,
+    isInlineCodeOpen: vp.isInlineCodeOpen,
+  });
 
-  // Customer Walkthrough automated timeline progression
-  useEffect(() => {
-    if (!isWalkthroughActive || !props.nodes || props.nodes.length === 0) return;
-    const timer = setInterval(() => {
-      setWalkthroughIndex((prev) => {
-        const next = (prev + 1) % props.nodes!.length;
-        const targetNode = props.nodes![next];
-        if (targetNode && props.onSelectNode) {
-          props.onSelectNode(targetNode.id);
-        }
-        return next;
-      });
-    }, 2500);
-    return () => clearInterval(timer);
-  }, [isWalkthroughActive, props.nodes, props.onSelectNode]);
-
-  // Intercept action with [EC-STORYBOARD-001] Dirty Guard
-  const runWithDirtyGuard = useCallback(
-    (action: () => void) => {
-      if (vp.dirtyBuffer) {
-        setPendingGuardedAction(() => action);
-        vp.setShowDirtyGuardPrompt(true);
-      } else {
-        action();
-      }
-    },
-    [vp]
-  );
-
-  const handleGuardedTabSelect = useCallback(
-    (tabId: string, format: CanvasTabItem["format"]) => {
-      runWithDirtyGuard(() => nav.handleTabSelect(tabId, format));
-    },
-    [nav, runWithDirtyGuard]
-  );
-
-  const handleGuardedNodeSelect = useCallback(
-    (nodeId: string) => {
-      runWithDirtyGuard(() => props.onSelectNode?.(nodeId));
-    },
-    [props, runWithDirtyGuard]
-  );
-
-  const handleGuardedSubStateSelect = useCallback(
-    (subState: FixtureVariant) => {
-      runWithDirtyGuard(() => {
-        vp.setActiveSubState(subState);
-        if (props.selectedNodeId) {
-          props.onSelectNodeSubState?.(props.selectedNodeId, subState);
-        }
-      });
-    },
-    [props, runWithDirtyGuard, vp]
-  );
-
-  const handleGuardedModeSelect = useCallback(
-    (mode: "interact" | "click-dom" | "drag-box") => {
-      runWithDirtyGuard(() => vp.setPointerMode(mode));
-    },
-    [runWithDirtyGuard, vp]
-  );
-
-  const handleConfirmSavePatch = useCallback(() => {
-    vp.setBaselineHtmlText(vp.htmlCodeText);
-    vp.setShowDirtyGuardPrompt(false);
-    vp.setIsInlineCodeOpen(false);
-    if (pendingGuardedAction) {
-      pendingGuardedAction();
-      setPendingGuardedAction(null);
-    }
-  }, [pendingGuardedAction, vp]);
-
-  const handleConfirmDiscardChanges = useCallback(() => {
-    vp.setHtmlCodeText(vp.baselineHtmlText);
-    vp.setShowDirtyGuardPrompt(false);
-    vp.setIsInlineCodeOpen(false);
-    if (pendingGuardedAction) {
-      pendingGuardedAction();
-      setPendingGuardedAction(null);
-    }
-  }, [pendingGuardedAction, vp]);
-
-  const handleCancelDirtyGuard = useCallback(() => {
-    vp.setShowDirtyGuardPrompt(false);
-    setPendingGuardedAction(null);
-  }, [vp]);
-
-  const isAmbiguityLocked = props.ambiguityScore !== undefined && props.ambiguityScore >= 0.45;
-  const isConflictLocked = Boolean(props.conflictState);
+  useWalkthroughPlaybackEffect(isWalkthroughActive, props.nodes, props.onSelectNode);
+  const guards = useCanvasGuardedActions(vp, nav, props);
 
   return (
-    <div
-      className="companion-canvas-tab-container"
-      aria-label={t("canvas.companionContainer", "Companion Canvas Studio")}
-      style={{
-        width: "100%",
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        backgroundColor: "var(--bg-canvas)",
-        position: "relative",
-      }}
-    >
-      {/* Top Banner: [AC-03] Ambiguity Execution Lock */}
-      {isAmbiguityLocked && (
-        <div
-          data-testid="ambiguity-execution-lock"
-          style={{
-            padding: "5px 14px",
-            backgroundColor: "var(--state-warning-soft)",
-            color: "var(--state-warning)",
-            borderBottom: "1px solid var(--state-warning)",
-            fontSize: "11px",
-            fontWeight: 600,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            zIndex: 20,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <BrandIcon name="lock" size={13} strokeWidth={1.85} color="currentColor" />
-            <span>
-              {t("sdi.ambiguityLockFull", "Khóa Thực Thi: Điểm mơ hồ {{score}} ≥ 0.45. Cần làm rõ ý định trước khi sinh mã.").replace("{{score}}", String(props.ambiguityScore))}
-            </span>
-          </div>
-        </div>
+    <div className="companion-canvas-tab-container" style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", backgroundColor: "var(--bg-canvas)", position: "relative" }}>
+      <CompanionLockBanners ambiguityScore={props.ambiguityScore} conflictState={props.conflictState} />
+      <CompanionDirtyGuardModal isOpen={vp.showDirtyGuardPrompt} onCancel={guards.handleCancelDirtyGuard} onDiscard={guards.handleConfirmDiscardChanges} onSave={guards.handleConfirmSavePatch} />
+      <CompanionTabBar tabs={nav.tabs} activeTabId={nav.activeTab.id} isNewTabMenuOpen={nav.isNewTabMenuOpen} onToggleNewTabMenu={() => nav.setIsNewTabMenuOpen((prev) => !prev)} onTabSelect={guards.handleGuardedTabSelect} onCloseTab={nav.handleClose} onCreateTab={nav.handleCreateTab} />
+      {isHtmlDesignTab && (
+        <CanvasProposalToolbar selectedNodeId={props.selectedNodeId} proposalsCount={proposalCtrl.proposalsCount} isDesignerTalkOpen={proposalCtrl.isDesignerTalkOpen} isDrawerOpen={proposalCtrl.isDrawerOpen} onToggleDesignerTalk={() => proposalCtrl.setIsDesignerTalkOpen((prev) => !prev)} onToggleDrawer={() => proposalCtrl.setIsDrawerOpen((prev) => !prev)} />
       )}
-
-      {/* Top Banner: [AC-04] DAG Conflict Lock */}
-      {isConflictLocked && (
-        <div
-          data-testid="dag-conflict-lock"
-          style={{
-            padding: "5px 14px",
-            backgroundColor: "var(--state-danger-soft)",
-            color: "var(--state-danger)",
-            borderBottom: "1px solid var(--state-danger)",
-            fontSize: "11px",
-            fontWeight: 600,
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            zIndex: 20,
-          }}
-        >
-          <BrandIcon name="warning" size={13} strokeWidth={1.85} color="currentColor" />
-          <span>{t("flow.dagConflictLockMessage", "Cảnh báo Xung Đột DAG Chưa Giải Quyết: Các thao tác triển khai bị khóa tạm thời.")}</span>
-        </div>
-      )}
-
-      {/* [EC-STORYBOARD-001] Global Dirty Editor Guard Modal */}
-      {vp.showDirtyGuardPrompt && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          data-testid="dirty-buffer-guard-modal"
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 60,
-            backgroundColor: "var(--bg-overlay)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "16px",
-          }}
-        >
-          <div
-            style={{
-              width: "100%",
-              maxWidth: "420px",
-              backgroundColor: "var(--bg-surface)",
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-lg)",
-              padding: "18px 20px",
-              boxShadow: "var(--shadow-lg)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <BrandIcon name="warning" size={18} strokeWidth={1.85} color="var(--state-warning)" />
-              <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                {t("canvas.dirtyGuardTitle", "Thay Đổi Chưa Lưu Trong Trình Sửa Mã")}
-              </h3>
-            </div>
-            <p style={{ margin: 0, fontSize: "12px", color: "var(--text-secondary)", lineHeight: "1.5" }}>
-              {t(
-                "canvas.dirtyGuardBody",
-                "Bạn có thay đổi chưa lưu trong Inline </> Editor. Bạn muốn Lưu bản vá (Save Patch) hay Hủy bỏ thay đổi (Discard Changes) trước khi chuyển đổi?"
-              )}
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
-              <button
-                type="button"
-                data-testid="dirty-guard-cancel-btn"
-                onClick={handleCancelDirtyGuard}
-                style={{
-                  padding: "6px 12px",
-                  fontSize: "11px",
-                  borderRadius: "var(--radius-xs)",
-                  border: "1px solid var(--border-default)",
-                  backgroundColor: "transparent",
-                  color: "var(--text-secondary)",
-                  cursor: "pointer",
-                }}
-              >
-                {t("common.cancel", "Hủy Bỏ")}
-              </button>
-              <button
-                type="button"
-                data-testid="dirty-guard-discard-btn"
-                onClick={handleConfirmDiscardChanges}
-                style={{
-                  padding: "6px 12px",
-                  fontSize: "11px",
-                  borderRadius: "var(--radius-xs)",
-                  border: "1px solid var(--border-default)",
-                  backgroundColor: "var(--bg-subtle)",
-                  color: "var(--state-danger)",
-                  cursor: "pointer",
-                }}
-              >
-                {t("canvas.discardChangesBtn", "Hủy Thay Đổi (Discard)")}
-              </button>
-              <button
-                type="button"
-                data-testid="dirty-guard-save-btn"
-                onClick={handleConfirmSavePatch}
-                style={{
-                  padding: "6px 14px",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  borderRadius: "var(--radius-xs)",
-                  border: "none",
-                  backgroundColor: "var(--action-primary)",
-                  color: "var(--action-primary-fg)",
-                  cursor: "pointer",
-                }}
-              >
-                {t("canvas.savePatchBtn", "Lưu Bản Vá (Save Patch)")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tab Bar */}
-      <CompanionTabBar
-        tabs={nav.tabs}
-        activeTabId={nav.activeTab.id}
-        isNewTabMenuOpen={nav.isNewTabMenuOpen}
-        onToggleNewTabMenu={() => nav.setIsNewTabMenuOpen((prev) => !prev)}
-        onTabSelect={handleGuardedTabSelect}
-        onCloseTab={nav.handleClose}
-        onCreateTab={nav.handleCreateTab}
-      />
-
       {isHtmlDesignTab ? (
-        <DualPaneHtmlStage
-          {...props}
-          activeTab={nav.activeTab}
-          vp={vp}
-          splitContainerRef={splitContainerRef}
-          isLaunchpadOpen={isLaunchpadOpen}
-          onOpenLaunchpad={() => setIsLaunchpadOpen(true)}
-          onCloseLaunchpad={() => setIsLaunchpadOpen(false)}
-          isSampleDataOpen={isSampleDataOpen}
-          onOpenSampleData={() => setIsSampleDataOpen(true)}
-          onCloseSampleData={() => setIsSampleDataOpen(false)}
-          isWalkthroughActive={isWalkthroughActive}
-          onToggleWalkthrough={() => setIsWalkthroughActive((v) => !v)}
-          onGuardedNodeSelect={handleGuardedNodeSelect}
-          onGuardedSubStateSelect={handleGuardedSubStateSelect}
-          onGuardedModeSelect={handleGuardedModeSelect}
-        />
+        <DualPaneHtmlStage {...props} activeTab={nav.activeTab} vp={vp} splitContainerRef={splitContainerRef} isLaunchpadOpen={isLaunchpadOpen} onOpenLaunchpad={() => setIsLaunchpadOpen(true)} onCloseLaunchpad={() => setIsLaunchpadOpen(false)} isSampleDataOpen={isSampleDataOpen} onOpenSampleData={() => setIsSampleDataOpen(true)} onCloseSampleData={() => setIsSampleDataOpen(false)} isWalkthroughActive={isWalkthroughActive} onToggleWalkthrough={() => setIsWalkthroughActive((v) => !v)} isDesignerTalkOpen={proposalCtrl.isDesignerTalkOpen} onCloseDesignerTalk={() => proposalCtrl.setIsDesignerTalkOpen(false)} isProposalDrawerOpen={proposalCtrl.isDrawerOpen} isModalOpen={isLaunchpadOpen || isSampleDataOpen || vp.showDirtyGuardPrompt} activeProposal={proposalCtrl.activeProposal} onDecideTradeoff={proposalCtrl.decideTradeoff} onGuardedNodeSelect={guards.handleGuardedNodeSelect} onGuardedSubStateSelect={guards.handleGuardedSubStateSelect} onGuardedModeSelect={guards.handleGuardedModeSelect} />
       ) : (
         <NonHtmlTabView activeTab={nav.activeTab} inlineCodeText={vp.inlineCodeText} />
       )}
-
-      {/* Modals */}
-      <ProjectLaunchpadModal
-        isOpen={isLaunchpadOpen}
-        onClose={() => setIsLaunchpadOpen(false)}
-        onLaunchPath={(pathType, data) => {
-          void submitLaunchpadProject(pathType, data, props.projectId);
-        }}
-      />
-
-      <SampleDataStudioModal
-        isOpen={isSampleDataOpen}
-        onClose={() => setIsSampleDataOpen(false)}
-        onApplyFixture={(preset: SampleDataPreset, json: string) => {
-          void applyStudioSampleFixture(props.projectId, props.selectedNodeId, preset, json);
-        }}
-      />
+      <CanvasProposalDrawerHost controller={proposalCtrl} />
+      <ProjectLaunchpadModal isOpen={isLaunchpadOpen} onClose={() => setIsLaunchpadOpen(false)} onLaunchPath={(pathType, data) => { void submitLaunchpadProject(pathType, data, props.projectId); }} />
+      <SampleDataStudioModal isOpen={isSampleDataOpen} onClose={() => setIsSampleDataOpen(false)} onApplyFixture={(preset: SampleDataPreset, json: string) => { void applyStudioSampleFixture(props.projectId, props.selectedNodeId, preset, json); }} />
     </div>
   );
 };

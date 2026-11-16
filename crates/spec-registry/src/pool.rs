@@ -88,6 +88,15 @@ pub fn v9_migration_checksum() -> String {
     cached_migration_sha256(&CACHE, V9_MIGRATION_SQL)
 }
 
+pub const V10_MIGRATION_SQL: &str =
+    include_str!("../migrations/V10__story_05_2_proposals_receipts_tradeoffs.sql");
+pub const V10_MIGRATION_NAME: &str = "V10__story_05_2_proposals_receipts_tradeoffs.sql";
+
+pub fn v10_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V10_MIGRATION_SQL)
+}
+
 /// Configuration for the embedded SQLite WAL connection pool.
 #[derive(Debug, Clone)]
 pub struct SqliteWalConfig {
@@ -343,6 +352,7 @@ impl SqlitePool {
             Self::apply_v7_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v8_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v9_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v10_migration_if_needed(&mut conn, &config.db_path)?;
         }
         harden_sqlite_files(&config.db_path)?;
 
@@ -812,6 +822,22 @@ impl SqlitePool {
         Ok(())
     }
 
+    fn apply_v10_columns(tx: &Connection) -> Result<(), HarnessError> {
+        Self::ensure_columns_idempotent(
+            tx,
+            "change_proposals",
+            &[
+                ("node_id", "TEXT"),
+                ("batch_id", "TEXT"),
+                ("composite_scope_key", "TEXT NOT NULL DEFAULT ''"),
+                ("content_mode", "TEXT NOT NULL DEFAULT 'full_file'"),
+                ("base_file_hashes_json", "TEXT NOT NULL DEFAULT '{}'"),
+                ("visual_diff_json", "TEXT NOT NULL DEFAULT '{}'"),
+                ("gate_receipt_id", "TEXT"),
+            ],
+        )
+    }
+
     fn cached_genesis_db_bytes(parent_dir: &Path) -> Result<&'static [u8], HarnessError> {
         static GENESIS_BYTES: OnceLock<Result<Vec<u8>, String>> = OnceLock::new();
         let res = GENESIS_BYTES.get_or_init(|| {
@@ -887,6 +913,9 @@ impl SqlitePool {
         Self::apply_v9_columns(&tx)?;
         tx.execute_batch(V9_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "genesis_v9"))?;
+        Self::apply_v10_columns(&tx)?;
+        tx.execute_batch(V10_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v10"))?;
 
         let now = Utc::now().timestamp_millis();
         for (version, name, sha) in [
@@ -897,6 +926,7 @@ impl SqlitePool {
             (7i64, V7_MIGRATION_NAME, v7_migration_checksum()),
             (8i64, V8_MIGRATION_NAME, v8_migration_checksum()),
             (9i64, V9_MIGRATION_NAME, v9_migration_checksum()),
+            (10i64, V10_MIGRATION_NAME, v10_migration_checksum()),
         ] {
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
@@ -1334,6 +1364,52 @@ impl SqlitePool {
                         .to_string(),
             });
         }
+        Ok(())
+    }
+
+    fn apply_v10_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v10_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 10",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v10_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V10]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v10"))?;
+        Self::apply_v10_columns(&tx)?;
+        tx.execute_batch(V10_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v10_sql"))?;
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (10, ?1, ?2, ?3)",
+            params![
+                V10_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
+        )
+        .map_err(|e| map_sqlite_error(e, "insert_v10_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v10_migration"))?;
         Ok(())
     }
 

@@ -649,6 +649,13 @@ model ChangeProposal {
   projectId            String   @map("project_id")
   specKey              String   @map("spec_key")
   intentId             String?  @map("intent_id")
+  nodeId               String?  @map("node_id")
+  batchId              String?  @map("batch_id")
+  compositeScopeKey    String   @default("") @map("composite_scope_key")
+  contentMode          String   @default("full_file") @map("content_mode")
+  baseFileHashesJson   String   @default("{}") @map("base_file_hashes_json")
+  visualDiffJson       String   @default("{}") @map("visual_diff_json")
+  gateReceiptId        String?  @map("gate_receipt_id")
   title                String   @default("")
   description          String   @default("")
   filesJson            String   @default("[]") @map("files_json")
@@ -659,8 +666,68 @@ model ChangeProposal {
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @default(now()) @map("updated_at")
 
+  targetNodes  ProposalTargetNode[]
+  gateReceipts ProposalGateReceipt[]
+  tradeoffs    ProposalTradeoff[]
+
   @@index([projectId, updatedAt])
+  @@index([projectId, nodeId])
   @@map("change_proposals")
+}
+
+model ProposalTargetNode {
+  proposalId String @map("proposal_id")
+  tenantId   String @default("local-default") @map("tenant_id")
+  projectId  String @map("project_id")
+  nodeId     String @map("node_id")
+
+  proposal ChangeProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@id([proposalId, nodeId])
+  @@index([tenantId, projectId, nodeId])
+  @@map("proposal_target_nodes")
+}
+
+model ProposalGateReceipt {
+  id                 String @id @default(uuid())
+  tenantId           String @default("local-default") @map("tenant_id")
+  projectId          String @map("project_id")
+  proposalId         String @map("proposal_id")
+  diffSha256         String @map("diff_sha256")
+  constraintsSha256  String @map("constraints_sha256")
+  workspaceHeadSha256 String @map("workspace_head_sha256")
+  checksJson         String @default("[]") @map("checks_json")
+  exitCode           Int    @map("exit_code")
+  receiptHmac        String @map("receipt_hmac")
+  createdAt          String @map("created_at")
+
+  proposal ChangeProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId, createdAt])
+  @@map("proposal_gate_receipts")
+}
+
+model ProposalTradeoff {
+  id               String  @id @default(uuid())
+  tenantId         String  @default("local-default") @map("tenant_id")
+  projectId        String  @map("project_id")
+  proposalId       String  @map("proposal_id")
+  nodeId           String? @map("node_id")
+  elementFfId      String  @map("element_ff_id")
+  badgeIndex       Int     @map("badge_index")
+  designNote       String  @default("") @map("design_note")
+  insteadLabel     String  @default("") @map("instead_label")
+  insteadPatchJson String  @default("null") @map("instead_patch_json")
+  decision         String  @default("pending")
+  askPrompt        String? @map("ask_prompt")
+  decidedAt        String? @map("decided_at")
+  createdAt        String  @map("created_at")
+
+  proposal ChangeProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, badgeIndex])
+  @@index([proposalId, badgeIndex])
+  @@map("proposal_tradeoffs")
 }
 
 model VersionSnapshot {

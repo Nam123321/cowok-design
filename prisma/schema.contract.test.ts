@@ -94,6 +94,22 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  // Mirror pool.rs idempotent V10 column guards
+  db.exec(`
+    ALTER TABLE change_proposals ADD COLUMN node_id TEXT;
+    ALTER TABLE change_proposals ADD COLUMN batch_id TEXT;
+    ALTER TABLE change_proposals ADD COLUMN composite_scope_key TEXT NOT NULL DEFAULT '';
+    ALTER TABLE change_proposals ADD COLUMN content_mode TEXT NOT NULL DEFAULT 'full_file';
+    ALTER TABLE change_proposals ADD COLUMN base_file_hashes_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE change_proposals ADD COLUMN visual_diff_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE change_proposals ADD COLUMN gate_receipt_id TEXT;
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V10__story_05_2_proposals_receipts_tradeoffs.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
@@ -117,7 +133,10 @@ describe("P1 Persistence Contract & SQLite WAL V1-V9 Mirror Verification (ADR-09
     expect(mappedTables).toContain("daemon_replay_nonces");
     expect(mappedTables).toContain("workspace_sync_intents");
     expect(mappedTables).toContain("idempotency_records");
-    expect(mappedTables).toHaveLength(43);
+    expect(mappedTables).toContain("proposal_target_nodes");
+    expect(mappedTables).toContain("proposal_gate_receipts");
+    expect(mappedTables).toContain("proposal_tradeoffs");
+    expect(mappedTables).toHaveLength(46);
   });
 
   it("UT-DB-02: executes V1-V9 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
