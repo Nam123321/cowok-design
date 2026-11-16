@@ -185,22 +185,26 @@ test.describe("Story 04.3: Live Onboarding SQLite Hydration, BYOS/BYOK Doctor, V
       await expect(page.getByRole("button", { name: /New Conversation|Cuộc trò chuyện mới/i })).toBeVisible({ timeout: 15000 });
       await expect(wizardHeading).toBeHidden();
 
-      // Open Settings -> Models, update model & BYOS endpoint, save & verify F5 reload persistence
+      // Open Settings -> Models (3-Bento layout), verify retired default-model select is absent,
+      // expand API/BYOS Bento -> configure BYOS endpoint -> save & verify F5 reload persistence
       await page.getByRole("button", { name: /Cài đặt|Settings/i }).first().click();
       await page.getByRole("button", { name: /Mô hình & BYOS|Models & BYOS/i }).click();
-      const modelSelect = page.getByTestId("settings-default-model-select");
-      await expect(modelSelect).toBeVisible();
-      await modelSelect.selectOption("claude-37");
-      const byosInput = page.locator('input[placeholder*="gateway"], input[placeholder*="http"]').first();
+      await expect(page.getByTestId("settings-default-model-select")).toHaveCount(0);
+      await page.getByTestId("toggle-api-bento-btn").click();
+      await page.getByTestId("api-bento-tile-byos").click();
+      const byosInput = page.locator('input[placeholder*="11434"], input[placeholder*="gateway"], input[placeholder*="http"]').first();
       await byosInput.fill("https://gateway.example.com/v1");
-      await page.getByRole("button", { name: /Lưu|Save/i }).first().click();
-      await page.waitForTimeout(400);
+      await page.getByTestId("settings-save-btn").click();
+      await expect(page.getByTestId("settings-sync-warning")).toHaveCount(0);
+      await expect(page.getByTestId("settings-save-btn")).toBeHidden({ timeout: 5000 });
 
       await page.reload({ waitUntil: "domcontentloaded" });
       await expect(wizardHeading).toBeHidden();
       await page.getByRole("button", { name: /Cài đặt|Settings/i }).first().click();
       await page.getByRole("button", { name: /Mô hình & BYOS|Models & BYOS/i }).click();
-      await expect(page.getByTestId("settings-default-model-select")).toHaveValue("claude-37");
+      await expect(
+        page.locator('input[placeholder*="11434"], input[placeholder*="gateway"], input[placeholder*="http"]').first()
+      ).toHaveValue("https://gateway.example.com/v1");
       await page.screenshot({ path: path.join(evidenceDir, "02-settings-f5-persisted.png"), fullPage: true });
 
       fs.writeFileSync(path.join(evidenceDir, "dom-snapshot.html"), await page.content(), "utf-8");

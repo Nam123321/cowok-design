@@ -91,7 +91,11 @@ async fn test_element_comment_cas_stale_mapping_and_reanchor() {
         conn.execute(
             "INSERT INTO flow_graphs (id, project_id, portal_key, title, updated_at)
              VALUES (?1, ?2, 'default', 'Story 04.5 Graph', ?3)",
-            rusqlite::params![uuid::Uuid::new_v4().to_string(), proj.id.to_string(), now_ms],
+            rusqlite::params![
+                uuid::Uuid::new_v4().to_string(),
+                proj.id.to_string(),
+                now_ms
+            ],
         )
         .unwrap();
         conn.execute(
@@ -119,7 +123,10 @@ async fn test_element_comment_cas_stale_mapping_and_reanchor() {
     let (st_stale_create, val_stale_create) = send_req(
         &router,
         "POST",
-        &format!("/api/v1/projects/{}/flow/nodes/{}/comments", proj.id, node_id),
+        &format!(
+            "/api/v1/projects/{}/flow/nodes/{}/comments",
+            proj.id, node_id
+        ),
         &tok,
         Some(json!({
             "elementFfId": "sec-header",
@@ -138,7 +145,10 @@ async fn test_element_comment_cas_stale_mapping_and_reanchor() {
     let (st_ok, val_ok) = send_req(
         &router,
         "POST",
-        &format!("/api/v1/projects/{}/flow/nodes/{}/comments", proj.id, node_id),
+        &format!(
+            "/api/v1/projects/{}/flow/nodes/{}/comments",
+            proj.id, node_id
+        ),
         &tok,
         Some(json!({
             "elementFfId": "sec-header",
@@ -191,7 +201,10 @@ async fn test_element_comment_cas_stale_mapping_and_reanchor() {
     let (st_list, val_list) = send_req(
         &router,
         "GET",
-        &format!("/api/v1/projects/{}/flow/nodes/{}/comments", proj.id, node_id),
+        &format!(
+            "/api/v1/projects/{}/flow/nodes/{}/comments",
+            proj.id, node_id
+        ),
         &tok,
         None,
     )
@@ -233,7 +246,10 @@ async fn test_screen_fixtures_uppercase_variants() {
     let (st_bad, _) = send_req(
         &router,
         "POST",
-        &format!("/api/v1/projects/{}/flow/nodes/{}/fixtures", proj.id, node_id),
+        &format!(
+            "/api/v1/projects/{}/flow/nodes/{}/fixtures",
+            proj.id, node_id
+        ),
         &tok,
         Some(json!({ "variant": "loading", "payloadJson": "{}", "isDefault": false })),
     )
@@ -244,7 +260,10 @@ async fn test_screen_fixtures_uppercase_variants() {
         let (st, val) = send_req(
             &router,
             "POST",
-            &format!("/api/v1/projects/{}/flow/nodes/{}/fixtures", proj.id, node_id),
+            &format!(
+                "/api/v1/projects/{}/flow/nodes/{}/fixtures",
+                proj.id, node_id
+            ),
             &tok,
             Some(json!({
                 "variant": v,
