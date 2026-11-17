@@ -105,6 +105,17 @@ fn validate_key_syntax(
                 Ok("Local/BYOS endpoint format valid")
             }
         }
+        "github" => {
+            if (key.starts_with("ghp_")
+                || key.starts_with("github_pat_")
+                || key.starts_with("gho_"))
+                && key.len() >= 20
+            {
+                Ok("GitHub PAT format valid")
+            } else {
+                Err("Expected GitHub token starting with 'ghp_', 'github_pat_', or 'gho_' (min 20 chars)")
+            }
+        }
         _ => {
             if key.len() >= 16 {
                 Ok("Provider key format valid")
@@ -136,12 +147,15 @@ fn canonical_probe_url(provider: &str, custom_endpoint: &str) -> Option<String> 
         }
         "deepseek" => Some("https://api.deepseek.com/models".to_string()),
         "openrouter" => Some("https://openrouter.ai/api/v1/models".to_string()),
+        "github" => Some("https://api.github.com/user".to_string()),
         "ollama" => Some("http://127.0.0.1:11434/api/tags".to_string()),
         _ => None,
     }
 }
 
-async fn resolve_and_pin_ssrf_addr(target_url: &str) -> Result<(String, SocketAddr), String> {
+pub(crate) async fn resolve_and_pin_ssrf_addr(
+    target_url: &str,
+) -> Result<(String, SocketAddr), String> {
     validate_ssrf_safe_url(target_url, true)?;
     let uri = target_url
         .parse::<Uri>()
@@ -228,6 +242,14 @@ async fn probe_provider_upstream(
         }
         "gemini" | "google" => {
             req = req.header("x-goog-api-key", api_key);
+        }
+        "github" => {
+            if !api_key.is_empty() {
+                req = req
+                    .bearer_auth(api_key)
+                    .header("Accept", "application/vnd.github+json")
+                    .header("User-Agent", "cowok-design-daemon");
+            }
         }
         "ollama" => {}
         _ => {
@@ -627,6 +649,22 @@ const SUPPORTED_CLI_DEFINITIONS: &[CliTargetDefinition] = &[
         category: "ide",
         env_keys: &["AWS_ACCESS_KEY_ID", "KIRO_API_KEY"],
         config_subpaths: &[".kiro/settings.json"],
+    },
+    CliTargetDefinition {
+        id: "vscode",
+        name: "VS Code CLI",
+        command: "code",
+        category: "ide",
+        env_keys: &[],
+        config_subpaths: &[".vscode/argv.json"],
+    },
+    CliTargetDefinition {
+        id: "gh",
+        name: "GitHub CLI",
+        command: "gh",
+        category: "cli",
+        env_keys: &["GITHUB_TOKEN", "GH_TOKEN"],
+        config_subpaths: &[".config/gh/hosts.yml"],
     },
 ];
 

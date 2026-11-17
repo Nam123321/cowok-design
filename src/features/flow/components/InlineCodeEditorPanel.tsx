@@ -68,7 +68,7 @@ const InlineEditorHeader: React.FC<{
 export const InlineCodeEditorPanel: React.FC<InlineCodeEditorPanelProps> = (p) => {
   const { t } = useTranslation();
   return (
-    <div data-testid="inline-code-editor-panel" style={{ width: "100%", height: "100%", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div data-testid="inline-code-editor-panel" data-inline-code-editor="true" style={{ width: "100%", height: "100%", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <InlineEditorHeader title={p.activeTab.filePath || p.activeTab.title} dirtyBuffer={p.dirtyBuffer} onApplyHtml={p.onApplyHtml} />
       {p.showDirtyGuardPrompt && (
         <div role="alertdialog" data-testid="dirty-buffer-guard-banner" style={{ padding: "8px 12px", backgroundColor: "var(--state-warning-soft)", borderBottom: "1px solid var(--state-warning)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", fontSize: "11px", color: "var(--text-primary)" }}>

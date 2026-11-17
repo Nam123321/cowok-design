@@ -2,6 +2,7 @@
 // @implements AC-02, AC-04 (Left-Open Chat Drawer with Node Scope Chips, Zero useEffect)
 import React from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
+import { useFormatter } from "../../../hooks/useFormatter";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { useAgentChatConversation } from "../hooks/useAgentChatConversation";
 import { AgentChatComposer } from "./AgentChatComposer";
@@ -13,6 +14,16 @@ export interface ScopeNodeChip {
   id: string;
   screenKey: string;
   title: string;
+}
+
+export interface ChatProposalControls {
+  selectedNodeId?: string | null;
+  selectedNodeKey?: string | null;
+  proposalsCount: number;
+  isDesignerTalkOpen: boolean;
+  isDrawerOpen: boolean;
+  onToggleDesignerTalk: () => void;
+  onToggleDrawer: () => void;
 }
 
 export interface AgentChatPanelProps {
@@ -29,22 +40,68 @@ export interface AgentChatPanelProps {
   onSendMessage?: (text: string) => void;
   onAttachClick?: () => void;
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
+  proposalControls?: ChatProposalControls;
 }
 
-const ChatCollapsedRail: React.FC<{ onToggleShorten: () => void }> = ({ onToggleShorten }) => {
+const ChatCollapsedRail: React.FC<{
+  onToggleShorten: () => void;
+  proposalControls?: ChatProposalControls;
+}> = ({ onToggleShorten, proposalControls }) => {
   const { t } = useTranslation();
+  const { formatNumber } = useFormatter();
   const expandLabel = t("chat.expandChat", "Mở rộng khung Chat");
+  const talkLabel = `${t("proposals.suggestionLabel", "Gợi ý")} (T)`;
+  const propLabel = `${t("proposals.proposalLabel", "Đề xuất")} (${formatNumber(proposalControls?.proposalsCount ?? 0)})`;
+  const scopeText = proposalControls?.selectedNodeKey || proposalControls?.selectedNodeId;
+
   return (
     <aside
       className="workbench-chat-panel-shortened"
       data-testid="chat-collapsed-rail"
       aria-label={t("chat.shortenChat", "Khung trò chuyện thu gọn")}
-      style={{ width: "40px", minWidth: "40px", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", backgroundColor: "var(--bg-workspace)", borderRight: "1px solid var(--border-subtle)", boxSizing: "border-box", flexShrink: 0, padding: "8px 0", zIndex: 4 }}
+      style={{ width: "40px", minWidth: "40px", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", backgroundColor: "var(--bg-workspace)", borderRight: "1px solid var(--border-subtle)", boxSizing: "border-box", flexShrink: 0, padding: "8px 0", zIndex: 4 }}
     >
       <button type="button" onClick={onToggleShorten} title={expandLabel} aria-label={expandLabel} className="btn-shorten-chat cowok-btn cowok-btn-ghost" style={{ width: "28px", height: "28px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-secondary)", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-surface)" }}>
         <BrandIcon name="panel-left-open" size={14} color="currentColor" />
       </button>
-      <div onClick={onToggleShorten} style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", marginTop: "14px", fontSize: "11px", fontWeight: 600, color: "var(--text-muted)", letterSpacing: "0.04em", userSelect: "none", cursor: "pointer" }}>
+      {proposalControls && (
+        <>
+          <button
+            type="button"
+            data-testid="toggle-designer-talk-btn"
+            aria-pressed={proposalControls.isDesignerTalkOpen}
+            title={talkLabel}
+            aria-label={talkLabel}
+            onClick={proposalControls.onToggleDesignerTalk}
+            style={{ width: "28px", height: "28px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-xs)", border: proposalControls.isDesignerTalkOpen ? "1px solid var(--action-primary)" : "1px solid var(--border-subtle)", backgroundColor: proposalControls.isDesignerTalkOpen ? "var(--bg-selected)" : "var(--bg-surface)", color: proposalControls.isDesignerTalkOpen ? "var(--text-primary)" : "var(--text-secondary)", cursor: "pointer" }}
+          >
+            <BrandIcon name="message-square" size={14} color="currentColor" />
+          </button>
+          <button
+            type="button"
+            data-testid="toggle-change-proposal-drawer-btn"
+            aria-pressed={proposalControls.isDrawerOpen}
+            title={propLabel}
+            aria-label={propLabel}
+            onClick={proposalControls.onToggleDrawer}
+            style={{ position: "relative", width: "28px", height: "28px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-xs)", border: proposalControls.isDrawerOpen ? "1px solid var(--action-primary)" : "1px solid var(--border-subtle)", backgroundColor: proposalControls.isDrawerOpen ? "var(--bg-selected)" : "var(--bg-surface)", color: proposalControls.isDrawerOpen ? "var(--text-primary)" : "var(--text-secondary)", cursor: "pointer" }}
+          >
+            <BrandIcon name="layers" size={14} color="currentColor" />
+            <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "14px", height: "14px", padding: "0 3px", borderRadius: "var(--radius-pill)", backgroundColor: proposalControls.proposalsCount > 0 ? "var(--action-primary)" : "var(--bg-elevated)", color: proposalControls.proposalsCount > 0 ? "var(--action-primary-fg)" : "var(--text-secondary)", border: "1px solid var(--border-default)", fontSize: "9px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+              {formatNumber(proposalControls.proposalsCount)}
+            </span>
+          </button>
+          <span
+            className="cp-scope-pill"
+            data-testid="canvas-active-scope-pill"
+            title={scopeText ? `${t("proposals.scopeNode", "NODE")}: ${scopeText}` : t("proposals.scopeBatch", "BATCH")}
+            style={{ maxWidth: "34px", padding: "1px 4px", fontSize: "9px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {scopeText ? String(scopeText).slice(0, 5) : "ALL"}
+          </span>
+        </>
+      )}
+      <div onClick={onToggleShorten} style={{ writingMode: "vertical-rl", transform: "rotate(180deg)", marginTop: "8px", fontSize: "11px", fontWeight: 600, color: "var(--text-muted)", letterSpacing: "0.04em", userSelect: "none", cursor: "pointer" }}>
         {t("chat.agentTitle", "cowok Agent")}
       </div>
     </aside>
@@ -77,7 +134,7 @@ const LeftChatScopeChips: React.FC<{
             {n.screenKey}
           </span>
           {onDeselectNode && (
-            <button type="button" onClick={() => onDeselectNode(n.id)} aria-label={`${t("floatingChat.deselectNode", "Bỏ chọn")} ${n.screenKey}`} style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: 0, display: "inline-flex" }}>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onDeselectNode(n.id); }} aria-label={`${t("floatingChat.deselectNode", "Bỏ chọn")} ${n.screenKey}`} style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", width: "16px", height: "16px", minWidth: "16px", padding: "2px", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <BrandIcon name="close" size={10} color="currentColor" />
             </button>
           )}
@@ -89,21 +146,59 @@ const LeftChatScopeChips: React.FC<{
 
 export const AgentChatPanel: React.FC<AgentChatPanelProps> = (props) => {
   const { t } = useTranslation();
+  const { formatNumber } = useFormatter();
   const chat = useAgentChatConversation(props.attachmentChips || [], props.onSendMessage, props.projectId, props.activeSessionId, props.selectedNodes);
 
-  if (props.isShortened) return <ChatCollapsedRail onToggleShorten={props.onToggleShorten} />;
+  if (props.isShortened) {
+    return <ChatCollapsedRail onToggleShorten={props.onToggleShorten} proposalControls={props.proposalControls} />;
+  }
   const shortenLabel = t("chat.shortenChat", "Thu gọn khung Chat");
+  const pc = props.proposalControls;
+  const scopeText = pc?.selectedNodeKey || pc?.selectedNodeId;
 
   return (
     <aside className="workbench-chat-panel" aria-label={t("chat.agentTitle", "cowok Agent")} style={{ width: `${props.width}px`, height: "100%", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-canvas)", borderRight: "1px solid var(--border-subtle)", boxSizing: "border-box", flexShrink: 0, position: "relative", fontFamily: "var(--font-sans)" }}>
-      <div style={{ height: "36px", minHeight: "36px", padding: "0 10px 0 12px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-workspace)" }}>
-        <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>{t("chat.agentTitle", "cowok Agent")}</span>
-        <button type="button" onClick={props.onToggleShorten} className="btn-shorten-chat cowok-btn cowok-btn-ghost" title={shortenLabel} aria-label={shortenLabel} style={{ width: "28px", height: "28px", minWidth: "28px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-workspace)", color: "var(--text-secondary)", borderRadius: "var(--radius-xs)", cursor: "pointer" }}>
-          <BrandIcon name="panel-left-close" size={14} color="currentColor" />
-        </button>
+      <div style={{ display: "flex", flexDirection: "column", borderBottom: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-workspace)" }}>
+        <div style={{ height: "34px", padding: "0 8px 0 10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "nowrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>{t("chat.agentTitle", "cowok Agent")}</span>
+            {pc && (
+              <span className="cp-scope-pill" data-testid="canvas-active-scope-pill" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {scopeText ? `${t("proposals.scopeNode", "NODE")}: ${scopeText}` : t("proposals.scopeBatch", "BATCH")}
+              </span>
+            )}
+          </div>
+          <button type="button" onClick={props.onToggleShorten} className="btn-shorten-chat cowok-btn cowok-btn-ghost" title={shortenLabel} aria-label={shortenLabel} style={{ width: "26px", height: "26px", minWidth: "26px", flexShrink: 0, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-surface)", color: "var(--text-secondary)", borderRadius: "var(--radius-xs)", cursor: "pointer" }}>
+            <BrandIcon name="panel-left-close" size={14} color="currentColor" />
+          </button>
+        </div>
+        {pc && (
+          <div style={{ padding: "4px 10px 6px", display: "flex", alignItems: "center", gap: "6px", borderTop: "1px solid var(--border-subtle)", flexWrap: "nowrap" }}>
+            <button
+              type="button"
+              className={`cp-toolbar-btn${pc.isDesignerTalkOpen ? " cp-toolbar-btn--active" : ""}`}
+              data-testid="toggle-designer-talk-btn"
+              aria-pressed={pc.isDesignerTalkOpen}
+              title={t("proposals.suggestionTooltip", "Gợi ý thiết kế & Đánh đổi (Phím tắt T)")}
+              onClick={pc.onToggleDesignerTalk}
+            >
+              <span>{t("proposals.suggestionLabel", "Gợi ý")}</span>
+            </button>
+            <button
+              type="button"
+              className={`cp-toolbar-btn${pc.isDrawerOpen ? " cp-toolbar-btn--active" : ""}`}
+              data-testid="toggle-change-proposal-drawer-btn"
+              aria-pressed={pc.isDrawerOpen}
+              title={`${t("proposals.proposalTooltip", "Danh sách Đề xuất thay đổi")} (${formatNumber(pc.proposalsCount)})`}
+              onClick={pc.onToggleDrawer}
+            >
+              <span>{t("proposals.proposalLabel", "Đề xuất")}</span>
+            </button>
+          </div>
+        )}
       </div>
       <LeftChatScopeChips projectId={props.projectId} sessionId={props.activeSessionId} selectedNodes={props.selectedNodes || []} onDeselectNode={props.onDeselectNode} onFocusNode={props.onFocusNode} />
-      <AgentChatStream messages={chat.messages} showScrollBottom={chat.showScrollBottom} onScrollMessages={chat.handleScrollMessages} onScrollToBottom={chat.scrollToBottom} messagesEndRef={chat.messagesEndRef} />
+      <AgentChatStream messages={chat.messages} showScrollBottom={chat.showScrollBottom} onScrollMessages={chat.handleScrollMessages} onScrollToBottom={chat.scrollToBottom} messagesEndRef={chat.messagesEndRef} onSelectSdiVariant={(intentId, pid, variantId) => { void chat.handleSelectSdiVariant(intentId, pid, variantId); }} />
       <AgentChatComposer inputValue={chat.inputValue} onInputChange={chat.setInputValue} onSend={chat.handleSend} attachmentChips={props.attachmentChips || []} onRemoveAttachmentChip={props.onRemoveAttachmentChip} onAttachClick={props.onAttachClick} onOpenSettings={props.onOpenSettings} />
     </aside>
   );

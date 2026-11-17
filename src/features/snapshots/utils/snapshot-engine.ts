@@ -1,8 +1,9 @@
+// @story 05.3
 import {
-  CreateSnapshotInput,
-  RevertResultResponse,
-  SnapshotFileItem,
-  VersionSnapshotResponse,
+  type CreateSnapshotInput,
+  type RevertResultResponse,
+  type SnapshotFileItem,
+  type VersionSnapshotResponse,
 } from "../../../lib/validations/version-snapshot";
 import {
   SHA256_K,
@@ -33,70 +34,19 @@ import {
   SHIFT_25,
 } from "./sha256-constants";
 
-export const liveWorkspaceStore = new Map<string, Map<string, string>>();
-
-export function getWorkspaceKey(projectId: string, tenantId: string = "default-tenant"): string {
-  return `${projectId}:${tenantId}`;
-}
-
-export function getLiveWorkspaceFile(
-  projectId: string,
-  tenantId: string,
-  path: string
-): string | undefined {
-  const key = getWorkspaceKey(projectId, tenantId);
-  return liveWorkspaceStore.get(key)?.get(path);
-}
-
-export function setLiveWorkspaceFile(
-  projectId: string,
-  tenantId: string,
-  path: string,
-  content: string
-): void {
-  const key = getWorkspaceKey(projectId, tenantId);
-  let tenantFiles = liveWorkspaceStore.get(key);
-  if (!tenantFiles) {
-    tenantFiles = new Map<string, string>();
-    liveWorkspaceStore.set(key, tenantFiles);
-  }
-  tenantFiles.set(path, content);
-}
-
-export function clearLiveWorkspace(projectId?: string, tenantId?: string): void {
-  if (projectId && tenantId) {
-    liveWorkspaceStore.delete(getWorkspaceKey(projectId, tenantId));
-  } else {
-    liveWorkspaceStore.clear();
-  }
-}
-
-export function collectWorkspaceFiles(
-  projectId: string,
-  tenantId: string = "default-tenant",
-  baseFiles: SnapshotFileItem[]
-): SnapshotFileItem[] {
-  const fileMap = new Map<string, string>();
-  for (const f of baseFiles) {
-    fileMap.set(f.path, f.content);
-  }
-  const key = getWorkspaceKey(projectId, tenantId);
-  const tenantOverlay = liveWorkspaceStore.get(key);
-  if (tenantOverlay) {
-    for (const [p, c] of tenantOverlay.entries()) {
-      fileMap.set(p, c);
-    }
-  }
-  return Array.from(fileMap.entries()).map(([path, content]) => ({ path, content }));
-}
-
 function rotr(n: number, b: number): number {
   return (n >>> b) | (n << (BITS_IN_WORD - b));
 }
 
 function buildScheduleWord(w: Uint32Array, t: number): number {
-  const s0 = rotr(w[t - SHIFT_15], SHIFT_7) ^ rotr(w[t - SHIFT_15], SHIFT_18) ^ (w[t - SHIFT_15] >>> SHIFT_3);
-  const s1 = rotr(w[t - SHIFT_2], SHIFT_17) ^ rotr(w[t - SHIFT_2], SHIFT_19) ^ (w[t - SHIFT_2] >>> SHIFT_10);
+  const s0 =
+    rotr(w[t - SHIFT_15], SHIFT_7) ^
+    rotr(w[t - SHIFT_15], SHIFT_18) ^
+    (w[t - SHIFT_15] >>> SHIFT_3);
+  const s1 =
+    rotr(w[t - SHIFT_2], SHIFT_17) ^
+    rotr(w[t - SHIFT_2], SHIFT_19) ^
+    (w[t - SHIFT_2] >>> SHIFT_10);
   return (w[t - SHIFT_16] + s0 + w[t - SHIFT_7] + s1) >>> 0;
 }
 
@@ -169,7 +119,8 @@ export function createSnapshotFromInput(
   const now = new Date().toISOString();
   const nextVerNum = existingSnapshotsCount + 1;
   const versionTag = input.versionTag || `v1.${nextVerNum}.0`;
-  const treeSha256 = computeTreeSha256(input.files);
+  const files = input.files ?? [];
+  const treeSha256 = computeTreeSha256(files);
   const id = input.id || crypto.randomUUID();
   const description = input.description || "";
   const trigger = input.trigger || "manual";
@@ -183,13 +134,53 @@ export function createSnapshotFromInput(
     description,
     trigger,
     treeSha256,
-    files: input.files,
+    proposalId: input.proposalId ?? null,
+    parentSnapshotId: input.parentSnapshotId ?? null,
+    chatArtifactSnapshotId: input.chatArtifactSnapshotId ?? null,
+    files,
     metadata: input.metadata || {},
     createdAt: now,
   };
 }
 
-export function performTwoPhaseRevert(
+export function isHistoricalPreviewReadOnly(
+  activeTurnSnapshotId: string | null | undefined
+): boolean {
+  return typeof activeTurnSnapshotId === "string" && activeTurnSnapshotId.trim().length > 0;
+}
+
+export function parseTurnManifestFiles(manifestJson: string): SnapshotFileItem[] {
+  try {
+    const parsed: unknown = JSON.parse(manifestJson);
+    let rawList: unknown[] = [];
+    if (Array.isArray(parsed)) {
+      rawList = parsed;
+    } else if (parsed && typeof parsed === "object") {
+      const filesProp: unknown = Reflect.get(parsed, "files");
+      if (Array.isArray(filesProp)) {
+        rawList = filesProp;
+      }
+    }
+    return rawList.filter((item): item is SnapshotFileItem => {
+      if (!item || typeof item !== "object") return false;
+      const candidatePath = Reflect.get(item, "path");
+      const candidateContent = Reflect.get(item, "content");
+      const candidateSha = Reflect.get(item, "sha256");
+      const candidateSize = Reflect.get(item, "sizeBytes");
+      return (
+        typeof candidatePath === "string" &&
+        candidatePath.length > 0 &&
+        typeof candidateContent === "string" &&
+        (candidateSha === undefined || typeof candidateSha === "string") &&
+        (candidateSize === undefined || typeof candidateSize === "number")
+      );
+    });
+  } catch {
+    return [];
+  }
+}
+
+export function buildPureRevertPreview(
   currentFiles: SnapshotFileItem[],
   targetSnapshot: VersionSnapshotResponse,
   projectId: string,
@@ -211,14 +202,6 @@ export function performTwoPhaseRevert(
   });
 
   const restoredFiles = targetSnapshot.files.map((f) => ({ ...f }));
-
-  const key = getWorkspaceKey(projectId, tenantId);
-  const tenantFiles = new Map<string, string>();
-  for (const f of restoredFiles) {
-    tenantFiles.set(f.path, f.content);
-  }
-  liveWorkspaceStore.set(key, tenantFiles);
-
   const result: RevertResultResponse = {
     success: true,
     revertedToSnapshotId: targetSnapshot.id,
@@ -231,5 +214,38 @@ export function performTwoPhaseRevert(
     safetySnapshot,
     restoredFiles,
     result,
+  };
+}
+
+export interface StageMutationCallbacks<TConflict = unknown> {
+  isDraftDirty?: boolean;
+  conflictState?: TConflict | null;
+  onDeployDraft?: () => void;
+  onDiscardDraft?: () => void;
+  onResolveConflict?: (choice: "keep_mine" | "take_agent" | "inspect_collisions") => void;
+}
+
+/** Strips live draft/conflict mutators whenever a read-only historical snapshot is previewed. */
+export function resolveHistoricalReadOnlyStageBindings<TConflict = unknown>(
+  raw: StageMutationCallbacks<TConflict>,
+  isHistoricalReadOnly: boolean
+): StageMutationCallbacks<TConflict> {
+  if (!isHistoricalReadOnly) return raw;
+  return {
+    isDraftDirty: false,
+    conflictState: null,
+    onDeployDraft: undefined,
+    onDiscardDraft: undefined,
+    onResolveConflict: undefined,
+  };
+}
+
+/** Guards inline stage mutation callbacks against mutating live state while Historical Preview is active. */
+export function guardReadOnlyAction<TArgs extends unknown[]>(
+  isReadOnly: boolean,
+  fn: ((...args: TArgs) => void) | undefined
+): (...args: TArgs) => void {
+  return (...args: TArgs) => {
+    if (!isReadOnly && fn) fn(...args);
   };
 }

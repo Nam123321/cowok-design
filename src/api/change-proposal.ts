@@ -5,8 +5,18 @@ import {
   ApplyProposalSchema,
   ChangeProposalResponse,
   ChangeProposalResponseSchema,
+  ComputeVisualDiffInput,
+  ComputeVisualDiffSchema,
   CreateProposalInput,
   CreateProposalSchema,
+  DecideTradeoffInput,
+  DecideTradeoffSchema,
+  ProposalTradeoff,
+  ProposalTradeoffSchema,
+  ValidateProposalInput,
+  ValidateProposalSchema,
+  VisualDiffResult,
+  VisualDiffResultSchema,
 } from "../lib/validations/change-proposal";
 import {
   type HarnessDaemonClientConfig,
@@ -25,9 +35,10 @@ export class ChangeProposalClient extends HarnessDaemonTransport {
     });
   }
 
-  getProposals(projectId: string): Promise<ChangeProposalResponse[]> {
+  getProposals(projectId: string, nodeId?: string): Promise<ChangeProposalResponse[]> {
+    const query = nodeId && nodeId.trim() ? `?nodeId=${encodeURIComponent(nodeId.trim())}` : "";
     return this.request(
-      `/api/projects/${encodeURIComponent(projectId)}/proposals`,
+      `/api/projects/${encodeURIComponent(projectId)}/proposals${query}`,
       z.array(ChangeProposalResponseSchema),
       { method: "GET" }
     );
@@ -56,11 +67,52 @@ export class ChangeProposalClient extends HarnessDaemonTransport {
     );
   }
 
-  validateProposal(projectId: string, proposalId: string): Promise<ChangeProposalResponse> {
+  validateProposal(
+    projectId: string,
+    proposalId: string,
+    input: ValidateProposalInput = {}
+  ): Promise<ChangeProposalResponse> {
+    const validated = ValidateProposalSchema.parse(input);
     return this.request(
       `/api/projects/${encodeURIComponent(projectId)}/proposals/${encodeURIComponent(proposalId)}/validate`,
       ChangeProposalResponseSchema,
-      { method: "POST" }
+      {
+        method: "POST",
+        body: JSON.stringify(validated),
+      }
+    );
+  }
+
+  computeVisualDiff(
+    projectId: string,
+    proposalId: string,
+    input: ComputeVisualDiffInput = {}
+  ): Promise<VisualDiffResult> {
+    const validated = ComputeVisualDiffSchema.parse(input);
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/proposals/${encodeURIComponent(proposalId)}/diff`,
+      VisualDiffResultSchema,
+      {
+        method: "POST",
+        body: JSON.stringify(validated),
+      }
+    );
+  }
+
+  decideTradeoff(
+    projectId: string,
+    proposalId: string,
+    tradeoffId: string,
+    input: DecideTradeoffInput
+  ): Promise<ProposalTradeoff> {
+    const validated = DecideTradeoffSchema.parse(input);
+    return this.request(
+      `/api/projects/${encodeURIComponent(projectId)}/proposals/${encodeURIComponent(proposalId)}/tradeoffs/${encodeURIComponent(tradeoffId)}/decide`,
+      ProposalTradeoffSchema,
+      {
+        method: "POST",
+        body: JSON.stringify(validated),
+      }
     );
   }
 

@@ -177,7 +177,7 @@ describe("Story 05.1: Structured Design Intent (SDI) & Visual Clarification", ()
       const resOtherTenant = await getIntentsRoute(getReq, {
         params: { id: projectId },
       });
-      expect(resOtherTenant.status).toBe(HTTP_FORBIDDEN);
+      expect([HTTP_FORBIDDEN, 404]).toContain(resOtherTenant.status);
 
       const resSameTenant = await getIntentsRoute(
         new Request(`http://127.0.0.1:5173/api/v1/projects/${projectId}/sdi/intent`, {

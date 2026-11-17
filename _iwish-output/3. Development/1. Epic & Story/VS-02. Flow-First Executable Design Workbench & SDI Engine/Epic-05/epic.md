@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-05"
 title: "Epic 05: Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR"
-status: in-progress
+status: completed
 track: "Stream-2"
 wave: 3
 provides: ["Option 5 2D Storyboard", "Entry-First Live HTML Stage", "Per-Node ChangeProposal & cowok-design-diff", "Turn Snapshots & Real GitHub PR Pipeline"]
@@ -62,9 +62,9 @@ Epic 05 xây dựng hệ thống chuyển hóa ngôn ngữ tự nhiên thành ý
 
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
-| **Story 05.1** | Trình biên dịch Structured Design Intent (SDI) (DesignIntentV1) & Visual Clarification (2-3 Phương án) | `refactored` | `2` | `['02.2', '04.3']` |
-| **Story 05.2** | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | `refactored` | `3` | `['05.1']` |
-| **Story 05.3** | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | `planned` | `2` | `['05.2']` |
+| **Story 05.1** | Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11) | `completed` | `2` | `['02.2', '04.5']` |
+| **Story 05.2** | Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup | `completed` | `3` | `['05.1']` |
+| **Story 05.3** | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | `completed` | `2` | `['05.2']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 
@@ -107,9 +107,9 @@ Epic 05 xây dựng hệ thống chuyển hóa ngôn ngữ tự nhiên thành ý
 
 | Story ID | Trạng thái Thực tế | Provides (Cung cấp) | Consumes (Tiêu thụ) | Zod Schema Status | Ghi chú & Rào chắn |
 |---|---|---|---|:---:|---|
-| **Story-05.1** | `planned` | Cung cấp năng lực của `Story 05.1` cho các Story phụ thuộc trong `Epic 05` và các làn sóng tiếp theo | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
-| **Story-05.2** | `planned` | Cung cấp năng lực của `Story 05.2` cho các Story phụ thuộc trong `Epic 05` và các làn sóng tiếp theo | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
-| **Story-05.3** | `planned` | Cung cấp năng lực của `Story 05.3` cho các Story phụ thuộc trong `Epic 05` và các làn sóng tiếp theo | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
+| **Story-05.1** | `refactored` | **AC-07 (Entry-First Live Shell, IframeKeepAlivePool, Shared AppShell & Non-Tech Sample Data Studio  | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
+| **Story-05.2** | `refactored` | Cung cấp cơ chế duyệt và kiểm soát thay đổi thị giác cho `Story 05.3`, `Epic 10` (Design Tournament) | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
+| **Story-05.3** | `refactored` | Cung cấp tính năng khôi phục trạng thái, xuất bản mã nguồn, mở PR và chuyển giao thiết kế sang IDE c | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
 
 ---
 
@@ -118,15 +118,15 @@ Epic 05 xây dựng hệ thống chuyển hóa ngôn ngữ tự nhiên thành ý
 ```mermaid
 flowchart TD
     subgraph S1["Sprint 1: Phân kỳ Thực thi"]
-        Story_05_1["Story-05.1 (Planned)<br>Story 05.1: Trình biên dịch Structured Design"]
+        Story_05_1["Story-05.1 (Refactored)<br>Story 05.1: Project Launchpad 4-Path, Option "]
     end
 
     subgraph S2["Sprint 2: Phân kỳ Thực thi"]
-        Story_05_2["Story-05.2 (Planned)<br>Story 05.2: Sandboxed ChangeProposal Diff, Va"]
+        Story_05_2["Story-05.2 (Refactored)<br>Story 05.2: Per-Node / Batch ChangeProposal, "]
     end
 
     subgraph S3["Sprint 3: Phân kỳ Thực thi"]
-        Story_05_3["Story-05.3 (Planned)<br>Story 05.3: Lịch sử Phiên bản VersionSnapshot"]
+        Story_05_3["Story-05.3 (Refactored)<br>Story 05.3: Immutable Turn Snapshots, Convers"]
     end
 
     E2E_GATE["E2E Platform Gate<br>Zero-Trust Verification"]
@@ -148,7 +148,7 @@ flowchart TD
 #### Sprint 1: Phân kỳ Tác vụ
 - **Mô hình**: Các câu chuyện được phát triển **tuần tự (Sequential)**.
 - **Phạm vi thực thi**:
-  1. **`Story-05.1`** (planned): Story 05.1: Trình biên dịch Structured Design Intent (SDI) (DesignIntentV1) & Visual Clarification (2-3 Phương án)
+  1. **`Story-05.1`** (refactored): Story 05.1: Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11)
 - **Tiêu chí Hoàn thành (Sprint Done Criteria)**:
   - Toàn bộ Zod schemas và Unit tests cho các story trong sprint vượt qua 100%.
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
@@ -156,7 +156,7 @@ flowchart TD
 #### Sprint 2: Phân kỳ Tác vụ
 - **Mô hình**: Các câu chuyện được phát triển **tuần tự (Sequential)**.
 - **Phạm vi thực thi**:
-  1. **`Story-05.2`** (planned): Story 05.2: Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject
+  1. **`Story-05.2`** (refactored): Story 05.2: Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup
 - **Tiêu chí Hoàn thành (Sprint Done Criteria)**:
   - Toàn bộ Zod schemas và Unit tests cho các story trong sprint vượt qua 100%.
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
@@ -164,99 +164,22 @@ flowchart TD
 #### Sprint 3: Phân kỳ Tác vụ
 - **Mô hình**: Các câu chuyện được phát triển **tuần tự (Sequential)**.
 - **Phạm vi thực thi**:
-  1. **`Story-05.3`** (planned): Story 05.3: Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR
+  1. **`Story-05.3`** (refactored): Story 05.3: Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17)
 - **Tiêu chí Hoàn thành (Sprint Done Criteria)**:
   - Toàn bộ Zod schemas và Unit tests cho các story trong sprint vượt qua 100%.
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
 
 <!-- END AUTO-ROADMAP -->
+
 | Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | planned |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | refactored |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | refactored |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | refactored |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Agent-Centric Minimalist Open-Prose Chat, SDI Compiler & 2D DAG Structural Draft JSON Diff Analyzer | 02.2, 04.3 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Sandboxed ChangeProposal Diff, Validation Gate & One-Click Apply / Reject | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR | 05.2 | refactored |
+| :--- | :--- | :--- | :--- |
+| [Story-05.1](./Story-05.1/story.md) | Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11) | 02.2, 04.5 | completed |
+| [Story-05.2](./Story-05.2/story.md) | Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup | 05.1 | completed |
+| [Story-05.3](./Story-05.3/story.md) | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | 05.2 | completed |
+
+## Layer Documents
+- [Layer-Epic-FE](./layer-epic-fe.md)
+- [Layer-Epic-DB](./layer-epic-db.md)
+- [Layer-Epic-API](./layer-epic-api.md)
+- [Contract Claims](./contract_claims.yaml)
+

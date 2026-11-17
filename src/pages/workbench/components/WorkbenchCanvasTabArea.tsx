@@ -6,6 +6,7 @@ import { FlowWorkbenchState, createNewFlowWorkbenchStore } from "../../../featur
 import { CompanionCanvasTab, CanvasTabItem } from "../../../features/flow/components/CompanionCanvasTab";
 import { DagCanvas2D } from "../../../features/flow/components/DagCanvas2D";
 import { ContextualNodeFloatingChat } from "../../../features/flow/components/ContextualNodeFloatingChat";
+import type { useNodeProposalController } from "../../../features/proposals/hooks/useNodeProposalController";
 import { ErrorBoundary } from "../../../components/ui/ErrorBoundary";
 import { findOrphanNodes } from "../../../features/flow/utils/graph-analysis";
 import { useWorkbenchGraphHandlers } from "../hooks/useWorkbenchGraphHandlers";
@@ -65,11 +66,12 @@ export interface WorkbenchCanvasTabAreaProps {
   onOpenLeftChat?: () => void;
   isLeftChatCollapsed?: boolean;
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
+  proposalController?: ReturnType<typeof useNodeProposalController>;
 }
 
 export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = ({
   state, store, activeTabId, projectId = DEFAULT_FLOW_PROJECT_ID, sessionId = "session-1",
-  onTabChange, graphHandlers, onCommentOnNode, onAddQuoteChip, onOpenLeftChat, isLeftChatCollapsed = false, onOpenSettings,
+  onTabChange, graphHandlers, onCommentOnNode, onAddQuoteChip, onOpenLeftChat, isLeftChatCollapsed = false, onOpenSettings, proposalController,
 }) => {
   const { t } = useTranslation();
   const [isDeploying, setIsDeploying] = useState(false);
@@ -78,7 +80,7 @@ export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = ({
 
   return (
     <main style={{ flex: 1, minWidth: "550px", height: "100%", overflow: "hidden", position: "relative", backgroundColor: "var(--bg-canvas)" }}>
-      <CompanionCanvasTab projectId={projectId} activeTabId={activeTabId} onTabChange={onTabChange} selectedNodeId={state.selectedNodeId} nodes={state.nodes} isDraftDirty={state.isDraftDirty} orphanCount={orphanCount} conflictState={state.conflictState} onResolveConflict={(c) => { void store.resolveConflict(c); }} onDeployDraft={() => { void handleDeployDraft(); }} onDiscardDraft={() => store.discardDraft()} onAttachRegionToChat={onCommentOnNode} onQuoteText={onAddQuoteChip} onSelectNodeSubState={(nid, sub) => store.setNodeSubState(nid, sub)}>
+      <CompanionCanvasTab projectId={projectId} activeTabId={activeTabId} onTabChange={onTabChange} selectedNodeId={state.selectedNodeId} onSelectNode={(id) => store.selectNode(id, false)} nodes={state.nodes} isDraftDirty={state.isDraftDirty} orphanCount={orphanCount} conflictState={state.conflictState} onResolveConflict={(c) => { void store.resolveConflict(c); }} onDeployDraft={() => { void handleDeployDraft(); }} onDiscardDraft={() => store.discardDraft()} onAttachRegionToChat={onCommentOnNode} onQuoteText={onAddQuoteChip} onSelectNodeSubState={(nid, sub) => store.setNodeSubState(nid, sub)} proposalController={proposalController}>
         <ErrorBoundary fallbackTitle={t("errors.dagCanvasRender", "Lỗi hiển thị Canvas 2D DAG")} onReset={() => store.discardDraft()}>
           <DagCanvas2D state={state} projectId={projectId} sessionId={sessionId} onUpdatePosition={graphHandlers.handleUpdatePosition} onSetViewport={graphHandlers.handleSetViewport} onSelectNode={(id, multi) => store.selectNode(id, multi)} onSelectTransition={(id) => store.selectTransition(id)} onAddNode={graphHandlers.handleAddNode} onAutoLayout={() => store.autoLayoutNodes()} onSelectSubState={(id, sub) => store.setNodeSubState(id, sub)} onDuplicateNode={(id) => store.duplicateNode(id)} onRenameNode={(id, title) => store.renameNode(id, title)} onDeleteNode={(id) => store.deleteNode(id)} onAddTransition={graphHandlers.handleAddTransition} onUpdateTransition={(id, u) => store.updateTransition(id, u)} onReverseTransition={graphHandlers.handleReverseTransition} onDeleteTransition={(id) => store.deleteTransition(id)} onUpdateNodeNote={(id, note) => store.updateNodeNote(id, note)} onToggleMinimap={() => store.toggleMinimap()} onUndo={() => store.undo()} onRedo={() => store.redo()} onCommentOnNode={onCommentOnNode} />
         </ErrorBoundary>

@@ -15,15 +15,17 @@ const FONT_WEIGHT_MEDIUM = 500;
 const TEXTAREA_ROWS = 3;
 
 const buildLensButtonStyle = (isActive: boolean): React.CSSProperties => ({
-  height: "24px",
-  padding: "0 10px",
+  height: "26px",
+  padding: "0 8px",
   borderRadius: "4px 4px 0 0",
   border: "none",
   borderBottom: isActive ? "2px solid var(--action-primary)" : "2px solid transparent",
   backgroundColor: isActive ? "var(--bg-selected)" : "transparent",
   color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
   fontWeight: isActive ? FONT_WEIGHT_SEMIBOLD : FONT_WEIGHT_MEDIUM,
-  fontSize: "11.5px",
+  fontSize: "11px",
+  whiteSpace: "nowrap",
+  flexShrink: 0,
   display: "inline-flex",
   alignItems: "center",
   gap: "5px",
@@ -110,14 +112,30 @@ const StructurePaneHeader: React.FC<{
 
   return (
     <div className="structure-pane-header" style={{ height: "35px", minHeight: "35px", padding: "0 8px", backgroundColor: "var(--bg-surface)", borderBottom: "1px solid var(--border-default)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
-      <div className="btn-1click-view-toggle" role="tablist" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-        <button type="button" role="tab" aria-selected={structureLens === "userflow"} data-testid="lens-userflow-btn" onClick={() => onSetLens("userflow")} style={buildLensButtonStyle(structureLens === "userflow")}>
+      <div className="btn-1click-view-toggle" role="tablist" style={{ display: "inline-flex", alignItems: "center", gap: "4px", flexWrap: "nowrap", minWidth: 0 }}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={structureLens === "userflow"}
+          data-testid="lens-userflow-btn"
+          title={t("canvas.userflowLensTooltip", "Sơ đồ luồng người dùng 2D (Userflow DAG): thiết kế cấu trúc màn hình, điều kiện rẽ nhánh và luồng chuyển trạng thái.")}
+          onClick={() => onSetLens("userflow")}
+          style={buildLensButtonStyle(structureLens === "userflow")}
+        >
           <BrandIcon name="workflow" size={ICON_SIZE_MD} color="currentColor" />
-          <span>{t("canvas.userflowLens", "Userflow")}</span>
+          <span>{t("canvas.userflowLens", "Luồng người dùng")}</span>
         </button>
-        <button type="button" role="tab" aria-selected={structureLens === "slide-cms"} data-testid="lens-slide-cms-btn" onClick={() => onSetLens("slide-cms")} style={buildLensButtonStyle(structureLens === "slide-cms")}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={structureLens === "slide-cms"}
+          data-testid="lens-slide-cms-btn"
+          title={t("canvas.slideCmsLensTooltip", "Trình chiếu Slide & Zero-Code CMS: biên tập nội dung slide, tiêu đề và chỉ số KPI trực quan không cần viết mã.")}
+          onClick={() => onSetLens("slide-cms")}
+          style={buildLensButtonStyle(structureLens === "slide-cms")}
+        >
           <BrandIcon name="layers" size={ICON_SIZE_MD} color="currentColor" />
-          <span>{t("canvas.slideCmsLens", "Slide Deck / CMS")}</span>
+          <span>{t("canvas.slideCmsLens", "Trình chiếu Slide")}</span>
         </button>
       </div>
       <button
@@ -152,6 +170,8 @@ export const CompanionStructureLeftPane: React.FC<{
   onSelectSlide: (idx: number) => void;
   onCloseCmsDrawer: () => void;
   onUpdateActiveSlide: (patch: Partial<SlidePhaseItem>) => void;
+  isWalkthroughActive?: boolean;
+  walkthroughStepLabel?: string;
   children: React.ReactNode;
 }> = (props) => {
   const { t } = useTranslation();
@@ -178,6 +198,15 @@ export const CompanionStructureLeftPane: React.FC<{
         isRightPreviewHidden={props.isRightPreviewHidden}
         onToggleRightPreviewHidden={props.onToggleRightPreviewHidden}
       />
+      {props.isWalkthroughActive && (
+        <div data-testid="walkthrough-dag-sync-banner" style={{ padding: "5px 10px", backgroundColor: "var(--bg-selected)", borderBottom: "1px solid var(--action-primary)", color: "var(--action-primary)", fontSize: "11px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
+            <BrandIcon name="workflow" size={12} color="currentColor" />
+            <span>{t("canvas.walkthroughDagSyncLabel", "Walkthrough Dual Screen — Đồng bộ DAG")}</span>
+          </span>
+          {props.walkthroughStepLabel && <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px" }}>{props.walkthroughStepLabel}</span>}
+        </div>
+      )}
       <DraftDeployBanner
         isDraftDirty={props.isDraftDirty}
         orphanCount={props.orphanCount}

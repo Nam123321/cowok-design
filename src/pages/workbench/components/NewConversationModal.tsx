@@ -167,6 +167,10 @@ export const NewConversationModal: React.FC<NewConversationModalProps> = (props)
               localFolderPath={s.localFolderPath} onChangeLocalFolderPath={s.setLocalFolderPath}
               sessionTitle={s.sessionTitle} onChangeSessionTitle={s.setSessionTitle}
               onBrowseFolder={() => s.setIsDaemonPickerOpen(true)}
+              onOpenLaunchpad={() => {
+                props.onClose();
+                window.dispatchEvent(new CustomEvent("cowok:open-launchpad"));
+              }}
             />
             <ModalFooterButtons isSlugValid={isSlugValid} onClose={props.onClose} />
           </form>

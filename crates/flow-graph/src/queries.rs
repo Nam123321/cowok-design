@@ -15,6 +15,7 @@ pub(crate) struct GraphHeader {
     pub id: String,
     pub version: i64,
     pub layout_version: i64,
+    pub revision: i64,
 }
 
 pub(crate) fn validate_node_type(node_type: &str) -> Result<&str, FlowServiceError> {
@@ -30,11 +31,11 @@ pub(crate) fn validate_node_type(node_type: &str) -> Result<&str, FlowServiceErr
 
 pub(crate) fn validate_flow_type(flow_type: &str) -> Result<&str, FlowServiceError> {
     match flow_type {
-        "main" | "if_else" | "if_not" => Ok(flow_type),
+        "main" | "if_else" | "if_not" | "loopback" => Ok(flow_type),
         other => Err(FlowServiceError::new(
             400,
             "VALIDATION_ERROR",
-            format!("Invalid flowType '{other}' (expected main|if_else|if_not)"),
+            format!("Invalid flowType '{other}' (expected main|if_else|if_not|loopback)"),
         )),
     }
 }
@@ -90,7 +91,7 @@ pub(crate) fn ensure_project_and_graph(
 
     let header_opt: Option<GraphHeader> = tx
         .query_row(
-            "SELECT id, version, layout_version FROM flow_graphs \
+            "SELECT id, version, layout_version, COALESCE(revision, 1) FROM flow_graphs \
              WHERE tenant_id = ?1 AND project_id = ?2 AND portal_key = 'default'",
             params![tenant_id, project_id],
             |r| {
@@ -98,6 +99,7 @@ pub(crate) fn ensure_project_and_graph(
                     id: r.get(0)?,
                     version: r.get(1)?,
                     layout_version: r.get(2)?,
+                    revision: r.get(3)?,
                 })
             },
         )
@@ -112,14 +114,15 @@ pub(crate) fn ensure_project_and_graph(
             id: format!("virtual-{project_id}"),
             version: 1,
             layout_version: 1,
+            revision: 1,
         });
     }
 
     let gid = Uuid::new_v4().to_string();
     let now_ms = Utc::now().timestamp_millis();
     tx.execute(
-        "INSERT INTO flow_graphs (id, tenant_id, project_id, portal_key, title, version, layout_version, updated_at) \
-         VALUES (?1, ?2, ?3, 'default', 'Default Flow', 1, 1, ?4)",
+        "INSERT INTO flow_graphs (id, tenant_id, project_id, portal_key, title, version, layout_version, revision, updated_at) \
+         VALUES (?1, ?2, ?3, 'default', 'Default Flow', 1, 1, 1, ?4)",
         params![gid, tenant_id, project_id, now_ms],
     )
     .map_err(|e| FlowServiceError::from_harness(map_sqlite_error(e, "insert_default_flow_graph")))?;
@@ -128,6 +131,7 @@ pub(crate) fn ensure_project_and_graph(
         id: gid,
         version: 1,
         layout_version: 1,
+        revision: 1,
     })
 }
 
@@ -140,7 +144,8 @@ pub(crate) fn load_nodes_in_tx(
         .prepare(
             "SELECT id, tenant_id, project_id, portal_id, screen_key, title, node_type, \
                     route_path, component_entry_path, fixture_ref, fixture_json, note, \
-                    viewport_preset, pos_x, pos_y, version, layout_version, created_at, updated_at \
+                    viewport_preset, pos_x, pos_y, version, layout_version, created_at, updated_at, \
+                    portal_group, shared_app_shell_id, mini_skeleton_html, cta_pills_json, revision \
              FROM flow_nodes WHERE tenant_id = ?1 AND project_id = ?2 ORDER BY created_at ASC, id ASC",
         )
         .map_err(|e| FlowServiceError::from_harness(map_sqlite_error(e, "prepare_load_nodes")))?;
@@ -167,7 +172,8 @@ pub(crate) fn load_node_by_id_in_tx(
     tx.query_row(
         "SELECT id, tenant_id, project_id, portal_id, screen_key, title, node_type, \
                 route_path, component_entry_path, fixture_ref, fixture_json, note, \
-                viewport_preset, pos_x, pos_y, version, layout_version, created_at, updated_at \
+                viewport_preset, pos_x, pos_y, version, layout_version, created_at, updated_at, \
+                portal_group, shared_app_shell_id, mini_skeleton_html, cta_pills_json, revision \
          FROM flow_nodes WHERE id = ?1 AND tenant_id = ?2 AND project_id = ?3",
         params![node_id, tenant_id, project_id],
         map_node_row,
@@ -184,7 +190,8 @@ pub(crate) fn load_transitions_in_tx(
     let mut stmt = tx
         .prepare(
             "SELECT id, tenant_id, project_id, source_node_id, target_node_id, flow_type, \
-                    trigger_event, guard_condition, version, created_at, updated_at \
+                    trigger_event, guard_condition, version, created_at, updated_at, \
+                    source_cta_ff_id, max_loop_iterations, revision \
              FROM flow_edges WHERE tenant_id = ?1 AND project_id = ?2 ORDER BY created_at ASC, id ASC",
         )
         .map_err(|e| FlowServiceError::from_harness(map_sqlite_error(e, "prepare_load_edges")))?;
@@ -215,6 +222,7 @@ pub(crate) fn load_snapshot_in_tx(
         graph_id: hdr.id,
         graph_version: hdr.version,
         layout_version: hdr.layout_version,
+        revision: hdr.revision,
         nodes,
         transitions,
     })
@@ -229,6 +237,11 @@ pub(crate) fn map_node_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<FlowNodeDt
     let raw_viewport_preset: String = r.get(12)?;
     let viewport_preset = normalize_viewport_preset(&raw_viewport_preset)
         .unwrap_or_else(|_| "desktop-1440".to_string());
+    let portal_group: Option<String> = r.get(19).unwrap_or(None);
+    let shared_app_shell_id: Option<String> = r.get(20).unwrap_or(None);
+    let mini_skeleton_html: Option<String> = r.get(21).unwrap_or(None);
+    let cta_pills_json: String = r.get(22).unwrap_or_else(|_| "[]".to_string());
+    let revision: i64 = r.get(23).unwrap_or(1);
     Ok(FlowNodeDto {
         id: r.get(0)?,
         tenant_id: r.get(1)?,
@@ -249,12 +262,20 @@ pub(crate) fn map_node_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<FlowNodeDt
         layout_version: r.get(16)?,
         created_at: created_ms.to_string(),
         updated_at: updated_ms.to_string(),
+        portal_group,
+        shared_app_shell_id,
+        mini_skeleton_html,
+        cta_pills_json,
+        revision,
     })
 }
 
 pub(crate) fn map_transition_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<FlowTransitionDto> {
     let created_ms: i64 = r.get(9)?;
     let updated_ms: i64 = r.get(10)?;
+    let source_cta_ff_id: Option<String> = r.get(11).unwrap_or(None);
+    let max_loop_iterations: i64 = r.get(12).unwrap_or(3);
+    let revision: i64 = r.get(13).unwrap_or(1);
     Ok(FlowTransitionDto {
         id: r.get(0)?,
         tenant_id: r.get(1)?,
@@ -267,5 +288,8 @@ pub(crate) fn map_transition_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Flow
         version: r.get(8)?,
         created_at: created_ms.to_string(),
         updated_at: updated_ms.to_string(),
+        source_cta_ff_id,
+        max_loop_iterations,
+        revision,
     })
 }

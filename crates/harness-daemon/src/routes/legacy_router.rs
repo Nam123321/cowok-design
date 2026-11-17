@@ -8,11 +8,13 @@ use axum::{
 
 use crate::daemon_auth::legacy_project_auth_middleware;
 use crate::routes::fs_jail;
+use crate::routes::github_ide_integrations::integration_routes;
 use crate::routes::legacy_proposals::{
     handle_apply_proposal, handle_create_pr, handle_create_proposal, handle_create_snapshot,
-    handle_download_export, handle_export_snapshots, handle_get_proposal, handle_get_snapshot,
-    handle_list_proposals, handle_list_snapshots, handle_reject_proposal, handle_revert_snapshot,
-    handle_validate_proposal,
+    handle_decide_tradeoff, handle_diff_proposal, handle_download_export, handle_export_snapshots,
+    handle_fork_turn_snapshot, handle_get_proposal, handle_get_snapshot, handle_list_proposals,
+    handle_list_snapshots, handle_list_turn_snapshots, handle_open_ide_handoff,
+    handle_reject_proposal, handle_revert_snapshot, handle_validate_proposal,
 };
 use crate::routes::legacy_sdi::{
     handle_get_constraint_profile, handle_get_design_contracts, handle_get_icon_manifest,
@@ -148,6 +150,14 @@ fn legacy_sdi_proposal_routes() -> Router<DaemonAppState> {
             "/api/v1/projects/:id/proposals/:proposal_id/reject",
             post(handle_reject_proposal),
         )
+        .route(
+            "/api/v1/projects/:id/proposals/:proposal_id/diff",
+            post(handle_diff_proposal),
+        )
+        .route(
+            "/api/v1/projects/:id/proposals/:proposal_id/tradeoffs/:tradeoff_id/decide",
+            post(handle_decide_tradeoff),
+        )
 }
 
 fn legacy_snapshot_session_routes() -> Router<DaemonAppState> {
@@ -155,6 +165,10 @@ fn legacy_snapshot_session_routes() -> Router<DaemonAppState> {
         .route(
             "/api/v1/projects/:id/snapshots",
             get(handle_list_snapshots).post(handle_create_snapshot),
+        )
+        .route(
+            "/api/v1/projects/:id/turn-snapshots",
+            get(handle_list_turn_snapshots),
         )
         .route(
             "/api/v1/projects/:id/snapshots/:snapshot_id",
@@ -165,6 +179,10 @@ fn legacy_snapshot_session_routes() -> Router<DaemonAppState> {
             post(handle_revert_snapshot),
         )
         .route(
+            "/api/v1/projects/:id/snapshots/:turn_snapshot_id/fork",
+            post(handle_fork_turn_snapshot),
+        )
+        .route(
             "/api/v1/projects/:id/snapshots/export",
             post(handle_export_snapshots),
         )
@@ -173,6 +191,10 @@ fn legacy_snapshot_session_routes() -> Router<DaemonAppState> {
             get(handle_download_export),
         )
         .route("/api/v1/projects/:id/snapshots/pr", post(handle_create_pr))
+        .route(
+            "/api/v1/projects/:id/handoff/open-ide",
+            post(handle_open_ide_handoff),
+        )
         .route("/api/v1/projects/:id/boundary", get(handle_get_boundary))
         .route("/api/v1/projects/:id/promote", post(handle_promote_scratch))
         .route(
@@ -201,6 +223,7 @@ pub(crate) fn build_protected_legacy_router(state: DaemonAppState) -> Router<Dae
         .merge(legacy_project_spec_routes())
         .merge(legacy_sdi_proposal_routes())
         .merge(legacy_snapshot_session_routes())
+        .merge(integration_routes())
         .route_layer(middleware::from_fn_with_state(
             state,
             legacy_project_auth_middleware,

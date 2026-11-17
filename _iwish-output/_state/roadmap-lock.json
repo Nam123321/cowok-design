@@ -1,10 +1,13 @@
 {
   "schema_version": "1.0.0",
   "project_slug": "cowok-design",
-  "verified_state_sha": "8ab55dc5ac996b626e5cc5d55f1f1940cba2dd8d44d6619f66c3ef4021928e9e",
-  "generated_at": "2026-11-13T12:10:03.267890",
+  "verified_state_sha": "61772b92e2fde8145f6d98a6ccef298092c9996f4b6eda4274d910fa07c04d8c",
+  "generated_at": "2026-11-17T19:14:38.635592",
   "maturity_baseline_epics": [
-    "03"
+    "01",
+    "03",
+    "04",
+    "05"
   ],
   "waves": [
     {
@@ -12,7 +15,8 @@
       "wave_name": "Wave 1: Vertical Value Increment 1",
       "status": "active",
       "epics": [
-        "01"
+        "02",
+        "06"
       ],
       "sub_epic_slices": [],
       "vertical_value_slice": "Delivery of core capabilities for Wave 1",
@@ -30,8 +34,8 @@
       "wave_name": "Wave 2: Vertical Value Increment 2",
       "status": "pending",
       "epics": [
-        "02",
-        "04"
+        "08",
+        "07"
       ],
       "sub_epic_slices": [],
       "vertical_value_slice": "Delivery of core capabilities for Wave 2",
@@ -49,9 +53,7 @@
       "wave_name": "Wave 3: Vertical Value Increment 3",
       "status": "pending",
       "epics": [
-        "08",
-        "05",
-        "06"
+        "09"
       ],
       "sub_epic_slices": [],
       "vertical_value_slice": "Delivery of core capabilities for Wave 3",
@@ -69,8 +71,7 @@
       "wave_name": "Wave 4: Vertical Value Increment 4",
       "status": "pending",
       "epics": [
-        "09",
-        "07"
+        "10"
       ],
       "sub_epic_slices": [],
       "vertical_value_slice": "Delivery of core capabilities for Wave 4",
@@ -88,7 +89,6 @@
       "wave_name": "Wave 5: Vertical Value Increment 5",
       "status": "pending",
       "epics": [
-        "10",
         "11",
         "12"
       ],
@@ -106,43 +106,32 @@
   ],
   "allowed_stories_by_wave": {
     "wave_1": [
-      "01.1",
-      "01.2",
-      "01.3"
-    ],
-    "wave_2": [
       "02.1",
       "02.2",
       "02.3",
-      "04.1",
-      "04.2",
-      "04.3",
-      "04.4",
-      "04.5"
-    ],
-    "wave_3": [
-      "08.1",
-      "08.2",
-      "08.3",
-      "05.1",
-      "05.2",
-      "05.3",
       "06.1",
       "06.2",
       "06.3"
     ],
-    "wave_4": [
-      "09.1",
-      "09.2",
-      "09.3",
+    "wave_2": [
+      "08.1",
+      "08.2",
+      "08.3",
       "07.1",
       "07.2",
       "07.3"
     ],
-    "wave_5": [
+    "wave_3": [
+      "09.1",
+      "09.2",
+      "09.3"
+    ],
+    "wave_4": [
       "10.1",
       "10.2",
-      "10.3",
+      "10.3"
+    ],
+    "wave_5": [
       "11.1",
       "11.2",
       "11.3",
@@ -154,14 +143,26 @@
   "immediate_p0_action_slices": [
     {
       "slice_id": "P0.1",
-      "epic_id": "01",
-      "name": "Cargo Workspace, Domain Contracts (ts-rs) & 16-Table SQLite Registry (Immediate P0 Anchor)",
+      "epic_id": "02",
+      "name": "JIT Prompt Assembler & 3-Profile Model Capability Adapter (Immediate P0 Anchor)",
       "story_ids": [
-        "01.1",
-        "01.2",
-        "01.3"
+        "02.1",
+        "02.2",
+        "02.3"
       ],
       "track": "Stream-1",
+      "rationale": "Zero blocker risk anchor for Wave 1 unblocking downstream business workflows."
+    },
+    {
+      "slice_id": "P0.2",
+      "epic_id": "06",
+      "name": "Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench (Immediate P0 Anchor)",
+      "story_ids": [
+        "06.1",
+        "06.2",
+        "06.3"
+      ],
+      "track": "Stream-2",
       "rationale": "Zero blocker risk anchor for Wave 1 unblocking downstream business workflows."
     }
   ],

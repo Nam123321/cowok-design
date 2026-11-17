@@ -2,8 +2,8 @@
 // @implements AC-06, AC-07, AC-08
 import type { FixtureRef, ViewportPreset } from "../../../lib/validations/screen-fixture";
 
-export type FlowEdgeType = "main" | "branch" | "fallback";
-export type CanonicalFlowType = "main" | "if_else" | "if_not";
+export type FlowEdgeType = "main" | "branch" | "fallback" | "loopback";
+export type CanonicalFlowType = "main" | "if_else" | "if_not" | "loopback";
 export type NodeDraftStatus = "synced" | "draft";
 export type SemanticNodeType = "screen" | "modal" | "condition" | "decision" | "action";
 export type NodeSubState = FixtureRef | "Default" | "Loading" | "Empty" | "Error";
@@ -36,6 +36,8 @@ export interface WorkbenchTransition {
   edgeType: FlowEdgeType;
   conditionLabel?: string;
   guardCondition?: string | null;
+  sourceCtaFfId?: string | null;
+  maxLoopIterations?: number | null;
   version: number;
   status: NodeDraftStatus;
 }
@@ -99,12 +101,14 @@ export interface FlowWorkbenchState {
 export function edgeTypeToCanonical(edgeType: FlowEdgeType): CanonicalFlowType {
   if (edgeType === "branch") return "if_else";
   if (edgeType === "fallback") return "if_not";
+  if (edgeType === "loopback") return "loopback";
   return "main";
 }
 
 export function canonicalToEdgeType(flowType: string): FlowEdgeType {
   if (flowType === "if_else") return "branch";
   if (flowType === "if_not") return "fallback";
+  if (flowType === "loopback") return "loopback";
   return "main";
 }
 

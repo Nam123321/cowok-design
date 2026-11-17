@@ -1,5 +1,7 @@
 // @story 04.4
 // @implements AC-02, AC-04 (Dual-Surface Chat Store bridging Left-Open Chat, Floating Chat, SSE & Sub-Sessions)
+import type { SdiClarificationCardData } from "@/components/workbench/ChatStreamPrimitives";
+
 export interface SharedChatMessage {
   id: string;
   sender: "human" | "agent";
@@ -10,6 +12,7 @@ export interface SharedChatMessage {
   jobId?: string;
   projectSeq?: number;
   fencingToken?: number;
+  sdiClarification?: SdiClarificationCardData;
 }
 
 export interface SharedChatSnapshot {
@@ -56,6 +59,20 @@ class SharedChatSyncStore {
     if (msg.nodeId) {
       this.clearedScopes.delete(`${scopeKey}::${msg.nodeId}`);
     }
+    this.emit(false);
+  }
+
+  public resolveSdiClarification(scopeKey: string, intentId: string, selectedVariantId: string, status: "ready" | "executed"): void {
+    const list = this.messagesByScope.get(scopeKey);
+    if (!list) return;
+    let changed = false;
+    const next = list.map((item) => {
+      if (!item.sdiClarification || item.sdiClarification.intentId !== intentId) return item;
+      changed = true;
+      return { ...item, sdiClarification: { ...item.sdiClarification, status, selectedVariantId } };
+    });
+    if (!changed) return;
+    this.messagesByScope.set(scopeKey, next);
     this.emit(false);
   }
 

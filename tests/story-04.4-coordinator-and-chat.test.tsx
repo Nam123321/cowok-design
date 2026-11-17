@@ -2,8 +2,9 @@
 // @story 04.4
 // @implements AC-01, AC-02, AC-03, AC-04, AC-05
 import React from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { setGlobalLocale } from "../src/hooks/useTranslation";
 import { FlowExecutionClient } from "../src/api/flow-execution";
 import { DagNodeHeader } from "../src/features/flow/components/DagNodeHeaderAndPorts";
 import { ContextualNodeFloatingChat } from "../src/features/flow/components/ContextualNodeFloatingChat";
@@ -36,8 +37,14 @@ const makeNode = (id: string, screenKey: string, title: string): WorkbenchNode =
 
 describe("Story 04.4 Coordinator, Floating Chat v2, Left-Open Scope Chips & 3-Level Sidebar", () => {
   beforeEach(() => {
+    setGlobalLocale("en-US");
     globalKeyedParallelCoordinator.clearAll();
     sharedChatStore.clearAll();
+  });
+
+  afterEach(() => {
+    cleanup();
+    setGlobalLocale("vi-VN");
   });
 
   it("enforces global running + paused <= 4 cap and reconciles daemon fencing tokens + interrupted states", () => {

@@ -232,8 +232,8 @@ fn mig_01_concurrent_open_wal_is_idempotent() {
             )
             .expect("count");
         assert_eq!(
-            table_count, 42,
-            "17 V1 tables + 8 V2 tables + flow_draft_deployments + schema_migrations + 4 V4 tables + 8 V6 tables + 3 V8 tables = 42"
+            table_count, 46,
+            "17 V1 tables + 8 V2 tables + flow_draft_deployments + schema_migrations + 4 V4 tables + 8 V6 tables + 3 V8 tables + 1 V9 table (idempotency_records) + 3 V10 tables (proposal_target_nodes, proposal_gate_receipts, proposal_tradeoffs) = 46"
         );
     }
 }
@@ -497,4 +497,90 @@ fn schema_02_v2_migration_adds_8_tables_and_workspace_root_unique_index() {
             "recovery_commits missing column {col}"
         );
     }
+}
+
+#[test]
+fn tc_05_3_01_v11_migration_adds_snapshot_fork_handoff_columns_and_indexes() {
+    let dir = tempdir().expect("tempdir");
+    let db_path = dir.path().join("v11-migration.db");
+    let pool = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, dir.path())).expect("open_wal");
+    let conn = pool.connection().expect("connection");
+
+    let fk_on: i64 = conn
+        .query_row("PRAGMA foreign_keys;", [], |r| r.get(0))
+        .expect("foreign_keys");
+    assert_eq!(fk_on, 1);
+
+    let v11_sha: String = conn
+        .query_row(
+            "SELECT checksum_sha256 FROM schema_migrations WHERE version = 11",
+            [],
+            |r| r.get(0),
+        )
+        .expect("schema_migrations v11 row");
+    assert_eq!(v11_sha, spec_registry::pool::v11_migration_checksum());
+
+    for (table, expected_cols) in [
+        (
+            "chat_sessions",
+            &["forked_from_session_id", "forked_from_message_id"][..],
+        ),
+        (
+            "chat_artifact_snapshots",
+            &["proposal_id", "parent_snapshot_id", "node_snapshot_json"][..],
+        ),
+        (
+            "version_snapshots",
+            &[
+                "proposal_id",
+                "parent_snapshot_id",
+                "chat_artifact_snapshot_id",
+            ][..],
+        ),
+        (
+            "github_pull_requests",
+            &[
+                "snapshot_id",
+                "handoff_manifest_sha256",
+                "visual_diff_summary_json",
+            ][..],
+        ),
+    ] {
+        let cols = get_table_columns(&conn, table);
+        for col in expected_cols {
+            assert!(cols.contains(*col), "{table} missing V11 column {col}");
+        }
+    }
+
+    for idx_name in [
+        "idx_chat_sessions_forked_from",
+        "idx_artifact_snapshots_proposal",
+        "idx_artifact_snapshots_parent",
+        "idx_version_snapshots_proposal",
+        "idx_version_snapshots_parent",
+        "idx_github_prs_snapshot",
+    ] {
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name=?1",
+                [idx_name],
+                |r| r.get(0),
+            )
+            .expect("index count");
+        assert_eq!(count, 1, "Missing mandatory V11 index: {idx_name}");
+    }
+
+    // Verify idempotent re-open succeeds cleanly
+    drop(conn);
+    drop(pool);
+    let reopened =
+        SqlitePool::open_wal(SqliteWalConfig::new(&db_path, dir.path())).expect("reopen v11");
+    let conn2 = reopened.connection().expect("conn2");
+    let fk_violations: usize = conn2
+        .prepare("PRAGMA foreign_key_check;")
+        .expect("fk check")
+        .query_map([], |r| r.get::<_, String>(0))
+        .expect("fk rows")
+        .count();
+    assert_eq!(fk_violations, 0);
 }

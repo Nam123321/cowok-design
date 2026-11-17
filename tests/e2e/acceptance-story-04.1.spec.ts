@@ -98,9 +98,9 @@ test.describe("Story 04.1: Direct Browser Acceptance Suite with Video & Screensh
           return { bg: cs.backgroundColor, borderBottomWidth: cs.borderBottomWidth, borderBottomColor: cs.borderBottomColor };
         });
       expect(activeTabStyles.borderBottomWidth).toBe("2px");
-      expect(activeTabStyles.borderBottomColor).toBe("rgb(255, 154, 47)");
+      expect(activeTabStyles.borderBottomColor).toBe("rgb(241, 245, 249)");
       expect(activeTabStyles.bg).not.toBe("rgb(0, 87, 255)");
-      s1.assertions.push("Active tab uses 2px #FF9A2F bottom line and neutral surface (non-solid blue)");
+      s1.assertions.push("Active tab uses 2px #F1F5F9 bottom line (DESIGN.md Zero-Amber) and neutral surface (non-solid blue)");
 
       const composerBorderTop = await page
         .getByTestId("chat-composer-wrapper")
@@ -225,16 +225,16 @@ test.describe("Story 04.1: Direct Browser Acceptance Suite with Video & Screensh
         s3.screenshots.push("05-sandboxed-preview-iframe.png");
 
         await expect(page.getByTestId("toggle-design-cdn-btn")).toHaveCount(0);
-        await expect(page.getByTestId("pointer-mode-inspect")).toBeVisible({ timeout: 5000 });
-        await page.getByTestId("pointer-mode-inspect").click();
-        s3.assertions.push("Zero-network Option CSP-B verified (toggle-design-cdn-btn retired) and Inspect / Comment (C) active");
+        await expect(page.getByTestId("pointer-mode-toggle")).toBeVisible({ timeout: 5000 });
+        await page.getByTestId("pointer-mode-toggle").click();
+        s3.assertions.push("Zero-network Option CSP-B verified (toggle-design-cdn-btn retired) and Chọn vùng (C) toggle active");
 
         const shotCdn = path.join(mediaDir, "06-inspect-mode-toggled.png");
         await page.screenshot({ path: shotCdn, fullPage: true });
         s3.screenshots.push("06-inspect-mode-toggled.png");
 
-        // Verify Present button is compact 28x28 icon button with tooltip & BrandIcon SVG
-        const presentBtn = page.getByTestId("toggle-present-btn");
+        // Verify Expand button is compact 26-34px icon button with tooltip & BrandIcon SVG
+        const presentBtn = page.getByTestId("toggle-expand-html-btn");
         await expect(presentBtn).toBeVisible({ timeout: 5000 });
         const presentBox = await presentBtn.boundingBox();
         expect(presentBox).not.toBeNull();

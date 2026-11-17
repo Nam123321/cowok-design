@@ -73,11 +73,68 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  // Mirror pool.rs idempotent V9 column guards prior to V9 12-step rebuild
+  db.exec(`
+    ALTER TABLE sdi_intents ADD COLUMN routing_mode TEXT NOT NULL DEFAULT 'direct_edit';
+    ALTER TABLE sdi_intents ADD COLUMN gap_questions_json TEXT;
+    ALTER TABLE sdi_intents ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE flow_nodes ADD COLUMN portal_group TEXT;
+    ALTER TABLE flow_nodes ADD COLUMN shared_app_shell_id TEXT;
+    ALTER TABLE flow_nodes ADD COLUMN mini_skeleton_html TEXT;
+    ALTER TABLE flow_nodes ADD COLUMN cta_pills_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE flow_nodes ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE screen_fixtures ADD COLUMN preset_key TEXT;
+    ALTER TABLE screen_fixtures ADD COLUMN sample_rows_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE screen_fixtures ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE flow_graphs ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V9__epic05_storyboard_proposals_handoff.sql"),
+      "utf-8"
+    )
+  );
+  // Mirror pool.rs idempotent V10 column guards
+  db.exec(`
+    ALTER TABLE change_proposals ADD COLUMN node_id TEXT;
+    ALTER TABLE change_proposals ADD COLUMN batch_id TEXT;
+    ALTER TABLE change_proposals ADD COLUMN composite_scope_key TEXT NOT NULL DEFAULT '';
+    ALTER TABLE change_proposals ADD COLUMN content_mode TEXT NOT NULL DEFAULT 'full_file';
+    ALTER TABLE change_proposals ADD COLUMN base_file_hashes_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE change_proposals ADD COLUMN visual_diff_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE change_proposals ADD COLUMN gate_receipt_id TEXT;
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V10__story_05_2_proposals_receipts_tradeoffs.sql"),
+      "utf-8"
+    )
+  );
+  // Mirror pool.rs idempotent V11 column guards
+  db.exec(`
+    ALTER TABLE chat_sessions ADD COLUMN forked_from_session_id TEXT REFERENCES chat_sessions(id) ON DELETE SET NULL;
+    ALTER TABLE chat_sessions ADD COLUMN forked_from_message_id TEXT REFERENCES chat_messages(id) ON DELETE SET NULL;
+    ALTER TABLE chat_artifact_snapshots ADD COLUMN proposal_id TEXT REFERENCES change_proposals(id) ON DELETE SET NULL;
+    ALTER TABLE chat_artifact_snapshots ADD COLUMN parent_snapshot_id TEXT REFERENCES chat_artifact_snapshots(id) ON DELETE SET NULL;
+    ALTER TABLE chat_artifact_snapshots ADD COLUMN node_snapshot_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE version_snapshots ADD COLUMN proposal_id TEXT REFERENCES change_proposals(id) ON DELETE SET NULL;
+    ALTER TABLE version_snapshots ADD COLUMN parent_snapshot_id TEXT REFERENCES version_snapshots(id) ON DELETE SET NULL;
+    ALTER TABLE version_snapshots ADD COLUMN chat_artifact_snapshot_id TEXT REFERENCES chat_artifact_snapshots(id) ON DELETE SET NULL;
+    ALTER TABLE github_pull_requests ADD COLUMN snapshot_id TEXT REFERENCES version_snapshots(id) ON DELETE SET NULL;
+    ALTER TABLE github_pull_requests ADD COLUMN handoff_manifest_sha256 TEXT NOT NULL DEFAULT '';
+    ALTER TABLE github_pull_requests ADD COLUMN visual_diff_summary_json TEXT NOT NULL DEFAULT '{}';
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V11__story_05_3_snapshots_fork_handoff.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
 
-describe("P1 Persistence Contract & SQLite WAL V1-V8 Mirror Verification (ADR-091)", () => {
+describe("P1 Persistence Contract & SQLite WAL V1-V9 Mirror Verification (ADR-091)", () => {
   const schemaPath = path.resolve(__dirname, "schema.prisma");
   const migrationsDir = path.resolve(__dirname, "../crates/spec-registry/migrations");
 
@@ -95,10 +152,14 @@ describe("P1 Persistence Contract & SQLite WAL V1-V8 Mirror Verification (ADR-09
     expect(mappedTables).toContain("daemon_sessions");
     expect(mappedTables).toContain("daemon_replay_nonces");
     expect(mappedTables).toContain("workspace_sync_intents");
-    expect(mappedTables).toHaveLength(42);
+    expect(mappedTables).toContain("idempotency_records");
+    expect(mappedTables).toContain("proposal_target_nodes");
+    expect(mappedTables).toContain("proposal_gate_receipts");
+    expect(mappedTables).toContain("proposal_tradeoffs");
+    expect(mappedTables).toHaveLength(46);
   });
 
-  it("UT-DB-02: executes V1-V8 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V9 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 
@@ -217,5 +278,41 @@ describe("P1 Persistence Contract & SQLite WAL V1-V8 Mirror Verification (ADR-09
     db.prepare("DELETE FROM flow_nodes WHERE id = 'node-1'").run();
     const remainingEdges = db.prepare("SELECT COUNT(*) as count FROM flow_edges").get() as { count: number };
     expect(remainingEdges.count).toBe(0);
+  });
+
+  it("UT-DB-06: verifies Story 05.3 V11 columns, 6 indexes, and Prisma parity", () => {
+    const db = openMigratedMemoryDb();
+    const schemaContent = fs.readFileSync(schemaPath, "utf-8");
+
+    for (const [table, cols] of [
+      ["chat_sessions", ["forked_from_session_id", "forked_from_message_id"]],
+      ["chat_artifact_snapshots", ["proposal_id", "parent_snapshot_id", "node_snapshot_json"]],
+      ["version_snapshots", ["proposal_id", "parent_snapshot_id", "chat_artifact_snapshot_id"]],
+      ["github_pull_requests", ["snapshot_id", "handoff_manifest_sha256", "visual_diff_summary_json"]],
+    ] as const) {
+      const tableCols = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(
+        (r) => r.name
+      );
+      for (const col of cols) {
+        expect(tableCols).toContain(col);
+        expect(schemaContent).toContain(`@map("${col}")`);
+      }
+    }
+
+    const idxNames = (
+      db
+        .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
+        .all() as { name: string }[]
+    ).map((r) => r.name);
+    for (const expectedIdx of [
+      "idx_chat_sessions_forked_from",
+      "idx_artifact_snapshots_proposal",
+      "idx_artifact_snapshots_parent",
+      "idx_version_snapshots_proposal",
+      "idx_version_snapshots_parent",
+      "idx_github_prs_snapshot",
+    ]) {
+      expect(idxNames).toContain(expectedIdx);
+    }
   });
 });

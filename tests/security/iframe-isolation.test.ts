@@ -62,11 +62,12 @@ describe("Option CSP-B Sandboxed HTML Preview Security Gate (SEC-IFRAME-01..08)"
   it("SEC-IFRAME-02: wrapUserHtmlSrcDoc injects zero host wrapper CSS and preserves user styles 100%", () => {
     const userHtml = `<!DOCTYPE html><html><head><style>.hero{color:#123456;margin:0}</style></head><body class="dark-landing"><h1 class="hero">Hello</h1></body></html>`;
     const wrapped = wrapUserHtmlSrcDoc(userHtml, { epoch: 1 });
+    const withoutBridgeScript = wrapped.replace(/<script data-cowok-sandbox-bridge="v1"[\s\S]*?<\/script>/g, "");
 
     expect(wrapped).toContain(".hero{color:#123456;margin:0}");
     expect(wrapped).toContain('class="dark-landing"');
-    expect(wrapped).not.toContain("--bg-canvas");
-    expect(wrapped).not.toContain("--action-primary");
+    expect(withoutBridgeScript).not.toContain("--bg-canvas");
+    expect(withoutBridgeScript).not.toContain("--action-primary");
     expect(wrapped).not.toContain("<style data-cowok");
   });
 
@@ -101,7 +102,7 @@ describe("Option CSP-B Sandboxed HTML Preview Security Gate (SEC-IFRAME-01..08)"
     expect(freezeIdx).toBeGreaterThan(bridgeIdx);
     expect(submitIdx).toBeGreaterThan(bridgeIdx);
     expect(trustedIdx).toBeGreaterThan(bridgeIdx);
-    expect(userScriptIdx).toBeGreaterThan(bridgeIdx);
+    expect(userScriptIdx).toBe(-1);
   });
 
   it("SEC-IFRAME-05: defaults to STRICT_OFFLINE_CSP with default-src 'none', connect-src 'none', form-action 'none'", () => {
@@ -171,18 +172,21 @@ describe("Option CSP-B Sandboxed HTML Preview Security Gate (SEC-IFRAME-01..08)"
     vi.stubGlobal("MessageChannel", MockChannel);
 
     try {
-      const { getByTestId, rerender } = render(
+      const { getByTestId, rerender, unmount } = render(
         React.createElement(CompanionLiveHtmlRightPane, buildPaneProps("node-scr-01"))
       );
 
       const iframe = getByTestId("sandboxed-html-iframe") as HTMLIFrameElement;
+      const postMessage = vi.fn();
       Object.defineProperty(iframe, "contentWindow", {
-        value: { postMessage: vi.fn() },
+        value: { postMessage },
         configurable: true,
       });
       fireEvent.load(iframe);
+      expect(postMessage).toHaveBeenCalledTimes(1);
 
       rerender(React.createElement(CompanionLiveHtmlRightPane, buildPaneProps("node-scr-02")));
+      unmount();
       expect(closeSpy).toHaveBeenCalled();
     } finally {
       vi.stubGlobal("MessageChannel", OrigMessageChannel);

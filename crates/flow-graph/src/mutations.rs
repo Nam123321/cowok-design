@@ -41,13 +41,19 @@ pub(crate) fn insert_node_in_tx(
         "INSERT INTO flow_nodes ( \
             id, graph_id, tenant_id, project_id, portal_id, screen_key, title, node_type, \
             route_path, component_entry_path, fixture_ref, fixture_json, note, viewport_preset, \
-            pos_x, pos_y, version, layout_version, created_at, updated_at \
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, 1, 1, ?17, ?17)",
+            pos_x, pos_y, version, layout_version, created_at, updated_at, \
+            portal_group, shared_app_shell_id, mini_skeleton_html, cta_pills_json, revision \
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, 1, 1, ?17, ?17, ?18, ?19, ?20, ?21, ?22)",
         params![
             node_id, graph_id, tenant_id, project_id, input.portal_id.trim(),
             input.screen_key.trim(), input.title.trim(), input.node_type.trim(),
             input.route_path.trim(), input.component_entry_path.trim(), fixture_ref,
-            input.fixture_json, input.note, viewport_preset, pos_x, pos_y, now_ms
+            input.fixture_json, input.note, viewport_preset, pos_x, pos_y, now_ms,
+            input.portal_group.as_deref().map(str::trim),
+            input.shared_app_shell_id.as_deref().map(str::trim),
+            input.mini_skeleton_html.as_deref(),
+            input.cta_pills_json.trim(),
+            input.revision.max(1)
         ],
     )
     .map_err(|e| FlowServiceError::from_harness(map_sqlite_error(e, "insert_flow_node")))?;
@@ -121,10 +127,22 @@ fn apply_layout_patch(
             ),
         ));
     }
+    if let Some(exp_rev) = input.expected_revision {
+        if existing.revision != exp_rev {
+            return Err(FlowServiceError::new(
+                409,
+                "STALE_REVISION",
+                format!(
+                    "Node '{}' revision mismatch (expected {exp_rev}, actual {})",
+                    existing.id, existing.revision
+                ),
+            ));
+        }
+    }
     let px = normalize_coord(input.pos_x.unwrap_or(existing.pos_x), "posX")?;
     let py = normalize_coord(input.pos_y.unwrap_or(existing.pos_y), "posY")?;
     tx.execute(
-        "UPDATE flow_nodes SET pos_x = ?1, pos_y = ?2, layout_version = layout_version + 1, updated_at = ?3 \
+        "UPDATE flow_nodes SET pos_x = ?1, pos_y = ?2, layout_version = layout_version + 1, revision = revision + 1, updated_at = ?3 \
          WHERE id = ?4 AND tenant_id = ?5 AND project_id = ?6 AND layout_version = ?7",
         params![px, py, now_ms, existing.id, tenant_id, project_id, exp_lv],
     )
@@ -160,6 +178,18 @@ fn apply_semantic_patch(
                 existing.id, existing.version
             ),
         ));
+    }
+    if let Some(exp_rev) = input.expected_revision {
+        if existing.revision != exp_rev {
+            return Err(FlowServiceError::new(
+                409,
+                "STALE_REVISION",
+                format!(
+                    "Node '{}' revision mismatch (expected {exp_rev}, actual {})",
+                    existing.id, existing.revision
+                ),
+            ));
+        }
     }
     let title = input.title.as_deref().unwrap_or(&existing.title).trim();
     if title.is_empty() || title.len() > 100 {
@@ -201,11 +231,29 @@ fn apply_semantic_patch(
     )?;
     let px = normalize_coord(input.pos_x.unwrap_or(existing.pos_x), "posX")?;
     let py = normalize_coord(input.pos_y.unwrap_or(existing.pos_y), "posY")?;
+    let portal_group = match &input.portal_group {
+        Some(val) => Some(val.trim().to_string()),
+        None => existing.portal_group.clone(),
+    };
+    let shared_app_shell_id = match &input.shared_app_shell_id {
+        Some(val) => Some(val.trim().to_string()),
+        None => existing.shared_app_shell_id.clone(),
+    };
+    let mini_skeleton_html = match &input.mini_skeleton_html {
+        Some(val) => Some(val.clone()),
+        None => existing.mini_skeleton_html.clone(),
+    };
+    let cta_pills_json = match &input.cta_pills_json {
+        Some(val) => val.trim().to_string(),
+        None => existing.cta_pills_json.clone(),
+    };
     tx.execute(
         "UPDATE flow_nodes SET title = ?1, portal_id = ?2, node_type = ?3, route_path = ?4, \
          component_entry_path = ?5, fixture_ref = ?6, fixture_json = ?7, note = ?8, \
-         viewport_preset = ?9, pos_x = ?10, pos_y = ?11, version = version + 1, updated_at = ?12 \
-         WHERE id = ?13 AND tenant_id = ?14 AND project_id = ?15 AND version = ?16",
+         viewport_preset = ?9, pos_x = ?10, pos_y = ?11, portal_group = ?12, \
+         shared_app_shell_id = ?13, mini_skeleton_html = ?14, cta_pills_json = ?15, \
+         version = version + 1, revision = revision + 1, updated_at = ?16 \
+         WHERE id = ?17 AND tenant_id = ?18 AND project_id = ?19 AND version = ?20",
         params![
             title,
             input
@@ -230,6 +278,10 @@ fn apply_semantic_patch(
             viewport_preset,
             px,
             py,
+            portal_group,
+            shared_app_shell_id,
+            mini_skeleton_html,
+            cta_pills_json,
             now_ms,
             existing.id,
             tenant_id,

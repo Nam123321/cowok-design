@@ -48,11 +48,13 @@ export const WorkbenchSettingsDialog: React.FC<{
 
 const WorkbenchConnectedBody: React.FC<{
   shell: ReturnType<typeof useWorkbenchShellState>;
+  isOnboardingOpen: boolean;
   resolvedProjectName: string;
   resolvedProjectId: string;
   defaultSessionTitle: string;
-}> = ({ shell, resolvedProjectName, resolvedProjectId, defaultSessionTitle }) => {
+}> = ({ shell, isOnboardingOpen, resolvedProjectName, resolvedProjectId, defaultSessionTitle }) => {
   const { settings, sessionManager: sm, store, state } = shell;
+  const anyShellModalOpen = Boolean(settings.isSettingsOpen || sm.isNewConvoModalOpen || sm.pickerState.isOpen || isOnboardingOpen);
   return (
     <WorkbenchBodyLayout
       projectName={resolvedProjectName} projectId={resolvedProjectId} projects={sm.projects} sessions={sm.sessions}
@@ -72,6 +74,7 @@ const WorkbenchConnectedBody: React.FC<{
       activeTabId={shell.activeTabId}
       onTabChange={(id, format) => { shell.setActiveTabId(id); store.setActiveFormatTab(format); }}
       splitter={shell.splitter} attachments={shell.attachments} graphHandlers={shell.graphHandlers}
+      isModalOpen={anyShellModalOpen}
       state={state} store={store}
     />
   );
@@ -191,7 +194,7 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
   return (
     <div className={`workbench-shell theme-${settings.themeMode}`} data-theme={settings.themeMode} data-flow-hydrated={shell.isFlowHydrated ? "true" : "false"} style={createWorkbenchShellStyle(settings.currentFontSize)}>
       <WorkbenchTopNav projectName={resolvedProjectName} activeSessionTitle={activeSession?.title} isStandaloneConversation={!activeSession?.projectId} themeMode={settings.themeMode} />
-      <WorkbenchConnectedBody shell={shell} resolvedProjectName={resolvedProjectName} resolvedProjectId={resolvedProjectId} defaultSessionTitle={t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới")} />
+      <WorkbenchConnectedBody shell={shell} isOnboardingOpen={isOnboardingOpen} resolvedProjectName={resolvedProjectName} resolvedProjectId={resolvedProjectId} defaultSessionTitle={t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới")} />
       <WorkbenchModalsAndToasts shell={shell} isOnboardingOpen={isOnboardingOpen} daemonWarning={daemonWarning} onCloseOnboarding={closeOnboarding} onSetDaemonWarning={setDaemonWarning} />
     </div>
   );

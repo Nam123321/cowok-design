@@ -1,16 +1,75 @@
 // @story 04.4
 // @implements AC-01, AC-02, AC-03 (Daemon Enqueue, Lifecycle SSE Stream & CAS Dispatch Helper)
 import React from "react";
+import { apiChangeProposal } from "@/api/change-proposal";
 import { apiFlowExecution } from "@/api/flow-execution";
 import { apiSdiEngine } from "@/api/sdi-engine";
+import {
+  buildUiChangeProposalInput,
+  notifyProposalsChanged,
+} from "@/features/proposals/utils/proposal-events";
 import { WorkbenchNode } from "../store/flow-workbench-store";
 import { globalKeyedParallelCoordinator } from "../store/keyed-parallel-coordinator";
 import { sharedChatStore, toSessionChatKey } from "../store/shared-chat-sync";
 import { useKeyedParallelCoordinator } from "./useKeyedParallelCoordinator";
 import type { FloatingChatMessage } from "./useFloatingChatSync";
 
+type TranslateFn = (key: string, fallback: string) => string;
+
+interface ActiveSseListener {
+  controller: AbortController;
+  sessionId: string;
+  onAppendMsg?: (msg: FloatingChatMessage) => void;
+  t: TranslateFn;
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const activeStreams = new Map<string, AbortController>();
+const activeStreams = new Map<string, ActiveSseListener>();
+
+function formatJsonSsePayload(
+  raw: string,
+  kind: string,
+  t: TranslateFn
+): string {
+  try {
+    const obj = JSON.parse(raw) as Record<string, unknown>;
+    const tag = String(obj.event || obj.type || kind);
+    if (tag === "github_pr_attempt") {
+      if (obj.ok) {
+        return t("chat.sseGithubPrSuccess", "Created GitHub Pull Request ({{branch}}).").replace(
+          "{{branch}}",
+          String(obj.branch || "feature")
+        );
+      }
+      const reason = String(obj.error || t("chat.sseGithubPrMissingConfig", "Git remote/token configuration required"));
+      return t("chat.sseGithubPrFallback", "Unable to create GitHub PR directly ({{reason}}) — download offline ZIP instead.").replace("{{reason}}", reason);
+    }
+    if (tag === "revert_tx_journal" || tag === "snapshot_revert") {
+      return t("chat.sseSnapshotReverted", "Safely reverted snapshot in SQLite and workspace files.");
+    }
+    if (obj.summary || obj.message) return String(obj.summary || obj.message);
+    return t("chat.sseEventCompleted", "Event {{event}} completed.").replace("{{event}}", tag);
+  } catch {
+    return raw;
+  }
+}
+
+function formatSseEventContent(
+  eventKind: string,
+  payloadText: string,
+  t: TranslateFn = (_k, fallback) => fallback
+): string | null {
+  const kind = eventKind.trim().toLowerCase();
+  const raw = payloadText.trim();
+  if (!raw || kind === "enqueued" || kind === "heartbeat") return null;
+  if (kind === "proposal_ready") {
+    return t("chat.sseProposalReady", "ChangeProposal synthesized. Open the Proposals drawer to inspect and apply.");
+  }
+  if (raw.startsWith("{") && raw.endsWith("}")) {
+    return formatJsonSsePayload(raw, kind, t);
+  }
+  return raw;
+}
 
 export interface DispatchExecutionParams {
   projectId: string;
@@ -40,20 +99,27 @@ export async function syncCoordinatorFromDaemon(
   } catch { /* ignore when daemon offline */ }
 }
 
-export function ensureProjectSseStream(
-  projectId: string,
-  sessionId: string,
-  streamAbortRef?: React.MutableRefObject<AbortController | null>,
-  onAppendMsg?: (msg: FloatingChatMessage) => void
-): void {
+export function ensureProjectSseStream(opts: {
+  projectId: string;
+  sessionId: string;
+  streamAbortRef?: React.MutableRefObject<AbortController | null>;
+  onAppendMsg?: (msg: FloatingChatMessage) => void;
+  t?: TranslateFn;
+}): void {
+  const { projectId, sessionId, streamAbortRef, onAppendMsg } = opts;
+  const t: TranslateFn = opts.t ?? ((_k, fallback) => fallback);
   if (!UUID_RE.test(projectId)) return;
   const existing = activeStreams.get(projectId);
-  if (existing && !existing.signal.aborted) {
-    if (streamAbortRef) streamAbortRef.current = existing;
+  if (existing && !existing.controller.signal.aborted) {
+    existing.sessionId = sessionId;
+    existing.onAppendMsg = onAppendMsg;
+    existing.t = t;
+    if (streamAbortRef) streamAbortRef.current = existing.controller;
     return;
   }
   const controller = new AbortController();
-  activeStreams.set(projectId, controller);
+  const listener: ActiveSseListener = { controller, sessionId, onAppendMsg, t };
+  activeStreams.set(projectId, listener);
   if (streamAbortRef) streamAbortRef.current = controller;
 
   void apiFlowExecution.streamJobEvents(projectId, {
@@ -63,27 +129,69 @@ export function ensureProjectSseStream(
       if (latestSeq > 0) globalKeyedParallelCoordinator.updateProjectSeq(latestSeq);
       for (const ev of events) {
         if (!ev.payloadText) continue;
+        const formatted = formatSseEventContent(ev.eventKind, ev.payloadText, listener.t);
+        if (!formatted) continue;
         const msg: FloatingChatMessage = {
-          id: `sse-${ev.id}`,
-          nodeId: ev.nodeId,
-          role: "assistant",
-          content: `[${ev.eventKind}] ${ev.payloadText}`,
-          timestamp: Date.now(),
-          projectSeq: ev.projectSeq ?? ev.seqNo,
+          id: `sse-${ev.id}`, nodeId: ev.nodeId, role: "assistant",
+          content: formatted, timestamp: Date.now(), projectSeq: ev.projectSeq ?? ev.seqNo,
         };
-        if (onAppendMsg) onAppendMsg(msg);
-        else sharedChatStore.appendMessage(toSessionChatKey(projectId, sessionId), {
+        if (listener.onAppendMsg) listener.onAppendMsg(msg);
+        else sharedChatStore.appendMessage(toSessionChatKey(projectId, listener.sessionId), {
           id: msg.id, sender: "agent", text: msg.content, timestamp: new Date().toLocaleTimeString(),
           createdAtMs: msg.timestamp, nodeId: ev.nodeId, jobId: ev.jobId, projectSeq: msg.projectSeq,
         });
       }
-      if (events.some((ev) => ev.jobStatus)) {
-        void syncCoordinatorFromDaemon(projectId);
-      }
+      if (events.some((ev) => ev.jobStatus)) void syncCoordinatorFromDaemon(projectId);
     },
   }).catch(() => { /* stream aborted or offline */ }).finally(() => {
-    if (activeStreams.get(projectId) === controller) activeStreams.delete(projectId);
+    if (activeStreams.get(projectId) === listener) activeStreams.delete(projectId);
   });
+}
+
+async function synthesizeProposalAndCompleteJobs(
+  params: DispatchExecutionParams,
+  jobs: Awaited<ReturnType<typeof apiFlowExecution.enqueueJobs>>["jobs"],
+  intentType: string
+): Promise<void> {
+  try {
+    await apiChangeProposal.createProposal(
+      params.projectId,
+      buildUiChangeProposalInput({
+        prompt: params.prompt,
+        nodeId: params.primaryNode?.id,
+        nodeIds: params.selectedNodeIds,
+        screenKey: (params.primaryNode as { screenKey?: string } | null)?.screenKey || null,
+      })
+    );
+    notifyProposalsChanged(params.projectId);
+  } catch {
+    params.onAppendMsg({
+      id: `prop-warn-${Date.now()}`,
+      nodeId: params.primaryNode?.id || "unknown",
+      role: "assistant",
+      content: params.t("chat.proposalCompileWarning", "Unable to synthesize ChangeProposal right now; please inspect inputs."),
+      timestamp: Date.now(),
+    });
+    await syncCoordinatorFromDaemon(params.projectId, params.coordinator);
+    return;
+  }
+  for (const job of jobs) {
+    if (job.status !== "RUNNING") continue;
+    try {
+      await apiFlowExecution.postJobEvent(params.projectId, {
+        jobId: job.id,
+        nodeId: job.nodeId,
+        sessionId: params.sessionId,
+        eventKind: "proposal_ready",
+        payloadText: `Synthesized ChangeProposal for ${intentType}`,
+        jobStatus: "COMPLETED",
+        expectedFencingToken: job.fencingToken,
+      });
+    } catch {
+      /* ignore fencing mismatch if externally modified */
+    }
+  }
+  await syncCoordinatorFromDaemon(params.projectId, params.coordinator);
 }
 
 async function runEnqueueAndCompile(params: DispatchExecutionParams): Promise<void> {
@@ -100,8 +208,19 @@ async function runEnqueueAndCompile(params: DispatchExecutionParams): Promise<vo
   const clarifyPct = params.formatNumber(Math.round(intent.ambiguityScore * 100));
   const summary = intent.status === "clarifying"
     ? `${params.t("chat.clarifyPrefix", "Cần làm rõ")} (${clarifyPct}%): ${intent.clarificationVariants?.map((v) => v.title).join(" | ") || intent.intentType}`
-    : `${params.t("floatingChat.compiledIntent", "Đã biên dịch intent")} (${intent.intentType}) · status=${intent.status}`;
-  params.onAppendMsg({ id: `resp-${intent.id}`, nodeId: params.primaryNode?.id || "unknown", role: "assistant", content: summary, timestamp: Date.now() });
+    : `${params.t("floatingChat.compiledIntent", "Đã biên dịch intent")} (${intent.intentType}) · ${params.t("chat.intentStatusLabel", "Status")}: ${intent.status}`;
+  const sdiClarification = intent.status === "clarifying" && intent.clarificationVariants?.length
+    ? {
+        intentId: intent.id,
+        projectId: params.projectId,
+        status: intent.status,
+        ambiguityScore: intent.ambiguityScore,
+        variants: intent.clarificationVariants,
+        selectedVariantId: intent.selectedVariantId ?? undefined,
+      }
+    : undefined;
+  params.onAppendMsg({ id: `resp-${intent.id}`, nodeId: params.primaryNode?.id || "unknown", role: "assistant", content: summary, timestamp: Date.now(), sdiClarification });
+  await synthesizeProposalAndCompleteJobs(params, enq.jobs, intent.intentType);
 }
 
 export async function dispatchNodeExecutionToDaemon(params: DispatchExecutionParams) {
@@ -113,7 +232,13 @@ export async function dispatchNodeExecutionToDaemon(params: DispatchExecutionPar
     return;
   }
 
-  ensureProjectSseStream(params.projectId, params.sessionId, params.streamAbortRef, params.onAppendMsg);
+  ensureProjectSseStream({
+    projectId: params.projectId,
+    sessionId: params.sessionId,
+    streamAbortRef: params.streamAbortRef,
+    onAppendMsg: params.onAppendMsg,
+    t: params.t,
+  });
   try {
     await runEnqueueAndCompile(params);
   } catch (err) {

@@ -3,15 +3,15 @@ profile_kind: DERIVED_EVIDENCE_PROFILE
 repo_id: cowok-ai
 worktree_id: uxui-os-6d92b60d
 worktree_root: /Users/hatrang20061988/Desktop/AI Project/uxui-os
-git_head: 703e54ef9555530a3aa6fefa368e01aa9f9fd833
+git_head: d30ede5939703672ebcdaafe90107ed0e6e08528
 policy_version: 2.1.0
 probe_version: 2.1.0
-generated_at: '2026-11-15T11:51:52.490134+00:00'
+generated_at: '2026-11-16T05:22:52.985972+00:00'
 sha256_digest: sha256:b674f859ed58e357db6f5f6071f7eb1b193b68ced8504ad8aa233edfdfe7a9a0
 overall_status: NOT_READY
 delta_summary:
-  previous_digest: sha256:b89df79a65be436f23b93102a66bda41fe66873a2517c8dc4c529d23b716e126
-  digest_changed: true
+  previous_digest: sha256:b674f859ed58e357db6f5f6071f7eb1b193b68ced8504ad8aa233edfdfe7a9a0
+  digest_changed: false
   changed_probes: []
 source_manifest:
 - path: _iwish-output/2. Product Planning/2.5. architecture.md

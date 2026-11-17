@@ -1,12 +1,61 @@
+// @story 05.1
+// @implements Zero-Tailwind Semantic Pure CSS Clarification Card
 import React from "react";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { ClarificationVariant } from "../../../lib/validations/sdi";
+
+const FONT_WEIGHT_SEMIBOLD = 600;
 
 interface ClarificationCardProps {
   variant: ClarificationVariant;
   isSelected: boolean;
   onSelect: (id: string) => void;
 }
+
+const CARD_BASE_STYLE: React.CSSProperties = {
+  textAlign: "left",
+  padding: "12px",
+  borderRadius: "var(--radius-md)",
+  transition: "all var(--duration-fast) var(--ease-standard)",
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+  cursor: "pointer",
+  width: "100%",
+  boxSizing: "border-box",
+};
+
+interface VariantBulletSectionProps {
+  label: string;
+  color: string;
+  items: string[];
+  prefix: string;
+}
+
+const VariantBulletSection: React.FC<VariantBulletSectionProps> = ({
+  label,
+  color,
+  items,
+  prefix,
+}) => (
+  <div style={{ fontSize: "11px", display: "flex", flexDirection: "column", gap: "4px" }}>
+    <div style={{ fontWeight: FONT_WEIGHT_SEMIBOLD, color }}>{label}</div>
+    <ul
+      style={{
+        margin: 0,
+        paddingLeft: "16px",
+        color: "var(--text-muted)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "2px",
+      }}
+    >
+      {items.map((item, idx) => (
+        <li key={`${prefix}-${idx}`}>{item}</li>
+      ))}
+    </ul>
+  </div>
+);
 
 export const ClarificationCard: React.FC<ClarificationCardProps> = ({
   variant,
@@ -17,31 +66,23 @@ export const ClarificationCard: React.FC<ClarificationCardProps> = ({
   return (
     <button
       type="button"
+      data-testid={`clarification-card-${variant.id}`}
       onClick={() => onSelect(variant.id)}
-      className={`text-left p-3 rounded-lg border transition-all flex flex-col gap-2 ${
-        isSelected
-          ? "border-primary bg-primary/10 shadow-sm"
-          : "border-border bg-card hover:border-muted-foreground"
-      }`}
+      style={{
+        ...CARD_BASE_STYLE,
+        border: isSelected ? "2px solid var(--action-primary)" : "1px solid var(--border-default)",
+        backgroundColor: isSelected ? "var(--bg-selected)" : "var(--bg-surface)",
+        boxShadow: isSelected ? "var(--shadow-sm)" : "none",
+      }}
     >
-      <div className="font-semibold text-sm text-foreground">{variant.title}</div>
-      <p className="text-xs text-muted-foreground">{variant.description}</p>
-      <div className="space-y-1 text-xs">
-        <div className="font-medium text-emerald-600 dark:text-emerald-400">{t("sdi.prosLabel", "Ưu điểm:")}</div>
-        <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
-          {variant.pros.map((p, idx) => (
-            <li key={`pro-${idx}`}>{p}</li>
-          ))}
-        </ul>
+      <div style={{ fontSize: "13px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--text-primary)" }}>
+        {variant.title}
       </div>
-      <div className="space-y-1 text-xs">
-        <div className="font-semibold text-foreground">{t("sdi.consLabel", "Đánh đổi:")}</div>
-        <ul className="list-disc pl-4 space-y-0.5 text-muted-foreground">
-          {variant.cons.map((c, idx) => (
-            <li key={`con-${idx}`}>{c}</li>
-          ))}
-        </ul>
-      </div>
+      <p style={{ margin: 0, fontSize: "11px", color: "var(--text-muted)", lineHeight: "1.4" }}>
+        {variant.description}
+      </p>
+      <VariantBulletSection label={t("sdi.prosLabel", "Ưu điểm:")} color="var(--state-success)" items={variant.pros} prefix="pro" />
+      <VariantBulletSection label={t("sdi.consLabel", "Đánh đổi:")} color="var(--text-primary)" items={variant.cons} prefix="con" />
     </button>
   );
 };

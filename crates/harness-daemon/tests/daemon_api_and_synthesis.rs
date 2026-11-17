@@ -1930,7 +1930,14 @@ async fn test_ac07_ac08_ac09_ac10_hardening() {
     )
     .await;
     assert_eq!(status, StatusCode::NOT_IMPLEMENTED);
-    assert_eq!(pr_val["code"], "GITHUB_INTEGRATION_NOT_CONFIGURED");
+    let pr_code = pr_val["code"].as_str().unwrap_or("");
+    assert!(
+        matches!(
+            pr_code,
+            "GIT_REMOTE_MISSING" | "GH_CLI_MISSING" | "GH_UNAUTHENTICATED"
+        ),
+        "expected Story 05.3 preflight 501 code, got {pr_val}"
+    );
 }
 
 #[tokio::test]
