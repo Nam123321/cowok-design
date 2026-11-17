@@ -32,8 +32,8 @@ use crate::routes::execution_coordinator::{
 use crate::routes::execution_events::{handle_post_job_event, handle_stream_job_events};
 use crate::routes::execution_sessions::handle_mark_node_session_read;
 use crate::routes::legacy_workbench_v6::{
-    handle_create_comment, handle_create_fixture, handle_delete_mcp_server,
-    handle_get_fixture, handle_list_agent_settings, handle_list_comments, handle_list_fixtures,
+    handle_create_comment, handle_create_fixture, handle_delete_mcp_server, handle_get_fixture,
+    handle_list_agent_settings, handle_list_comments, handle_list_fixtures,
     handle_list_mcp_servers, handle_update_comment, handle_update_fixture, handle_update_viewport,
     handle_upsert_agent_setting, handle_upsert_mcp_server,
 };

@@ -1,14 +1,13 @@
+// @story 05.3
 import {
-  ExportZipInput,
-  ExportZipResponse,
-  GitHubPRInput,
-  GitHubPRResponse,
-  SnapshotFileItem,
+  type ExportZipInput,
+  type ExportZipResponse,
+  type SnapshotFileItem,
 } from "../../../lib/validations/version-snapshot";
 import { computeTreeSha256 } from "./snapshot-engine";
 import { createZipArchive } from "./zip-writer";
 
-export { createZipArchive } from "./zip-writer";
+export { createZipArchive };
 
 export interface BundleCompletenessCheck {
   hasTokens: boolean;
@@ -16,13 +15,14 @@ export interface BundleCompletenessCheck {
   hasPackageJson: boolean;
   hasFixtures: boolean;
   hasSource: boolean;
+  hasHandoffManifest: boolean;
   readyToRun: boolean;
   missingItems: string[];
 }
 
 function hasBuildScript(content: string): boolean {
   try {
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(content) as { scripts?: { build?: unknown } };
     return typeof parsed?.scripts?.build === "string" && parsed.scripts.build.trim().length > 0;
   } catch {
     return false;
@@ -38,7 +38,12 @@ export function checkExportCompleteness(files: SnapshotFileItem[]): BundleComple
   const hasBuild = pkgFile ? hasBuildScript(pkgFile.content) : false;
   const hasFixtures = paths.some((p) => p.includes("fixture"));
   const hasSource = paths.some(
-    (p) => p.includes("src/") && (p.endsWith(".tsx") || p.endsWith(".jsx") || p.endsWith(".ts") || p.endsWith(".js"))
+    (p) =>
+      p.includes("src/") &&
+      (p.endsWith(".tsx") || p.endsWith(".jsx") || p.endsWith(".ts") || p.endsWith(".js"))
+  );
+  const hasHandoffManifest = paths.some(
+    (p) => p === "cowok-handoff-manifest.json" || p.endsWith("/cowok-handoff-manifest.json")
   );
 
   const missingItems: string[] = [];
@@ -48,8 +53,16 @@ export function checkExportCompleteness(files: SnapshotFileItem[]): BundleComple
   if (hasPackageJson && !hasBuild) missingItems.push("package.json scripts.build");
   if (!hasFixtures) missingItems.push("screen fixtures");
   if (!hasSource) missingItems.push("source code (src/*.tsx)");
+  if (!hasHandoffManifest) missingItems.push("cowok-handoff-manifest.json");
 
-  const readyToRun = hasTokens && hasIcons && hasPackageJson && hasBuild && hasFixtures && hasSource;
+  const readyToRun =
+    hasTokens &&
+    hasIcons &&
+    hasPackageJson &&
+    hasBuild &&
+    hasFixtures &&
+    hasSource &&
+    hasHandoffManifest;
 
   return {
     hasTokens,
@@ -57,6 +70,7 @@ export function checkExportCompleteness(files: SnapshotFileItem[]): BundleComple
     hasPackageJson,
     hasFixtures,
     hasSource,
+    hasHandoffManifest,
     readyToRun,
     missingItems,
   };
@@ -65,7 +79,12 @@ export function checkExportCompleteness(files: SnapshotFileItem[]): BundleComple
 export function buildExportZipMetadata(
   projectId: string,
   files: SnapshotFileItem[],
-  options: ExportZipInput = { includeFixtures: true, includeTokens: true, includeIcons: true, format: "zip" },
+  options: ExportZipInput = {
+    includeFixtures: true,
+    includeTokens: true,
+    includeIcons: true,
+    format: "zip",
+  },
   tenantId: string = "default-tenant"
 ): ExportZipResponse {
   const filteredFiles = files.filter((f) => {
@@ -87,22 +106,6 @@ export function buildExportZipMetadata(
     sha256: bundleSha256,
     filesIncluded: filteredFiles.map((f) => f.path),
     readyToRun: completeness.readyToRun,
-  };
-}
-
-let prSequenceCounter = 100;
-
-export function buildGitHubPRPayload(
-  projectId: string,
-  input: GitHubPRInput,
-  _filesCount: number
-): GitHubPRResponse {
-  prSequenceCounter += 1;
-  const sanitizedBranch = input.branchName.replace(/[^a-zA-Z0-9_-]/g, "-");
-  return {
-    prUrl: `https://github.com/cowok-ai/${projectId}/pull/${prSequenceCounter}`,
-    prNumber: prSequenceCounter,
-    branchName: sanitizedBranch,
-    status: "created",
+    handoffManifestIncluded: completeness.hasHandoffManifest,
   };
 }

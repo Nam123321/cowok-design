@@ -742,7 +742,8 @@ fn check_or_reserve_idempotency_tx(
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|e| map_sqlite_error(e, "begin_idempotency_tx1"))?;
 
-    let existing: Option<(String, String, i64, Option<i64>, Option<String>, i64)> = tx
+    type SdiIdemRow = (String, String, i64, Option<i64>, Option<String>, i64);
+    let existing: Option<SdiIdemRow> = tx
         .query_row(
             "SELECT request_sha256, status, lease_expires_at, response_status, response_body_json, expires_at
              FROM idempotency_records
@@ -791,7 +792,14 @@ fn check_or_reserve_idempotency_tx(
             tenant_id, actor_id, idempotency_key, request_sha256, status, lease_expires_at,
             response_status, response_body_json, expires_at
          ) VALUES (?1, ?2, ?3, ?4, 'IN_PROGRESS', ?5, NULL, NULL, ?6)",
-        params![tenant_id, actor_id, idempotency_key, request_sha, lease_expires_at, expires_at],
+        params![
+            tenant_id,
+            actor_id,
+            idempotency_key,
+            request_sha,
+            lease_expires_at,
+            expires_at
+        ],
     )
     .map_err(|e| map_sqlite_error(e, "insert_idempotency_record"))?;
     tx.commit()
@@ -957,8 +965,7 @@ fn verify_sdi_project_tenant(
             .map_err(|e| map_error_to_response(map_sqlite_error(e, "anti_idor_check")))?;
         match row {
             Some(ref pt)
-                if ver.principal.role == "admin"
-                    || pt.trim() == ver.principal.tenant_id.trim() =>
+                if ver.principal.role == "admin" || pt.trim() == ver.principal.tenant_id.trim() =>
             {
                 Ok(())
             }
@@ -1045,12 +1052,7 @@ pub(super) async fn handle_sdi_intent(
         })?;
         let now_ms = Utc::now().timestamp_millis();
         let reservation = check_or_reserve_idempotency_tx(
-            &mut conn,
-            &tenant_id,
-            &actor_id,
-            ikey,
-            &req_sha,
-            now_ms,
+            &mut conn, &tenant_id, &actor_id, ikey, &req_sha, now_ms,
         )
         .map_err(map_error_to_response)?;
 
@@ -1157,7 +1159,9 @@ pub(super) async fn handle_sdi_intent(
             .unwrap_or(0);
 
         let mut spec_stmt = conn
-            .prepare("SELECT spec_key FROM project_specs WHERE project_id = ?1 AND status = 'CONFIRMED'")
+            .prepare(
+                "SELECT spec_key FROM project_specs WHERE project_id = ?1 AND status = 'CONFIRMED'",
+            )
             .map_err(|e| map_error_to_response(map_sqlite_error(e, "query_specs")))?;
         let specs = spec_stmt
             .query_map(params![project_id.to_string()], |r| r.get::<_, String>(0))
@@ -1320,19 +1324,25 @@ pub(super) async fn handle_sdi_intent(
                     GapQuestionOptionDto {
                         id: "opt-drawer".to_string(),
                         label: "RightDrawer (Khuyến nghị)".to_string(),
-                        description: Some("Ngăn kéo trượt từ cạnh phải, giữ ngữ cảnh màn hình chính".to_string()),
+                        description: Some(
+                            "Ngăn kéo trượt từ cạnh phải, giữ ngữ cảnh màn hình chính".to_string(),
+                        ),
                         preview_thumbnail: Some("layout-drawer.svg".to_string()),
                     },
                     GapQuestionOptionDto {
                         id: "opt-modal".to_string(),
                         label: "Modal Popup trung tâm".to_string(),
-                        description: Some("Hộp thoại đè giữa màn hình với nền mờ backdrop".to_string()),
+                        description: Some(
+                            "Hộp thoại đè giữa màn hình với nền mờ backdrop".to_string(),
+                        ),
                         preview_thumbnail: Some("layout-modal.svg".to_string()),
                     },
                     GapQuestionOptionDto {
                         id: "opt-inline".to_string(),
                         label: "Mở rộng nội dòng (Inline Accordion)".to_string(),
-                        description: Some("Mở rộng trực tiếp tại vị trí dòng/thẻ đang chọn".to_string()),
+                        description: Some(
+                            "Mở rộng trực tiếp tại vị trí dòng/thẻ đang chọn".to_string(),
+                        ),
                         preview_thumbnail: Some("layout-inline.svg".to_string()),
                     },
                 ],
@@ -1346,7 +1356,9 @@ pub(super) async fn handle_sdi_intent(
                     GapQuestionOptionDto {
                         id: "opt-empty-cta".to_string(),
                         label: "Minh họa kèm nút Tạo Mới (CTA Button)".to_string(),
-                        description: Some("Khuyến khích hành động ban đầu của người dùng".to_string()),
+                        description: Some(
+                            "Khuyến khích hành động ban đầu của người dùng".to_string(),
+                        ),
                         preview_thumbnail: Some("empty-cta.svg".to_string()),
                     },
                     GapQuestionOptionDto {
@@ -1366,13 +1378,17 @@ pub(super) async fn handle_sdi_intent(
                     GapQuestionOptionDto {
                         id: "opt-scope-local".to_string(),
                         label: "Chỉ áp dụng trên màn hình này".to_string(),
-                        description: Some("Không ảnh hưởng đến thanh điều hướng hay bố cục chung".to_string()),
+                        description: Some(
+                            "Không ảnh hưởng đến thanh điều hướng hay bố cục chung".to_string(),
+                        ),
                         preview_thumbnail: Some("scope-local.svg".to_string()),
                     },
                     GapQuestionOptionDto {
                         id: "opt-scope-shared".to_string(),
                         label: "Kế thừa Shared AppShell cho toàn bộ Portal Group".to_string(),
-                        description: Some("Đồng bộ thanh Sidebar, Topbar và Footer của Portal".to_string()),
+                        description: Some(
+                            "Đồng bộ thanh Sidebar, Topbar và Footer của Portal".to_string(),
+                        ),
                         preview_thumbnail: Some("scope-shared.svg".to_string()),
                     },
                 ],

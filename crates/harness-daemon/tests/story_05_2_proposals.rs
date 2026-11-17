@@ -143,11 +143,11 @@ async fn story_05_2_v10_schema_node_filtering_and_target_cascade() {
     let tmp = TempDir::new().expect("tempdir");
     let (state, router, tok) = setup_daemon(&tmp);
 
-    // Health endpoint reports schema_version = 10
-    assert_eq!(CURRENT_SCHEMA_VERSION, 10);
+    // Health endpoint reports schema_version == 11 (V11 bump)
+    assert_eq!(CURRENT_SCHEMA_VERSION, 11);
     let (st_h, health) = send_req(&router, "GET", "/api/v1/health", &tok, None).await;
     assert_eq!(st_h, StatusCode::OK);
-    assert_eq!(health["schema_version"], 10);
+    assert_eq!(health["schema_version"], 11);
 
     let proj = create_project(&router, &tok, "proj-node-filter", None).await;
     let proj_id = proj.id.to_string();
@@ -462,7 +462,10 @@ async fn story_05_2_cas_stale_base_hash_409_rebase_and_pre_apply_snapshot() {
     let (st_ap1, _) = send_req(
         &router,
         "POST",
-        &format!("/api/v1/projects/{proj_id}/proposals/{}/apply", p1["id"].as_str().unwrap()),
+        &format!(
+            "/api/v1/projects/{proj_id}/proposals/{}/apply",
+            p1["id"].as_str().unwrap()
+        ),
         &tok,
         Some(json!({})),
     )
@@ -558,7 +561,10 @@ async fn story_05_2_cas_stale_base_hash_409_rebase_and_pre_apply_snapshot() {
     .await;
     assert_eq!(st_ok, StatusCode::OK, "applied: {applied}");
     assert_eq!(applied["status"], "applied");
-    assert_eq!(fs::read_to_string(ws.join("src/Card.tsx")).unwrap(), v2_code);
+    assert_eq!(
+        fs::read_to_string(ws.join("src/Card.tsx")).unwrap(),
+        v2_code
+    );
 
     let conn = state.registry.pool().connection().unwrap();
     let safety_count: i64 = conn
@@ -568,7 +574,10 @@ async fn story_05_2_cas_stale_base_hash_409_rebase_and_pre_apply_snapshot() {
             |r| r.get(0),
         )
         .unwrap();
-    assert_eq!(safety_count, 2, "each apply captures a pre_apply_safety snapshot");
+    assert_eq!(
+        safety_count, 2,
+        "each apply captures a pre_apply_safety snapshot"
+    );
 }
 
 #[tokio::test]
@@ -610,7 +619,13 @@ async fn story_05_2_visual_diff_pixelmatch_ssim_and_rasterizer_fallback() {
     assert_eq!(st_fallback, StatusCode::OK);
     assert_eq!(fallback_res["status"], "RASTERIZER_UNAVAILABLE");
     assert_eq!(fallback_res["ssim"], 1.0);
-    assert_eq!(fallback_res["structuralDiffSummary"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        fallback_res["structuralDiffSummary"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
 
     // 2. Out-of-bounds width > 1280 -> 422
     let (st_oob, _) = send_req(
@@ -665,7 +680,10 @@ async fn story_05_2_visual_diff_pixelmatch_ssim_and_rasterizer_fallback() {
         json!({ "x": 4, "y": 6, "width": 4, "height": 4 })
     );
     let ssim = diff_res["ssim"].as_f64().unwrap();
-    assert!(ssim > 0.0 && ssim < 1.0, "expected partial SSIM, got {ssim}");
+    assert!(
+        ssim > 0.0 && ssim < 1.0,
+        "expected partial SSIM, got {ssim}"
+    );
 
     // Persisted in GET /proposals/:id
     let (st_get, fetched) = send_req(

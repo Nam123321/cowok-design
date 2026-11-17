@@ -13,6 +13,13 @@ const DELTA_DECIMALS = 2;
 
 interface DrawerProps {
   proposal: ChangeProposalResponse | null;
+  proposals?: ChangeProposalResponse[];
+  nodeLabelsById?: Record<string, string>;
+  beforeImageUrl?: string;
+  afterImageUrl?: string;
+  onSelectProposal?: (proposalId: string) => void;
+  onCreateQuickProposal?: () => void;
+  onOpenInlineEditor?: () => void;
   isOpen: boolean;
   onClose: () => void;
   onApply: (proposalId: string) => void;
@@ -62,11 +69,16 @@ const ProposalMetricStrip: React.FC<{ proposal: ChangeProposalResponse }> = ({ p
   );
 };
 
-const ProposalDrawerHeader: React.FC<{ proposal: ChangeProposalResponse; onClose: () => void }> = ({ proposal, onClose }) => {
+const ProposalDrawerHeader: React.FC<{
+  proposal: ChangeProposalResponse;
+  nodeLabelsById?: Record<string, string>;
+  onClose: () => void;
+}> = ({ proposal, nodeLabelsById, onClose }) => {
   const { t } = useTranslation();
   const { formatNumber } = useFormatter();
   const isBatch = Boolean(proposal.batchId || (proposal.nodeIds && proposal.nodeIds.length > 1));
-  const scopeLabel = isBatch ? `${t("proposals.scopeBatch", "BATCH")} (${formatNumber(proposal.nodeIds?.length || 1)})` : `${t("proposals.scopeNode", "NODE")}: ${proposal.nodeId || "PROJECT"}`;
+  const nodeLabel = proposal.nodeId ? nodeLabelsById?.[proposal.nodeId] || proposal.nodeId : "PROJECT";
+  const scopeLabel = isBatch ? `${t("proposals.scopeBatch", "BATCH")} (${formatNumber(proposal.nodeIds?.length || 1)})` : `${t("proposals.scopeNode", "NODE")}: ${nodeLabel}`;
 
   return (
     <div className="cp-drawer-header">
@@ -105,8 +117,10 @@ const ProposalBodyTabs: React.FC<{
   activeTab: "visual" | "code";
   onTabChange: (tab: "visual" | "code") => void;
   onComputeVisualDiff?: (id: string) => void;
+  beforeImageUrl?: string;
+  afterImageUrl?: string;
   isComputingDiff: boolean;
-}> = ({ proposal, activeTab, onTabChange, onComputeVisualDiff, isComputingDiff }) => {
+}> = ({ proposal, activeTab, onTabChange, onComputeVisualDiff, beforeImageUrl, afterImageUrl, isComputingDiff }) => {
   const { t } = useTranslation();
   const { formatNumber } = useFormatter();
 
@@ -117,7 +131,7 @@ const ProposalBodyTabs: React.FC<{
         <button type="button" role="tab" aria-selected={activeTab === "code"} className={`cp-tab${activeTab === "code" ? " cp-tab--active" : ""}`} data-testid="proposal-tab-code" onClick={() => onTabChange("code")}>{t("proposals.codeDiffTab", "Code Diff")}</button>
       </div>
       {activeTab === "visual" ? (
-        <CowokDesignDiffViewer visualDiff={proposal.visualDiff} isComputing={isComputingDiff} onComputeDiff={onComputeVisualDiff ? () => onComputeVisualDiff(proposal.id) : undefined} />
+        <CowokDesignDiffViewer visualDiff={proposal.visualDiff} beforeImageUrl={beforeImageUrl} afterImageUrl={afterImageUrl} isComputing={isComputingDiff} onComputeDiff={onComputeVisualDiff ? () => onComputeVisualDiff(proposal.id) : undefined} />
       ) : (
         <div className="cp-file-section">
           <span className="cp-section-label">{t("proposals.modifiedFilesLabel", "Modified Files")} ({formatNumber(proposal.files.length)})</span>
@@ -134,8 +148,64 @@ function canApplyProposal(proposal: ChangeProposalResponse, errorBanner?: Propos
   return proposal.status === "ready" && proposal.validationStatus === "passed" && !hasFailedCheck && !isBlocked;
 }
 
+const EmptyProposalDrawerBody: React.FC<{
+  onClose: () => void;
+  onCreateQuickProposal?: () => void;
+  onOpenInlineEditor?: () => void;
+}> = ({ onClose, onCreateQuickProposal, onOpenInlineEditor }) => {
+  const { t } = useTranslation();
+  return (
+    <aside className="cp-drawer" role="complementary" aria-label={t("proposals.drawerTitle", "ChangeProposals")} data-testid="change-proposal-drawer">
+      <div className="cp-drawer-body">
+        <div className="cp-drawer-header">
+          <div className="cp-drawer-title-wrap">
+            <h3 className="cp-drawer-title">{t("proposals.drawerTitle", "ChangeProposals")} (0)</h3>
+            <p className="cp-drawer-desc">{t("proposals.emptyDesc", "Send a design prompt in Chat, edit HTML directly, or create a draft ChangeProposal for the active scope.")}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label={t("common.close", "Close")} className="cp-icon-close-btn">✕</button>
+        </div>
+        <div className="cp-file-section" data-testid="proposal-drawer-empty-state">
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "12px", borderRadius: "var(--radius-sm)", border: "1px dashed var(--border-strong)", backgroundColor: "var(--bg-subtle)" }}>
+            <span className="cp-drawer-desc">{t("proposals.emptyGuide", "No pending ChangeProposals yet for this selection.")}</span>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {onCreateQuickProposal && (
+                <button type="button" className="cp-btn-apply" data-testid="proposal-empty-create-btn" onClick={onCreateQuickProposal}>
+                  {t("proposals.createDraftBtn", "Create Draft Proposal")}
+                </button>
+              )}
+              {onOpenInlineEditor && (
+                <button type="button" className="cp-btn-reject" data-testid="proposal-empty-inline-btn" onClick={() => { onClose(); onOpenInlineEditor(); }}>
+                  {t("proposals.openInlineHtmlBtn", "Edit HTML Directly")}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+};
+
+const ProposalListSelector: React.FC<{
+  proposals?: ChangeProposalResponse[];
+  activeId: string;
+  onSelect?: (id: string) => void;
+}> = ({ proposals, activeId, onSelect }) => {
+  if (!proposals || proposals.length <= 1 || !onSelect) return null;
+  return (
+    <div className="cp-tabs" style={{ flexWrap: "wrap", gap: "4px" }}>
+      {proposals.map((item, idx) => (
+        <button key={item.id} type="button" className={`cp-tab${item.id === activeId ? " cp-tab--active" : ""}`} data-testid={`proposal-select-${idx}`} onClick={() => onSelect(item.id)}>
+          #{idx + 1} · {item.status}
+        </button>
+      ))}
+    </div>
+  );
+};
+
 export const ChangeProposalDrawer: React.FC<DrawerProps> = ({
-  proposal, isOpen, onClose, onApply, onReject, onRebaseAndValidate, onComputeVisualDiff,
+  proposal, proposals, nodeLabelsById, beforeImageUrl, afterImageUrl, onSelectProposal, onCreateQuickProposal, onOpenInlineEditor,
+  isOpen, onClose, onApply, onReject, onRebaseAndValidate, onComputeVisualDiff,
   errorBanner, receiptToast, onDismissToast, isRevalidating = false, isComputingDiff = false,
 }) => {
   const { t } = useTranslation();
@@ -149,17 +219,19 @@ export const ChangeProposalDrawer: React.FC<DrawerProps> = ({
     </div>
   ) : null;
 
-  if (!isOpen || !proposal) return toastNode;
+  if (!isOpen) return toastNode;
+  if (!proposal) return <><EmptyProposalDrawerBody onClose={onClose} onCreateQuickProposal={onCreateQuickProposal} onOpenInlineEditor={onOpenInlineEditor} />{toastNode}</>;
   const canApply = canApplyProposal(proposal, errorBanner);
 
   return (
     <>
       <aside className="cp-drawer" role="complementary" aria-label={proposal.title} data-testid="change-proposal-drawer">
         <div className="cp-drawer-body">
-          <ProposalDrawerHeader proposal={proposal} onClose={onClose} />
+          <ProposalDrawerHeader proposal={proposal} nodeLabelsById={nodeLabelsById} onClose={onClose} />
+          <ProposalListSelector proposals={proposals} activeId={proposal.id} onSelect={onSelectProposal} />
           <ProposalMetricStrip proposal={proposal} />
           <ValidationGateBadge checks={proposal.validationChecks} gateReceipt={proposal.gateReceipt} errorBanner={errorBanner} isRevalidating={isRevalidating} onRebaseAndValidate={onRebaseAndValidate ? () => onRebaseAndValidate(proposal.id) : undefined} />
-          <ProposalBodyTabs proposal={proposal} activeTab={activeTab} onTabChange={setActiveTab} onComputeVisualDiff={onComputeVisualDiff} isComputingDiff={isComputingDiff} />
+          <ProposalBodyTabs proposal={proposal} activeTab={activeTab} onTabChange={setActiveTab} onComputeVisualDiff={onComputeVisualDiff} beforeImageUrl={beforeImageUrl} afterImageUrl={afterImageUrl} isComputingDiff={isComputingDiff} />
         </div>
         <div className="cp-drawer-footer">
           <button type="button" onClick={() => onReject(proposal.id)} className="cp-btn-reject" data-testid="proposal-reject-btn">{t("proposals.rejectBtn", "Reject")}</button>

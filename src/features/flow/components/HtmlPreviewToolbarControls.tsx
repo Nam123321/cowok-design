@@ -17,7 +17,7 @@ const GROUP_WRAP_STYLE: React.CSSProperties = {
   borderRadius: "var(--radius-xs)",
   padding: "2px",
   gap: "2px",
-  flexWrap: "nowrap",
+  flexWrap: "wrap",
 };
 
 const MODE_BTN_BASE: React.CSSProperties = {

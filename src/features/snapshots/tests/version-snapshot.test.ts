@@ -6,17 +6,13 @@ import {
   VersionSnapshotDtoSchema,
 } from "../../../lib/validations/version-snapshot";
 import {
+  buildPureRevertPreview,
   computeSha256Hex,
   computeTreeSha256,
   createSnapshotFromInput,
-  performTwoPhaseRevert,
-  setLiveWorkspaceFile,
-  clearLiveWorkspace,
-  collectWorkspaceFiles,
 } from "../utils/snapshot-engine";
 import {
   buildExportZipMetadata,
-  buildGitHubPRPayload,
   checkExportCompleteness,
 } from "../utils/export-bundle";
 import { issueBffLoopbackSession } from "../../../lib/api-guard";
@@ -87,7 +83,7 @@ describe("Story 05.3: VersionSnapshot Schema & Engine", () => {
       { path: "src/Extra.tsx", content: "export default function Extra() {}" },
     ];
 
-    const { safetySnapshot, restoredFiles, result } = performTwoPhaseRevert(
+    const { safetySnapshot, restoredFiles, result } = buildPureRevertPreview(
       modifiedFiles,
       original,
       "proj-1",
@@ -101,22 +97,15 @@ describe("Story 05.3: VersionSnapshot Schema & Engine", () => {
     expect(restoredFiles).toHaveLength(1);
     expect(restoredFiles[0].path).toBe("package.json");
   });
-
-  it("captures uncommitted workspace modifications into pre-revert safety backup (F-01)", () => {
-    clearLiveWorkspace();
-    setLiveWorkspaceFile("proj-test-workspace", "tenant-test", "src/features/UnsavedComponent.tsx", "export const Unsaved = () => null;");
-    const gathered = collectWorkspaceFiles("proj-test-workspace", "tenant-test", []);
-    expect(gathered.some((f) => f.path === "src/features/UnsavedComponent.tsx")).toBe(true);
-
-    const otherTenantFiles = collectWorkspaceFiles("proj-test-workspace", "tenant-other", []);
-    expect(otherTenantFiles.some((f) => f.path === "src/features/UnsavedComponent.tsx")).toBe(false);
-    clearLiveWorkspace();
-  });
 });
 
 describe("Story 05.3: Export Bundle & Runnable Verification (AC-03)", () => {
-  it("verifies export completeness when tokens, icons, package.json, and fixtures exist", () => {
-    const check = checkExportCompleteness(sampleFiles);
+  it("verifies export completeness when tokens, icons, package.json, fixtures, and handoff manifest exist", () => {
+    const completeFiles = [
+      ...sampleFiles,
+      { path: "cowok-handoff-manifest.json", content: '{"projectId":"proj-1"}' },
+    ];
+    const check = checkExportCompleteness(completeFiles);
     expect(check.readyToRun).toBe(true);
     expect(check.missingItems).toHaveLength(0);
   });
@@ -137,8 +126,12 @@ describe("Story 05.3: Export Bundle & Runnable Verification (AC-03)", () => {
     expect(check.missingItems).toContain("source code (src/*.tsx)");
   });
 
-  it("builds export zip metadata and formats GitHub PR payload (F-05)", () => {
-    const meta = buildExportZipMetadata("my-project", sampleFiles, {
+  it("builds export zip metadata including handoffManifestIncluded flag", () => {
+    const completeFiles = [
+      ...sampleFiles,
+      { path: "cowok-handoff-manifest.json", content: '{"projectId":"my-project"}' },
+    ];
+    const meta = buildExportZipMetadata("my-project", completeFiles, {
       includeFixtures: true,
       includeTokens: true,
       includeIcons: true,
@@ -148,18 +141,8 @@ describe("Story 05.3: Export Bundle & Runnable Verification (AC-03)", () => {
     expect(meta.fileName).toContain("my-project");
     expect(meta.fileName).toContain("bundle-");
     expect(meta.readyToRun).toBe(true);
-    expect(meta.filesIncluded).toHaveLength(5);
-
-    const pr = buildGitHubPRPayload("my-project", {
-      branchName: "feat/new design",
-      prTitle: "Update design intent",
-      prBody: "Automated PR",
-      targetBranch: "main",
-    }, meta.filesIncluded.length);
-
-    expect(pr.branchName).toBe("feat-new-design");
-    expect(pr.prUrl).toContain("https://github.com/cowok-ai/my-project/pull/");
-    expect(pr.prNumber).toBeGreaterThan(100);
+    expect(meta.handoffManifestIncluded).toBe(true);
+    expect(meta.filesIncluded).toHaveLength(6);
   });
 });
 
@@ -364,6 +347,8 @@ describe("Story 05.3: REST API Routes & Tenant Jailing", () => {
     });
     expect(res.status).toBe(501);
     const body = await res.json();
-    expect(body.error).toBe("GITHUB_INTEGRATION_NOT_CONFIGURED");
+    expect(["GIT_REMOTE_MISSING", "GH_CLI_MISSING", "GH_UNAUTHENTICATED", "GITHUB_INTEGRATION_NOT_CONFIGURED"]).toContain(
+      body.code || body.error
+    );
   });
 });

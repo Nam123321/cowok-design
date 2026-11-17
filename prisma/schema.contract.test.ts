@@ -110,6 +110,26 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  // Mirror pool.rs idempotent V11 column guards
+  db.exec(`
+    ALTER TABLE chat_sessions ADD COLUMN forked_from_session_id TEXT REFERENCES chat_sessions(id) ON DELETE SET NULL;
+    ALTER TABLE chat_sessions ADD COLUMN forked_from_message_id TEXT REFERENCES chat_messages(id) ON DELETE SET NULL;
+    ALTER TABLE chat_artifact_snapshots ADD COLUMN proposal_id TEXT REFERENCES change_proposals(id) ON DELETE SET NULL;
+    ALTER TABLE chat_artifact_snapshots ADD COLUMN parent_snapshot_id TEXT REFERENCES chat_artifact_snapshots(id) ON DELETE SET NULL;
+    ALTER TABLE chat_artifact_snapshots ADD COLUMN node_snapshot_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE version_snapshots ADD COLUMN proposal_id TEXT REFERENCES change_proposals(id) ON DELETE SET NULL;
+    ALTER TABLE version_snapshots ADD COLUMN parent_snapshot_id TEXT REFERENCES version_snapshots(id) ON DELETE SET NULL;
+    ALTER TABLE version_snapshots ADD COLUMN chat_artifact_snapshot_id TEXT REFERENCES chat_artifact_snapshots(id) ON DELETE SET NULL;
+    ALTER TABLE github_pull_requests ADD COLUMN snapshot_id TEXT REFERENCES version_snapshots(id) ON DELETE SET NULL;
+    ALTER TABLE github_pull_requests ADD COLUMN handoff_manifest_sha256 TEXT NOT NULL DEFAULT '';
+    ALTER TABLE github_pull_requests ADD COLUMN visual_diff_summary_json TEXT NOT NULL DEFAULT '{}';
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V11__story_05_3_snapshots_fork_handoff.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
@@ -258,5 +278,41 @@ describe("P1 Persistence Contract & SQLite WAL V1-V9 Mirror Verification (ADR-09
     db.prepare("DELETE FROM flow_nodes WHERE id = 'node-1'").run();
     const remainingEdges = db.prepare("SELECT COUNT(*) as count FROM flow_edges").get() as { count: number };
     expect(remainingEdges.count).toBe(0);
+  });
+
+  it("UT-DB-06: verifies Story 05.3 V11 columns, 6 indexes, and Prisma parity", () => {
+    const db = openMigratedMemoryDb();
+    const schemaContent = fs.readFileSync(schemaPath, "utf-8");
+
+    for (const [table, cols] of [
+      ["chat_sessions", ["forked_from_session_id", "forked_from_message_id"]],
+      ["chat_artifact_snapshots", ["proposal_id", "parent_snapshot_id", "node_snapshot_json"]],
+      ["version_snapshots", ["proposal_id", "parent_snapshot_id", "chat_artifact_snapshot_id"]],
+      ["github_pull_requests", ["snapshot_id", "handoff_manifest_sha256", "visual_diff_summary_json"]],
+    ] as const) {
+      const tableCols = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(
+        (r) => r.name
+      );
+      for (const col of cols) {
+        expect(tableCols).toContain(col);
+        expect(schemaContent).toContain(`@map("${col}")`);
+      }
+    }
+
+    const idxNames = (
+      db
+        .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
+        .all() as { name: string }[]
+    ).map((r) => r.name);
+    for (const expectedIdx of [
+      "idx_chat_sessions_forked_from",
+      "idx_artifact_snapshots_proposal",
+      "idx_artifact_snapshots_parent",
+      "idx_version_snapshots_proposal",
+      "idx_version_snapshots_parent",
+      "idx_github_prs_snapshot",
+    ]) {
+      expect(idxNames).toContain(expectedIdx);
+    }
   });
 });

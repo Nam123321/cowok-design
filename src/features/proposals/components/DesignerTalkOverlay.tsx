@@ -135,6 +135,22 @@ const TradeoffPopoverCard: React.FC<{
   );
 };
 
+const DesignerTalkEmptyCard: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="cp-dt-overlay" data-testid="designer-talk-overlay">
+      <div className="cp-dt-popover" data-testid="designer-talk-empty-card" style={{ left: `${INITIAL_POPOVER_LEFT}px`, top: `${INITIAL_POPOVER_TOP}px` }}>
+        <div className="cp-dt-popover-header">
+          <span className="cp-dt-index-pill">T</span>
+          <span className="cp-dt-ff-chip">{t("proposals.designerTalkTitle", "Designer Talk Trade-off")}</span>
+          <button type="button" className="cp-icon-close-btn" aria-label={t("common.close", "Close")} onClick={onClose}>✕</button>
+        </div>
+        <p className="cp-dt-note">{t("proposals.designerTalkEmpty", "No design trade-offs recorded yet for this selection. Generate or edit a ChangeProposal first.")}</p>
+      </div>
+    </div>
+  );
+};
+
 export const DesignerTalkOverlay: React.FC<DesignerTalkOverlayProps> = ({
   isOpen, tradeoffs, elementRects, drawerWidth = 0, isModalOpen = false, isInlineEditorOpen = false, onClose, onDecide,
 }) => {
@@ -146,7 +162,8 @@ export const DesignerTalkOverlay: React.FC<DesignerTalkOverlayProps> = ({
   const popoverGeom = usePopoverGeometrySync({ overlayRef, isOpen, activeItem, elementRects, drawerWidth });
   useTradeoffKeyboardNav({ isOpen, boundedTradeoffs, activeItem, isModalOpen, isInlineEditorOpen, setActiveId, onClose, onDecide });
 
-  if (!isOpen || boundedTradeoffs.length === 0) return null;
+  if (!isOpen) return null;
+  if (boundedTradeoffs.length === 0) return <DesignerTalkEmptyCard onClose={onClose} />;
   const docked = boundedTradeoffs.filter((item) => !elementRects[item.elementFfId]);
   const anchored = boundedTradeoffs.filter((item) => Boolean(elementRects[item.elementFfId]));
 

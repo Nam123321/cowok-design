@@ -276,8 +276,16 @@ pub(super) async fn handle_create_project(
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| "local-default".to_string());
 
-    let entry = req.entry_path.as_deref().unwrap_or("prompt_prd").trim().to_string();
-    if !matches!(entry.as_str(), "prompt_prd" | "starter_template" | "design_import" | "git_codebase") {
+    let entry = req
+        .entry_path
+        .as_deref()
+        .unwrap_or("prompt_prd")
+        .trim()
+        .to_string();
+    if !matches!(
+        entry.as_str(),
+        "prompt_prd" | "starter_template" | "design_import" | "git_codebase"
+    ) {
         return Err(map_error_to_response(HarnessError::ValidationFailed {
             reason: format!("Invalid entryPath '{entry}' (expected prompt_prd | starter_template | design_import | git_codebase)"),
         }));
@@ -286,12 +294,17 @@ pub(super) async fn handle_create_project(
     if entry == "git_codebase" {
         let repo_url = match &req.git_repo_url {
             Some(u) if !u.trim().is_empty() => u.trim(),
-            _ => return Err(map_error_to_response(HarnessError::ValidationFailed {
-                reason: "gitRepoUrl is required for git_codebase entry path".to_string(),
-            })),
+            _ => {
+                return Err(map_error_to_response(HarnessError::ValidationFailed {
+                    reason: "gitRepoUrl is required for git_codebase entry path".to_string(),
+                }))
+            }
         };
         let lower_url = repo_url.to_ascii_lowercase();
-        if lower_url.starts_with("file:") || lower_url.starts_with("ext:") || lower_url.contains("..") {
+        if lower_url.starts_with("file:")
+            || lower_url.starts_with("ext:")
+            || lower_url.contains("..")
+        {
             return Err(map_error_to_response(HarnessError::ValidationFailed {
                 reason: format!("PROTOCOL_DENIED: Protocol or path in '{repo_url}' is forbidden"),
             }));

@@ -103,7 +103,7 @@ const ScopeChipStrip: React.FC<{
             {n.screenKey}
           </span>
           {selectedNodes.length > 1 && (
-            <button type="button" onClick={() => onDeselectNode(n.id)} aria-label={`${t("floatingChat.deselectNode", "Bỏ chọn")} ${n.screenKey}`} style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center" }}>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onDeselectNode(n.id); }} aria-label={`${t("floatingChat.deselectNode", "Bỏ chọn")} ${n.screenKey}`} style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", width: "16px", height: "16px", minWidth: "16px", padding: "2px", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <BrandIcon name="close" size={10} color="currentColor" />
             </button>
           )}

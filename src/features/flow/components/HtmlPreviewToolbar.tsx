@@ -49,6 +49,7 @@ export interface HtmlPreviewToolbarProps {
   onToggleSampleData?: () => void;
   isWalkthroughActive?: boolean;
   onToggleWalkthrough?: () => void;
+  versionMenuNode?: React.ReactNode;
 }
 
 const ViewportRightControls: React.FC<HtmlPreviewToolbarProps> = (p) => {
@@ -77,6 +78,7 @@ const ViewportRightControls: React.FC<HtmlPreviewToolbarProps> = (p) => {
           <span>{p.commentCount ?? 0}</span>
         </button>
       )}
+      {p.versionMenuNode}
       <button type="button" data-testid="toggle-present-btn" onClick={p.onTogglePresenting} title={presentTitle} aria-label={presentTitle} aria-pressed={p.isPresenting} className="cowok-btn cowok-btn-primary" style={{ width: "28px", height: "28px", padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-xs)", backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)", cursor: "pointer" }}>
         <BrandIcon name={p.isPresenting ? "close" : "play"} size={ICON_SIZE_SM} color="currentColor" />
       </button>

@@ -9,20 +9,22 @@ export const PROPOSAL_DRAWER_WIDTH_PX = 420;
 
 export const CanvasProposalToolbar: React.FC<{
   selectedNodeId?: string | null;
+  selectedNodeKey?: string | null;
   proposalsCount: number;
   isDesignerTalkOpen: boolean;
   isDrawerOpen: boolean;
   onToggleDesignerTalk: () => void;
   onToggleDrawer: () => void;
-}> = ({ selectedNodeId, proposalsCount, isDesignerTalkOpen, isDrawerOpen, onToggleDesignerTalk, onToggleDrawer }) => {
+}> = ({ selectedNodeId, selectedNodeKey, proposalsCount, isDesignerTalkOpen, isDrawerOpen, onToggleDesignerTalk, onToggleDrawer }) => {
   const { t } = useTranslation();
   const { formatNumber } = useFormatter();
+  const readableScope = selectedNodeKey || selectedNodeId;
 
   return (
     <div className="cp-canvas-toolbar" data-testid="proposal-canvas-toolbar">
       <div className="cp-canvas-toolbar-group">
         <span className="cp-scope-pill" data-testid="canvas-active-scope-pill">
-          {selectedNodeId ? `${t("proposals.scopeNode", "NODE")}: ${selectedNodeId}` : t("proposals.scopeBatch", "BATCH")}
+          {readableScope ? `${t("proposals.scopeNode", "NODE")}: ${readableScope}` : t("proposals.scopeBatch", "BATCH")}
         </span>
       </div>
       <div className="cp-canvas-toolbar-group">
@@ -50,17 +52,29 @@ export const CanvasProposalToolbar: React.FC<{
   );
 };
 
+const NOOP_PROPOSAL_MUTATION = () => {};
+
 export const CanvasProposalDrawerHost: React.FC<{
   controller: ReturnType<typeof useNodeProposalController>;
-}> = ({ controller }) => (
+  nodeLabelsById?: Record<string, string>;
+  onOpenInlineEditor?: () => void;
+  isReadOnly?: boolean;
+}> = ({ controller, nodeLabelsById, onOpenInlineEditor, isReadOnly = false }) => (
   <ChangeProposalDrawer
     proposal={controller.activeProposal}
+    proposals={controller.proposals}
+    nodeLabelsById={nodeLabelsById}
+    beforeImageUrl={controller.activeDiffFrames?.beforeImageUrl}
+    afterImageUrl={controller.activeDiffFrames?.afterImageUrl}
+    onSelectProposal={controller.setSelectedProposalId}
+    onCreateQuickProposal={isReadOnly ? NOOP_PROPOSAL_MUTATION : () => { void controller.createQuickDraftProposal(); }}
+    onOpenInlineEditor={isReadOnly ? undefined : onOpenInlineEditor}
     isOpen={controller.isDrawerOpen}
     onClose={() => controller.setIsDrawerOpen(false)}
-    onApply={(id) => { void controller.applyProposal(id); }}
-    onReject={(id) => { void controller.rejectProposal(id); }}
-    onRebaseAndValidate={(id) => { void controller.rebaseAndValidate(id); }}
-    onComputeVisualDiff={(id) => { void controller.computeVisualDiff(id); }}
+    onApply={isReadOnly ? NOOP_PROPOSAL_MUTATION : (id) => { void controller.applyProposal(id); }}
+    onReject={isReadOnly ? NOOP_PROPOSAL_MUTATION : (id) => { void controller.rejectProposal(id); }}
+    onRebaseAndValidate={isReadOnly ? NOOP_PROPOSAL_MUTATION : (id) => { void controller.rebaseAndValidate(id); }}
+    onComputeVisualDiff={isReadOnly ? NOOP_PROPOSAL_MUTATION : (id) => { void controller.computeVisualDiff(id); }}
     errorBanner={controller.errorBanner}
     receiptToast={controller.receiptToast}
     onDismissToast={controller.dismissToast}
