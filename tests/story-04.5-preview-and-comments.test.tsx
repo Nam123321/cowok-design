@@ -5,7 +5,7 @@ import React from "react";
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { CompanionCanvasTab } from "../src/features/flow/components/CompanionCanvasTab";
 import { CompanionLiveHtmlRightPane } from "../src/features/flow/components/CompanionLiveHtmlRightPane";
 import { ElementCommentThread } from "../src/features/comments/components/ElementCommentThread";
@@ -57,7 +57,7 @@ describe("Story 04.5: State-Hydrated Live Preview, Option CSP-B CSPRNG Bridge & 
     expect(getByTestId("dirty-buffer-guard-banner")).toBeTruthy();
     expect(getByTestId("inline-code-editor-panel")).toBeTruthy();
 
-    fireEvent.click(getByTestId("dirty-guard-discard-btn"));
+    fireEvent.click(within(getByTestId("dirty-buffer-guard-banner")).getByTestId("dirty-guard-discard-btn"));
     expect(queryByTestId("inline-code-editor-panel")).toBeNull();
 
     // Editing and clicking Apply closes inline editor immediately without getting trapped on dirty guard
@@ -83,6 +83,7 @@ describe("Story 04.5: State-Hydrated Live Preview, Option CSP-B CSPRNG Bridge & 
 
     // Host rejects PORT_ACK with wrong bootSecretAck and closes port1
     const closeSpy = vi.fn();
+    const port1PostMessageSpy = vi.fn();
     const handlerRef: { fn: ((ev: MessageEvent) => void) | null } = { fn: null };
     const OrigChannel = globalThis.MessageChannel;
     class CapturingChannel {
@@ -94,7 +95,7 @@ describe("Story 04.5: State-Hydrated Live Preview, Option CSP-B CSPRNG Bridge & 
         get onmessage() {
           return handlerRef.fn;
         },
-        postMessage: vi.fn(),
+        postMessage: port1PostMessageSpy,
       };
       port2 = { close: vi.fn(), onmessage: null, postMessage: vi.fn() };
     }
@@ -152,12 +153,15 @@ describe("Story 04.5: State-Hydrated Live Preview, Option CSP-B CSPRNG Bridge & 
       } as MessageEvent);
       expect(closeSpy).toHaveBeenCalledTimes(2);
 
-      // Sub-state change rotates epoch so reloaded iframe binds fresh INIT_PORT
+      // Sub-state change hydrates in place over the pooled MessagePort with bound epoch (LRU-5 avoids iframe reload)
       fireEvent.click(getByTestId("fixture-variant-LOADING"));
-      fireEvent.load(iframe);
-      expect(postMessage).toHaveBeenCalledTimes(2);
-      const nextInit = postMessage.mock.calls[1][0] as { epoch: number; bootSecret: string };
-      expect(nextInit.epoch).not.toBe(initPayload.epoch);
+      expect(port1PostMessageSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "FLOW_PREVIEW_HYDRATE",
+          variant: "LOADING",
+          epoch: initPayload.epoch,
+        })
+      );
     } finally {
       vi.stubGlobal("MessageChannel", OrigChannel);
     }

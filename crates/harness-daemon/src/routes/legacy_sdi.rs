@@ -1210,7 +1210,7 @@ pub(super) async fn handle_sdi_intent(
         || lower.contains("dialog")
         || lower.contains("badge");
 
-    let is_vague = (lower.contains("đẹp")
+    let has_vague_keyword = lower.contains("đẹp")
         || lower.contains("fix")
         || lower.contains("sửa")
         || lower.contains("change")
@@ -1218,9 +1218,8 @@ pub(super) async fn handle_sdi_intent(
         || lower.contains("tối ưu")
         || lower.contains("cải tiến")
         || lower.contains("giao diện")
-        || lower.contains("better"))
-        && word_count <= 4
-        && !is_node_targeted;
+        || lower.contains("better");
+    let is_vague = has_vague_keyword && !has_specific_element && !is_node_targeted;
 
     let is_multi_flow = lower.contains("luồng")
         || lower.contains("flow")

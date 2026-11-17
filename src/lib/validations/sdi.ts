@@ -11,7 +11,9 @@ export const ClarificationVariantSchema = z.object({
   description: z.string().min(1),
   pros: z.array(z.string()),
   cons: z.array(z.string()),
-  previewPayload: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+  previewPayload: z
+    .record(z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(z.string())]))
+    .optional(),
 });
 
 export const GapQuestionOptionSchema = z.object({
