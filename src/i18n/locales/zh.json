@@ -233,7 +233,10 @@
     "walkthroughDagSyncLabel": "双屏演练 — DAG 同步",
     "viewportSwitcherAria": "视口尺寸",
     "userflowLensTooltip": "2D 用户流程 DAG：设计界面结构、条件分支与状态流转。",
-    "slideCmsLensTooltip": "幻灯片演示与 Zero-Code CMS：无需编写代码即可可视化编辑标题、要点与 KPI 指标。"
+    "slideCmsLensTooltip": "幻灯片演示与 Zero-Code CMS：无需编写代码即可可视化编辑标题、要点与 KPI 指标。",
+    "viewportDesktop": "桌面视口",
+    "viewportTablet": "平板视口",
+    "viewportMobile": "手机视口"
   },
   "settings": {
     "title": "系统设置与偏好",
@@ -654,7 +657,13 @@
     "charsUnit": "字符",
     "exportShortLabel": "导出",
     "exportMenuTooltip": "导出：下载 ZIP、发起 GitHub PR 或在 IDE 中打开",
-    "emptyDetailPlaceholder": "选择一个版本或创建快照以预览 HTML、用户流程与文件清单。"
+    "emptyDetailPlaceholder": "选择一个版本或创建快照以预览 HTML、用户流程与文件清单。",
+    "downloadZipTooltip": "将不含密钥的完整项目打包为 ZIP 压缩包",
+    "pushGithubPrTooltip": "创建分支并提交 GitHub Pull Request",
+    "openIdeTooltip": "生成一键交接清单并在 Cursor / VS Code / Antigravity 中打开",
+    "slidePreviewTabTooltip": "预览 16:9 幻灯片快照",
+    "htmlPreviewTabTooltip": "预览 HTML 界面快照",
+    "userflowTabTooltip": "预览用户流程图快照"
   },
   "onboarding": {
     "authNeeded": "需要登录",

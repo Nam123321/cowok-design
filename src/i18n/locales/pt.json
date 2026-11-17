@@ -233,7 +233,10 @@
     "walkthroughDagSyncLabel": "Tela dupla — Sincronização DAG",
     "viewportSwitcherAria": "Largura da tela",
     "userflowLensTooltip": "DAG de fluxo de usuário 2D: projete arquitetura de telas, ramificações e transições de estado.",
-    "slideCmsLensTooltip": "Apresentação de Slides e CMS Zero-Code: edite títulos, resumos e métricas KPI visualmente sem código."
+    "slideCmsLensTooltip": "Apresentação de Slides e CMS Zero-Code: edite títulos, resumos e métricas KPI visualmente sem código.",
+    "viewportDesktop": "Tela desktop",
+    "viewportTablet": "Tela tablet",
+    "viewportMobile": "Tela mobile"
   },
   "settings": {
     "title": "Configurações e preferências do sistema",
@@ -654,7 +657,13 @@
     "charsUnit": "caracteres",
     "exportShortLabel": "Exportar",
     "exportMenuTooltip": "Exportar: Baixar ZIP, PR GitHub ou Abrir IDE",
-    "emptyDetailPlaceholder": "Selecione uma versão ou crie um checkpoint para inspecionar HTML, fluxo e arquivos."
+    "emptyDetailPlaceholder": "Selecione uma versão ou crie um checkpoint para inspecionar HTML, fluxo e arquivos.",
+    "downloadZipTooltip": "Empacote o repositório completo sem segredos em um arquivo ZIP",
+    "pushGithubPrTooltip": "Crie um branch e abra um Pull Request no GitHub",
+    "openIdeTooltip": "Gere o manifesto 1-Click e abra no Cursor, VS Code ou Antigravity",
+    "slidePreviewTabTooltip": "Pré-visualizar slide 16:9",
+    "htmlPreviewTabTooltip": "Pré-visualizar tela HTML",
+    "userflowTabTooltip": "Pré-visualizar fluxo de usuário"
   },
   "onboarding": {
     "authNeeded": "Login necessário",

@@ -233,7 +233,10 @@
     "walkthroughDagSyncLabel": "Walkthrough Dual Screen — Đồng bộ DAG",
     "viewportSwitcherAria": "Kích thước màn hình",
     "userflowLensTooltip": "Sơ đồ luồng người dùng 2D (Userflow DAG): thiết kế cấu trúc màn hình, điều kiện rẽ nhánh và luồng chuyển trạng thái.",
-    "slideCmsLensTooltip": "Trình chiếu Slide & Zero-Code CMS: biên tập nội dung slide, tiêu đề và chỉ số KPI trực quan không cần viết mã."
+    "slideCmsLensTooltip": "Trình chiếu Slide & Zero-Code CMS: biên tập nội dung slide, tiêu đề và chỉ số KPI trực quan không cần viết mã.",
+    "viewportDesktop": "Màn hình Desktop",
+    "viewportTablet": "Màn hình Tablet",
+    "viewportMobile": "Màn hình Mobile"
   },
   "settings": {
     "title": "Cài đặt & Tùy biến Hệ thống",
@@ -654,7 +657,13 @@
     "charsUnit": "ký tự",
     "exportShortLabel": "Xuất bản",
     "exportMenuTooltip": "Xuất bản: Tải ZIP, Tạo GitHub PR hoặc Mở IDE",
-    "emptyDetailPlaceholder": "Chọn một bản chụp hoặc tạo Snapshot đầu tiên để xem trước HTML / Userflow / Danh sách tệp."
+    "emptyDetailPlaceholder": "Chọn một bản chụp hoặc tạo Snapshot đầu tiên để xem trước HTML / Userflow / Danh sách tệp.",
+    "downloadZipTooltip": "Đóng gói toàn bộ dự án sạch không chứa secret thành tệp ZIP",
+    "pushGithubPrTooltip": "Tạo nhánh và đẩy Pull Request lên GitHub repository",
+    "openIdeTooltip": "Tạo manifest bàn giao 1-Click và mở trong Cursor / VS Code / Antigravity",
+    "slidePreviewTabTooltip": "Xem trước Slide 16:9",
+    "htmlPreviewTabTooltip": "Xem trước giao diện HTML",
+    "userflowTabTooltip": "Xem sơ đồ Luồng người dùng"
   },
   "onboarding": {
     "authNeeded": "Cần đăng nhập",

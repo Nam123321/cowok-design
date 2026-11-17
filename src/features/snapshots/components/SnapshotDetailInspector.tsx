@@ -1,5 +1,7 @@
 // @story 05.3
 import React, { useMemo, useState } from "react";
+import { BrandIcon } from "../../../components/ui/BrandIcon";
+import { useFormatter } from "../../../hooks/useFormatter";
 import { useTranslation } from "../../../hooks/useTranslation";
 import type {
   ChatArtifactSnapshotResponse,
@@ -60,25 +62,60 @@ const DetailHeaderSwitcher: React.FC<{
   onSetMode: (m: DetailViewMode) => void;
   onCloseDetail: () => void;
 }> = ({ title, hash, isSlideDeck, effectiveMode, fileCount, onSetMode, onCloseDetail }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
+  const htmlTooltip = isSlideDeck
+    ? t("snapshots.slidePreviewTabTooltip", "Xem trước Slide 16:9")
+    : t("snapshots.htmlPreviewTabTooltip", "Xem trước giao diện HTML");
+  const userflowTooltip = t("snapshots.userflowTabTooltip", "Xem sơ đồ Luồng người dùng");
+  const filesTooltip = `${t("snapshots.filesTab", "Tệp nguồn")} (${formatNumber(fileCount)})`;
+
   return (
     <div className="snap-detail-header">
       <div className="snap-item-tag">{title} · <code>{hash}</code></div>
       <div className="snap-item-actions">
         <div className="snap-detail-switcher" role="tablist" data-testid="detail-view-switcher">
-          <button type="button" role="tab" aria-selected={effectiveMode === "html"} className={`snap-btn snap-btn--compact ${effectiveMode === "html" ? "snap-btn--primary" : "snap-btn--ghost"}`} data-testid="detail-mode-html" onClick={() => onSetMode("html")}>
-            {isSlideDeck ? t("snapshots.slidePreviewTab", "Slide 16:9") : t("snapshots.htmlPreviewTab", "HTML")}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={effectiveMode === "html"}
+            title={htmlTooltip}
+            aria-label={htmlTooltip}
+            className={`snap-detail-icon-btn${effectiveMode === "html" ? " snap-detail-icon-btn--active" : ""}`}
+            data-testid="detail-mode-html"
+            onClick={() => onSetMode("html")}
+          >
+            <BrandIcon name={isSlideDeck ? "presentation" : "eye"} size={13} color="currentColor" />
           </button>
           {!isSlideDeck && (
-            <button type="button" role="tab" aria-selected={effectiveMode === "userflow"} className={`snap-btn snap-btn--compact ${effectiveMode === "userflow" ? "snap-btn--primary" : "snap-btn--ghost"}`} data-testid="detail-mode-userflow" onClick={() => onSetMode("userflow")}>
-              {t("snapshots.userflowTab", "Userflow")}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={effectiveMode === "userflow"}
+              title={userflowTooltip}
+              aria-label={userflowTooltip}
+              className={`snap-detail-icon-btn${effectiveMode === "userflow" ? " snap-detail-icon-btn--active" : ""}`}
+              data-testid="detail-mode-userflow"
+              onClick={() => onSetMode("userflow")}
+            >
+              <BrandIcon name="workflow" size={13} color="currentColor" />
             </button>
           )}
-          <button type="button" role="tab" aria-selected={effectiveMode === "files"} className={`snap-btn snap-btn--compact ${effectiveMode === "files" ? "snap-btn--primary" : "snap-btn--ghost"}`} data-testid="detail-mode-files" onClick={() => onSetMode("files")}>
-            {t("snapshots.filesTab", "Files")} ({fileCount})
+          <button
+            type="button"
+            role="tab"
+            aria-selected={effectiveMode === "files"}
+            title={filesTooltip}
+            aria-label={filesTooltip}
+            className={`snap-detail-icon-btn${effectiveMode === "files" ? " snap-detail-icon-btn--active" : ""}`}
+            data-testid="detail-mode-files"
+            onClick={() => onSetMode("files")}
+          >
+            <BrandIcon name="file-text" size={13} color="currentColor" />
+            {fileCount > 0 && <span className="snap-detail-count-badge">{formatNumber(fileCount)}</span>}
           </button>
         </div>
-        <button type="button" className="snap-drawer-close-btn" onClick={onCloseDetail} title={t("common.close", "Close")}>✕</button>
+        <button type="button" className="snap-drawer-close-btn" onClick={onCloseDetail} title={t("common.close", "Đóng")} aria-label={t("common.close", "Đóng")}>✕</button>
       </div>
     </div>
   );
@@ -92,7 +129,8 @@ const DetailStageViewport: React.FC<{
   isSlideDeck: boolean;
   files: Array<{ path: string; size: number }>;
 }> = ({ title, previewDoc, selected, effectiveMode, isSlideDeck, files }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
   const nodeName = selected.kind === "turn" ? (selected.item.nodeId || "SCR-01") : selected.item.label;
   return (
     <div className="snap-detail-stage">
@@ -108,7 +146,7 @@ const DetailStageViewport: React.FC<{
           {files.slice(0, MAX_FLOW_PREVIEW_CARDS).map((f) => (
             <div key={f.path} className="snap-flow-preview-node">
               <code>{f.path}</code>
-              <span className="snap-meta-label">{f.size} {t("snapshots.charsUnit", "chars")}</span>
+              <span className="snap-meta-label">{formatNumber(f.size)} {t("snapshots.charsUnit", "chars")}</span>
             </div>
           ))}
         </div>
@@ -118,7 +156,7 @@ const DetailStageViewport: React.FC<{
           {files.map((f) => (
             <li key={f.path} className="snap-checklist-item">
               <code>{f.path}</code>
-              <span>{f.size} {t("snapshots.charsUnit", "chars")}</span>
+              <span>{formatNumber(f.size)} {t("snapshots.charsUnit", "chars")}</span>
             </li>
           ))}
         </ul>

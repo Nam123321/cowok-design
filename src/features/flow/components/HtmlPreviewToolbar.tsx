@@ -2,6 +2,7 @@
 // @implements AC-01, AC-02, AC-03 (2-Row Responsive Toolbar: Primary Actions + Icon-Only Viewport & History Strip)
 import React, { useEffect, useRef, useState } from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
+import { useFormatter } from "../../../hooks/useFormatter";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { normalizeViewportPreset, type FixtureVariant, type ViewportPreset } from "../../../lib/validations/screen-fixture";
 import type { ExportInitialSection } from "../../snapshots/components/ExportBundleModal";
@@ -18,10 +19,10 @@ const ICON_SIZE_SM = 12;
 const ICON_SIZE_MD = 13;
 type ToolbarViewportPreset = ViewportPreset | "desktop" | "tablet" | "mobile";
 
-const VIEWPORT_ITEMS: ReadonlyArray<{ preset: ViewportPreset; icon: "monitor" | "tablet" | "smartphone"; label: string }> = [
-  { preset: "desktop-1440", icon: "monitor", label: "Desktop (1440px)" },
-  { preset: "tablet-768", icon: "tablet", label: "Tablet (768px)" },
-  { preset: "mobile-390", icon: "smartphone", label: "Mobile (390px)" },
+const VIEWPORT_ITEMS: ReadonlyArray<{ preset: ViewportPreset; icon: "monitor" | "tablet" | "smartphone"; pxWidth: number; i18nKey: string; defaultLabel: string }> = [
+  { preset: "desktop-1440", icon: "monitor", pxWidth: 1440, i18nKey: "canvas.viewportDesktop", defaultLabel: "Desktop" },
+  { preset: "tablet-768", icon: "tablet", pxWidth: 768, i18nKey: "canvas.viewportTablet", defaultLabel: "Tablet" },
+  { preset: "mobile-390", icon: "smartphone", pxWidth: 390, i18nKey: "canvas.viewportMobile", defaultLabel: "Mobile" },
 ];
 
 const NEXT_ASPECT_RATIO: Record<"auto" | "16-9" | "16-10", "auto" | "16-9" | "16-10"> = {
@@ -219,7 +220,8 @@ const RowOnePrimaryActions: React.FC<HtmlPreviewToolbarProps & { isNarrow: boole
 };
 
 const RowTwoIconUtilityStrip: React.FC<HtmlPreviewToolbarProps> = (p) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
   const activePreset = normalizeViewportPreset(p.viewportPreset);
   const aspectLabelMap: Record<"auto" | "16-9" | "16-10", string> = {
     auto: t("canvas.aspectAutoFit", "Tự động vừa khung"),
@@ -228,16 +230,19 @@ const RowTwoIconUtilityStrip: React.FC<HtmlPreviewToolbarProps> = (p) => {
   };
   const nextAspect = NEXT_ASPECT_RATIO[p.aspectRatio];
   const aspectTitle = `${t("canvas.aspectRatio", "Tỷ lệ khung hình")}: ${aspectLabelMap[p.aspectRatio]} (→ ${aspectLabelMap[nextAspect]})`;
-  const commentsTitle = `${t("comments.drawerTitle", "Bình luận ghim trên phần tử")} (${p.commentCount ?? 0})`;
-  const historyTitle = `${t("snapshots.historyTitle", "Lịch sử Phiên bản")} (${p.snapshotsCount ?? 0})`;
+  const commentsCount = p.commentCount ?? 0;
+  const snapshotsCount = p.snapshotsCount ?? 0;
+  const commentsTitle = `${t("comments.drawerTitle", "Bình luận ghim trên phần tử")} (${formatNumber(commentsCount)})`;
+  const historyTitle = `${t("snapshots.historyTitle", "Lịch sử Phiên bản")} (${formatNumber(snapshotsCount)})`;
 
   return (
     <div style={{ ...ROW_STYLE, borderTop: "1px solid var(--border-subtle)", paddingTop: "3px" }}>
       <SubStateSwitcher activeSubState={p.activeSubState} isReadOnly={p.isReadOnly} onSelectSubState={p.onSelectSubState} />
       <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "nowrap", flexShrink: 0 }}>
         <div style={VP_GROUP_STYLE} role="group" aria-label={t("canvas.viewportSwitcherAria", "Kích thước màn hình")}>
-          {VIEWPORT_ITEMS.map(({ preset, icon, label }) => {
+          {VIEWPORT_ITEMS.map(({ preset, icon, pxWidth, i18nKey, defaultLabel }) => {
             const isActive = activePreset === preset;
+            const vpTitle = `${t(i18nKey, defaultLabel)} (${formatNumber(pxWidth)}px)`;
             return (
               <button
                 key={preset}
@@ -246,8 +251,8 @@ const RowTwoIconUtilityStrip: React.FC<HtmlPreviewToolbarProps> = (p) => {
                 data-testid={`viewport-btn-${preset}`}
                 aria-pressed={isActive}
                 onClick={() => p.onSetViewportPreset(preset)}
-                title={label}
-                aria-label={label}
+                title={vpTitle}
+                aria-label={vpTitle}
                 style={{
                   ...TOOLBAR_ICON_BTN_BASE,
                   height: "20px",
@@ -295,9 +300,9 @@ const RowTwoIconUtilityStrip: React.FC<HtmlPreviewToolbarProps> = (p) => {
             }}
           >
             <BrandIcon name="message-square" size={ICON_SIZE_SM} color="currentColor" />
-            {(p.commentCount ?? 0) > 0 && (
+            {commentsCount > 0 && (
               <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "13px", height: "13px", padding: "0 3px", borderRadius: "var(--radius-pill)", backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)", fontSize: "8.5px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                {p.commentCount}
+                {formatNumber(commentsCount)}
               </span>
             )}
           </button>
@@ -318,9 +323,9 @@ const RowTwoIconUtilityStrip: React.FC<HtmlPreviewToolbarProps> = (p) => {
             }}
           >
             <BrandIcon name="history" size={ICON_SIZE_MD} color="currentColor" />
-            {(p.snapshotsCount ?? 0) > 0 && (
+            {snapshotsCount > 0 && (
               <span style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "13px", height: "13px", padding: "0 3px", borderRadius: "var(--radius-pill)", backgroundColor: "var(--bg-elevated)", border: "1px solid var(--border-default)", color: "var(--text-primary)", fontSize: "8.5px", fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                {p.snapshotsCount}
+                {formatNumber(snapshotsCount)}
               </span>
             )}
           </button>

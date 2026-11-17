@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { apiHarnessDaemon } from "../../../api/harness-daemon";
 import { apiScreenFixture } from "../../../api/screen-fixture";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
+import { useFormatter } from "../../../hooks/useFormatter";
 import { useTranslation } from "../../../hooks/useTranslation";
 import type { ConflictState, WorkbenchNode } from "../store/flow-workbench-types";
 import type { FixtureVariant, ViewportPreset } from "../../../lib/validations/screen-fixture";
@@ -291,9 +292,11 @@ function useWalkthroughController(
     setIsPresenting(false);
   }, [setIsPresenting]);
 
+  const { locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
   const currentNode = total > 0 ? nodes?.[stepIndex % total] : undefined;
   const stepLabel = total > 0
-    ? `${currentNode?.screenKey || currentNode?.id || "SCR"} (${(stepIndex % total) + 1}/${total})`
+    ? `${currentNode?.screenKey || currentNode?.id || "SCR"} (${formatNumber((stepIndex % total) + 1)}/${formatNumber(total)})`
     : undefined;
 
   return {
@@ -378,11 +381,39 @@ export function CompanionCanvasTab(props: CompanionCanvasTabProps) {
   const versionMenuNode = (
     <VersionPublishMenuButton snapshotsCount={s.snapshotCtrl.snapshots.length} onOpenHistory={() => s.snapshotCtrl.setIsDrawerOpen((p) => !p)} onOpenExportSection={(sec) => { void s.snapshotCtrl.exp.handleOpenExport(sec); }} />
   );
+  const isWalkthroughFullscreen = s.walkthrough.isActive;
+  const containerStyle: React.CSSProperties = isWalkthroughFullscreen
+    ? {
+        position: "fixed",
+        inset: 0,
+        width: "100vw",
+        height: "100vh",
+        zIndex: 45,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        backgroundColor: "var(--bg-canvas)",
+      }
+    : {
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        backgroundColor: "var(--bg-canvas)",
+        position: "relative",
+      };
   return (
-    <div className="companion-canvas-tab-container" style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", backgroundColor: "var(--bg-canvas)", position: "relative" }}>
+    <div
+      className={`companion-canvas-tab-container${isWalkthroughFullscreen ? " walkthrough-fullscreen-active" : ""}`}
+      data-walkthrough-fullscreen={isWalkthroughFullscreen ? "true" : "false"}
+      style={containerStyle}
+    >
       <CompanionLockBanners ambiguityScore={props.ambiguityScore} conflictState={s.stageMutators.conflictState} />
       <CompanionDirtyGuardModal isOpen={s.vp.showDirtyGuardPrompt} onCancel={s.guards.handleCancelDirtyGuard} onDiscard={s.guards.handleConfirmDiscardChanges} onSave={s.guards.handleConfirmSavePatch} />
-      <CompanionTabBar tabs={s.nav.tabs} activeTabId={s.nav.activeTab.id} isNewTabMenuOpen={s.nav.isNewTabMenuOpen} onToggleNewTabMenu={() => s.nav.setIsNewTabMenuOpen((prev) => !prev)} onTabSelect={s.guards.handleGuardedTabSelect} onCloseTab={s.nav.handleClose} onCreateTab={s.nav.handleCreateTab} />
+      {!isWalkthroughFullscreen && (
+        <CompanionTabBar tabs={s.nav.tabs} activeTabId={s.nav.activeTab.id} isNewTabMenuOpen={s.nav.isNewTabMenuOpen} onToggleNewTabMenu={() => s.nav.setIsNewTabMenuOpen((prev) => !prev)} onTabSelect={s.guards.handleGuardedTabSelect} onCloseTab={s.nav.handleClose} onCreateTab={s.nav.handleCreateTab} />
+      )}
       <HistoricalPreviewBanner activePreviewTurn={s.snapshotCtrl.turn.activePreviewTurn} onExit={s.snapshotCtrl.turn.handlePreviewTurn} />
       {s.isHtmlDesignTab ? (
         <ReadOnlyCanvasContext.Provider value={s.isHistoricalReadOnly}>

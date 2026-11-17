@@ -233,7 +233,10 @@
     "walkthroughDagSyncLabel": "デュアル画面 — DAG連動",
     "viewportSwitcherAria": "ビューポート幅",
     "userflowLensTooltip": "2DユーザーフローDAG: 画面構成・条件分岐・状態遷移を設計します。",
-    "slideCmsLensTooltip": "スライド発表＆Zero-Code CMS: コード不要でスライド見出し・要点・KPI数値を直感的に編集できます。"
+    "slideCmsLensTooltip": "スライド発表＆Zero-Code CMS: コード不要でスライド見出し・要点・KPI数値を直感的に編集できます。",
+    "viewportDesktop": "デスクトップ表示",
+    "viewportTablet": "タブレット表示",
+    "viewportMobile": "モバイル表示"
   },
   "settings": {
     "title": "システム設定と環境設定",
@@ -654,7 +657,13 @@
     "charsUnit": "文字",
     "exportShortLabel": "出力",
     "exportMenuTooltip": "出力: ZIP保存・GitHub PR・IDE起動",
-    "emptyDetailPlaceholder": "履歴を選択するか最初のスナップショットを作成すると、HTML・フロー・ファイル一覧をプレビューできます。"
+    "emptyDetailPlaceholder": "履歴を選択するか最初のスナップショットを作成すると、HTML・フロー・ファイル一覧をプレビューできます。",
+    "downloadZipTooltip": "シークレットを除いた完全リポジトリをZIPにパッケージ化します",
+    "pushGithubPrTooltip": "ブランチを作成してGitHub Pull Requestを発行します",
+    "openIdeTooltip": "1-Clickハンドオフマニフェストを作成しIDEで開きます",
+    "slidePreviewTabTooltip": "16:9スライドをプレビュー",
+    "htmlPreviewTabTooltip": "HTML画面をプレビュー",
+    "userflowTabTooltip": "ユーザーフロー図をプレビュー"
   },
   "onboarding": {
     "authNeeded": "ログインが必要です",

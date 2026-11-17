@@ -233,7 +233,10 @@
     "walkthroughDagSyncLabel": "듀얼 화면 — DAG 동기화",
     "viewportSwitcherAria": "뷰포트 크기",
     "userflowLensTooltip": "2D 사용자 흐름 DAG: 화면 구조, 조건 분기 및 상태 전환을 설계합니다.",
-    "slideCmsLensTooltip": "슬라이드 프레젠테이션 & Zero-Code CMS: 코드 없이 슬라이드 제목, 요약, KPI 수치를 직관적으로 편집합니다."
+    "slideCmsLensTooltip": "슬라이드 프레젠테이션 & Zero-Code CMS: 코드 없이 슬라이드 제목, 요약, KPI 수치를 직관적으로 편집합니다.",
+    "viewportDesktop": "데스크톱 화면",
+    "viewportTablet": "태블릿 화면",
+    "viewportMobile": "모바일 화면"
   },
   "settings": {
     "title": "시스템 설정 및 환경설정",
@@ -654,7 +657,13 @@
     "charsUnit": "자",
     "exportShortLabel": "내보내기",
     "exportMenuTooltip": "내보내기: ZIP 다운로드, GitHub PR, IDE 열기",
-    "emptyDetailPlaceholder": "버전을 선택하거나 스냅샷을 생성하면 HTML, 사용자 흐름 및 파일 목록을 미리 볼 수 있습니다."
+    "emptyDetailPlaceholder": "버전을 선택하거나 스냅샷을 생성하면 HTML, 사용자 흐름 및 파일 목록을 미리 볼 수 있습니다.",
+    "downloadZipTooltip": "시크릿을 제외한 전체 저장소를 ZIP 파일로 패키징합니다",
+    "pushGithubPrTooltip": "브랜치를 생성하고 GitHub Pull Request를 엽니다",
+    "openIdeTooltip": "1-Click 핸드오프 매니페스트를 생성하고 IDE에서 엽니다",
+    "slidePreviewTabTooltip": "16:9 슬라이드 미리보기",
+    "htmlPreviewTabTooltip": "HTML 화면 미리보기",
+    "userflowTabTooltip": "사용자 흐름 그래프 미리보기"
   },
   "onboarding": {
     "authNeeded": "로그인 필요",

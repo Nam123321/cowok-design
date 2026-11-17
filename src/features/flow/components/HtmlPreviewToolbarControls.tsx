@@ -160,7 +160,7 @@ export const ExportActionDropdown: React.FC<{
           fontWeight: 500,
         }}
       >
-        <BrandIcon name="deploy" size={12} strokeWidth={1.85} color="currentColor" />
+        <BrandIcon name="upload" size={12} strokeWidth={1.85} color="currentColor" />
         <span>{t("snapshots.exportShortLabel", "Export")}</span>
         <BrandIcon name="chevron-down" size={10} color="currentColor" />
       </button>
@@ -168,14 +168,23 @@ export const ExportActionDropdown: React.FC<{
         typeof document !== "undefined" &&
         createPortal(
           <div ref={menuRef} role="menu" data-testid="toolbar-export-menu" style={{ ...MENU_PANEL_STYLE, top: `${coords.top}px`, left: `${coords.left}px` }}>
-            <button type="button" role="menuitem" data-testid="toolbar-export-zip" style={MENU_ITEM_STYLE} onClick={() => pick("zip")}>
-              <span>{t("snapshots.downloadZipBtn", "Tải ZIP Full Repo")}</span>
+            <button type="button" role="menuitem" data-testid="toolbar-export-zip" title={t("snapshots.downloadZipTooltip", "Đóng gói toàn bộ dự án sạch không chứa secret thành tệp ZIP")} style={MENU_ITEM_STYLE} onClick={() => pick("zip")}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <BrandIcon name="zip" size={12} color="currentColor" />
+                <span>{t("snapshots.downloadZipBtn", "Tải ZIP Full Repo")}</span>
+              </span>
             </button>
-            <button type="button" role="menuitem" data-testid="toolbar-export-github" style={MENU_ITEM_STYLE} onClick={() => pick("github-pr")}>
-              <span>{t("snapshots.pushGithubPrMenu", "Đẩy lên GitHub PR")}</span>
+            <button type="button" role="menuitem" data-testid="toolbar-export-github" title={t("snapshots.pushGithubPrTooltip", "Tạo nhánh và đẩy Pull Request lên GitHub repository")} style={MENU_ITEM_STYLE} onClick={() => pick("github-pr")}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <BrandIcon name="handoff" size={12} color="currentColor" />
+                <span>{t("snapshots.pushGithubPrMenu", "Đẩy lên GitHub PR")}</span>
+              </span>
             </button>
-            <button type="button" role="menuitem" data-testid="toolbar-export-ide" style={MENU_ITEM_STYLE} onClick={() => pick("ide-handoff")}>
-              <span>{t("snapshots.ideHandoffTitle", "Mở trong IDE")}</span>
+            <button type="button" role="menuitem" data-testid="toolbar-export-ide" title={t("snapshots.openIdeTooltip", "Tạo manifest bàn giao 1-Click và mở trong Cursor / VS Code / Antigravity")} style={MENU_ITEM_STYLE} onClick={() => pick("ide-handoff")}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <BrandIcon name="terminal" size={12} color="currentColor" />
+                <span>{t("snapshots.ideHandoffTitle", "Mở trong IDE")}</span>
+              </span>
             </button>
           </div>,
           document.body
@@ -279,14 +288,23 @@ export const OverflowActionsDropdown: React.FC<{
             {onOpenExportSection && (
               <>
                 <div style={{ height: "1px", backgroundColor: "var(--border-subtle)", margin: "2px 4px" }} />
-                <button type="button" role="menuitem" data-testid="overflow-export-zip" style={MENU_ITEM_STYLE} onClick={() => { setOpen(false); onOpenExportSection("zip"); }}>
-                  <span>{t("snapshots.downloadZipBtn", "Export · Tải ZIP Full Repo")}</span>
+                <button type="button" role="menuitem" data-testid="overflow-export-zip" title={t("snapshots.downloadZipTooltip", "Đóng gói toàn bộ dự án sạch không chứa secret thành tệp ZIP")} style={MENU_ITEM_STYLE} onClick={() => { setOpen(false); onOpenExportSection("zip"); }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <BrandIcon name="zip" size={12} color="currentColor" />
+                    <span>{t("snapshots.downloadZipBtn", "Tải ZIP Full Repo")}</span>
+                  </span>
                 </button>
-                <button type="button" role="menuitem" data-testid="overflow-export-github" style={MENU_ITEM_STYLE} onClick={() => { setOpen(false); onOpenExportSection("github-pr"); }}>
-                  <span>{t("snapshots.pushGithubPrMenu", "Export · Đẩy GitHub PR")}</span>
+                <button type="button" role="menuitem" data-testid="overflow-export-github" title={t("snapshots.pushGithubPrTooltip", "Tạo nhánh và đẩy Pull Request lên GitHub repository")} style={MENU_ITEM_STYLE} onClick={() => { setOpen(false); onOpenExportSection("github-pr"); }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <BrandIcon name="handoff" size={12} color="currentColor" />
+                    <span>{t("snapshots.pushGithubPrMenu", "Đẩy GitHub PR")}</span>
+                  </span>
                 </button>
-                <button type="button" role="menuitem" data-testid="overflow-export-ide" style={MENU_ITEM_STYLE} onClick={() => { setOpen(false); onOpenExportSection("ide-handoff"); }}>
-                  <span>{t("snapshots.ideHandoffTitle", "Export · Mở trong IDE")}</span>
+                <button type="button" role="menuitem" data-testid="overflow-export-ide" title={t("snapshots.openIdeTooltip", "Tạo manifest bàn giao 1-Click và mở trong Cursor / VS Code / Antigravity")} style={MENU_ITEM_STYLE} onClick={() => { setOpen(false); onOpenExportSection("ide-handoff"); }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <BrandIcon name="terminal" size={12} color="currentColor" />
+                    <span>{t("snapshots.ideHandoffTitle", "Mở IDE 1-Click")}</span>
+                  </span>
                 </button>
               </>
             )}
