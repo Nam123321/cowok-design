@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-08"
 title: "Epic 08: agentskills.io Repackager Engine, 6 Built-in Harness Skills & GitHub Cron Lifecycle"
-status: in-progress
+status: completed
 track: "Stream-4"
 wave: 1
 provides: ["crates/plugin-host", "crates/skill-repackager", "packages/builtin-skills", "6 Core + 3 Seed Harness Skills", "agentskills.io SKILL.md + plugin.json Normalizer", "GitHub Cron Sync Scheduler", "LEARN HUMAN_ONLY Valve"]
