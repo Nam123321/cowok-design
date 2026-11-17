@@ -1,13 +1,13 @@
+// @story 08.1
+// @cover AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08
 import { describe, it, expect, beforeEach } from "vitest";
 import * as path from "path";
 import * as fs from "fs";
-import {
-  BuiltinSkillsRegistry,
-  PerRunStagingManager,
-  TriangleLinter,
-  validateSkillFrontmatter,
-  estimateTokenCount,
-} from "../src/index";
+import * as os from "os";
+import { BuiltinSkillsRegistry } from "../src/registry";
+import { PerRunStagingManager } from "../src/staging";
+import { TriangleLinter } from "../src/triangle-linter";
+import { validateSkillFrontmatter, estimateTokenCount } from "../src/validator";
 
 describe("Story 08.1: Built-in Harness Skills & Multi-Axis Registry", () => {
   const packageRoot = path.resolve(__dirname, "..");
@@ -133,7 +133,7 @@ description: ${"extremely detailed description ".repeat(30)}
     });
 
     it("stages skills into isolated sandbox directory and generates run receipt", () => {
-      const tmpBase = path.join(packageRoot, ".test-cowok-skills");
+      const tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), "cowok-skills-stage-"));
       const stager = new PerRunStagingManager(tmpBase);
 
       const skill = {
@@ -146,14 +146,16 @@ description: ${"extremely detailed description ".repeat(30)}
         tags: [],
       };
 
-      const receipt = stager.stageRun("run-999", [skill]);
-      expect(receipt.run_id).toBe("run-999");
-      expect(receipt.staged_skills).toContain("test-run-skill");
-      expect(fs.existsSync(path.join(tmpBase, "run-999", "test-run-skill", "plugin.json"))).toBe(true);
-      expect(fs.existsSync(path.join(tmpBase, "run-999", "run-receipt.json"))).toBe(true);
-
-      // Cleanup
-      fs.rmSync(tmpBase, { recursive: true, force: true });
+      try {
+        const receipt = stager.stageRun("run-999", [skill]);
+        expect(receipt.run_id).toBe("run-999");
+        expect(receipt.staged_skills).toContain("test-run-skill");
+        expect(fs.existsSync(path.join(tmpBase, "run-999", "test-run-skill", "plugin.json"))).toBe(true);
+        expect(fs.existsSync(path.join(tmpBase, "run-999", "run-receipt.json"))).toBe(true);
+      } finally {
+        stager.cleanupRun("run-999");
+        fs.rmSync(tmpBase, { recursive: true, force: true });
+      }
     });
   });
 
@@ -228,6 +230,134 @@ description: ${"extremely detailed description ".repeat(30)}
       );
       expect(researchRoom).toContain("anti-fabrication");
       expect(researchRoom).toContain("ADR");
+    });
+  });
+
+  describe("Golden Parity & AC-06..AC-08 Hardening", () => {
+    const fixturesDir = path.join(packageRoot, "tests", "fixtures");
+    const goldenFile = fs.readdirSync(fixturesDir).find((f) => f.endsWith("-golden.json"));
+    if (!goldenFile) {
+      throw new Error(`Missing golden parity fixture in ${fixturesDir}`);
+    }
+    const goldenPath = path.join(fixturesDir, goldenFile);
+    const golden = JSON.parse(fs.readFileSync(goldenPath, "utf8"));
+
+    it("enforces strict line-bounded YAML delimiters and 1,024B ceiling (AC-06)", () => {
+      const shared = golden.shared_vectors;
+      const validRes = validateSkillFrontmatter(shared.yaml_valid_with_triple_dash_scalar);
+      expect(validRes.valid).toBe(true);
+      expect(validRes.fields?.name).toBe("dash-in-scalar");
+      expect(validRes.fields?.description).toBe("Handle --- delimiter inside quoted scalar safely");
+
+      expect(validateSkillFrontmatter(shared.yaml_invalid_no_opening_delimiter).valid).toBe(false);
+      expect(validateSkillFrontmatter(shared.yaml_invalid_over_1024_bytes).valid).toBe(false);
+      // F-01 & W2-02 regression: unterminated/unclosed YAML scalars & adjacent quotes fail closed; quoted keys + inline comments pass
+      expect(
+        validateSkillFrontmatter("---\nname: ok\ndescription: \"unterminated\n---\n").valid,
+      ).toBe(false);
+      expect(
+        validateSkillFrontmatter("---\nname: ok\ndescription: {unclosed\n---\n").valid,
+      ).toBe(false);
+      expect(
+        validateSkillFrontmatter("---\nname: \"a\" \"b\"\ndescription: desc\n---\n").valid,
+      ).toBe(false);
+      expect(
+        validateSkillFrontmatter("---\nname: demo\ndescription: 12\n---\n").valid,
+      ).toBe(false);
+      const quotedAndHashRes = validateSkillFrontmatter(
+        "---\n# top comment\n\"name\": quoted-key\nversion: 1.0.0 # inline comment\ndescription: C# guide # note\n---\n",
+      );
+      expect(quotedAndHashRes.valid).toBe(true);
+      expect(quotedAndHashRes.fields?.name).toBe("quoted-key");
+      expect(quotedAndHashRes.fields?.description).toBe("C# guide");
+      // F-02 parity: TS now runs real yaml + cl100k_base BPE matching Rust D2 SSOT across all SSOT edge vectors
+      expect(
+        validateSkillFrontmatter(golden.rust_ssot_bpe_vectors.yaml_vietnamese_multilingual_over_100_bpe).valid,
+      ).toBe(false);
+      expect(
+        validateSkillFrontmatter(golden.rust_ssot_bpe_vectors.yaml_invalid_anchor_alias).valid,
+      ).toBe(false);
+      expect(
+        validateSkillFrontmatter(golden.rust_ssot_bpe_vectors.yaml_invalid_custom_tag).valid,
+      ).toBe(false);
+      expect(
+        validateSkillFrontmatter(golden.rust_ssot_bpe_vectors.yaml_invalid_duplicate_key).valid,
+      ).toBe(false);
+    });
+
+    it("matches Rust canonical KV-cache hash and rejects unsafe staging / prompts (AC-07)", () => {
+      const kv = golden.shared_vectors.kv_hash_parity;
+      const toEntries = (arr: Array<{ manifest: any; skill_md_sha256: string }>) =>
+        arr.map((e) => ({ manifest: e.manifest, skillMdSha256: e.skill_md_sha256 }));
+
+      const hashA = PerRunStagingManager.computeStablePromptHashWithSources(toEntries(kv.entries_variant_a));
+      const hashB = PerRunStagingManager.computeStablePromptHashWithSources(toEntries(kv.entries_variant_b));
+      expect(hashA).toBe(kv.expected_stable_prompt_hash);
+      expect(hashB).toBe(kv.expected_stable_prompt_hash);
+
+      const tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), "cowok-skills-hardening-"));
+      const stager = new PerRunStagingManager(tmpBase);
+      try {
+        for (const badVec of golden.shared_vectors.prompt_injection_rejections) {
+          const badSkill = {
+            name: "bad-prompt",
+            version: "1.0.0",
+            description: "desc",
+            entry_point: "SKILL.md",
+            capabilities_required: [],
+            risk_tier: 1 as const,
+            tags: [],
+            prompt_overview: badVec.content,
+          };
+          expect(() => stager.stageRun(`run-${badVec.id}`, [badSkill])).toThrow();
+          expect(fs.existsSync(path.join(tmpBase, `run-${badVec.id}`))).toBe(false);
+        }
+      } finally {
+        fs.rmSync(tmpBase, { recursive: true, force: true });
+      }
+    });
+
+    it("detects script, dangerouslySetInnerHTML, javascript: URI, and beacon tells (AC-08)", () => {
+      for (const item of golden.shared_vectors.linter_security_hygiene) {
+        const report = TriangleLinter.lint(item.content);
+        expect(report.passed).toBe(false);
+        expect(report.issues.map((i) => i.rule_id)).toContain(item.expected_rule);
+      }
+      // F-03 regression: multi-line <img> and Markdown beacons
+      const multilineImg = '<img\n  src="https://tracker.invalid/p.gif"\n  alt="beacon"\n/>';
+      expect(TriangleLinter.lint(multilineImg).issues.map((i) => i.rule_id)).toContain(
+        "ANTI_SLOP_07_EXTERNAL_BEACON",
+      );
+      const multilineMd = "![tracker](\nhttps://tracker.invalid/p.gif\n)";
+      expect(TriangleLinter.lint(multilineMd).issues.map((i) => i.rule_id)).toContain(
+        "ANTI_SLOP_07_EXTERNAL_BEACON",
+      );
+    });
+
+    it("enforces >= 25 distinct geometric and WCAG rules in TriangleLinter (AC-04 / F-04)", () => {
+      const sample = `<html lang="en"><style>
+@font-face { font-family: Custom; }
+@keyframes spin { from { transform: rotate(0deg); } }
+</style>
+<h1>Title</h1><h3>Skipped H2</h3>
+<div class="inner" style="border-radius: 12px; padding: 16px;"></div>
+<div style="background-color: #fff; color: #999; outline: none;"></div>
+<p style="width: 120px; line-height: 1; font-size: 9px;">Clipped text</p>
+<div style="padding: 13px; min-width: 1200px; z-index: 99999; backdrop-filter: blur(8px); transition: width 0.2s; position: sticky; top: 0;"></div>
+<button style="height: 24px">Click</button>
+<img src="local.png" />
+<span class="badge bg-red-500 status-dot"></span>
+<span class="truncate">Long text</span>
+<svg class="icon"><path d="" /></svg>
+<video src="demo.mp4"></video>
+<input type="text" />
+<a tabindex="1">First</a>
+</html>`;
+      const report = TriangleLinter.lint(sample);
+      const distinctGeo = new Set(
+        report.issues.map((i) => i.rule_id).filter((id) => id.startsWith("RULE_GEO_")),
+      );
+      expect(distinctGeo.size).toBeGreaterThanOrEqual(25);
     });
   });
 });

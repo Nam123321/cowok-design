@@ -1,18 +1,35 @@
 use serde::{Deserialize, Serialize};
 
+fn default_entry_point() -> String {
+    "SKILL.md".to_string()
+}
+
+const fn default_risk_tier() -> u8 {
+    1
+}
+
 /// Skill manifest conforming to agentskills.io standard
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts",
+    ts(export, export_to = "../../../packages/shared-types/src/generated/")
+)]
 pub struct SkillManifest {
     pub name: String,
     pub version: String,
     pub description: String,
-    #[serde(default)]
+    #[serde(default = "default_entry_point")]
     pub entry_point: String,
     #[serde(default)]
     pub capabilities_required: Vec<String>,
-    #[serde(default)]
+    #[serde(default = "default_risk_tier")]
     pub risk_tier: u8,
     #[serde(default)]
+    #[cfg_attr(
+        feature = "ts",
+        ts(type = "Record<string, unknown> | boolean | null")
+    )]
     pub parameters: Option<serde_json::Value>,
     #[serde(default)]
     pub tags: Vec<String>,
