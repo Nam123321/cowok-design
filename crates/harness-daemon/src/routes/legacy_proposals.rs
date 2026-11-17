@@ -2580,6 +2580,66 @@ pub(super) async fn handle_validate_proposal(
     result.map(Json)
 }
 
+fn mark_conflicting_proposals_stale_tx(
+    tx: &rusqlite::Transaction<'_>,
+    project_id: Uuid,
+    tenant_id: &str,
+    applied_id: Uuid,
+    applied: &ChangeProposalDto,
+    now: &str,
+) -> rusqlite::Result<()> {
+    let applied_paths: std::collections::HashSet<String> =
+        applied.files.iter().map(|f| f.path.clone()).collect();
+    let mut stmt = tx.prepare(
+        "SELECT id, node_id, files_json FROM change_proposals
+         WHERE project_id = ?1 AND tenant_id = ?2 AND id != ?3
+           AND status IN ('draft', 'ready', 'validating')",
+    )?;
+    let candidates: Vec<(String, Option<String>, String)> = stmt
+        .query_map(
+            params![project_id.to_string(), tenant_id, applied_id.to_string()],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(stmt);
+
+    for (cand_id, cand_node_id, cand_files_json) in candidates {
+        let same_node = applied.node_id.is_some() && applied.node_id == cand_node_id;
+        let cand_files: Vec<FileDiffItemDto> =
+            serde_json::from_str(&cand_files_json).unwrap_or_default();
+        let overlapping_file = cand_files.iter().any(|f| applied_paths.contains(&f.path));
+        if same_node || overlapping_file {
+            tx.execute(
+                "UPDATE change_proposals SET status = 'stale', updated_at = ?1
+                 WHERE id = ?2 AND project_id = ?3 AND tenant_id = ?4",
+                params![now, cand_id, project_id.to_string(), tenant_id],
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn stale_base_hash_conflict_response(stale_files: Vec<String>) -> Response {
+    let summary = if stale_files.is_empty() {
+        "Proposal is stale due to concurrent workspace apply.".to_string()
+    } else {
+        format!(
+            "Workspace files changed since proposal snapshot: {}",
+            stale_files.join(", ")
+        )
+    };
+    (
+        StatusCode::CONFLICT,
+        Json(serde_json::json!({
+            "code": "PROPOSAL_STALE_BASE_HASH",
+            "error": "PROPOSAL_STALE_BASE_HASH",
+            "staleFiles": stale_files,
+            "message": summary,
+        })),
+    )
+        .into_response()
+}
+
 pub(super) async fn handle_apply_proposal(
     State(state): State<DaemonAppState>,
     caller: Option<Extension<VerifiedLegacyIngress>>,
@@ -2636,6 +2696,11 @@ pub(super) async fn handle_apply_proposal(
                 .into_response()));
         }
 
+        if proposal.status == "stale" {
+            let stale_paths = proposal.files.iter().map(|f| f.path.clone()).collect();
+            return Ok(Err(stale_base_hash_conflict_response(stale_paths)));
+        }
+
         if proposal.status != "ready" {
             return Ok(Err((
                 StatusCode::BAD_REQUEST,
@@ -2671,6 +2736,11 @@ pub(super) async fn handle_apply_proposal(
                     |r| r.get(0),
                 )
                 .optional()?;
+            if current_status.as_deref() == Some("stale") {
+                let stale_paths = proposal.files.iter().map(|f| f.path.clone()).collect();
+                tx_rejection = Some(stale_base_hash_conflict_response(stale_paths));
+                return Ok(());
+            }
             if current_status.as_deref() != Some("ready") {
                 tx_rejection = Some(
                     (
@@ -2698,21 +2768,7 @@ pub(super) async fn handle_apply_proposal(
                 }
             };
             if !stale_files.is_empty() {
-                tx_rejection = Some(
-                    (
-                        StatusCode::CONFLICT,
-                        Json(serde_json::json!({
-                            "code": "PROPOSAL_STALE_BASE_HASH",
-                            "error": "PROPOSAL_STALE_BASE_HASH",
-                            "staleFiles": stale_files,
-                            "message": format!(
-                                "Workspace files changed since proposal snapshot: {}",
-                                stale_files.join(", ")
-                            ),
-                        })),
-                    )
-                        .into_response(),
-                );
+                tx_rejection = Some(stale_base_hash_conflict_response(stale_files));
                 return Ok(());
             }
 
@@ -2858,6 +2914,14 @@ pub(super) async fn handle_apply_proposal(
                 "UPDATE change_proposals SET status = 'applied', updated_at = ?1
                  WHERE id = ?2 AND project_id = ?3 AND tenant_id = ?4",
                 params![now, proposal_id.to_string(), project_id.to_string(), tenant_id],
+            )?;
+            mark_conflicting_proposals_stale_tx(
+                &tx,
+                project_id,
+                &tenant_id,
+                proposal_id,
+                &proposal,
+                &now,
             )?;
             let apply_turn_files: Vec<SnapshotFileItemDto> = proposal
                 .files
@@ -6033,6 +6097,35 @@ fn preflight_pr_env_and_token(
                 &format!("VersionSnapshot '{sid}' was not found for this project/tenant"),
             ));
         }
+    }
+    let top_out = run_bounded_cmd_with_pgid(
+        "git",
+        &[
+            "-c",
+            "core.hooksPath=/dev/null",
+            "rev-parse",
+            "--show-toplevel",
+        ],
+        canon_project_root,
+        &[],
+    );
+    let is_standalone_repo_root = top_out.success
+        && std::fs::canonicalize(top_out.stdout.trim()).ok().as_deref() == Some(canon_project_root);
+    if !is_standalone_repo_root {
+        record_pr_audit_event(
+            conn,
+            project_id,
+            tenant_id,
+            &req.branch_name,
+            "failed",
+            "GIT_REMOTE_MISSING",
+            None,
+        );
+        return Err(json_err_resp(
+                StatusCode::NOT_IMPLEMENTED,
+                "GIT_REMOTE_MISSING",
+                "Scratch workspace has no standalone git repository; link a git repository or download ZIP bundle instead.",
+            ));
     }
     let remote_out = run_bounded_cmd_with_pgid(
         "git",

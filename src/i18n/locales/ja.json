@@ -213,7 +213,25 @@
     "modeSampleData": "サンプルデータ (D)",
     "pauseWalkthrough": "ウォークスルー停止",
     "startWalkthrough": "ウォークスルー",
-    "savePatchBtn": "HTMLを保存して適用"
+    "savePatchBtn": "HTMLを保存して適用",
+    "modeSelectRegion": "領域選択",
+    "modeToggleTooltip": "操作 <-> 領域選択: 要素クリックまたは範囲ドラッグ(>=16x16px)でコメント/チャット (C)",
+    "walkthroughLabel": "ウォークスルー",
+    "startWalkthroughTooltip": "ウォークスルー: DAGフローとデザインを連動再生 (Dual Screen / 全体表示)",
+    "stopWalkthrough": "ウォークスルー終了",
+    "editHtmlLabel": "HTML編集",
+    "editHtmlTooltip": "HTML/CSSを直接編集 (E)",
+    "sampleDataLabel": "サンプルデータ",
+    "sampleDataTooltip": "サンプルJSONフィクスチャ (HAPPY / EMPTY / LONG_TEXT / ERROR)",
+    "moreActionsTooltip": "その他の操作 (HTML編集・データ・エクスポート)",
+    "walkthroughPrev": "前の画面",
+    "resumeWalkthrough": "自動再生",
+    "walkthroughNext": "次の画面",
+    "walkthroughDualMode": "デュアル画面",
+    "walkthroughFullMode": "全体デザイン",
+    "exitWalkthrough": "終了 (Esc)",
+    "walkthroughDagSyncLabel": "デュアル画面 — DAG連動",
+    "viewportSwitcherAria": "ビューポート幅"
   },
   "settings": {
     "title": "システム設定と環境設定",
@@ -513,7 +531,11 @@
     "createDraftBtn": "下書き提案を作成",
     "openInlineHtmlBtn": "HTMLを直接編集",
     "designerTalkEmpty": "この選択範囲にはDesigner Talkのトレードオフがまだ記録されていません。",
-    "designerTalkCompact": "フィードバック"
+    "designerTalkCompact": "フィードバック",
+    "suggestionLabel": "提案ヒント",
+    "suggestionTooltip": "デザイン提案とトレードオフ (ショートカット T)",
+    "proposalLabel": "変更提案",
+    "proposalTooltip": "変更提案一覧"
   },
   "sdi": {
     "ambiguityScoreLabel": "曖昧さスコア:",
@@ -528,7 +550,11 @@
     "promptPlaceholder": "自然言語でUIの変更を記述してください...",
     "prosLabel": "メリット:",
     "reviewClarificationsBtn": "明確化オプションの確認と選択",
-    "ambiguityLockFull": "実行ロック：曖昧さスコア {{score}} ≥ 0.45。コード生成前に意図を明確化してください。"
+    "ambiguityLockFull": "実行ロック：曖昧さスコア {{score}} ≥ 0.45。コード生成前に意図を明確化してください。",
+    "clarificationResolved": "選択済みの設計方針:",
+    "chooseVariantPrompt": "実行を解除するには1つ選択してください:",
+    "variantConfirmedPrefix": "選択した案",
+    "variantUnlockedSuffix": "インテント準備完了・実行ロック解除。"
   },
   "snapshots": {
     "byteSizeLabel": "サイズ:",
@@ -623,7 +649,9 @@
     "exportMenuLabel": "エクスポート / 同期",
     "pushGithubPrMenu": "GitHub PR を作成",
     "originLabel": "リモート (origin):",
-    "charsUnit": "文字"
+    "charsUnit": "文字",
+    "exportShortLabel": "出力",
+    "exportMenuTooltip": "出力: ZIP保存・GitHub PR・IDE起動"
   },
   "onboarding": {
     "authNeeded": "ログインが必要です",
@@ -704,7 +732,8 @@
     "gitBranchLabel": "対象ブランチ",
     "loadSamplePrdBtn": "サンプルPRDを読み込む",
     "dropPrdPrompt": "PRDファイルをドロップまたは選択 (.md / .txt / .pdf)",
-    "selectedFilePrefix": "選択済みファイル:"
+    "selectedFilePrefix": "選択済みファイル:",
+    "openHubFromNewProject": "または4ルートLaunchpadハブを開く (PRD / テンプレート / URL / Git)"
   },
   "sampleData": {
     "title": "サンプルデータスタジオ — フィクスチャ連携",

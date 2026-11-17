@@ -17,6 +17,34 @@ import type { FloatingChatMessage } from "./useFloatingChatSync";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const activeStreams = new Map<string, AbortController>();
 
+function formatSseEventContent(eventKind: string, payloadText: string): string | null {
+  const kind = eventKind.trim().toLowerCase();
+  const raw = payloadText.trim();
+  if (!raw || kind === "enqueued" || kind === "heartbeat") return null;
+  if (kind === "proposal_ready") {
+    return "Đã tổng hợp Đề xuất thay đổi (ChangeProposal). Mở mục Đề xuất để kiểm tra & áp dụng.";
+  }
+  if (raw.startsWith("{") && raw.endsWith("}")) {
+    try {
+      const obj = JSON.parse(raw) as Record<string, unknown>;
+      const tag = String(obj.event || obj.type || kind);
+      if (tag === "github_pr_attempt") {
+        return obj.ok
+          ? `Đã tạo Pull Request GitHub (${String(obj.branch || "feature")}).`
+          : `Chưa thể tạo GitHub PR trực tiếp (${String(obj.error || "cần cấu hình remote/token")}) — có thể tải ZIP offline.`;
+      }
+      if (tag === "revert_tx_journal" || tag === "snapshot_revert") {
+        return "Đã khôi phục (Revert) snapshot an toàn trên SQLite & workspace.";
+      }
+      if (obj.summary || obj.message) return String(obj.summary || obj.message);
+      return `Sự kiện ${tag} đã hoàn tất.`;
+    } catch {
+      /* fallback below */
+    }
+  }
+  return raw;
+}
+
 export interface DispatchExecutionParams {
   projectId: string;
   sessionId: string;
@@ -68,11 +96,13 @@ export function ensureProjectSseStream(
       if (latestSeq > 0) globalKeyedParallelCoordinator.updateProjectSeq(latestSeq);
       for (const ev of events) {
         if (!ev.payloadText) continue;
+        const formatted = formatSseEventContent(ev.eventKind, ev.payloadText);
+        if (!formatted) continue;
         const msg: FloatingChatMessage = {
           id: `sse-${ev.id}`,
           nodeId: ev.nodeId,
           role: "assistant",
-          content: `[${ev.eventKind}] ${ev.payloadText}`,
+          content: formatted,
           timestamp: Date.now(),
           projectSeq: ev.projectSeq ?? ev.seqNo,
         };
@@ -145,7 +175,17 @@ async function runEnqueueAndCompile(params: DispatchExecutionParams): Promise<vo
   const summary = intent.status === "clarifying"
     ? `${params.t("chat.clarifyPrefix", "Cần làm rõ")} (${clarifyPct}%): ${intent.clarificationVariants?.map((v) => v.title).join(" | ") || intent.intentType}`
     : `${params.t("floatingChat.compiledIntent", "Đã biên dịch intent")} (${intent.intentType}) · status=${intent.status}`;
-  params.onAppendMsg({ id: `resp-${intent.id}`, nodeId: params.primaryNode?.id || "unknown", role: "assistant", content: summary, timestamp: Date.now() });
+  const sdiClarification = intent.status === "clarifying" && intent.clarificationVariants?.length
+    ? {
+        intentId: intent.id,
+        projectId: params.projectId,
+        status: intent.status,
+        ambiguityScore: intent.ambiguityScore,
+        variants: intent.clarificationVariants,
+        selectedVariantId: intent.selectedVariantId ?? undefined,
+      }
+    : undefined;
+  params.onAppendMsg({ id: `resp-${intent.id}`, nodeId: params.primaryNode?.id || "unknown", role: "assistant", content: summary, timestamp: Date.now(), sdiClarification });
   await synthesizeProposalAndCompleteJobs(params, enq.jobs, intent.intentType);
 }
 

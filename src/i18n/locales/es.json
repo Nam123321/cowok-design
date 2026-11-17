@@ -213,7 +213,25 @@
     "modeSampleData": "Datos de muestra (D)",
     "pauseWalkthrough": "Pausar recorrido",
     "startWalkthrough": "Recorrido",
-    "savePatchBtn": "Guardar y aplicar HTML"
+    "savePatchBtn": "Guardar y aplicar HTML",
+    "modeSelectRegion": "Seleccionar región",
+    "modeToggleTooltip": "Interactuar <-> Seleccionar región: clic o arrastre (>=16x16px) para comentar/chat (Atajo C)",
+    "walkthroughLabel": "Recorrido",
+    "startWalkthroughTooltip": "Recorrido: Ejecutar flujo DAG conectado al diseño (Dual Screen / Diseño completo)",
+    "stopWalkthrough": "Salir del recorrido",
+    "editHtmlLabel": "Editar HTML",
+    "editHtmlTooltip": "Editar HTML/CSS directamente (E)",
+    "sampleDataLabel": "Datos de muestra",
+    "sampleDataTooltip": "Datos JSON de ejemplo (HAPPY / EMPTY / LONG_TEXT / ERROR)",
+    "moreActionsTooltip": "Más acciones (Editar HTML, Datos, Exportar)",
+    "walkthroughPrev": "Paso anterior",
+    "resumeWalkthrough": "Reproducir auto",
+    "walkthroughNext": "Siguiente paso",
+    "walkthroughDualMode": "Pantalla dual",
+    "walkthroughFullMode": "Diseño completo",
+    "exitWalkthrough": "Salir del recorrido (Esc)",
+    "walkthroughDagSyncLabel": "Pantalla dual — Sincronización DAG",
+    "viewportSwitcherAria": "Ancho de vista"
   },
   "settings": {
     "title": "Configuración y preferencias del sistema",
@@ -513,7 +531,11 @@
     "createDraftBtn": "Crear borrador de propuesta",
     "openInlineHtmlBtn": "Editar HTML directamente",
     "designerTalkEmpty": "Aún no hay compensaciones de Designer Talk registradas para esta selección.",
-    "designerTalkCompact": "Opinión"
+    "designerTalkCompact": "Opinión",
+    "suggestionLabel": "Sugerencias",
+    "suggestionTooltip": "Sugerencias de diseño y compensaciones (Atajo T)",
+    "proposalLabel": "Propuestas",
+    "proposalTooltip": "Lista de propuestas"
   },
   "sdi": {
     "ambiguityScoreLabel": "Puntuación de ambigüedad:",
@@ -528,7 +550,11 @@
     "promptPlaceholder": "Describa el cambio de interfaz en lenguaje natural...",
     "prosLabel": "Ventajas:",
     "reviewClarificationsBtn": "Ver y seleccionar opción de clarificación",
-    "ambiguityLockFull": "Ejecución bloqueada: Puntuación de ambigüedad {{score}} ≥ 0.45. Aclara la intención antes de generar código."
+    "ambiguityLockFull": "Ejecución bloqueada: Puntuación de ambigüedad {{score}} ≥ 0.45. Aclara la intención antes de generar código.",
+    "clarificationResolved": "Enfoque de diseño elegido:",
+    "chooseVariantPrompt": "Elige una opción para desbloquear la ejecución:",
+    "variantConfirmedPrefix": "Opción seleccionada",
+    "variantUnlockedSuffix": "intent listo y ejecución desbloqueada."
   },
   "snapshots": {
     "byteSizeLabel": "Tamaño:",
@@ -623,7 +649,9 @@
     "exportMenuLabel": "Exportar / Sincronizar",
     "pushGithubPrMenu": "Crear PR en GitHub",
     "originLabel": "Origen:",
-    "charsUnit": "caracteres"
+    "charsUnit": "caracteres",
+    "exportShortLabel": "Exportar",
+    "exportMenuTooltip": "Exportar: Descargar ZIP, PR de GitHub o Abrir IDE"
   },
   "onboarding": {
     "authNeeded": "Inicio de sesión requerido",
@@ -704,7 +732,8 @@
     "gitBranchLabel": "Rama de destino",
     "loadSamplePrdBtn": "Cargar PRD de ejemplo",
     "dropPrdPrompt": "Suelta o busca un archivo PRD (.md / .txt / .pdf)",
-    "selectedFilePrefix": "Archivo seleccionado:"
+    "selectedFilePrefix": "Archivo seleccionado:",
+    "openHubFromNewProject": "O abrir Hub Launchpad de 4 rutas (PRD / Plantilla / URL / Git)"
   },
   "sampleData": {
     "title": "Estudio de Datos de Muestra — Enlace de Fixture",

@@ -98,7 +98,7 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
         onTogglePinSession={p.onTogglePinSession} onRenameSession={p.onRenameSession} onDeleteSession={p.onDeleteSession}
         onRenameProject={p.onRenameProject} onDeleteProject={p.onDeleteProject} onLinkProjectFolder={p.onLinkProjectFolder}
       />
-      <div className="dual-main-panel" style={{ display: "flex", flex: 1, minWidth: "650px", overflow: "hidden", position: "relative" }}>
+      <div className="dual-main-panel" style={{ display: "flex", flex: 1, minWidth: "744px", overflow: "hidden", position: "relative" }}>
         <AgentChatPanel
           projectId={resolvedProjectId} activeSessionId={p.activeSessionId} selectedNodes={selectedScopeNodes}
           onDeselectNode={(id) => p.store.selectNode(id, true)}

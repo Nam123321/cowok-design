@@ -78,7 +78,8 @@ function useProposalGateActions(
   projectId: string | undefined,
   setProposals: React.Dispatch<React.SetStateAction<ChangeProposalResponse[]>>,
   setErrorBanner: React.Dispatch<React.SetStateAction<ProposalGateErrorBanner | null>>,
-  setReceiptToast: React.Dispatch<React.SetStateAction<{ tone: "success" | "danger"; message: string } | null>>
+  setReceiptToast: React.Dispatch<React.SetStateAction<{ tone: "success" | "danger"; message: string } | null>>,
+  refreshProposals: () => Promise<void>
 ) {
   const { t } = useTranslation();
   const [isRevalidating, setIsRevalidating] = useState(false);
@@ -89,14 +90,19 @@ function useProposalGateActions(
       const updated = await apiChangeProposal.applyProposal(projectId, proposalId);
       setErrorBanner(null);
       setProposals((prev) => replaceProposalItem(prev, updated));
-      setReceiptToast({ tone: "success", message: t("proposals.appliedToast", "ChangeProposal applied atomically.") });
+      void refreshProposals();
+      const applyMsg = t("proposals.appliedToast", "ChangeProposal applied atomically.");
+      setReceiptToast({ tone: "success", message: applyMsg });
+      window.dispatchEvent(new CustomEvent("cowok:chat-receipt", {
+        detail: { projectId, text: `Turn Snapshot Receipt: ${updated.title} — ${applyMsg}` },
+      }));
     } catch (err) {
       if (err instanceof HarnessDaemonApiError) {
         setErrorBanner({ status: err.status, code: err.code, message: err.message });
         setReceiptToast({ tone: "danger", message: err.message });
       }
     }
-  }, [projectId, setErrorBanner, setProposals, setReceiptToast, t]);
+  }, [projectId, refreshProposals, setErrorBanner, setProposals, setReceiptToast, t]);
 
   const rejectProposal = useCallback(async (proposalId: string) => {
     if (!projectId) return;
@@ -178,7 +184,7 @@ export function useNodeProposalController(opts: NodeProposalControllerOptions) {
 
   const activeProposal = proposals.find((p) => p.id === selectedProposalId) ?? proposals[0] ?? null;
   useDesignerTalkToggleHotkey(Boolean(opts.isModalOpen || opts.disabled), opts.isInlineCodeOpen, setIsDesignerTalkOpen);
-  const gates = useProposalGateActions(opts.projectId, setProposals, setErrorBanner, setReceiptToast);
+  const gates = useProposalGateActions(opts.projectId, setProposals, setErrorBanner, setReceiptToast, refreshProposals);
   const extras = useProposalDiffAndTradeoffs(opts.projectId, activeProposal, setProposals, refreshProposals);
 
   const createQuickDraftProposal = useCallback(async () => {

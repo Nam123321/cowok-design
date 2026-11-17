@@ -213,7 +213,25 @@
     "modeSampleData": "Dữ liệu mẫu (D)",
     "pauseWalkthrough": "Tạm dừng duyệt luồng",
     "startWalkthrough": "Duyệt luồng",
-    "savePatchBtn": "Lưu & Áp dụng HTML"
+    "savePatchBtn": "Lưu & Áp dụng HTML",
+    "modeSelectRegion": "Chọn vùng",
+    "modeToggleTooltip": "Tương tác ↔ Chọn vùng: nhấn để click phần tử hoặc kéo vùng (>=16x16px) vào bình luận/chat (Phím tắt C)",
+    "walkthroughLabel": "Walkthrough",
+    "startWalkthroughTooltip": "Walkthrough: Chạy kịch bản kết nối DAG & thiết kế (Dual Screen / Toàn bộ thiết kế)",
+    "stopWalkthrough": "Thoát Walkthrough",
+    "editHtmlLabel": "Sửa HTML",
+    "editHtmlTooltip": "Sửa trực tiếp mã nguồn HTML/CSS (E)",
+    "sampleDataLabel": "Dữ liệu mẫu",
+    "sampleDataTooltip": "Dữ liệu mẫu JSON Fixtures (HAPPY / EMPTY / LONG_TEXT / ERROR)",
+    "moreActionsTooltip": "Thêm tác vụ (Sửa HTML, Dữ liệu mẫu, Export)",
+    "walkthroughPrev": "Màn hình trước",
+    "resumeWalkthrough": "Chạy tự động",
+    "walkthroughNext": "Màn hình tiếp theo",
+    "walkthroughDualMode": "Dual Screen (2 khung)",
+    "walkthroughFullMode": "Toàn bộ thiết kế",
+    "exitWalkthrough": "Thoát Walkthrough (Esc)",
+    "walkthroughDagSyncLabel": "Walkthrough Dual Screen — Đồng bộ DAG",
+    "viewportSwitcherAria": "Kích thước màn hình"
   },
   "settings": {
     "title": "Cài đặt & Tùy biến Hệ thống",
@@ -513,7 +531,11 @@
     "createDraftBtn": "Tạo Đề xuất nháp",
     "openInlineHtmlBtn": "Sửa HTML trực tiếp",
     "designerTalkEmpty": "Chưa có điểm đánh đổi Designer Talk nào cho phạm vi hiện tại. Hãy tạo hoặc chỉnh sửa một Đề xuất trước.",
-    "designerTalkCompact": "Góp ý"
+    "designerTalkCompact": "Góp ý",
+    "suggestionLabel": "Gợi ý",
+    "suggestionTooltip": "Gợi ý thiết kế & Đánh đổi (Phím tắt T)",
+    "proposalLabel": "Đề xuất",
+    "proposalTooltip": "Danh sách Đề xuất thay đổi"
   },
   "sdi": {
     "ambiguityScoreLabel": "Điểm mơ hồ:",
@@ -528,7 +550,11 @@
     "promptPlaceholder": "Mô tả thay đổi bằng ngôn ngữ tự nhiên...",
     "prosLabel": "Ưu điểm:",
     "reviewClarificationsBtn": "Xem & Chọn Phương Án Làm Rõ",
-    "ambiguityLockFull": "Khóa Thực Thi: Điểm mơ hồ {{score}} ≥ 0.45. Cần làm rõ ý định trước khi sinh mã."
+    "ambiguityLockFull": "Khóa Thực Thi: Điểm mơ hồ {{score}} ≥ 0.45. Cần làm rõ ý định trước khi sinh mã.",
+    "clarificationResolved": "Đã chọn hướng thiết kế:",
+    "chooseVariantPrompt": "Chọn 1 phương án để mở khóa thực thi:",
+    "variantConfirmedPrefix": "Đã chọn phương án",
+    "variantUnlockedSuffix": "intent đã sẵn sàng (ready) và mở khóa thực thi."
   },
   "snapshots": {
     "byteSizeLabel": "Dung lượng:",
@@ -623,7 +649,9 @@
     "exportMenuLabel": "Xuất bản / Đồng bộ",
     "pushGithubPrMenu": "Đẩy GitHub PR",
     "originLabel": "Kho gốc (origin):",
-    "charsUnit": "ký tự"
+    "charsUnit": "ký tự",
+    "exportShortLabel": "Xuất bản",
+    "exportMenuTooltip": "Xuất bản: Tải ZIP, Tạo GitHub PR hoặc Mở IDE"
   },
   "onboarding": {
     "authNeeded": "Cần đăng nhập",
@@ -704,7 +732,8 @@
     "gitBranchLabel": "Nhánh mục tiêu",
     "loadSamplePrdBtn": "Nạp PRD mẫu",
     "dropPrdPrompt": "Kéo thả hoặc chọn file PRD (.md / .txt / .pdf)",
-    "selectedFilePrefix": "Đã chọn file:"
+    "selectedFilePrefix": "Đã chọn file:",
+    "openHubFromNewProject": "Hoặc mở Hub 4 Lối Vào (PRD / Template / Design URL / Git)"
   },
   "sampleData": {
     "title": "Xưởng Dữ Liệu Mẫu — Liên Kết Fixture",

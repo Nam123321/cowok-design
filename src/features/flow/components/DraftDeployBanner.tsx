@@ -23,7 +23,8 @@ const DRAFT_BAR_STYLE: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "space-between",
-  gap: "10px",
+  flexWrap: "wrap",
+  gap: "8px",
 };
 
 const DRAFT_BADGE_STYLE: React.CSSProperties = {
@@ -135,7 +136,7 @@ const OrphanDeployConfirmBar: React.FC<{
 }> = ({ onConfirm, onCancel }) => {
   const { t } = useTranslation();
   return (
-    <div data-testid="orphan-deploy-confirm-bar" role="alert" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+    <div data-testid="orphan-deploy-confirm-bar" role="alert" style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
       <span style={{ fontSize: "11px", color: "var(--state-warning)", fontWeight: 600 }}>
         {t("canvas.orphanDeployConfirmPrompt", "Still deploy with orphan nodes?")}
       </span>

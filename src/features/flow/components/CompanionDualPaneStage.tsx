@@ -7,6 +7,7 @@ import { useFormatter } from "../../../hooks/useFormatter";
 import type { ChangeProposalResponse, DecideTradeoffInput } from "../../../lib/validations/change-proposal";
 import { normalizeFixtureRef, type FixtureVariant } from "../../../lib/validations/screen-fixture";
 import type { ChatArtifactSnapshotResponse } from "../../../lib/validations/version-snapshot";
+import type { ExportInitialSection } from "../../snapshots/components/ExportBundleModal";
 import {
   guardReadOnlyAction,
   isHistoricalPreviewReadOnly,
@@ -37,6 +38,17 @@ export interface StageProps extends CompanionCanvasTabProps {
   onCloseSampleData: () => void;
   isWalkthroughActive: boolean;
   onToggleWalkthrough: () => void;
+  walkthroughViewMode?: "dual" | "full";
+  onSetWalkthroughViewMode?: (mode: "dual" | "full") => void;
+  walkthroughStepLabel?: string;
+  walkthroughAutoPlay?: boolean;
+  onToggleWalkthroughAutoPlay?: () => void;
+  onWalkthroughPrev?: () => void;
+  onWalkthroughNext?: () => void;
+  onExitWalkthrough?: () => void;
+  snapshotsCount?: number;
+  onOpenVersionHistory?: () => void;
+  onOpenExportSection?: (section: ExportInitialSection) => void;
   isDesignerTalkOpen: boolean;
   onCloseDesignerTalk: () => void;
   isProposalDrawerOpen: boolean;
@@ -78,6 +90,8 @@ function StageLeftStructureSection({ p }: { p: StageProps }) {
       onUpdateActiveSlide={guardReadOnlyAction(isHistoricalReadOnly, (patch) =>
         vp.setSlides((prev) => prev.map((item, i) => (i === vp.activeSlideIndex ? { ...item, ...patch } : item)))
       )}
+      isWalkthroughActive={p.isWalkthroughActive}
+      walkthroughStepLabel={p.walkthroughStepLabel}
     >
       {p.children}
     </CompanionStructureLeftPane>
@@ -166,7 +180,7 @@ function DualPaneRightStage({ p }: { p: StageProps }) {
     });
   };
   return (
-    <div style={{ position: "relative", flex: 1, display: "flex", minWidth: "280px", height: "100%", overflow: "hidden" }}>
+    <div style={{ position: "relative", flex: 1, display: "flex", minWidth: "480px", height: "100%", overflow: "hidden" }}>
       <CompanionLiveHtmlRightPane
         projectId={p.projectId} activeTab={activeTab} structureLens={vp.structureLens}
         selectedNodeId={p.selectedNodeId} selectedNodeKey={selectedNode?.screenKey || undefined}
@@ -189,6 +203,12 @@ function DualPaneRightStage({ p }: { p: StageProps }) {
         isSampleDataOpen={p.isSampleDataOpen}
         onToggleSampleData={p.isSampleDataOpen ? p.onCloseSampleData : p.onOpenSampleData}
         isWalkthroughActive={p.isWalkthroughActive} onToggleWalkthrough={p.onToggleWalkthrough}
+        walkthroughViewMode={p.walkthroughViewMode} onSetWalkthroughViewMode={p.onSetWalkthroughViewMode}
+        walkthroughStepLabel={p.walkthroughStepLabel} walkthroughAutoPlay={p.walkthroughAutoPlay}
+        onToggleWalkthroughAutoPlay={p.onToggleWalkthroughAutoPlay} onWalkthroughPrev={p.onWalkthroughPrev}
+        onWalkthroughNext={p.onWalkthroughNext} onExitWalkthrough={p.onExitWalkthrough}
+        snapshotsCount={p.snapshotsCount} onOpenVersionHistory={p.onOpenVersionHistory}
+        onOpenExportSection={p.onOpenExportSection}
         isLeftStructureHidden={vp.isLeftStructureHidden}
         onToggleLeftStructureHidden={() => vp.setIsLeftStructureHidden((prev) => !prev)}
         versionMenuNode={p.versionMenuNode} isReadOnly={isHistoricalReadOnly}

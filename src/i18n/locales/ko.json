@@ -213,7 +213,25 @@
     "modeSampleData": "샘플 데이터 (D)",
     "pauseWalkthrough": "워크스루 일시 중지",
     "startWalkthrough": "워크스루",
-    "savePatchBtn": "HTML 저장 및 적용"
+    "savePatchBtn": "HTML 저장 및 적용",
+    "modeSelectRegion": "영역 선택",
+    "modeToggleTooltip": "상호작용 <-> 영역 선택: 요소 클릭 또는 드래그(>=16x16px)로 댓글/채팅 첨부 (C)",
+    "walkthroughLabel": "워크스루",
+    "startWalkthroughTooltip": "워크스루: DAG 흐름과 디자인 연동 재생 (Dual Screen / 전체 디자인)",
+    "stopWalkthrough": "워크스루 종료",
+    "editHtmlLabel": "HTML 편집",
+    "editHtmlTooltip": "HTML/CSS 코드 직접 편집 (E)",
+    "sampleDataLabel": "샘플 데이터",
+    "sampleDataTooltip": "샘플 JSON 픽스처 데이터 (HAPPY / EMPTY / LONG_TEXT / ERROR)",
+    "moreActionsTooltip": "더보기 (HTML 편집, 샘플 데이터, 내보내기)",
+    "walkthroughPrev": "이전 화면",
+    "resumeWalkthrough": "자동 재생",
+    "walkthroughNext": "다음 화면",
+    "walkthroughDualMode": "듀얼 화면",
+    "walkthroughFullMode": "전체 디자인",
+    "exitWalkthrough": "워크스루 나가기 (Esc)",
+    "walkthroughDagSyncLabel": "듀얼 화면 — DAG 동기화",
+    "viewportSwitcherAria": "뷰포트 크기"
   },
   "settings": {
     "title": "시스템 설정 및 환경설정",
@@ -513,7 +531,11 @@
     "createDraftBtn": "초안 제안 만들기",
     "openInlineHtmlBtn": "HTML 직접 편집",
     "designerTalkEmpty": "이 선택에 기록된 Designer Talk 트레이드오프가 아직 없습니다.",
-    "designerTalkCompact": "피드백"
+    "designerTalkCompact": "피드백",
+    "suggestionLabel": "제안",
+    "suggestionTooltip": "디자인 제안 및 트레이드오프 (단축키 T)",
+    "proposalLabel": "변경 제안",
+    "proposalTooltip": "변경 제안 목록"
   },
   "sdi": {
     "ambiguityScoreLabel": "모호성 점수:",
@@ -528,7 +550,11 @@
     "promptPlaceholder": "자연어로 UI 변경 사항을 설명하세요...",
     "prosLabel": "장점:",
     "reviewClarificationsBtn": "명확화 옵션 확인 및 선택",
-    "ambiguityLockFull": "실행 잠금: 모호성 점수 {{score}} ≥ 0.45. 코드 생성 전에 의도를 명확히 하세요."
+    "ambiguityLockFull": "실행 잠금: 모호성 점수 {{score}} ≥ 0.45. 코드 생성 전에 의도를 명확히 하세요.",
+    "clarificationResolved": "선택된 설계 방향:",
+    "chooseVariantPrompt": "실행 잠금을 해제할 옵션을 선택하세요:",
+    "variantConfirmedPrefix": "선택한 옵션",
+    "variantUnlockedSuffix": "인텐트 준비 완료 및 실행 잠금 해제됨."
   },
   "snapshots": {
     "byteSizeLabel": "크기:",
@@ -623,7 +649,9 @@
     "exportMenuLabel": "내보내기 / 동기화",
     "pushGithubPrMenu": "GitHub PR 푸시",
     "originLabel": "원격 (origin):",
-    "charsUnit": "자"
+    "charsUnit": "자",
+    "exportShortLabel": "내보내기",
+    "exportMenuTooltip": "내보내기: ZIP 다운로드, GitHub PR, IDE 열기"
   },
   "onboarding": {
     "authNeeded": "로그인 필요",
@@ -704,7 +732,8 @@
     "gitBranchLabel": "대상 브랜치",
     "loadSamplePrdBtn": "샘플 PRD 불러오기",
     "dropPrdPrompt": "PRD 파일을 드롭하거나 찾아보기 (.md / .txt / .pdf)",
-    "selectedFilePrefix": "선택된 파일:"
+    "selectedFilePrefix": "선택된 파일:",
+    "openHubFromNewProject": "또는 4경로 런치패드 허브 열기 (PRD / 템플릿 / URL / Git)"
   },
   "sampleData": {
     "title": "샘플 데이터 스튜디오 — 픽스처 바인딩",

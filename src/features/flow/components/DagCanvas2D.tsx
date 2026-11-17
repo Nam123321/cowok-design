@@ -1,7 +1,8 @@
 // @story 04.1, 04.4
 // @implements AC-04, AC-07, AC-08
-import React, { useRef } from "react";
+import React, { useContext, useRef } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { ReadOnlyCanvasContext } from "../hooks/useCompanionCanvasState";
 import {
   WorkbenchNode,
   WorkbenchTransition,
@@ -88,6 +89,7 @@ const DagCanvasHudLayer: React.FC<{
   onCancelJob: (jobId: string) => void;
 }> = ({ props, ix, handleUpdateVp, summary, activeJobs, onCancelJob }) => {
   const { t } = useTranslation();
+  const isReadOnly = useContext(ReadOnlyCanvasContext);
   const { state, onAddNode, onAutoLayout, onUndo, onRedo, onToggleMinimap } = props;
   const selectedTransition = state.transitions.find((tr) => tr.id === state.selectedTransitionId) || null;
   return (
@@ -105,6 +107,7 @@ const DagCanvasHudLayer: React.FC<{
         canUndo={(state.undoStack?.length || 0) > 0}
         canRedo={(state.redoStack?.length || 0) > 0}
         isMinimapOpen={Boolean(state.isMinimapOpen)}
+        isReadOnly={isReadOnly}
         onAddNode={() => (onAddNode ? onAddNode(t("flow.defaultNewNodeTitle", "Màn hình mới")) : undefined)}
         onAutoLayout={onAutoLayout} onUndo={onUndo || NOOP} onRedo={onRedo || NOOP}
         onZoomIn={ix.handleZoomIn} onZoomOut={ix.handleZoomOut} onResetZoom={ix.handleResetZoom}

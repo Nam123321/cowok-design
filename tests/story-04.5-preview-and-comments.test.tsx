@@ -28,16 +28,14 @@ describe("Story 04.5: State-Hydrated Live Preview, Option CSP-B CSPRNG Bridge & 
       })
     );
 
-    const interactBtn = getByTestId("pointer-mode-interact");
-    const inspectBtn = getByTestId("pointer-mode-inspect");
-    expect(interactBtn.getAttribute("aria-pressed")).toBe("true");
-    expect(inspectBtn.getAttribute("aria-pressed")).toBe("false");
+    const modeToggleBtn = getByTestId("pointer-mode-toggle");
+    expect(modeToggleBtn.getAttribute("aria-pressed")).toBe("false");
 
-    // Hotkey 'c' toggles Inspect / Comment (C)
+    // Hotkey 'c' toggles Interact <-> Chọn vùng (C)
     fireEvent.keyDown(window, { key: "c" });
-    expect(inspectBtn.getAttribute("aria-pressed")).toBe("true");
+    expect(modeToggleBtn.getAttribute("aria-pressed")).toBe("true");
     fireEvent.keyDown(window, { key: "C" });
-    expect(interactBtn.getAttribute("aria-pressed")).toBe("true");
+    expect(modeToggleBtn.getAttribute("aria-pressed")).toBe("false");
 
     // All 4 uppercase SubState pills present and interactive
     for (const v of ["DEFAULT", "LOADING", "EMPTY", "ERROR"]) {
@@ -48,12 +46,12 @@ describe("Story 04.5: State-Hydrated Live Preview, Option CSP-B CSPRNG Bridge & 
     }
 
     // Inline editor dirty_buffer lock guard
-    fireEvent.click(getByTestId("toggle-inline-code-btn"));
+    fireEvent.click(getByTestId("canvas-mode-inline-editor"));
     const textarea = getByTestId("inline-html-textarea") as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: "<main><h1>Modified HTML</h1></main>" } });
     expect(getByTestId("inline-html-dirty-badge")).toBeTruthy();
 
-    fireEvent.click(getByTestId("toggle-inline-code-btn"));
+    fireEvent.click(getByTestId("canvas-mode-inline-editor"));
     expect(getByTestId("dirty-buffer-guard-banner")).toBeTruthy();
     expect(getByTestId("inline-code-editor-panel")).toBeTruthy();
 
@@ -61,7 +59,7 @@ describe("Story 04.5: State-Hydrated Live Preview, Option CSP-B CSPRNG Bridge & 
     expect(queryByTestId("inline-code-editor-panel")).toBeNull();
 
     // Editing and clicking Apply closes inline editor immediately without getting trapped on dirty guard
-    fireEvent.click(getByTestId("toggle-inline-code-btn"));
+    fireEvent.click(getByTestId("canvas-mode-inline-editor"));
     fireEvent.change(getByTestId("inline-html-textarea"), { target: { value: "<main><h1>Applied HTML</h1></main>" } });
     fireEvent.click(getByTestId("apply-inline-html-btn"));
     expect(queryByTestId("inline-code-editor-panel")).toBeNull();

@@ -1,6 +1,8 @@
 // @story 04.1, 04.5, 05.1
 // @implements AC-01, AC-02, AC-03, AC-04 (IframeKeepAlivePool LRU-5 Live Preview Pane + 3-Way Comments)
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { BrandIcon } from "../../../components/ui/BrandIcon";
+import type { ExportInitialSection } from "../../snapshots/components/ExportBundleModal";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { useFormatter } from "../../../hooks/useFormatter";
 import type { CanvasTabItem } from "./CompanionCanvasTab";
@@ -111,6 +113,17 @@ export interface CompanionLiveHtmlRightPaneProps {
   onToggleSampleData?: () => void;
   isWalkthroughActive?: boolean;
   onToggleWalkthrough?: () => void;
+  walkthroughViewMode?: "dual" | "full";
+  onSetWalkthroughViewMode?: (mode: "dual" | "full") => void;
+  walkthroughStepLabel?: string;
+  walkthroughAutoPlay?: boolean;
+  onToggleWalkthroughAutoPlay?: () => void;
+  onWalkthroughPrev?: () => void;
+  onWalkthroughNext?: () => void;
+  onExitWalkthrough?: () => void;
+  snapshotsCount?: number;
+  onOpenVersionHistory?: () => void;
+  onOpenExportSection?: (section: ExportInitialSection) => void;
   versionMenuNode?: React.ReactNode;
   isReadOnly?: boolean;
 }
@@ -245,7 +258,13 @@ const PreviewDeviceFrame: React.FC<{
             </div>
           );
         })}
-        {p.pointerMode === "drag-box" && <MarqueeSelectionOverlay onRegionClick={p.onRegionClick} />}
+        {(p.pointerMode === "click-dom" || p.pointerMode === "drag-box") && (
+          <MarqueeSelectionOverlay
+            nodeLabel={p.routeBadge}
+            elementRects={p.elementRects}
+            onRegionClick={p.onRegionClick}
+          />
+        )}
       </div>
     </div>
   );
@@ -367,6 +386,19 @@ export const CompanionLiveHtmlRightPane: React.FC<CompanionLiveHtmlRightPaneProp
     }
   }, [bridge, props, t]);
 
+  useEffect(() => {
+    const onSampleFixture = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ projectId?: string; nodeId?: string; variant?: FixtureVariant; fixtureJson?: string }>).detail;
+      if (!detail?.fixtureJson) return;
+      if (detail.projectId && props.projectId && detail.projectId !== props.projectId) return;
+      const nextVar = detail.variant || "DEFAULT";
+      setLocalSubState(nextVar);
+      bridge.postFixtureHydrate(nextVar, detail.fixtureJson);
+    };
+    window.addEventListener("cowok:sample-fixture-applied", onSampleFixture);
+    return () => window.removeEventListener("cowok:sample-fixture-applied", onSampleFixture);
+  }, [bridge, props.projectId]);
+
   const wrappedSrcDoc = useMemo(
     () =>
       wrapUserHtmlSrcDoc(rawHtml, {
@@ -392,12 +424,13 @@ export const CompanionLiveHtmlRightPane: React.FC<CompanionLiveHtmlRightPaneProp
       aria-label={t("canvas.liveHtmlPane", "Live HTML Preview Sandbox")}
       style={{
         flex: 1,
-        minWidth: "280px",
+        minWidth: "480px",
         height: "100%",
         display: "flex",
         flexDirection: "column",
         backgroundColor: "var(--bg-surface)",
         overflow: "hidden",
+        position: "relative",
       }}
     >
       <HtmlPreviewToolbar
@@ -427,7 +460,10 @@ export const CompanionLiveHtmlRightPane: React.FC<CompanionLiveHtmlRightPaneProp
         onToggleSampleData={props.onToggleSampleData}
         isWalkthroughActive={props.isWalkthroughActive}
         onToggleWalkthrough={props.onToggleWalkthrough}
-        versionMenuNode={props.versionMenuNode}
+        snapshotsCount={props.snapshotsCount}
+        onOpenVersionHistory={props.onOpenVersionHistory}
+        onOpenExportSection={props.onOpenExportSection}
+        isReadOnly={props.isReadOnly}
       />
       <div
         style={{
@@ -507,6 +543,51 @@ export const CompanionLiveHtmlRightPane: React.FC<CompanionLiveHtmlRightPaneProp
           </aside>
         )}
       </div>
+      {props.isWalkthroughActive && (
+        <div
+          data-testid="walkthrough-floating-bar"
+          style={{
+            position: "absolute",
+            bottom: "14px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 25,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "5px 10px",
+            backgroundColor: "var(--bg-surface)",
+            border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-pill)",
+            boxShadow: "var(--shadow-lg)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "10.5px", fontWeight: 600, color: "var(--action-primary)" }}>
+            {props.walkthroughStepLabel || nodeBadgeKey}
+          </span>
+          <button type="button" data-testid="walkthrough-prev-btn" onClick={props.onWalkthroughPrev} title={t("canvas.walkthroughPrev", "Màn hình trước")} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <BrandIcon name="arrow-left" size={11} color="currentColor" />
+          </button>
+          <button type="button" data-testid="walkthrough-auto-toggle" onClick={props.onToggleWalkthroughAutoPlay} title={props.walkthroughAutoPlay ? t("canvas.pauseWalkthrough", "Tạm dừng tự động") : t("canvas.resumeWalkthrough", "Chạy tự động")} style={{ width: "26px", height: "26px", borderRadius: "50%", border: "none", backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <BrandIcon name={props.walkthroughAutoPlay ? "pause" : "play"} size={11} color="currentColor" />
+          </button>
+          <button type="button" data-testid="walkthrough-next-btn" onClick={props.onWalkthroughNext} title={t("canvas.walkthroughNext", "Màn hình tiếp theo")} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <BrandIcon name="chevron-right" size={11} color="currentColor" />
+          </button>
+          <div style={{ display: "inline-flex", backgroundColor: "var(--bg-workspace)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-pill)", padding: "2px", gap: "2px" }}>
+            <button type="button" data-testid="walkthrough-mode-dual" onClick={() => props.onSetWalkthroughViewMode?.("dual")} style={{ height: "22px", padding: "0 8px", borderRadius: "var(--radius-pill)", border: "none", fontSize: "10.5px", fontWeight: 600, cursor: "pointer", backgroundColor: (props.walkthroughViewMode ?? "dual") === "dual" ? "var(--bg-selected)" : "transparent", color: (props.walkthroughViewMode ?? "dual") === "dual" ? "var(--action-primary)" : "var(--text-secondary)" }}>
+              {t("canvas.walkthroughDualMode", "Dual Screen")}
+            </button>
+            <button type="button" data-testid="walkthrough-mode-full" onClick={() => props.onSetWalkthroughViewMode?.("full")} style={{ height: "22px", padding: "0 8px", borderRadius: "var(--radius-pill)", border: "none", fontSize: "10.5px", fontWeight: 600, cursor: "pointer", backgroundColor: props.walkthroughViewMode === "full" ? "var(--bg-selected)" : "transparent", color: props.walkthroughViewMode === "full" ? "var(--action-primary)" : "var(--text-secondary)" }}>
+              {t("canvas.walkthroughFullMode", "Toàn bộ thiết kế")}
+            </button>
+          </div>
+          <button type="button" data-testid="walkthrough-exit-btn" onClick={props.onExitWalkthrough} title={t("canvas.exitWalkthrough", "Thoát Walkthrough (Esc)")} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid var(--border-default)", backgroundColor: "transparent", color: "var(--text-secondary)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+            <BrandIcon name="close" size={11} color="currentColor" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

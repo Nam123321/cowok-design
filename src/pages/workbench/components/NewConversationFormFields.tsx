@@ -23,6 +23,7 @@ export interface NewConversationFormFieldsProps {
   sessionTitle: string;
   onChangeSessionTitle: (val: string) => void;
   onBrowseFolder: () => void;
+  onOpenLaunchpad?: () => void;
 }
 
 const INPUT_STYLE: React.CSSProperties = {
@@ -175,6 +176,18 @@ export const NewConversationFormFields: React.FC<NewConversationFormFieldsProps>
           <ProvenanceSelector provenance={p.provenance} onChangeProvenance={p.onChangeProvenance} />
           {p.provenance === "folder-backed" && (
             <FolderPathPicker localFolderPath={p.localFolderPath} onChangeLocalFolderPath={p.onChangeLocalFolderPath} onBrowseFolder={p.onBrowseFolder} />
+          )}
+          {p.onOpenLaunchpad && (
+            <button
+              type="button"
+              data-testid="open-4path-launchpad-btn"
+              onClick={p.onOpenLaunchpad}
+              className="cowok-btn cowok-btn-secondary"
+              style={{ width: "100%", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "11.5px", fontWeight: 600, borderRadius: "var(--radius-xs)", border: "1px dashed var(--action-primary)", backgroundColor: "var(--bg-selected)", color: "var(--action-primary)", cursor: "pointer" }}
+            >
+              <BrandIcon name="layers" size={13} color="currentColor" />
+              <span>{t("launchpad.openHubFromNewProject", "Hoặc mở Hub 4 Lối Vào (PRD / Template / Design URL / Git)")}</span>
+            </button>
           )}
         </>
       )}

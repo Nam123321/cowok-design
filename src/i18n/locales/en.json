@@ -213,7 +213,25 @@
     "modeSampleData": "Sample Data (D)",
     "pauseWalkthrough": "Pause Walkthrough",
     "startWalkthrough": "Walkthrough",
-    "savePatchBtn": "Save & Apply HTML"
+    "savePatchBtn": "Save & Apply HTML",
+    "modeSelectRegion": "Select Region",
+    "modeToggleTooltip": "Interact <-> Select Region: click element or drag region (>=16x16px) to comment/chat (Shortcut C)",
+    "walkthroughLabel": "Interactive Walkthrough",
+    "startWalkthroughTooltip": "Walkthrough: Play DAG flow connected to design (Dual Screen / Full Design)",
+    "stopWalkthrough": "Exit Walkthrough",
+    "editHtmlLabel": "Edit HTML",
+    "editHtmlTooltip": "Edit raw HTML/CSS inline (E)",
+    "sampleDataLabel": "Sample Data",
+    "sampleDataTooltip": "Sample Data JSON Fixtures (HAPPY / EMPTY / LONG_TEXT / ERROR)",
+    "moreActionsTooltip": "More actions (Edit HTML, Sample Data, Export)",
+    "walkthroughPrev": "Previous step",
+    "resumeWalkthrough": "Auto-play",
+    "walkthroughNext": "Next step",
+    "walkthroughDualMode": "Dual Screen",
+    "walkthroughFullMode": "Full Design",
+    "exitWalkthrough": "Exit Walkthrough (Esc)",
+    "walkthroughDagSyncLabel": "Walkthrough Dual Screen — DAG Sync",
+    "viewportSwitcherAria": "Viewport width"
   },
   "settings": {
     "title": "System Settings & Preferences",
@@ -513,7 +531,11 @@
     "createDraftBtn": "Create Draft Proposal",
     "openInlineHtmlBtn": "Edit HTML Directly",
     "designerTalkEmpty": "No design trade-offs recorded yet for this selection. Generate or edit a ChangeProposal first.",
-    "designerTalkCompact": "Feedback"
+    "designerTalkCompact": "Feedback",
+    "suggestionLabel": "Suggestions",
+    "suggestionTooltip": "Design Suggestions & Tradeoffs (Shortcut T)",
+    "proposalLabel": "Proposals",
+    "proposalTooltip": "Change Proposals List"
   },
   "sdi": {
     "ambiguityScoreLabel": "Ambiguity Score:",
@@ -528,7 +550,11 @@
     "promptPlaceholder": "Describe the UI change in natural language...",
     "prosLabel": "Pros:",
     "reviewClarificationsBtn": "View & Select Clarification Option",
-    "ambiguityLockFull": "Execution Locked: Ambiguity score {{score}} ≥ 0.45. Clarify intent before generating code."
+    "ambiguityLockFull": "Execution Locked: Ambiguity score {{score}} ≥ 0.45. Clarify intent before generating code.",
+    "clarificationResolved": "Selected design approach:",
+    "chooseVariantPrompt": "Choose one option to unlock execution:",
+    "variantConfirmedPrefix": "Selected option",
+    "variantUnlockedSuffix": "intent is ready and execution is unlocked."
   },
   "snapshots": {
     "byteSizeLabel": "Size:",
@@ -623,7 +649,9 @@
     "exportMenuLabel": "Export / Sync",
     "pushGithubPrMenu": "Push GitHub PR",
     "originLabel": "Origin:",
-    "charsUnit": "chars"
+    "charsUnit": "chars",
+    "exportShortLabel": "Export",
+    "exportMenuTooltip": "Export: Download ZIP, Push GitHub PR, or Open IDE"
   },
   "onboarding": {
     "authNeeded": "Login required",
@@ -704,7 +732,8 @@
     "gitBranchLabel": "Target Branch",
     "loadSamplePrdBtn": "Load Sample PRD",
     "dropPrdPrompt": "Drop or browse PRD file (.md / .txt / .pdf)",
-    "selectedFilePrefix": "Selected file:"
+    "selectedFilePrefix": "Selected file:",
+    "openHubFromNewProject": "Or open 4-Path Launchpad Hub (PRD / Template / Design URL / Git)"
   },
   "sampleData": {
     "title": "Sample Data Studio — Fixture Binding",

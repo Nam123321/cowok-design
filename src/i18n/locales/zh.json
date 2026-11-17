@@ -213,7 +213,25 @@
     "modeSampleData": "示例数据 (D)",
     "pauseWalkthrough": "暂停演练",
     "startWalkthrough": "流程演练",
-    "savePatchBtn": "保存并应用 HTML"
+    "savePatchBtn": "保存并应用 HTML",
+    "modeSelectRegion": "选择区域",
+    "modeToggleTooltip": "交互 <-> 选择区域：点击元素或框选 (>=16x16px) 以评论/对话 (快捷键 C)",
+    "walkthroughLabel": "交互演练",
+    "startWalkthroughTooltip": "演练模式：联动播放 DAG 流程与页面设计 (双屏对照 / 全屏设计)",
+    "stopWalkthrough": "退出演练",
+    "editHtmlLabel": "编辑 HTML",
+    "editHtmlTooltip": "直接编辑 HTML/CSS 源码 (E)",
+    "sampleDataLabel": "示例数据",
+    "sampleDataTooltip": "示例 JSON 数据集 (HAPPY / EMPTY / LONG_TEXT / ERROR)",
+    "moreActionsTooltip": "更多操作（编辑 HTML、示例数据、导出）",
+    "walkthroughPrev": "上一步",
+    "resumeWalkthrough": "自动播放",
+    "walkthroughNext": "下一步",
+    "walkthroughDualMode": "双屏对照",
+    "walkthroughFullMode": "全屏设计",
+    "exitWalkthrough": "退出 (Esc)",
+    "walkthroughDagSyncLabel": "双屏演练 — DAG 同步",
+    "viewportSwitcherAria": "视口尺寸"
   },
   "settings": {
     "title": "系统设置与偏好",
@@ -513,7 +531,11 @@
     "createDraftBtn": "创建提案草稿",
     "openInlineHtmlBtn": "直接编辑 HTML",
     "designerTalkEmpty": "当前选区尚未记录任何 Designer Talk 设计权衡。",
-    "designerTalkCompact": "反馈"
+    "designerTalkCompact": "反馈",
+    "suggestionLabel": "建议",
+    "suggestionTooltip": "设计建议与权衡 (快捷键 T)",
+    "proposalLabel": "变更提案",
+    "proposalTooltip": "变更提案列表"
   },
   "sdi": {
     "ambiguityScoreLabel": "歧义度评分:",
@@ -528,7 +550,11 @@
     "promptPlaceholder": "用自然语言描述界面更改...",
     "prosLabel": "优势:",
     "reviewClarificationsBtn": "查看并选择澄清选项",
-    "ambiguityLockFull": "执行已锁定：歧义评分 {{score}} ≥ 0.45。请在生成代码前明确设计意图。"
+    "ambiguityLockFull": "执行已锁定：歧义评分 {{score}} ≥ 0.45。请在生成代码前明确设计意图。",
+    "clarificationResolved": "已选择设计方案：",
+    "chooseVariantPrompt": "选择一个方案以解锁执行：",
+    "variantConfirmedPrefix": "已选方案",
+    "variantUnlockedSuffix": "意图已就绪并解锁执行。"
   },
   "snapshots": {
     "byteSizeLabel": "大小:",
@@ -623,7 +649,9 @@
     "exportMenuLabel": "导出 / 同步",
     "pushGithubPrMenu": "推送 GitHub PR",
     "originLabel": "远程仓库：",
-    "charsUnit": "字符"
+    "charsUnit": "字符",
+    "exportShortLabel": "导出",
+    "exportMenuTooltip": "导出：下载 ZIP、发起 GitHub PR 或在 IDE 中打开"
   },
   "onboarding": {
     "authNeeded": "需要登录",
@@ -704,7 +732,8 @@
     "gitBranchLabel": "目标分支",
     "loadSamplePrdBtn": "加载示例 PRD",
     "dropPrdPrompt": "拖放或选择 PRD 文件 (.md / .txt / .pdf)",
-    "selectedFilePrefix": "已选文件:"
+    "selectedFilePrefix": "已选文件:",
+    "openHubFromNewProject": "或打开 4 路径启动中心 (PRD / 模板 / 设计链接 / Git)"
   },
   "sampleData": {
     "title": "示例数据工作室 — 夹具数据绑定",

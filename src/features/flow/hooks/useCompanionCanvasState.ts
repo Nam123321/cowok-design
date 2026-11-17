@@ -1,9 +1,11 @@
 // @story-04.1, 04.5
 // @implements AC-01, AC-03
-import React, { useState, useEffect, useCallback } from "react";
+import React, { createContext, useState, useEffect, useCallback } from "react";
 import { DEFAULT_TABS, INITIAL_SLIDES, SlidePhaseItem, createCanvasTabByKind } from "../components/companion-canvas-data";
 import type { CanvasTabItem } from "../components/CompanionCanvasTab";
 import type { FixtureVariant, ViewportPreset } from "../../../lib/validations/screen-fixture";
+
+export const ReadOnlyCanvasContext = createContext<boolean>(false);
 
 export const DEFAULT_LEFT_PANE_PCT = 48;
 export const MIN_LEFT_PANE_PCT = 26;
@@ -62,7 +64,9 @@ export function useInspectHotkeyShortcut(setPointerMode: React.Dispatch<React.Se
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) return;
-      if (e.key === "c" || e.key === "C") setPointerMode((prev) => (prev === "click-dom" ? "interact" : "click-dom"));
+      if (e.key === "c" || e.key === "C") {
+        setPointerMode((prev) => (prev === "interact" ? "click-dom" : "interact"));
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);

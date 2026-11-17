@@ -92,7 +92,7 @@ const ComposerFooterBar: React.FC<{
           onOpenSettings={onOpenSettings}
         />
       </div>
-      <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onSend} disabled={isSendDisabled} title={sendLabel} aria-label={sendLabel} data-testid="chat-composer-send-btn" className="cowok-btn-primary" style={{ width: "28px", height: "28px", minWidth: "28px", padding: 0, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", backgroundColor: isSendDisabled ? "var(--bg-subtle)" : "var(--action-primary)", color: isSendDisabled ? "var(--text-muted)" : "var(--action-primary-fg)", border: "none", cursor: isSendDisabled ? "not-allowed" : "pointer", transition: "all var(--duration-fast)" }}>
+      <button type="button" onClick={onSend} disabled={isSendDisabled} title={sendLabel} aria-label={sendLabel} data-testid="chat-composer-send-btn" className="cowok-btn-primary" style={{ width: "28px", height: "28px", minWidth: "28px", padding: 0, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", backgroundColor: isSendDisabled ? "var(--bg-subtle)" : "var(--action-primary)", color: isSendDisabled ? "var(--text-muted)" : "var(--action-primary-fg)", border: "none", cursor: isSendDisabled ? "not-allowed" : "pointer", transition: "all var(--duration-fast)" }}>
         <BrandIcon name="send" size={12} color="currentColor" />
       </button>
     </div>

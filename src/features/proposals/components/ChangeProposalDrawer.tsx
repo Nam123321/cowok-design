@@ -230,7 +230,7 @@ export const ChangeProposalDrawer: React.FC<DrawerProps> = ({
           <ProposalDrawerHeader proposal={proposal} nodeLabelsById={nodeLabelsById} onClose={onClose} />
           <ProposalListSelector proposals={proposals} activeId={proposal.id} onSelect={onSelectProposal} />
           <ProposalMetricStrip proposal={proposal} />
-          <ValidationGateBadge checks={proposal.validationChecks} gateReceipt={proposal.gateReceipt} errorBanner={errorBanner} isRevalidating={isRevalidating} onRebaseAndValidate={onRebaseAndValidate ? () => onRebaseAndValidate(proposal.id) : undefined} />
+          <ValidationGateBadge checks={proposal.validationChecks} gateReceipt={proposal.gateReceipt} errorBanner={errorBanner} isStaleStatus={proposal.status === "stale"} isRevalidating={isRevalidating} onRebaseAndValidate={onRebaseAndValidate ? () => onRebaseAndValidate(proposal.id) : undefined} />
           <ProposalBodyTabs proposal={proposal} activeTab={activeTab} onTabChange={setActiveTab} onComputeVisualDiff={onComputeVisualDiff} beforeImageUrl={beforeImageUrl} afterImageUrl={afterImageUrl} isComputingDiff={isComputingDiff} />
         </div>
         <div className="cp-drawer-footer">

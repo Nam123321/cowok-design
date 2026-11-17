@@ -114,14 +114,13 @@ test.describe("Story 04.5 Acceptance: State-Hydrated Live Preview, Option CSP-B 
         timeout: 10_000,
       });
 
-      // AC-01: Designer-friendly Interact vs Inspect / Comment (C) toggle + Hotkey C
-      const interactBtn = page.getByTestId("pointer-mode-interact");
-      const inspectBtn = page.getByTestId("pointer-mode-inspect");
-      await expect(interactBtn).toHaveAttribute("aria-pressed", "true");
+      // AC-01: Unified Interact <-> Chọn vùng (C) toggle + Hotkey C
+      const toggleBtn = page.getByTestId("pointer-mode-toggle");
+      await expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
       await page.keyboard.press("c");
-      await expect(inspectBtn).toHaveAttribute("aria-pressed", "true");
+      await expect(toggleBtn).toHaveAttribute("aria-pressed", "true");
       await page.keyboard.press("c");
-      await expect(interactBtn).toHaveAttribute("aria-pressed", "true");
+      await expect(toggleBtn).toHaveAttribute("aria-pressed", "false");
 
       // AC-01: Uppercase 4-SubState Fixture Switcher (DEFAULT | LOADING | EMPTY | ERROR) + Viewport Switcher
       for (const variant of ["DEFAULT", "LOADING", "EMPTY", "ERROR"]) {
@@ -136,19 +135,19 @@ test.describe("Story 04.5 Acceptance: State-Hydrated Live Preview, Option CSP-B 
       await page.screenshot({ path: path.join(EVIDENCE_DIR, "01-live-preview-substates.png"), fullPage: true });
 
       // AC-01: Inline HTML Editor dirty_buffer Lock Guard + Apply closes panel cleanly
-      await page.getByTestId("toggle-inline-code-btn").click();
+      await page.getByTestId("canvas-mode-inline-editor").click();
       await expect(page.getByTestId("inline-code-editor-panel")).toBeVisible();
       const editorTextarea = page.getByTestId("inline-html-textarea");
       await editorTextarea.fill('<section data-ff-id="sec-hero"><h2>Updated 04.5 Preview</h2></section>');
       await expect(page.getByTestId("inline-html-dirty-badge")).toBeVisible();
-      await page.getByTestId("toggle-inline-code-btn").click();
+      await page.getByTestId("canvas-mode-inline-editor").click();
       await expect(page.getByTestId("dirty-buffer-guard-banner")).toBeVisible();
       await page.screenshot({ path: path.join(EVIDENCE_DIR, "02-dirty-buffer-guard.png"), fullPage: true });
       await page.getByTestId("dirty-guard-apply-btn").click();
       await expect(page.getByTestId("inline-code-editor-panel")).toBeHidden();
 
       // AC-03: 3-Way Spatial Feedback -> #chatAttachmentTray (Node DAG + Marquee >= 16x16px)
-      await page.getByTestId("pointer-mode-marquee").click();
+      await page.getByTestId("pointer-mode-toggle").click();
       const overlay = page.getByTestId("marquee-drag-overlay");
       const box = await overlay.boundingBox();
       expect(box).toBeTruthy();

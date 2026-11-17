@@ -217,12 +217,14 @@ test.describe("Story 05.3 Live E2E Acceptance Suite", () => {
           shell.classList.add("theme-night");
         }
       });
-      // Verify Option 3 layout: redundant strips removed & review controls in Chat header + Publish icon in HtmlPreviewToolbar
+      // Verify redesigned Chat header + 2-row Live HTML Toolbar controls
       await expect(page.getByTestId("canvas-snapshot-strip")).toBeHidden();
       await expect(page.getByTestId("proposal-canvas-toolbar")).toBeHidden();
       await expect(page.getByTestId("toggle-designer-talk-btn")).toBeVisible({ timeout: 15_000 });
       await expect(page.getByTestId("toggle-change-proposal-drawer-btn")).toBeVisible();
-      await expect(page.getByTestId("version-publish-menu-btn")).toBeVisible();
+      await expect(page.getByTestId("pointer-mode-toggle")).toBeVisible();
+      await expect(page.getByTestId("walkthrough-playback-btn")).toBeVisible();
+      await expect(page.getByTestId("toggle-version-history-btn")).toBeVisible();
       await expect(page.getByTestId("version-history-drawer")).toBeHidden();
       await saveShot("01-story-05-3-canvas-snapshot-controls-closed.png");
 
@@ -233,11 +235,7 @@ test.describe("Story 05.3 Live E2E Acceptance Suite", () => {
       await expect(page.getByTestId("chat-collapsed-rail").getByTestId("toggle-change-proposal-drawer-btn")).toBeVisible();
       await page.locator(".btn-shorten-chat").first().click();
 
-      // Open Version & Publish dropdown -> Version History Dual Master-Detail & check Night semantic tokens
-      await page.getByTestId("version-publish-menu-btn").click();
-      await expect(page.getByTestId("version-publish-dropdown")).toBeVisible();
-      await expect(page.getByTestId("toggle-version-history-btn")).toBeVisible();
-      await expect(page.getByTestId("open-export-handoff-btn")).toBeVisible();
+      // Open Version History Drawer directly from Row 2 history icon button & check Night semantic tokens
       await page.getByTestId("toggle-version-history-btn").click();
       await expect(page.getByTestId("version-history-drawer")).toBeVisible();
       const nightCheck = await page.evaluate(() => {

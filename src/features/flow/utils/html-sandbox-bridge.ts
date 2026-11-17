@@ -126,8 +126,53 @@ function buildHtmlPatchSnippet(): string {
   }
   function applyFixtureHydration(variant, fixtureJson) {
     if (!document.body) return;
-    document.body.setAttribute("data-ff-substate", String(variant || "DEFAULT"));
-    document.querySelectorAll("[data-ff-fixture-slot]").forEach(function(el){ el.textContent = String(variant || "DEFAULT") + " " + String(fixtureJson || "").slice(0, 160); });
+    var norm = String(variant || "DEFAULT").toUpperCase();
+    document.body.setAttribute("data-ff-substate", norm);
+    document.querySelectorAll("[data-ff-fixture-slot]").forEach(function(el){ el.textContent = norm; });
+    var hdr = document.querySelector('[data-ff-id="sec-header"]');
+    var kpi = document.querySelector('[data-ff-id="sec-kpi"]');
+    var bio = document.querySelector('[data-ff-id="sec-biometric"]');
+    var parsedRows = [];
+    try {
+      var rawObj = fixtureJson ? JSON.parse(String(fixtureJson)) : null;
+      if (rawObj && Array.isArray(rawObj.rows)) {
+        parsedRows = rawObj.rows;
+      } else if (rawObj && typeof rawObj === "object") {
+        parsedRows = Object.keys(rawObj).map(function(k){ return { key: k, value: String(rawObj[k]) }; });
+      }
+    } catch (_) {}
+    if (hdr) {
+      var h2 = hdr.querySelector("h2");
+      var p = hdr.querySelector("p");
+      if (h2 && !h2.getAttribute("data-orig")) h2.setAttribute("data-orig", h2.textContent || "");
+      if (p && !p.getAttribute("data-orig")) p.setAttribute("data-orig", p.textContent || "");
+      if (norm === "LOADING") {
+        if (h2) h2.textContent = "Đang đồng bộ trạng thái màn hình...";
+        if (p) p.textContent = "Skeleton shimmer đang nạp dữ liệu từ Rust SQLite WAL.";
+      } else if (norm === "EMPTY") {
+        if (h2) h2.textContent = "Chưa có dữ liệu (0 Records)";
+        if (p) p.textContent = "Nhấn tạo mới hoặc nạp bộ dữ liệu mẫu để xem trước nội dung.";
+      } else if (norm === "ERROR") {
+        if (h2) h2.textContent = "Lỗi xác thực dữ liệu (422 Unprocessable)";
+        if (p) p.textContent = "ERR_INSUFFICIENT_QUORUM: Cần bổ sung chữ ký hoặc kiểm tra ràng buộc.";
+      } else if (h2 && p) {
+        h2.textContent = h2.getAttribute("data-orig") || h2.textContent;
+        p.textContent = p.getAttribute("data-orig") || p.textContent;
+      }
+      if (parsedRows.length > 0 && h2 && p) {
+        var r0 = parsedRows[0] || {};
+        var r1 = parsedRows[1] || r0;
+        if (r0.value) h2.textContent = String(r0.key ? (r0.key + ": " + r0.value) : r0.value);
+        if (r1.value && r1 !== r0) p.textContent = String(r1.key ? (r1.key + ": " + r1.value) : r1.value);
+      }
+    }
+    if (kpi) {
+      kpi.style.opacity = norm === "LOADING" ? "0.55" : "1";
+      kpi.style.borderColor = norm === "ERROR" ? "var(--state-danger, #dc2626)" : "";
+    }
+    if (bio) {
+      bio.style.display = norm === "EMPTY" ? "none" : "flex";
+    }
     publishElementRects();
   }`;
 }

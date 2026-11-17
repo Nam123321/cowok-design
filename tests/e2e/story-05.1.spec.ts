@@ -61,11 +61,15 @@ async function verifyLiveWorkbenchUi(page: Page, saveShot: (name: string) => Pro
   }
   await saveShot("01-story-05-1-storyboard-and-sandbox.png");
 
-  // Verify Sample Data Studio modal opens from live toolbar button, switches preset, toggles tray
+  // Verify Sample Data Studio modal opens from Row 1 toolbar (or ••• menu when narrow), switches preset, toggles tray
   await expect(page.getByTestId("canvas-mode-group")).toBeVisible();
   const sampleDataBtn = page.getByTestId("canvas-mode-sample-data");
-  await expect(sampleDataBtn).toBeVisible();
-  await sampleDataBtn.click();
+  if (await sampleDataBtn.isVisible()) {
+    await sampleDataBtn.click();
+  } else {
+    await page.getByTestId("toolbar-more-actions-btn").click();
+    await page.getByTestId("overflow-sample-data-btn").click();
+  }
   const sampleModal = page.getByTestId("sample-data-studio-modal");
   await expect(sampleModal).toBeVisible();
   await page.getByTestId("preset-filter-btn-validation_error").click();

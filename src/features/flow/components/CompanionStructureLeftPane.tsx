@@ -152,6 +152,8 @@ export const CompanionStructureLeftPane: React.FC<{
   onSelectSlide: (idx: number) => void;
   onCloseCmsDrawer: () => void;
   onUpdateActiveSlide: (patch: Partial<SlidePhaseItem>) => void;
+  isWalkthroughActive?: boolean;
+  walkthroughStepLabel?: string;
   children: React.ReactNode;
 }> = (props) => {
   const { t } = useTranslation();
@@ -178,6 +180,15 @@ export const CompanionStructureLeftPane: React.FC<{
         isRightPreviewHidden={props.isRightPreviewHidden}
         onToggleRightPreviewHidden={props.onToggleRightPreviewHidden}
       />
+      {props.isWalkthroughActive && (
+        <div data-testid="walkthrough-dag-sync-banner" style={{ padding: "5px 10px", backgroundColor: "var(--bg-selected)", borderBottom: "1px solid var(--action-primary)", color: "var(--action-primary)", fontSize: "11px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
+            <BrandIcon name="workflow" size={12} color="currentColor" />
+            <span>{t("canvas.walkthroughDagSyncLabel", "Walkthrough Dual Screen — Đồng bộ DAG")}</span>
+          </span>
+          {props.walkthroughStepLabel && <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px" }}>{props.walkthroughStepLabel}</span>}
+        </div>
+      )}
       <DraftDeployBanner
         isDraftDirty={props.isDraftDirty}
         orphanCount={props.orphanCount}

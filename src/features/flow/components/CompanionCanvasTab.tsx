@@ -29,6 +29,7 @@ import { DualPaneHtmlStage } from "./CompanionDualPaneStage";
 import { ProjectLaunchpadModal } from "./ProjectLaunchpadModal";
 import { SampleDataStudioModal, type SampleDataPreset } from "./SampleDataStudioModal";
 import {
+  ReadOnlyCanvasContext,
   useInternalSplitResizer,
   useTabNavigationState,
   useDualPaneViewportState,
@@ -77,10 +78,20 @@ async function applyStudioSampleFixture(
   preset: SampleDataPreset,
   json: string
 ): Promise<void> {
+  const variantMap: Record<SampleDataPreset, FixtureVariant> = {
+    HAPPY: "DEFAULT",
+    EMPTY: "EMPTY",
+    LONG_TEXT: "DEFAULT",
+    VALIDATION_ERROR: "ERROR",
+  };
+  const variant = variantMap[preset] || "DEFAULT";
+  window.dispatchEvent(new CustomEvent("cowok:sample-fixture-applied", {
+    detail: { projectId, nodeId, preset, variant, fixtureJson: json },
+  }));
   if (!projectId || !nodeId) return;
   try {
     await apiScreenFixture.saveFixture(projectId, nodeId, {
-      variant: "DEFAULT",
+      variant,
       payloadJson: json,
       presetKey: preset,
     });
@@ -211,24 +222,87 @@ function useCanvasGuardedActions(
   };
 }
 
-function useWalkthroughPlaybackEffect(
-  isWalkthroughActive: boolean,
+function useWalkthroughController(
   nodes: CompanionCanvasTabProps["nodes"],
-  onSelectNode: CompanionCanvasTabProps["onSelectNode"]
+  onSelectNode: CompanionCanvasTabProps["onSelectNode"],
+  setIsPresenting: React.Dispatch<React.SetStateAction<boolean>>
 ) {
-  const [, setWalkthroughIndex] = useState(0);
+  const [isActive, setIsActive] = useState(false);
+  const [autoPlay, setAutoPlay] = useState(true);
+  const [viewMode, setViewModeState] = useState<"dual" | "full">("dual");
+  const [stepIndex, setStepIndex] = useState(0);
+  const total = nodes?.length ?? 0;
+
+  const jumpTo = useCallback((nextIdx: number) => {
+    if (!nodes || nodes.length === 0) return;
+    const bounded = ((nextIdx % nodes.length) + nodes.length) % nodes.length;
+    setStepIndex(bounded);
+    const target = nodes[bounded];
+    if (target && onSelectNode) onSelectNode(target.id);
+  }, [nodes, onSelectNode]);
+
   useEffect(() => {
-    if (!isWalkthroughActive || !nodes || nodes.length === 0) return;
+    if (!isActive || !autoPlay || total === 0) return;
     const timer = setInterval(() => {
-      setWalkthroughIndex((prev) => {
-        const next = (prev + 1) % nodes.length;
-        const targetNode = nodes[next];
-        if (targetNode && onSelectNode) onSelectNode(targetNode.id);
+      setStepIndex((prev) => {
+        const next = (prev + 1) % total;
+        const target = nodes?.[next];
+        if (target && onSelectNode) onSelectNode(target.id);
         return next;
       });
     }, WALKTHROUGH_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [isWalkthroughActive, nodes, onSelectNode]);
+  }, [autoPlay, isActive, nodes, onSelectNode, total]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") {
+        setIsActive(false);
+        setIsPresenting(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isActive, setIsPresenting]);
+
+  const toggleWalkthrough = useCallback(() => {
+    setIsActive((prev) => {
+      const next = !prev;
+      if (next) {
+        setAutoPlay(true);
+        setViewModeState("dual");
+        setIsPresenting(false);
+        jumpTo(0);
+      } else {
+        setIsPresenting(false);
+      }
+      return next;
+    });
+  }, [jumpTo, setIsPresenting]);
+
+  const setViewMode = useCallback((mode: "dual" | "full") => {
+    setViewModeState(mode);
+    setIsPresenting(mode === "full");
+  }, [setIsPresenting]);
+
+  const exitWalkthrough = useCallback(() => {
+    setIsActive(false);
+    setIsPresenting(false);
+  }, [setIsPresenting]);
+
+  const currentNode = total > 0 ? nodes?.[stepIndex % total] : undefined;
+  const stepLabel = total > 0
+    ? `${currentNode?.screenKey || currentNode?.id || "SCR"} (${(stepIndex % total) + 1}/${total})`
+    : undefined;
+
+  return {
+    isActive, autoPlay, viewMode, stepLabel,
+    toggleAutoPlay: () => setAutoPlay((v) => !v),
+    prevStep: () => { setAutoPlay(false); jumpTo(stepIndex - 1); },
+    nextStep: () => { setAutoPlay(false); jumpTo(stepIndex + 1); },
+    toggleWalkthrough, setViewMode, exitWalkthrough,
+  };
 }
 
 const CompanionOverlaysHost: React.FC<{
@@ -272,7 +346,6 @@ function useCompanionWorkspaceShell(props: CompanionCanvasTabProps) {
   useInternalSplitResizer(vp.isDraggingInternalSplit, vp.setIsDraggingInternalSplit, splitContainerRef, vp.setLeftPanePercent);
   const [isLaunchpadOpen, setIsLaunchpadOpen] = useState(false);
   const [isSampleDataOpen, setIsSampleDataOpen] = useState(false);
-  const [isWalkthroughActive, setIsWalkthroughActive] = useState(false);
   const [historicalPreviewTurn, setHistoricalPreviewTurn] = useState<ChatArtifactSnapshotResponse | null>(null);
   const isHistoricalReadOnly = isHistoricalPreviewReadOnly(historicalPreviewTurn?.id);
   const isHtmlDesignTab = nav.activeTab.format === "dag" || nav.activeTab.format === "slide-cms";
@@ -285,12 +358,17 @@ function useCompanionWorkspaceShell(props: CompanionCanvasTabProps) {
   const proposalCtrl = props.proposalController ?? internalProposalCtrl;
   const snapshotCtrl = useSnapshotWorkspaceController(props.projectId, setHistoricalPreviewTurn);
   const effectiveInspectorFormat = isHtmlDesignTab && vp.structureLens === "slide-cms" ? "slide-cms" : nav.activeTab.format;
-  useWalkthroughPlaybackEffect(isWalkthroughActive, props.nodes, props.onSelectNode);
+  const walkthrough = useWalkthroughController(props.nodes, props.onSelectNode, vp.setIsPresenting);
+  useEffect(() => {
+    const onOpenLaunchpad = () => setIsLaunchpadOpen(true);
+    window.addEventListener("cowok:open-launchpad", onOpenLaunchpad);
+    return () => window.removeEventListener("cowok:open-launchpad", onOpenLaunchpad);
+  }, []);
   const guards = useCanvasGuardedActions(vp, nav, props);
   const stageMutators = resolveHistoricalReadOnlyStageBindings(props, isHistoricalReadOnly);
   return {
     splitContainerRef, nav, vp, isLaunchpadOpen, setIsLaunchpadOpen, isSampleDataOpen, setIsSampleDataOpen,
-    isWalkthroughActive, setIsWalkthroughActive, historicalPreviewTurn, isHistoricalReadOnly,
+    walkthrough, historicalPreviewTurn, isHistoricalReadOnly,
     isHtmlDesignTab, nodeLabelsById, proposalCtrl, snapshotCtrl, effectiveInspectorFormat, guards, stageMutators,
   };
 }
@@ -307,17 +385,26 @@ export function CompanionCanvasTab(props: CompanionCanvasTabProps) {
       <CompanionTabBar tabs={s.nav.tabs} activeTabId={s.nav.activeTab.id} isNewTabMenuOpen={s.nav.isNewTabMenuOpen} onToggleNewTabMenu={() => s.nav.setIsNewTabMenuOpen((prev) => !prev)} onTabSelect={s.guards.handleGuardedTabSelect} onCloseTab={s.nav.handleClose} onCreateTab={s.nav.handleCreateTab} />
       <HistoricalPreviewBanner activePreviewTurn={s.snapshotCtrl.turn.activePreviewTurn} onExit={s.snapshotCtrl.turn.handlePreviewTurn} />
       {s.isHtmlDesignTab ? (
-        <DualPaneHtmlStage
-          {...props} {...s.stageMutators} activeTab={s.nav.activeTab} vp={s.vp} splitContainerRef={s.splitContainerRef}
-          isLaunchpadOpen={s.isLaunchpadOpen} onOpenLaunchpad={guardReadOnlyAction(s.isHistoricalReadOnly, () => s.setIsLaunchpadOpen(true))} onCloseLaunchpad={() => s.setIsLaunchpadOpen(false)}
-          isSampleDataOpen={s.isSampleDataOpen} onOpenSampleData={guardReadOnlyAction(s.isHistoricalReadOnly, () => s.setIsSampleDataOpen(true))} onCloseSampleData={() => s.setIsSampleDataOpen(false)}
-          isWalkthroughActive={s.isWalkthroughActive} onToggleWalkthrough={() => s.setIsWalkthroughActive((v) => !v)}
-          isDesignerTalkOpen={s.proposalCtrl.isDesignerTalkOpen} onCloseDesignerTalk={() => s.proposalCtrl.setIsDesignerTalkOpen(false)} isProposalDrawerOpen={s.proposalCtrl.isDrawerOpen}
-          isModalOpen={s.isLaunchpadOpen || s.isSampleDataOpen || s.vp.showDirtyGuardPrompt} activeProposal={s.proposalCtrl.activeProposal}
-          onDecideTradeoff={(tid, input) => (s.isHistoricalReadOnly ? Promise.resolve() : s.proposalCtrl.decideTradeoff(tid, input))}
-          onGuardedSubStateSelect={s.guards.handleGuardedSubStateSelect} onGuardedModeSelect={s.guards.handleGuardedModeSelect}
-          historicalPreviewTurn={s.historicalPreviewTurn} versionMenuNode={versionMenuNode}
-        />
+        <ReadOnlyCanvasContext.Provider value={s.isHistoricalReadOnly}>
+          <DualPaneHtmlStage
+            {...props} {...s.stageMutators} activeTab={s.nav.activeTab} vp={s.vp} splitContainerRef={s.splitContainerRef}
+            isLaunchpadOpen={s.isLaunchpadOpen} onOpenLaunchpad={guardReadOnlyAction(s.isHistoricalReadOnly, () => s.setIsLaunchpadOpen(true))} onCloseLaunchpad={() => s.setIsLaunchpadOpen(false)}
+            isSampleDataOpen={s.isSampleDataOpen} onOpenSampleData={guardReadOnlyAction(s.isHistoricalReadOnly, () => s.setIsSampleDataOpen(true))} onCloseSampleData={() => s.setIsSampleDataOpen(false)}
+            isWalkthroughActive={s.walkthrough.isActive} onToggleWalkthrough={s.walkthrough.toggleWalkthrough}
+            walkthroughViewMode={s.walkthrough.viewMode} onSetWalkthroughViewMode={s.walkthrough.setViewMode}
+            walkthroughStepLabel={s.walkthrough.stepLabel} walkthroughAutoPlay={s.walkthrough.autoPlay}
+            onToggleWalkthroughAutoPlay={s.walkthrough.toggleAutoPlay} onWalkthroughPrev={s.walkthrough.prevStep}
+            onWalkthroughNext={s.walkthrough.nextStep} onExitWalkthrough={s.walkthrough.exitWalkthrough}
+            snapshotsCount={s.snapshotCtrl.snapshots.length}
+            onOpenVersionHistory={() => s.snapshotCtrl.setIsDrawerOpen((p) => !p)}
+            onOpenExportSection={(sec) => { void s.snapshotCtrl.exp.handleOpenExport(sec); }}
+            isDesignerTalkOpen={s.proposalCtrl.isDesignerTalkOpen} onCloseDesignerTalk={() => s.proposalCtrl.setIsDesignerTalkOpen(false)} isProposalDrawerOpen={s.proposalCtrl.isDrawerOpen}
+            isModalOpen={s.isLaunchpadOpen || s.isSampleDataOpen || s.vp.showDirtyGuardPrompt} activeProposal={s.proposalCtrl.activeProposal}
+            onDecideTradeoff={(tid, input) => (s.isHistoricalReadOnly ? Promise.resolve() : s.proposalCtrl.decideTradeoff(tid, input))}
+            onGuardedSubStateSelect={s.guards.handleGuardedSubStateSelect} onGuardedModeSelect={s.guards.handleGuardedModeSelect}
+            historicalPreviewTurn={s.historicalPreviewTurn} versionMenuNode={versionMenuNode}
+          />
+        </ReadOnlyCanvasContext.Provider>
       ) : (
         <div style={{ position: "relative", flex: 1, display: "flex", overflow: "hidden" }}>
           <NonHtmlTabView activeTab={s.nav.activeTab} inlineCodeText={s.vp.inlineCodeText} />

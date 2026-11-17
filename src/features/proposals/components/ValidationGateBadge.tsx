@@ -18,6 +18,7 @@ interface ValidationGateBadgeProps {
   checks: ValidationCheckResult[];
   gateReceipt?: ProposalGateReceipt | null;
   errorBanner?: ProposalGateErrorBanner | null;
+  isStaleStatus?: boolean;
   onRebaseAndValidate?: () => void;
   isRevalidating?: boolean;
 }
@@ -30,12 +31,14 @@ function getStatusBadge(status: "passed" | "failed" | "skipped", t: (k: string, 
 
 const GateErrorAlerts: React.FC<{
   errorBanner?: ProposalGateErrorBanner | null;
+  isStaleStatus?: boolean;
   onRebaseAndValidate?: () => void;
   isRevalidating: boolean;
-}> = ({ errorBanner, onRebaseAndValidate, isRevalidating }) => {
+}> = ({ errorBanner, isStaleStatus, onRebaseAndValidate, isRevalidating }) => {
   const { t } = useTranslation();
   const isUnverifiedClaim = errorBanner?.status === HTTP_UNVERIFIED_GATE_STATUS || errorBanner?.code === "UNVERIFIED_GATE_CLAIM";
-  const isStaleBaseHash = errorBanner?.status === HTTP_STALE_BASE_HASH_STATUS || errorBanner?.code === "PROPOSAL_STALE_BASE_HASH";
+  const isStaleBaseHash =
+    Boolean(isStaleStatus) || errorBanner?.status === HTTP_STALE_BASE_HASH_STATUS || errorBanner?.code === "PROPOSAL_STALE_BASE_HASH";
 
   return (
     <>
@@ -67,6 +70,7 @@ export const ValidationGateBadge: React.FC<ValidationGateBadgeProps> = ({
   checks,
   gateReceipt,
   errorBanner,
+  isStaleStatus = false,
   onRebaseAndValidate,
   isRevalidating = false,
 }) => {
@@ -84,7 +88,7 @@ export const ValidationGateBadge: React.FC<ValidationGateBadgeProps> = ({
           {receiptLabel}
         </span>
       </div>
-      <GateErrorAlerts errorBanner={errorBanner} onRebaseAndValidate={onRebaseAndValidate} isRevalidating={isRevalidating} />
+      <GateErrorAlerts errorBanner={errorBanner} isStaleStatus={isStaleStatus} onRebaseAndValidate={onRebaseAndValidate} isRevalidating={isRevalidating} />
       <div className="cp-gate-list">
         {checks.map((c) => {
           const badge = getStatusBadge(c.status, t);

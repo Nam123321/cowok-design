@@ -61,6 +61,7 @@ export const DesignIntentResponseSchema = z.object({
   ambiguityScore: z.number().min(0).max(1),
   riskScore: z.number().min(0).max(1),
   clarificationVariants: z.array(ClarificationVariantSchema).max(MAX_VARIANTS_COUNT).optional(),
+  selectedVariantId: z.string().nullable().optional(),
   gapQuestions: z.array(GapQuestionSchema).optional(),
   status: z.enum(["clarifying", "ready", "executed"]),
   revision: z.number().int().min(1).default(1).optional(),

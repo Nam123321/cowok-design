@@ -57,8 +57,8 @@ test.describe("Story 04.1: Unified DualMainPanel Workbench, Rust SQLite WAL SSOT
     await expect(iframe).toHaveAttribute("referrerpolicy", "no-referrer");
 
     await expect(page.getByTestId("toggle-design-cdn-btn")).toHaveCount(0);
-    await expect(page.getByTestId("pointer-mode-interact")).toBeVisible();
-    await expect(page.getByTestId("pointer-mode-inspect")).toBeVisible();
+    await expect(page.getByTestId("pointer-mode-toggle")).toBeVisible();
+    await expect(page.getByTestId("walkthrough-playback-btn")).toBeVisible();
 
     // Capture Initial Light Mode Screenshot
     const screenshotInitPath = path.join(evidenceDir, "screenshot-workbench-init.png");

@@ -272,9 +272,8 @@ test.describe("Story 05.2 Live E2E Acceptance Suite", () => {
       };
 
       await expect(page.locator(".workbench-main-sidebar")).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByTestId("proposal-canvas-toolbar")).toBeVisible({ timeout: 10_000 });
-      await expect(page.getByTestId("toggle-designer-talk-btn")).toBeVisible();
-      await expect(page.getByTestId("toggle-change-proposal-drawer-btn")).toBeVisible();
+      await expect(page.locator(".workbench-chat-panel").getByTestId("toggle-designer-talk-btn")).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator(".workbench-chat-panel").getByTestId("toggle-change-proposal-drawer-btn")).toBeVisible();
       // RightDrawer [5.25] must remain closed by default on initial load
       await expect(page.getByTestId("change-proposal-drawer")).toBeHidden();
       await saveShot("01-story-05-2-canvas-toolbar-closed-drawer.png");

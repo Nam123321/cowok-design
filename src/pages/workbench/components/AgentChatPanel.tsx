@@ -50,8 +50,8 @@ const ChatCollapsedRail: React.FC<{
   const { t } = useTranslation();
   const { formatNumber } = useFormatter();
   const expandLabel = t("chat.expandChat", "Mở rộng khung Chat");
-  const talkLabel = `${t("proposals.designerTalkBtn", "Designer Talk")} (T)`;
-  const propLabel = `${t("proposals.drawerToggleBtn", "Proposals")} (${formatNumber(proposalControls?.proposalsCount ?? 0)})`;
+  const talkLabel = `${t("proposals.suggestionLabel", "Gợi ý")} (T)`;
+  const propLabel = `${t("proposals.proposalLabel", "Đề xuất")} (${formatNumber(proposalControls?.proposalsCount ?? 0)})`;
   const scopeText = proposalControls?.selectedNodeKey || proposalControls?.selectedNodeId;
 
   return (
@@ -158,46 +158,47 @@ export const AgentChatPanel: React.FC<AgentChatPanelProps> = (props) => {
 
   return (
     <aside className="workbench-chat-panel" aria-label={t("chat.agentTitle", "cowok Agent")} style={{ width: `${props.width}px`, height: "100%", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-canvas)", borderRight: "1px solid var(--border-subtle)", boxSizing: "border-box", flexShrink: 0, position: "relative", fontFamily: "var(--font-sans)" }}>
-      <div style={{ minHeight: "36px", padding: "4px 8px 4px 10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "wrap", borderBottom: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-workspace)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
-          <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>{t("chat.agentTitle", "cowok Agent")}</span>
-          {pc && (
-            <span className="cp-scope-pill" data-testid="canvas-active-scope-pill" style={{ whiteSpace: "nowrap" }}>
-              {scopeText ? `${t("proposals.scopeNode", "NODE")}: ${scopeText}` : t("proposals.scopeBatch", "BATCH")}
-            </span>
-          )}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
-          {pc && (
-            <>
-              <button
-                type="button"
-                className={`cp-toolbar-btn${pc.isDesignerTalkOpen ? " cp-toolbar-btn--active" : ""}`}
-                data-testid="toggle-designer-talk-btn"
-                aria-pressed={pc.isDesignerTalkOpen}
-                onClick={pc.onToggleDesignerTalk}
-              >
-                <span>{t("proposals.designerTalkCompact", "Feedback")}</span>
-                <span className="cp-toolbar-kbd" aria-hidden="true">{"T"}</span>
-              </button>
-              <button
-                type="button"
-                className={`cp-toolbar-btn${pc.isDrawerOpen ? " cp-toolbar-btn--active" : ""}`}
-                data-testid="toggle-change-proposal-drawer-btn"
-                aria-pressed={pc.isDrawerOpen}
-                onClick={pc.onToggleDrawer}
-              >
-                <span>{t("proposals.drawerToggleBtn", "Proposals")} ({formatNumber(pc.proposalsCount)})</span>
-              </button>
-            </>
-          )}
-          <button type="button" onClick={props.onToggleShorten} className="btn-shorten-chat cowok-btn cowok-btn-ghost" title={shortenLabel} aria-label={shortenLabel} style={{ width: "26px", height: "26px", minWidth: "26px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-workspace)", color: "var(--text-secondary)", borderRadius: "var(--radius-xs)", cursor: "pointer" }}>
+      <div style={{ display: "flex", flexDirection: "column", borderBottom: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-workspace)" }}>
+        <div style={{ height: "34px", padding: "0 8px 0 10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px", flexWrap: "nowrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
+            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", whiteSpace: "nowrap" }}>{t("chat.agentTitle", "cowok Agent")}</span>
+            {pc && (
+              <span className="cp-scope-pill" data-testid="canvas-active-scope-pill" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {scopeText ? `${t("proposals.scopeNode", "NODE")}: ${scopeText}` : t("proposals.scopeBatch", "BATCH")}
+              </span>
+            )}
+          </div>
+          <button type="button" onClick={props.onToggleShorten} className="btn-shorten-chat cowok-btn cowok-btn-ghost" title={shortenLabel} aria-label={shortenLabel} style={{ width: "26px", height: "26px", minWidth: "26px", flexShrink: 0, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-surface)", color: "var(--text-secondary)", borderRadius: "var(--radius-xs)", cursor: "pointer" }}>
             <BrandIcon name="panel-left-close" size={14} color="currentColor" />
           </button>
         </div>
+        {pc && (
+          <div style={{ padding: "4px 10px 6px", display: "flex", alignItems: "center", gap: "6px", borderTop: "1px solid var(--border-subtle)", flexWrap: "nowrap" }}>
+            <button
+              type="button"
+              className={`cp-toolbar-btn${pc.isDesignerTalkOpen ? " cp-toolbar-btn--active" : ""}`}
+              data-testid="toggle-designer-talk-btn"
+              aria-pressed={pc.isDesignerTalkOpen}
+              title={t("proposals.suggestionTooltip", "Gợi ý thiết kế & Đánh đổi (Phím tắt T)")}
+              onClick={pc.onToggleDesignerTalk}
+            >
+              <span>{t("proposals.suggestionLabel", "Gợi ý")}</span>
+            </button>
+            <button
+              type="button"
+              className={`cp-toolbar-btn${pc.isDrawerOpen ? " cp-toolbar-btn--active" : ""}`}
+              data-testid="toggle-change-proposal-drawer-btn"
+              aria-pressed={pc.isDrawerOpen}
+              title={`${t("proposals.proposalTooltip", "Danh sách Đề xuất thay đổi")} (${formatNumber(pc.proposalsCount)})`}
+              onClick={pc.onToggleDrawer}
+            >
+              <span>{t("proposals.proposalLabel", "Đề xuất")}</span>
+            </button>
+          </div>
+        )}
       </div>
       <LeftChatScopeChips projectId={props.projectId} sessionId={props.activeSessionId} selectedNodes={props.selectedNodes || []} onDeselectNode={props.onDeselectNode} onFocusNode={props.onFocusNode} />
-      <AgentChatStream messages={chat.messages} showScrollBottom={chat.showScrollBottom} onScrollMessages={chat.handleScrollMessages} onScrollToBottom={chat.scrollToBottom} messagesEndRef={chat.messagesEndRef} />
+      <AgentChatStream messages={chat.messages} showScrollBottom={chat.showScrollBottom} onScrollMessages={chat.handleScrollMessages} onScrollToBottom={chat.scrollToBottom} messagesEndRef={chat.messagesEndRef} onSelectSdiVariant={(intentId, pid, variantId) => { void chat.handleSelectSdiVariant(intentId, pid, variantId); }} />
       <AgentChatComposer inputValue={chat.inputValue} onInputChange={chat.setInputValue} onSend={chat.handleSend} attachmentChips={props.attachmentChips || []} onRemoveAttachmentChip={props.onRemoveAttachmentChip} onAttachClick={props.onAttachClick} onOpenSettings={props.onOpenSettings} />
     </aside>
   );

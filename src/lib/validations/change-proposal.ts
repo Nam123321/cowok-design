@@ -75,7 +75,7 @@ export const ChangeProposalResponseSchema = z.object({
   files: z.array(FileDiffItemSchema),
   validationStatus: z.enum(["pending", "passed", "failed"]),
   validationChecks: z.array(ValidationCheckResultSchema),
-  status: z.enum(["draft", "validating", "ready", "applied", "rejected"]),
+  status: z.enum(["draft", "validating", "ready", "stale", "applied", "rejected"]),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

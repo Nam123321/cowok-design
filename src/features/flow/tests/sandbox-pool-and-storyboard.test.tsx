@@ -246,13 +246,13 @@ describe("Story 05.1: Frontend Sandbox Hardening, IframeKeepAlivePool & Option 5
         />
       );
 
-      fireEvent.click(screen.getByTestId("toggle-inline-code-btn"));
+      fireEvent.click(screen.getByTestId("canvas-mode-inline-editor"));
       const textarea = screen.getByTestId("inline-html-textarea") as HTMLTextAreaElement;
 
       fireEvent.change(textarea, { target: { value: "<div>Edited Content Unsaved</div>" } });
       expect(screen.getByTestId("inline-html-dirty-badge")).toBeTruthy();
 
-      fireEvent.click(screen.getByTestId("toggle-inline-code-btn"));
+      fireEvent.click(screen.getByTestId("canvas-mode-inline-editor"));
       expect(screen.getByTestId("dirty-buffer-guard-modal")).toBeTruthy();
 
       // Click discard button inside dirty guard modal

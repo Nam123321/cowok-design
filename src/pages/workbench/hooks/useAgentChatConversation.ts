@@ -59,9 +59,21 @@ function sendSdiCompile(params: {
     .compileIntent(params.projectId, { rawPrompt: params.sentPrompt, targetNodeId: params.primaryNodeId })
     .then(async (intent) => {
       const now = Date.now();
+      const sdiClarification =
+        intent.status === "clarifying" && intent.clarificationVariants?.length
+          ? {
+              intentId: intent.id,
+              projectId: params.projectId,
+              status: intent.status,
+              ambiguityScore: intent.ambiguityScore,
+              variants: intent.clarificationVariants,
+              selectedVariantId: intent.selectedVariantId ?? undefined,
+            }
+          : undefined;
       sharedChatStore.appendMessage(params.targetKey, {
         id: `msg-agent-${intent.id}`, sender: "agent", createdAtMs: now, timestamp: params.formatTime(now), nodeId: params.primaryNodeId,
         text: buildCompiledIntentReply(intent, params.formatNumber, params.t),
+        sdiClarification,
       });
       if (UUID_RE.test(params.projectId)) {
         try {
@@ -115,13 +127,48 @@ export function useAgentChatConversation(
 
   const shared = sharedChatStore.getMessages(sessionKey);
   const messages = useMemo(
-    () => [initialGreeting, ...shared.map((m) => ({ id: m.id, sender: m.sender, text: m.text, timestamp: m.timestamp }))],
+    () => [initialGreeting, ...shared.map((m) => ({ id: m.id, sender: m.sender, text: m.text, timestamp: m.timestamp, sdiClarification: m.sdiClarification }))],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [initialGreeting, snap.version, sessionKey]
   );
   const inputValue = draftBySession[sessionKey] ?? "";
   const setInputValue = (val: string) => setDraftBySession((prev) => ({ ...prev, [sessionKey]: val }));
   useEffect(() => { messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" }); }, [messages, sessionKey]);
+  useEffect(() => {
+    const onReceipt = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ projectId?: string; text?: string }>).detail;
+      if (!detail?.text || (detail.projectId && projectId && detail.projectId !== projectId)) return;
+      const ts = Date.now();
+      sharedChatStore.appendMessage(sessionKey, {
+        id: `receipt-${ts}-${Math.random().toString(36).slice(2, 6)}`,
+        sender: "agent",
+        text: detail.text,
+        timestamp: formatTime(ts),
+        createdAtMs: ts,
+      });
+    };
+    window.addEventListener("cowok:chat-receipt", onReceipt);
+    return () => window.removeEventListener("cowok:chat-receipt", onReceipt);
+  }, [formatTime, projectId, sessionKey]);
+
+  const handleSelectSdiVariant = async (intentId: string, pid: string, variantId: string) => {
+    try {
+      const updated = await apiSdiEngine.selectClarification(pid, { intentId, selectedVariantId: variantId });
+      sharedChatStore.resolveSdiClarification(sessionKey, intentId, variantId, updated.status === "executed" ? "executed" : "ready");
+      const picked = updated.clarificationVariants?.find((v) => v.id === variantId)?.title || variantId;
+      const ts = Date.now();
+      sharedChatStore.appendMessage(sessionKey, {
+        id: `clarified-${intentId}-${variantId}`,
+        sender: "agent",
+        text: `${t("sdi.variantConfirmedPrefix", "Đã chọn phương án")} "${picked}" — ${t("sdi.variantUnlockedSuffix", "intent đã sẵn sàng (ready) và mở khóa thực thi.")}`,
+        timestamp: formatTime(ts),
+        createdAtMs: ts,
+      });
+      notifyProposalsChanged(pid);
+    } catch {
+      /* keep current clarifying state if offline */
+    }
+  };
 
   const handleScrollMessages = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -145,13 +192,14 @@ export function useAgentChatConversation(
         onAppendMsg: (m) => sharedChatStore.appendMessage(sessionKey, {
           id: m.id, sender: m.role === "user" ? "human" : "agent", text: m.content, timestamp: formatTime(m.timestamp),
           createdAtMs: m.timestamp, nodeId: m.nodeId, projectSeq: m.projectSeq, fencingToken: m.fencingToken,
+          sdiClarification: m.sdiClarification,
         }),
       });
       return;
     }
     sendSdiCompile({ projectId, targetKey: sessionKey, primaryNodeId: primaryNode?.id, sentPrompt, formatTime, formatNumber, t });
   };
-  return { messages, inputValue, setInputValue, showScrollBottom, messagesEndRef, handleScrollMessages, scrollToBottom, handleSend };
+  return { messages, inputValue, setInputValue, showScrollBottom, messagesEndRef, handleScrollMessages, scrollToBottom, handleSend, handleSelectSdiVariant };
 }
 
 export function useV7NodeSubSessions(projectId?: string, activeSessionId?: string) {
