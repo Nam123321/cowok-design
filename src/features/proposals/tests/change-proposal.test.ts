@@ -1,4 +1,5 @@
 /** @vitest-environment jsdom */
+// @story 05.2
 import React from "react";
 import fs from "node:fs";
 import path from "node:path";

@@ -29,49 +29,42 @@ function hasBuildScript(content: string): boolean {
   }
 }
 
+const JS_TS_FILE_EXTS = [".tsx", ".jsx", ".ts", ".js"];
+
+function isRunnableSourcePath(lowerPath: string): boolean {
+  return lowerPath.includes("src/") && JS_TS_FILE_EXTS.some((ext) => lowerPath.endsWith(ext));
+}
+
+function findPackageJson(files: SnapshotFileItem[]): SnapshotFileItem | undefined {
+  return files.find((f) => f.path === "package.json" || f.path.endsWith("/package.json"));
+}
+
 export function checkExportCompleteness(files: SnapshotFileItem[]): BundleCompletenessCheck {
   const paths = files.map((f) => f.path.toLowerCase());
-  const hasTokens = paths.some((p) => p.endsWith("tokens.css"));
-  const hasIcons = paths.some((p) => p.endsWith("icon-manifest.json"));
-  const pkgFile = files.find((f) => f.path === "package.json" || f.path.endsWith("/package.json"));
+  const pkgFile = findPackageJson(files);
   const hasPackageJson = Boolean(pkgFile);
   const hasBuild = pkgFile ? hasBuildScript(pkgFile.content) : false;
-  const hasFixtures = paths.some((p) => p.includes("fixture"));
-  const hasSource = paths.some(
-    (p) =>
-      p.includes("src/") &&
-      (p.endsWith(".tsx") || p.endsWith(".jsx") || p.endsWith(".ts") || p.endsWith(".js"))
-  );
-  const hasHandoffManifest = paths.some(
-    (p) => p === "cowok-handoff-manifest.json" || p.endsWith("/cowok-handoff-manifest.json")
-  );
 
-  const missingItems: string[] = [];
-  if (!hasTokens) missingItems.push("tokens.css");
-  if (!hasIcons) missingItems.push("icon-manifest.json");
-  if (!hasPackageJson) missingItems.push("package.json");
+  const checks: Array<[keyof Omit<BundleCompletenessCheck, "readyToRun" | "missingItems">, boolean, string]> = [
+    ["hasTokens", paths.some((p) => p.endsWith("tokens.css")), "tokens.css"],
+    ["hasIcons", paths.some((p) => p.endsWith("icon-manifest.json")), "icon-manifest.json"],
+    ["hasPackageJson", hasPackageJson, "package.json"],
+    ["hasFixtures", paths.some((p) => p.includes("fixture")), "screen fixtures"],
+    ["hasSource", paths.some(isRunnableSourcePath), "source code (src/*.tsx)"],
+    ["hasHandoffManifest", paths.some((p) => p === "cowok-handoff-manifest.json" || p.endsWith("/cowok-handoff-manifest.json")), "cowok-handoff-manifest.json"],
+  ];
+
+  const missingItems = checks.filter(([, ok]) => !ok).map(([, , label]) => label);
   if (hasPackageJson && !hasBuild) missingItems.push("package.json scripts.build");
-  if (!hasFixtures) missingItems.push("screen fixtures");
-  if (!hasSource) missingItems.push("source code (src/*.tsx)");
-  if (!hasHandoffManifest) missingItems.push("cowok-handoff-manifest.json");
 
-  const readyToRun =
-    hasTokens &&
-    hasIcons &&
-    hasPackageJson &&
-    hasBuild &&
-    hasFixtures &&
-    hasSource &&
-    hasHandoffManifest;
+  const flags = Object.fromEntries(checks.map(([k, ok]) => [k, ok])) as Record<
+    "hasTokens" | "hasIcons" | "hasPackageJson" | "hasFixtures" | "hasSource" | "hasHandoffManifest",
+    boolean
+  >;
 
   return {
-    hasTokens,
-    hasIcons,
-    hasPackageJson,
-    hasFixtures,
-    hasSource,
-    hasHandoffManifest,
-    readyToRun,
+    ...flags,
+    readyToRun: missingItems.length === 0,
     missingItems,
   };
 }

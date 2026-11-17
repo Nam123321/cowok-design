@@ -13,6 +13,7 @@ import {
   computeArtifactSha256Sync,
   generateBootSecret,
   generateEpochNonce,
+  type SandboxSubStateLabels,
 } from "./html-sandbox-bridge";
 
 export {
@@ -42,7 +43,10 @@ export interface WrapUserHtmlOptions {
   artifactSha256?: string;
   domAnchorHash?: string;
   parentOrigin?: string;
+  subStateLabels?: SandboxSubStateLabels;
 }
+
+export type { SandboxSubStateLabels };
 
 export interface PreviewDocumentLabels {
   lang?: string;
@@ -169,6 +173,7 @@ export function wrapUserHtmlSrcDoc(rawHtml: string, opts?: WrapUserHtmlOptions):
     artifactSha256,
     domAnchorHash,
     parentOrigin,
+    subStateLabels: opts?.subStateLabels,
   });
   const cspDirective = buildStrictOfflineCsp(scriptNonce);
   const headPrefix = `<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeHtmlAttr(cspDirective)}">${bridgeScript}`;
@@ -183,6 +188,16 @@ function buildPreviewRootCssVars(cssVars?: Record<string, string>): string {
   return pairs.length > 0 ? `:root{${pairs.join(";")}}` : "";
 }
 
+function resolveCommonPreviewLabels(labels?: PreviewDocumentLabels) {
+  return {
+    lang: labels?.lang ?? "en",
+    kpi1Label: labels?.kpi1Label ?? "Metric",
+    kpi2Label: labels?.kpi2Label ?? "Status",
+    kpi3Label: labels?.kpi3Label ?? "Latency",
+    actionHint: labels?.actionHint ?? "",
+  };
+}
+
 function resolvePreviewContent(params: {
   structureLens: "userflow" | "slide-cms";
   activeSlide: SlidePhaseItem;
@@ -190,23 +205,32 @@ function resolvePreviewContent(params: {
   formattedAmount: string;
   labels?: PreviewDocumentLabels;
 }) {
+  const base = resolveCommonPreviewLabels(params.labels);
   if (params.structureLens === "slide-cms") {
     const slide = params.activeSlide;
     return {
-      eyebrow: slide.code, headline: slide.headline, subtitle: slide.subtitle,
-      kpi1Val: params.formattedAmount, statusVal: slide.kpi2, latencyVal: slide.kpi3,
-      lang: params.labels?.lang ?? "en", kpi1Label: params.labels?.kpi1Label ?? "Metric",
-      kpi2Label: params.labels?.kpi2Label ?? "Status", kpi3Label: params.labels?.kpi3Label ?? "Latency",
-      actionHint: params.labels?.actionHint ?? "",
+      ...base,
+      eyebrow: slide.code,
+      headline: slide.headline,
+      subtitle: slide.subtitle,
+      kpi1Val: params.formattedAmount,
+      statusVal: slide.kpi2,
+      latencyVal: slide.kpi3,
     };
   }
   const scr = params.activeScreenData;
   return {
-    eyebrow: scr.eyebrow, headline: scr.headline, subtitle: scr.subtitle,
-    kpi1Val: scr.kpi1Display ?? params.formattedAmount, statusVal: scr.statusText, latencyVal: scr.latency,
-    lang: params.labels?.lang ?? "en", kpi1Label: scr.kpi1Label ?? params.labels?.kpi1Label ?? "Metric",
-    kpi2Label: scr.kpi2Label ?? params.labels?.kpi2Label ?? "Status", kpi3Label: scr.kpi3Label ?? params.labels?.kpi3Label ?? "Latency",
-    actionHint: scr.actionHint ?? params.labels?.actionHint ?? "",
+    eyebrow: scr.eyebrow,
+    headline: scr.headline,
+    subtitle: scr.subtitle,
+    kpi1Val: scr.kpi1Display ?? params.formattedAmount,
+    statusVal: scr.statusText,
+    latencyVal: scr.latency,
+    lang: base.lang,
+    kpi1Label: scr.kpi1Label ?? base.kpi1Label,
+    kpi2Label: scr.kpi2Label ?? base.kpi2Label,
+    kpi3Label: scr.kpi3Label ?? base.kpi3Label,
+    actionHint: scr.actionHint ?? base.actionHint,
   };
 }
 

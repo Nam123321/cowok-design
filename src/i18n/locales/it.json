@@ -117,7 +117,15 @@
     "scopeLabel": "ambito",
     "daemonConnectError": "Impossibile connettersi al daemon Rust",
     "daemonSyncError": "Errore di sincronizzazione daemon SDI",
-    "quoteToChat": "Cita nella chat"
+    "quoteToChat": "Cita nella chat",
+    "sseProposalReady": "ChangeProposal sintetizzata. Apri il pannello Proposte per esaminare e applicare.",
+    "sseGithubPrSuccess": "Pull Request GitHub creata ({{branch}}).",
+    "sseGithubPrFallback": "Impossibile creare la PR GitHub ({{reason}}) — scarica invece lo ZIP offline.",
+    "sseGithubPrMissingConfig": "configurazione remote/token richiesta",
+    "sseSnapshotReverted": "Snapshot ripristinato in sicurezza in SQLite e nell'area di lavoro.",
+    "sseEventCompleted": "Evento {{event}} completato.",
+    "proposalCompileWarning": "Impossibile sintetizzare ChangeProposal ora; controlla i dati inseriti.",
+    "intentStatusLabel": "Stato"
   },
   "canvas": {
     "userflowLens": "Flusso utente",
@@ -236,7 +244,19 @@
     "slideCmsLensTooltip": "Presentazione Slide e CMS Zero-Code: modifica titoli, riepiloghi e metriche KPI visivamente senza codice.",
     "viewportDesktop": "Vista desktop",
     "viewportTablet": "Vista tablet",
-    "viewportMobile": "Vista mobile"
+    "viewportMobile": "Vista mobile",
+    "substateLoadingTitle": "Sincronizzazione stato schermata...",
+    "substateLoadingBody": "Caricamento dei dati fixture da Rust SQLite WAL.",
+    "substateEmptyTitle": "Nessun dato disponibile (0 record)",
+    "substateEmptyBody": "Crea un elemento o carica dati di esempio per visualizzare l'anteprima.",
+    "substateErrorTitle": "Errore di convalida (422 Unprocessable)",
+    "substateErrorBody": "ERR_INSUFFICIENT_QUORUM: Firma aggiuntiva o controllo dei vincoli richiesto.",
+    "fallbackEyebrow": "SCHERMATA",
+    "fallbackHeadline": "Stato Schermata",
+    "fallbackSubtitle": "Anteprima",
+    "fallbackStatus": "Pronto",
+    "fallbackActionTitle": "Azione richiesta",
+    "fallbackCtaLabel": "Apri"
   },
   "settings": {
     "title": "Impostazioni e preferenze di sistema",
@@ -540,7 +560,10 @@
     "suggestionLabel": "Suggerimenti",
     "suggestionTooltip": "Suggerimenti di design e compromessi (Scorciatoia T)",
     "proposalLabel": "Proposte",
-    "proposalTooltip": "Elenco proposte"
+    "proposalTooltip": "Elenco proposte",
+    "turnReceiptPrefix": "Ricevuta Snapshot del Turno",
+    "defaultScope": "Flusso di Checkout",
+    "quickDraftPrompt": "Perfeziona gerarchia e contrasto del CTA principale per {{scope}}"
   },
   "sdi": {
     "ambiguityScoreLabel": "Punteggio di ambiguità:",
@@ -745,7 +768,8 @@
     "loadSamplePrdBtn": "Carica PRD di esempio",
     "dropPrdPrompt": "Trascina o sfoglia un file PRD (.md / .txt / .pdf)",
     "selectedFilePrefix": "File selezionato:",
-    "openHubFromNewProject": "Oppure apri Hub Launchpad a 4 percorsi (PRD / Modello / URL / Git)"
+    "openHubFromNewProject": "Oppure apri Hub Launchpad a 4 percorsi (PRD / Modello / URL / Git)",
+    "createError": "Impossibile creare il progetto da Launchpad: {{message}}"
   },
   "sampleData": {
     "title": "Studio Dati di Esempio — Associazione Fixture",
@@ -753,6 +777,7 @@
     "colKey": "Chiave Attributo",
     "colType": "Tipo Dato",
     "colValue": "Valore di Esempio",
-    "footerSummary": "{{count}} attributi caricati • Preset: {{preset}}"
+    "footerSummary": "{{count}} attributi caricati • Preset: {{preset}}",
+    "saveError": "Impossibile salvare il fixture di esempio: {{message}}"
   }
 }

@@ -14,6 +14,7 @@ export type ViewportPreset = z.infer<typeof CanonicalViewportPresetSchema>;
 const DESKTOP_WIDTH = 1440;
 const DESKTOP_HEIGHT = 900;
 const DESKTOP_SCALE = 0.55;
+const MIN_BOOT_SECRET_LEN = 16;
 
 const TABLET_WIDTH = 768;
 const TABLET_HEIGHT = 1024;
@@ -128,7 +129,7 @@ export type ScreenFixtureResponse = z.infer<typeof ScreenFixtureResponseSchema>;
 export const PreviewHydrationMessageSchema = z.object({
   type: z.literal("FLOW_PREVIEW_HYDRATE"),
   epoch: z.number().int().min(1).optional(),
-  bootSecret: z.string().min(16).optional(),
+  bootSecret: z.string().min(MIN_BOOT_SECRET_LEN).optional(),
   artifactSha256: z.string().optional(),
   nodeId: z.string(),
   screenKey: z.string(),

@@ -117,7 +117,15 @@
     "scopeLabel": "phạm vi",
     "daemonConnectError": "Không thể kết nối Rust daemon",
     "daemonSyncError": "Lỗi đồng bộ SDI daemon",
-    "quoteToChat": "Quote vào Chat"
+    "quoteToChat": "Quote vào Chat",
+    "sseProposalReady": "Đã tổng hợp Đề xuất thay đổi (ChangeProposal). Mở mục Đề xuất để kiểm tra & áp dụng.",
+    "sseGithubPrSuccess": "Đã tạo Pull Request GitHub ({{branch}}).",
+    "sseGithubPrFallback": "Chưa thể tạo GitHub PR trực tiếp ({{reason}}) — có thể tải ZIP offline.",
+    "sseGithubPrMissingConfig": "cần cấu hình remote/token",
+    "sseSnapshotReverted": "Đã khôi phục (Revert) snapshot an toàn trên SQLite & workspace.",
+    "sseEventCompleted": "Sự kiện {{event}} đã hoàn tất.",
+    "proposalCompileWarning": "Không thể tổng hợp Đề xuất thay đổi lúc này; vui lòng kiểm tra lại dữ liệu đầu vào.",
+    "intentStatusLabel": "Trạng thái"
   },
   "canvas": {
     "userflowLens": "Luồng người dùng",
@@ -236,7 +244,19 @@
     "slideCmsLensTooltip": "Trình chiếu Slide & Zero-Code CMS: biên tập nội dung slide, tiêu đề và chỉ số KPI trực quan không cần viết mã.",
     "viewportDesktop": "Màn hình Desktop",
     "viewportTablet": "Màn hình Tablet",
-    "viewportMobile": "Màn hình Mobile"
+    "viewportMobile": "Màn hình Mobile",
+    "substateLoadingTitle": "Đang đồng bộ trạng thái màn hình...",
+    "substateLoadingBody": "Skeleton shimmer đang nạp dữ liệu từ Rust SQLite WAL.",
+    "substateEmptyTitle": "Chưa có dữ liệu (0 Records)",
+    "substateEmptyBody": "Nhấn tạo mới hoặc nạp bộ dữ liệu mẫu để xem trước nội dung.",
+    "substateErrorTitle": "Lỗi xác thực dữ liệu (422 Unprocessable)",
+    "substateErrorBody": "ERR_INSUFFICIENT_QUORUM: Cần bổ sung chữ ký hoặc kiểm tra ràng buộc.",
+    "fallbackEyebrow": "MÀN HÌNH",
+    "fallbackHeadline": "Trạng thái Màn hình",
+    "fallbackSubtitle": "Xem trước",
+    "fallbackStatus": "Sẵn sàng",
+    "fallbackActionTitle": "Hành động",
+    "fallbackCtaLabel": "Mở"
   },
   "settings": {
     "title": "Cài đặt & Tùy biến Hệ thống",
@@ -540,7 +560,10 @@
     "suggestionLabel": "Gợi ý",
     "suggestionTooltip": "Gợi ý thiết kế & Đánh đổi (Phím tắt T)",
     "proposalLabel": "Đề xuất",
-    "proposalTooltip": "Danh sách Đề xuất thay đổi"
+    "proposalTooltip": "Danh sách Đề xuất thay đổi",
+    "turnReceiptPrefix": "Biên nhận Bản chụp Lượt",
+    "defaultScope": "Luồng Thanh toán",
+    "quickDraftPrompt": "Tinh chỉnh bố cục phân cấp và độ tương phản CTA chính cho {{scope}}"
   },
   "sdi": {
     "ambiguityScoreLabel": "Điểm mơ hồ:",
@@ -745,7 +768,8 @@
     "loadSamplePrdBtn": "Nạp PRD mẫu",
     "dropPrdPrompt": "Kéo thả hoặc chọn file PRD (.md / .txt / .pdf)",
     "selectedFilePrefix": "Đã chọn file:",
-    "openHubFromNewProject": "Hoặc mở Hub 4 Lối Vào (PRD / Template / Design URL / Git)"
+    "openHubFromNewProject": "Hoặc mở Hub 4 Lối Vào (PRD / Template / Design URL / Git)",
+    "createError": "Không thể tạo dự án từ Launchpad: {{message}}"
   },
   "sampleData": {
     "title": "Xưởng Dữ Liệu Mẫu — Liên Kết Fixture",
@@ -753,6 +777,7 @@
     "colKey": "Khóa Thuộc Tính",
     "colType": "Kiểu Dữ Liệu",
     "colValue": "Giá Trị Mẫu",
-    "footerSummary": "Đã nạp {{count}} thuộc tính • Bộ mẫu: {{preset}}"
+    "footerSummary": "Đã nạp {{count}} thuộc tính • Bộ mẫu: {{preset}}",
+    "saveError": "Không thể lưu dữ liệu mẫu: {{message}}"
   }
 }

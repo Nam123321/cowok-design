@@ -93,6 +93,27 @@ const EmptyDetailPlaceholder: React.FC = () => {
   );
 };
 
+function renderDetailInspectorNode(params: {
+  detailCollapsed: boolean;
+  effectiveSelected: SelectedHistoryEntry | null;
+  props: VersionHistoryDrawerProps;
+  onClearDetail: () => void;
+  onSelectSnap: (snap: VersionSnapshotResponse) => void;
+}): React.ReactNode {
+  if (params.detailCollapsed) return null;
+  if (!params.effectiveSelected) return <EmptyDetailPlaceholder />;
+  return (
+    <SnapshotDetailInspector
+      selected={params.effectiveSelected}
+      artifactFormat={params.props.artifactFormat}
+      onCloseDetail={params.onClearDetail}
+      onRequestRevertSnapshot={params.onSelectSnap}
+      onPreviewTurn={params.props.onPreviewTurn}
+      onForkTurn={params.props.onForkTurn}
+    />
+  );
+}
+
 const DrawerOverlayHost: React.FC<{
   props: VersionHistoryDrawerProps;
   selected: SelectedHistoryEntry | null;
@@ -103,58 +124,30 @@ const DrawerOverlayHost: React.FC<{
   onSelectSnap: (snap: VersionSnapshotResponse) => void;
   onOpenExport: () => void;
 }> = ({
-  props,
-  selected,
-  detailCollapsed,
-  onInspectSnapshot,
-  onInspectTurn,
-  onClearDetail,
-  onSelectSnap,
-  onOpenExport,
+  props, selected, detailCollapsed, onInspectSnapshot, onInspectTurn, onClearDetail, onSelectSnap, onOpenExport,
 }) => {
   if (!props.isOpen) return null;
-  const effectiveSelected =
-    detailCollapsed
-      ? null
-      : (selected ?? resolveDefaultHistoryEntry(props.snapshots, props.turnSnapshots, props.activePreviewTurnId));
+  const effectiveSelected = detailCollapsed
+    ? null
+    : (selected ?? resolveDefaultHistoryEntry(props.snapshots, props.turnSnapshots, props.activePreviewTurnId));
   const selectedKey = effectiveSelected
     ? `${effectiveSelected.kind === "snapshot" ? "snap" : "turn"}:${effectiveSelected.item.id}`
     : null;
-  const detailNode = detailCollapsed ? null : effectiveSelected ? (
-    <SnapshotDetailInspector
-      selected={effectiveSelected}
-      artifactFormat={props.artifactFormat}
-      onCloseDetail={onClearDetail}
-      onRequestRevertSnapshot={onSelectSnap}
-      onPreviewTurn={props.onPreviewTurn}
-      onForkTurn={props.onForkTurn}
-    />
-  ) : (
-    <EmptyDetailPlaceholder />
-  );
+  const detailNode = renderDetailInspectorNode({
+    detailCollapsed, effectiveSelected, props, onClearDetail, onSelectSnap,
+  });
 
   return (
     <>
       <div className="snap-drawer-backdrop" onClick={props.onClose} aria-hidden="true" />
       <DrawerSidebar
-        snapshots={props.snapshots}
-        turnSnapshots={props.turnSnapshots}
-        activePreviewTurnId={props.activePreviewTurnId}
-        forkedSessionByTurnId={props.forkedSessionByTurnId}
-        selectedEntryKey={selectedKey}
-        detailNode={detailNode}
-        onClose={props.onClose}
-        onSelect={onSelectSnap}
-        onInspectSnapshot={onInspectSnapshot}
-        onInspectTurn={onInspectTurn}
-        onOpenExport={onOpenExport}
-        onCreateCheckpoint={props.onCreateCheckpoint}
-        onPreviewTurn={(turn) => {
-          onInspectTurn(turn);
-          props.onPreviewTurn?.(turn);
-        }}
-        onUndoTurn={props.onUndoTurn}
-        onForkTurn={props.onForkTurn}
+        snapshots={props.snapshots} turnSnapshots={props.turnSnapshots}
+        activePreviewTurnId={props.activePreviewTurnId} forkedSessionByTurnId={props.forkedSessionByTurnId}
+        selectedEntryKey={selectedKey} detailNode={detailNode} onClose={props.onClose}
+        onSelect={onSelectSnap} onInspectSnapshot={onInspectSnapshot} onInspectTurn={onInspectTurn}
+        onOpenExport={onOpenExport} onCreateCheckpoint={props.onCreateCheckpoint}
+        onPreviewTurn={(turn) => { onInspectTurn(turn); props.onPreviewTurn?.(turn); }}
+        onUndoTurn={props.onUndoTurn} onForkTurn={props.onForkTurn}
       />
     </>
   );

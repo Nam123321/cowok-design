@@ -122,7 +122,7 @@ export const VersionPublishMenuButton: React.FC<VersionPublishMenuButtonProps> =
   const handleToggle = () => {
     if (!open && anchorRef.current && typeof window !== "undefined") {
       const rect = anchorRef.current.getBoundingClientRect();
-      setCoords(rect.width > 0 ? { top: rect.bottom + MENU_OFFSET_Y, right: Math.max(8, window.innerWidth - rect.right) } : null);
+      setCoords(rect.width > 0 ? { top: rect.bottom + MENU_OFFSET_Y, right: Math.max(MENU_OFFSET_Y, window.innerWidth - rect.right) } : null);
     }
     setOpen((prev) => !prev);
     setSubmenuOpen(false);

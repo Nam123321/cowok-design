@@ -2,7 +2,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiVersionSnapshot } from "../../../api/version-snapshot";
 import type { ExportInitialSection, PrSubmissionError } from "../components/ExportBundleModal";
-import type { ProjectIntegrationsStatus } from "../../../lib/validations/github-ide-integration";
+import {
+  ProjectIntegrationsStatusSchema,
+  type ProjectIntegrationsStatus,
+} from "../../../lib/validations/github-ide-integration";
 import type {
   ChatArtifactSnapshotResponse,
   ExportZipResponse,
@@ -106,8 +109,9 @@ function useIntegrationsState(projectId: string | undefined) {
     setIntegrationBusy(true);
     try {
       const next = await task();
-      if (next && typeof next === "object" && "github" in next) {
-        setIntegrationsStatus(next as unknown as ProjectIntegrationsStatus);
+      const parsed = ProjectIntegrationsStatusSchema.safeParse(next);
+      if (parsed.success) {
+        setIntegrationsStatus(parsed.data);
       } else { await refreshIntegrations(); }
     } finally { setIntegrationBusy(false); }
   };
@@ -226,7 +230,7 @@ export function useSnapshotWorkspaceController(
     await apiVersionSnapshot.createSnapshot(projectId, {
       label: "Manual Workspace Checkpoint",
       trigger: "manual",
-      files: [{ path: "index.html", content: "<main><h2>Workspace Checkpoint</h2></main>" }],
+      files: [],
     });
     await lists.refreshData();
   }, [lists, projectId]);

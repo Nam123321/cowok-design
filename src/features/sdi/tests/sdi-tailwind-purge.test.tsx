@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // @story 05.1
-// @implements AC-01, AC-02, AC-03 (SDI Engine, Gap-Driven Discovery & Zero-Tailwind Verification)
+// @implements AC-01, AC-02, AC-03, AC-09 (SDI Engine, Gap-Driven Discovery & Zero-Tailwind Verification)
 import React from "react";
 import fs from "node:fs";
 import path from "node:path";

@@ -59,7 +59,7 @@ Triển khai lát cắt dọc hoàn chỉnh cho Story 05.1 theo Master Plan:
 - **AC-06 (Option 5 Action-Linked Vertical Storyboard 2D + CTA Sync <16ms + Loopback DAG):** Bản đồ 2D xếp dọc trục nam châm, nhánh ngang 2D, hỗ trợ cạnh `loopback`; thẻ Node hiển thị mini-skeleton $\le 4$KB, CTA Pills gắn `source_cta_ff_id`, thanh 4 Sub-States; đồng bộ hover CTA $\leftrightarrow$ HTML element $< 16$ms và chế độ Walkthrough.
 - **AC-07 (Entry-First Live Shell, IframeKeepAlivePool, Shared AppShell & Non-Tech Sample Data Studio — GAP-07..10):** Sinh vỏ HTML ngay từ lượt đầu tiên; chuyển đổi Node 0ms qua LRU-5 Iframe Pool; hỗ trợ kế thừa Shared AppShell cho các màn hình cùng Portal; và cung cấp Sample Data Sheet kiểm thử dữ liệu rỗng/văn bản dài.
 - **AC-08 (5-Mode Visual Canvas Toolbar + Inline </> Editor + Gap-Driven Visual Discovery — GAP-07, GAP-11):** Cung cấp đủ 5 chế độ thao tác trên Stage; tích hợp Inline Editor (`patch_by_ff_id` `<1ms`); SDI phân luồng `direct_edit` vs `full_plan` kèm Gap-Driven Discovery tối đa 1–3 câu hỏi có thẻ minh họa.
-- **[EDGE-CASE] EC-STORYBOARD-001 (Exception Branch Isolation, Dirty Editor Guard & Pure CSS Cleanup):** Thu gọn nhánh ngoại lệ không làm xô lệch tọa độ toàn đồ thị; khóa an toàn code đang gõ dở khi job nền xong; thanh tẩy 100% Tailwind utility classes trong `src/features/sdi/**` sang `tokens.css` (kế thừa `CompanionLiveHtmlRightPane` đã được chuẩn hóa ở `Story 04.5`; `src/features/preview/**` đã được giải thể ở `Story 04.1`).
+- **AC-09 ([EDGE-CASE] Exception Branch Isolation, Dirty Editor Guard & Pure CSS Cleanup — EC-STORYBOARD-001):** Thu gọn nhánh ngoại lệ không làm xô lệch tọa độ toàn đồ thị; khóa an toàn code đang gõ dở khi job nền xong; thanh tẩy 100% Tailwind utility classes trong `src/features/sdi/**` sang `tokens.css` (kế thừa `CompanionLiveHtmlRightPane` đã được chuẩn hóa ở `Story 04.5`; `src/features/preview/**` đã được giải thể ở `Story 04.1`).
 
 ## 4. Tasks
 - [x] **Task 05.1.1**: Xây dựng luồng hiển thị Chat tối giản (`.chat-human-bubble` + `.chat-agent-prose` không avatar) và `FloatingCapsuleComposer` tinh gọn có khay `#chatAttachmentTray` (thỏa mãn `AC-01`).
@@ -69,7 +69,7 @@ Triển khai lát cắt dọc hoàn chỉnh cho Story 05.1 theo Master Plan:
 - [x] **Task 05.1.5**: Cài đặt Option 5 Action-Linked 2D Storyboard với Magnetic Vertical Spine, CTA Pills, đồng bộ hover `<16ms` và loopback edge support (thỏa mãn `AC-06`).
 - [x] **Task 05.1.6**: Xây dựng Entry-First Live Shell, IframeKeepAlivePool (LRU-5), Shared AppShell cho Portal Groups và Sample Data Studio (thỏa mãn `AC-07`).
 - [x] **Task 05.1.7**: Hoàn thiện 5-Mode Visual Canvas Toolbar, Inline `</>` Editor và SDI Gap-Driven Discovery (thỏa mãn `AC-08`).
-- [x] **Task 05.1.8**: Cài đặt `EC-STORYBOARD-001` và thanh tẩy 100% Tailwind classes trong `src/features/sdi/**` (thỏa mãn `EC-STORYBOARD-001`).
+- [x] **Task 05.1.8**: Cài đặt `EC-STORYBOARD-001` (`AC-09`) và thanh tẩy 100% Tailwind classes trong `src/features/sdi/**` (thỏa mãn `AC-09`).
 
 ## 5. AC-to-Task Traceability Matrix
 | AC ID | Description | Mapped Implementation Tasks | Verification Method | Status |
@@ -82,7 +82,7 @@ Triển khai lát cắt dọc hoàn chỉnh cho Story 05.1 theo Master Plan:
 | **AC-06** | Option 5 Action-Linked 2D Storyboard | `Task 05.1.5` | CTA Sync & Loopback Playwright Test | completed |
 | **AC-07** | Entry-First Live Shell & Shared AppShell | `Task 05.1.6` | LRU-5 Pool & Shell Inheritance Test | completed |
 | **AC-08** | 5-Mode Toolbar & Gap-Driven Discovery | `Task 05.1.7` | Toolbar & SDI Discovery Test | completed |
-| **EC-STORYBOARD-001** | [EDGE-CASE] Exception Branch & Tailwind Cleanup | `Task 05.1.8` | Clean Code Guardian & AST Linter Test | completed |
+| **AC-09** | [EDGE-CASE] Exception Branch & Tailwind Cleanup (`EC-STORYBOARD-001`) | `Task 05.1.8` | Clean Code Guardian & AST Linter Test | completed |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** `["04.5"]`

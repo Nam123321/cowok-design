@@ -40,3 +40,6 @@ Audited post-refactor delta (`CompanionDualPaneStage.tsx`, `CompanionCanvasTab.t
 
 ## 4. Final Verdict
 **VERDICT: PASS / APPROVED** (`0` critical/high findings; verified by `38652a3c` + `7fc0afed` + Vitest `140/140` + Rust `cargo test --workspace --locked`)
+
+## 5. Audit-360 Post-Hardening Delta Sync
+- Updated `legacy_proposals.rs` (`collect_live_snapshot_files` + `should_sync_workspace` guard), `version-snapshot.ts` (`CreateSnapshotSchema.files.default([])`), `snapshot-engine.ts`, `useSnapshotWorkspaceController.ts` (`ProjectIntegrationsStatusSchema.safeParse`), `SnapshotDetailInspector.tsx`, `VersionHistoryDrawer.tsx`, `VersionPublishMenuButton.tsx`, and `export-bundle.ts` (`checkExportCompleteness`); shared Canvas/Pane helpers verified in Round 4 by `ff0ec11e-a43c-4101-93bc-20394cb68b20` (`APPROVED`, `9.3/10`).

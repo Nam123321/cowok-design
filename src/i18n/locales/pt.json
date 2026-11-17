@@ -117,7 +117,15 @@
     "scopeLabel": "escopo",
     "daemonConnectError": "Não foi possível conectar ao daemon Rust",
     "daemonSyncError": "Erro de sincronização do daemon SDI",
-    "quoteToChat": "Citar no chat"
+    "quoteToChat": "Citar no chat",
+    "sseProposalReady": "ChangeProposal sintetizada. Abra o painel Propostas para revisar e aplicar.",
+    "sseGithubPrSuccess": "Pull Request do GitHub criada ({{branch}}).",
+    "sseGithubPrFallback": "Não foi possível criar PR no GitHub diretamente ({{reason}}) — baixe o ZIP offline.",
+    "sseGithubPrMissingConfig": "configuração de remote/token necessária",
+    "sseSnapshotReverted": "Snapshot restaurado com segurança no SQLite e no workspace.",
+    "sseEventCompleted": "Evento {{event}} concluído.",
+    "proposalCompileWarning": "Não foi possível sintetizar ChangeProposal agora; verifique as entradas.",
+    "intentStatusLabel": "Estado"
   },
   "canvas": {
     "userflowLens": "Fluxo de usuário",
@@ -236,7 +244,19 @@
     "slideCmsLensTooltip": "Apresentação de Slides e CMS Zero-Code: edite títulos, resumos e métricas KPI visualmente sem código.",
     "viewportDesktop": "Tela desktop",
     "viewportTablet": "Tela tablet",
-    "viewportMobile": "Tela mobile"
+    "viewportMobile": "Tela mobile",
+    "substateLoadingTitle": "Sincronizando estado da tela...",
+    "substateLoadingBody": "Carregando dados de fixture do Rust SQLite WAL.",
+    "substateEmptyTitle": "Sem dados disponíveis (0 registros)",
+    "substateEmptyBody": "Crie um registro ou carregue dados de exemplo para pré-visualizar.",
+    "substateErrorTitle": "Erro de validação (422 Unprocessable)",
+    "substateErrorBody": "ERR_INSUFFICIENT_QUORUM: Assinatura adicional ou verificação de restrição necessária.",
+    "fallbackEyebrow": "TELA",
+    "fallbackHeadline": "Estado da Tela",
+    "fallbackSubtitle": "Pré-visualização",
+    "fallbackStatus": "Pronto",
+    "fallbackActionTitle": "Ação",
+    "fallbackCtaLabel": "Abrir"
   },
   "settings": {
     "title": "Configurações e preferências do sistema",
@@ -540,7 +560,10 @@
     "suggestionLabel": "Sugestões",
     "suggestionTooltip": "Sugestões de design e compensações (Atalho T)",
     "proposalLabel": "Propostas",
-    "proposalTooltip": "Lista de propostas"
+    "proposalTooltip": "Lista de propostas",
+    "turnReceiptPrefix": "Recibo de Snapshot do Turno",
+    "defaultScope": "Fluxo de Checkout",
+    "quickDraftPrompt": "Refinar hierarquia e contraste do CTA principal em {{scope}}"
   },
   "sdi": {
     "ambiguityScoreLabel": "Pontuação de ambiguidade:",
@@ -745,7 +768,8 @@
     "loadSamplePrdBtn": "Carregar PRD de exemplo",
     "dropPrdPrompt": "Solte ou procure um arquivo PRD (.md / .txt / .pdf)",
     "selectedFilePrefix": "Arquivo selecionado:",
-    "openHubFromNewProject": "Ou abrir o Hub Launchpad de 4 caminhos (PRD / Modelo / URL / Git)"
+    "openHubFromNewProject": "Ou abrir o Hub Launchpad de 4 caminhos (PRD / Modelo / URL / Git)",
+    "createError": "Não foi possível criar o projeto do Launchpad: {{message}}"
   },
   "sampleData": {
     "title": "Estúdio de Dados de Exemplo — Vínculo de Fixture",
@@ -753,6 +777,7 @@
     "colKey": "Chave de Atributo",
     "colType": "Tipo de Dado",
     "colValue": "Valor de Exemplo",
-    "footerSummary": "{{count}} atributos carregados • Predefinição: {{preset}}"
+    "footerSummary": "{{count}} atributos carregados • Predefinição: {{preset}}",
+    "saveError": "Não foi possível salvar o fixture de exemplo: {{message}}"
   }
 }

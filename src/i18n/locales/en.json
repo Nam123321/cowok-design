@@ -117,7 +117,15 @@
     "scopeLabel": "scope",
     "daemonConnectError": "Unable to connect to Rust daemon",
     "daemonSyncError": "SDI daemon sync error",
-    "quoteToChat": "Quote to Chat"
+    "quoteToChat": "Quote to Chat",
+    "sseProposalReady": "ChangeProposal synthesized. Open the Proposals drawer to inspect and apply.",
+    "sseGithubPrSuccess": "Created GitHub Pull Request ({{branch}}).",
+    "sseGithubPrFallback": "Unable to create GitHub PR directly ({{reason}}) — download offline ZIP instead.",
+    "sseGithubPrMissingConfig": "Git remote/token configuration required",
+    "sseSnapshotReverted": "Safely reverted snapshot in SQLite and workspace files.",
+    "sseEventCompleted": "Event {{event}} completed.",
+    "proposalCompileWarning": "Unable to synthesize ChangeProposal right now; please inspect inputs.",
+    "intentStatusLabel": "Status"
   },
   "canvas": {
     "userflowLens": "Userflow",
@@ -236,7 +244,19 @@
     "slideCmsLensTooltip": "Slide Presentation & Zero-Code CMS: edit slide headlines, takeaways, and KPI metrics visually without coding.",
     "viewportDesktop": "Desktop viewport",
     "viewportTablet": "Tablet viewport",
-    "viewportMobile": "Mobile viewport"
+    "viewportMobile": "Mobile viewport",
+    "substateLoadingTitle": "Synchronizing screen state...",
+    "substateLoadingBody": "Loading live fixture data from Rust SQLite WAL.",
+    "substateEmptyTitle": "No data available (0 Records)",
+    "substateEmptyBody": "Create a record or inject sample fixtures to preview this screen.",
+    "substateErrorTitle": "Validation error (422 Unprocessable)",
+    "substateErrorBody": "ERR_INSUFFICIENT_QUORUM: Additional signature or constraint check required.",
+    "fallbackEyebrow": "SCREEN",
+    "fallbackHeadline": "Screen State",
+    "fallbackSubtitle": "Preview",
+    "fallbackStatus": "Ready",
+    "fallbackActionTitle": "Action",
+    "fallbackCtaLabel": "Open"
   },
   "settings": {
     "title": "System Settings & Preferences",
@@ -540,7 +560,10 @@
     "suggestionLabel": "Suggestions",
     "suggestionTooltip": "Design Suggestions & Tradeoffs (Shortcut T)",
     "proposalLabel": "Proposals",
-    "proposalTooltip": "Change Proposals List"
+    "proposalTooltip": "Change Proposals List",
+    "turnReceiptPrefix": "Turn Snapshot Receipt",
+    "defaultScope": "Checkout Flow",
+    "quickDraftPrompt": "Refine {{scope}} hierarchy & primary CTA contrast"
   },
   "sdi": {
     "ambiguityScoreLabel": "Ambiguity Score:",
@@ -745,7 +768,8 @@
     "loadSamplePrdBtn": "Load Sample PRD",
     "dropPrdPrompt": "Drop or browse PRD file (.md / .txt / .pdf)",
     "selectedFilePrefix": "Selected file:",
-    "openHubFromNewProject": "Or open 4-Path Launchpad Hub (PRD / Template / Design URL / Git)"
+    "openHubFromNewProject": "Or open 4-Path Launchpad Hub (PRD / Template / Design URL / Git)",
+    "createError": "Unable to create Launchpad project: {{message}}"
   },
   "sampleData": {
     "title": "Sample Data Studio — Fixture Binding",
@@ -753,6 +777,7 @@
     "colKey": "Attribute Key",
     "colType": "Data Type",
     "colValue": "Sample Value",
-    "footerSummary": "{{count}} attributes loaded • Preset: {{preset}}"
+    "footerSummary": "{{count}} attributes loaded • Preset: {{preset}}",
+    "saveError": "Unable to save sample fixture: {{message}}"
   }
 }

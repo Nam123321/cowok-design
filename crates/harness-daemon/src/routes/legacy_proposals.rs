@@ -263,6 +263,7 @@ pub struct CreateSnapshotRequest {
     pub version_tag: Option<String>,
     #[serde(default = "default_trigger")]
     pub trigger: String,
+    #[serde(default)]
     pub files: Vec<SnapshotFileItemDto>,
     #[serde(default)]
     pub metadata: Option<std::collections::HashMap<String, String>>,
@@ -300,6 +301,7 @@ pub struct VersionSnapshotDto {
     pub description: String,
     pub trigger: String,
     pub tree_sha256: String,
+    #[serde(default)]
     pub files: Vec<SnapshotFileItemDto>,
     #[serde(default)]
     pub metadata: Option<std::collections::HashMap<String, String>>,
@@ -4055,6 +4057,86 @@ fn insert_immutable_turn_snapshot_tx(
     Ok(turn_snap_id)
 }
 
+fn collect_live_snapshot_files(
+    conn: &rusqlite::Connection,
+    project_registry: &SpecRegistry,
+    canon_project_root: &Path,
+    project_id: Uuid,
+) -> Result<Vec<SnapshotFileItemDto>, Response> {
+    let mut files =
+        load_workspace_files_from_db(conn, project_id).map_err(map_error_to_response)?;
+    let mut seen: HashSet<String> = files.iter().map(|f| f.path.clone()).collect();
+
+    for spec_key in CanonicalSpecKey::ALL {
+        if project_registry
+            .get_spec(project_id, spec_key)
+            .map_err(map_error_to_response)?
+            .is_some()
+        {
+            if let Some(bytes) = read_jailed_spec_bytes(canon_project_root, spec_key)
+                .map_err(map_error_to_response)?
+            {
+                if let Ok(content) = String::from_utf8(bytes) {
+                    let rel = format!("product/specs/{}", spec_key.as_str());
+                    if !is_secret_path(&rel) && seen.insert(rel.clone()) {
+                        files.push(SnapshotFileItemDto {
+                            path: rel,
+                            content,
+                            sha256: None,
+                            size_bytes: None,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    if files.is_empty() {
+        let proj_row: Option<(String, String, String, String)> = conn
+            .query_row(
+                "SELECT slug, name, product_brief, status FROM projects WHERE id = ?1",
+                params![project_id.to_string()],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .optional()
+            .map_err(|e| map_error_to_response(map_sqlite_error(e, "load_project_for_snapshot")))?;
+        let mut node_rows = Vec::new();
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT id, screen_key, title, route_path, viewport_preset FROM flow_nodes_v3 WHERE project_id = ?1 ORDER BY screen_key ASC",
+        ) {
+            if let Ok(mapped) = stmt.query_map(params![project_id.to_string()], |r| {
+                Ok(serde_json::json!({
+                    "id": r.get::<_, String>(0)?,
+                    "screenKey": r.get::<_, String>(1)?,
+                    "title": r.get::<_, String>(2)?,
+                    "routePath": r.get::<_, String>(3)?,
+                    "viewportPreset": r.get::<_, String>(4)?,
+                }))
+            }) {
+                for row in mapped.flatten() {
+                    node_rows.push(row);
+                }
+            }
+        }
+        let manifest = serde_json::json!({
+            "projectId": project_id.to_string(),
+            "project": proj_row.map(|(slug, name, brief, status)| serde_json::json!({
+                "slug": slug, "name": name, "productBrief": brief, "status": status,
+            })),
+            "flowNodes": node_rows,
+        });
+        let content = serde_json::to_string_pretty(&manifest).unwrap_or_else(|_| "{}".to_string());
+        files.push(SnapshotFileItemDto {
+            path: "workspace-state.json".to_string(),
+            content,
+            sha256: None,
+            size_bytes: None,
+        });
+    }
+
+    Ok(files)
+}
+
 pub(super) async fn handle_create_snapshot(
     State(state): State<DaemonAppState>,
     caller: Option<Extension<VerifiedLegacyIngress>>,
@@ -4063,7 +4145,7 @@ pub(super) async fn handle_create_snapshot(
     Json(req): Json<CreateSnapshotRequest>,
 ) -> Result<(StatusCode, Json<VersionSnapshotDto>), Response> {
     let project_id = parse_project_uuid(&id).map_err(map_error_to_response)?;
-    let (project_registry, _canon_project_root, _) =
+    let (project_registry, canon_project_root, _) =
         verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
     let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
@@ -4075,9 +4157,15 @@ pub(super) async fn handle_create_snapshot(
     let chat_artifact_snapshot_id = normalize_opt_ref(req.chat_artifact_snapshot_id);
 
     let dto = tokio::task::spawn_blocking(move || {
-        let tree_sha256 = compute_files_tree_sha(&req.files).map_err(map_error_to_response)?;
-        let normalized_files: Vec<SnapshotFileItemDto> = req
-            .files
+        let mut conn = project_registry.pool().connection().map_err(map_error_to_response)?;
+        let should_sync_workspace = !req.files.is_empty();
+        let raw_files = if req.files.is_empty() {
+            collect_live_snapshot_files(&conn, &project_registry, &canon_project_root, project_id)?
+        } else {
+            req.files
+        };
+        let tree_sha256 = compute_files_tree_sha(&raw_files).map_err(map_error_to_response)?;
+        let normalized_files: Vec<SnapshotFileItemDto> = raw_files
             .into_iter()
             .map(|mut f| {
                 f.path = validate_safe_relative_path(&f.path)?;
@@ -4094,7 +4182,6 @@ pub(super) async fn handle_create_snapshot(
             })
         })?;
 
-        let mut conn = project_registry.pool().connection().map_err(map_error_to_response)?;
         verify_snapshot_parent_refs(
             &conn,
             project_id,
@@ -4158,31 +4245,33 @@ pub(super) async fn handle_create_snapshot(
                     now,
                 ],
             )?;
-            for f in &normalized_files {
-                let sha = f
-                    .sha256
-                    .clone()
-                    .unwrap_or_else(|| format!("{:x}", Sha256::digest(f.content.as_bytes())));
-                tx.execute(
-                    "INSERT INTO project_workspace_files (
-                        id, project_id, relative_path, file_sha256, byte_size, content, created_at, updated_at
-                     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-                     ON CONFLICT(project_id, relative_path) DO UPDATE SET
-                        file_sha256 = excluded.file_sha256,
-                        byte_size = excluded.byte_size,
-                        content = excluded.content,
-                        updated_at = excluded.updated_at",
-                    params![
-                        Uuid::new_v4().to_string(),
-                        project_id.to_string(),
-                        f.path,
-                        sha,
-                        f.content.len() as i64,
-                        f.content,
-                        now,
-                        now,
-                    ],
-                )?;
+            if should_sync_workspace {
+                for f in &normalized_files {
+                    let sha = f
+                        .sha256
+                        .clone()
+                        .unwrap_or_else(|| format!("{:x}", Sha256::digest(f.content.as_bytes())));
+                    tx.execute(
+                        "INSERT INTO project_workspace_files (
+                            id, project_id, relative_path, file_sha256, byte_size, content, created_at, updated_at
+                         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                         ON CONFLICT(project_id, relative_path) DO UPDATE SET
+                            file_sha256 = excluded.file_sha256,
+                            byte_size = excluded.byte_size,
+                            content = excluded.content,
+                            updated_at = excluded.updated_at",
+                        params![
+                            Uuid::new_v4().to_string(),
+                            project_id.to_string(),
+                            f.path,
+                            sha,
+                            f.content.len() as i64,
+                            f.content,
+                            now,
+                            now,
+                        ],
+                    )?;
+                }
             }
             tx.commit()
         })?;

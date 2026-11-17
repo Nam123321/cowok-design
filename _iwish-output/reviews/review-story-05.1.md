@@ -24,3 +24,12 @@
 - **RPN Threshold:** All RPN scores `<= 16` (far below critical `100` threshold).
 - **Static Analysis & Styling Parity:** `AstLinter::walk_jsx_element` extended for `*ClassName`/`cn(...)` and zero Tailwind utility classes across `src/features/sdi/components/**`.
 - **Verdict:** Remediation actions validated for Story `05.1` vertical slice.
+
+---
+
+## 3. Audit-360 Post-Hardening Delta Review (Reviewer `ff0ec11e-a43c-4101-93bc-20394cb68b20`)
+- **Round 4 Verdict:** `VERDICT: APPROVED` — Score: **9.3 / 10**
+- **Verified Fixes:**
+  - `src/features/flow/utils/html-sandbox-bridge.ts`, `html-sandbox-wrapper.ts`, `useSandboxedIframeBridge.ts`: `safeInlineJson` escaping (`<`, `>`, `&`, `\u2028`, `\u2029`) + `NONCE_SAFE_RE`, named hashing constants, localized `subStateLabels`.
+  - `src/features/flow/components/CompanionLiveHtmlRightPane.tsx` & `companion-canvas-actions.ts`: `useLiveHtmlPaneController` + subcomponent decomposition, localized `fallbackScreenData`, node-filtered `useSampleFixtureSyncEffect`, `submitLaunchpadProject` (`"cowok:project-create-error"`), and `applyStudioSampleFixture` (`"cowok:sample-fixture-error"` + `UUID_RE`).
+  - `src/pages/workbench/hooks/useWorkbenchSessionSettings.ts`: all helpers/hooks decomposed (`<= 46` lines), `ProjectDtoSchema.safeParse`, session rollback, and hydration merge guard.

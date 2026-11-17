@@ -74,13 +74,31 @@ function useDesignerTalkToggleHotkey(
   }, [isInlineCodeOpen, isModalOpen, setIsDesignerTalkOpen]);
 }
 
-function useProposalGateActions(
-  projectId: string | undefined,
-  setProposals: React.Dispatch<React.SetStateAction<ChangeProposalResponse[]>>,
-  setErrorBanner: React.Dispatch<React.SetStateAction<ProposalGateErrorBanner | null>>,
-  setReceiptToast: React.Dispatch<React.SetStateAction<{ tone: "success" | "danger"; message: string } | null>>,
-  refreshProposals: () => Promise<void>
+interface ProposalGateActionsDeps {
+  projectId: string | undefined;
+  setProposals: React.Dispatch<React.SetStateAction<ChangeProposalResponse[]>>;
+  setErrorBanner: React.Dispatch<React.SetStateAction<ProposalGateErrorBanner | null>>;
+  setReceiptToast: React.Dispatch<React.SetStateAction<{ tone: "success" | "danger"; message: string } | null>>;
+  refreshProposals: () => Promise<void>;
+}
+
+function handleProposalError(
+  err: unknown,
+  setErrorBanner: ProposalGateActionsDeps["setErrorBanner"] | null,
+  setReceiptToast: ProposalGateActionsDeps["setReceiptToast"]
 ) {
+  if (err instanceof HarnessDaemonApiError) {
+    setErrorBanner?.({ status: err.status, code: err.code, message: err.message });
+    setReceiptToast({ tone: "danger", message: err.message });
+    return;
+  }
+  if (err instanceof Error && err.message) {
+    setReceiptToast({ tone: "danger", message: err.message });
+  }
+}
+
+function useProposalGateActions(deps: ProposalGateActionsDeps) {
+  const { projectId, setProposals, setErrorBanner, setReceiptToast, refreshProposals } = deps;
   const { t } = useTranslation();
   const [isRevalidating, setIsRevalidating] = useState(false);
 
@@ -92,15 +110,13 @@ function useProposalGateActions(
       setProposals((prev) => replaceProposalItem(prev, updated));
       void refreshProposals();
       const applyMsg = t("proposals.appliedToast", "ChangeProposal applied atomically.");
+      const receiptLabel = t("proposals.turnReceiptPrefix", "Turn Snapshot Receipt");
       setReceiptToast({ tone: "success", message: applyMsg });
       window.dispatchEvent(new CustomEvent("cowok:chat-receipt", {
-        detail: { projectId, text: `Turn Snapshot Receipt: ${updated.title} — ${applyMsg}` },
+        detail: { projectId, text: `${receiptLabel}: ${updated.title} — ${applyMsg}` },
       }));
     } catch (err) {
-      if (err instanceof HarnessDaemonApiError) {
-        setErrorBanner({ status: err.status, code: err.code, message: err.message });
-        setReceiptToast({ tone: "danger", message: err.message });
-      }
+      handleProposalError(err, setErrorBanner, setReceiptToast);
     }
   }, [projectId, refreshProposals, setErrorBanner, setProposals, setReceiptToast, t]);
 
@@ -111,7 +127,7 @@ function useProposalGateActions(
       setProposals((prev) => replaceProposalItem(prev, updated));
       setReceiptToast({ tone: "success", message: t("proposals.rejectedToast", "ChangeProposal rejected.") });
     } catch (err) {
-      if (err instanceof HarnessDaemonApiError) setReceiptToast({ tone: "danger", message: err.message });
+      handleProposalError(err, null, setReceiptToast);
     }
   }, [projectId, setProposals, setReceiptToast, t]);
 
@@ -122,56 +138,109 @@ function useProposalGateActions(
       const updated = await apiChangeProposal.validateProposal(projectId, proposalId, { rebaseBaseHashes: true });
       setErrorBanner(null);
       setProposals((prev) => replaceProposalItem(prev, updated));
+    } catch (err) {
+      handleProposalError(err, setErrorBanner, setReceiptToast);
     } finally {
       setIsRevalidating(false);
     }
-  }, [projectId, setErrorBanner, setProposals]);
+  }, [projectId, setErrorBanner, setProposals, setReceiptToast]);
 
   return { isRevalidating, applyProposal, rejectProposal, rebaseAndValidate };
 }
 
-function useProposalDiffAndTradeoffs(
-  projectId: string | undefined,
-  activeProposal: ChangeProposalResponse | null,
-  setProposals: React.Dispatch<React.SetStateAction<ChangeProposalResponse[]>>,
-  refreshProposals: () => Promise<void>
-) {
+async function runVisualDiffComputation(deps: {
+  projectId: string;
+  proposalId: string;
+  activeProposal: ChangeProposalResponse | null;
+  setDiffFrameUrls: React.Dispatch<React.SetStateAction<Record<string, { beforeImageUrl?: string; afterImageUrl?: string }>>>;
+  setProposals: React.Dispatch<React.SetStateAction<ChangeProposalResponse[]>>;
+  setReceiptToast: ProposalGateActionsDeps["setReceiptToast"];
+}) {
+  const { projectId, proposalId, activeProposal, setDiffFrameUrls, setProposals, setReceiptToast } = deps;
+  try {
+    const target = activeProposal?.id === proposalId ? activeProposal : null;
+    const frames = target ? rasterizeProposalVisualFrames(target) : { requestPayload: {} };
+    if (frames.beforeImageUrl || frames.afterImageUrl) {
+      setDiffFrameUrls((prev) => ({ ...prev, [proposalId]: { beforeImageUrl: frames.beforeImageUrl, afterImageUrl: frames.afterImageUrl } }));
+    }
+    const visualDiff = await apiChangeProposal.computeVisualDiff(projectId, proposalId, frames.requestPayload);
+    setProposals((prev) => prev.map((item) => (item.id === proposalId ? { ...item, visualDiff } : item)));
+  } catch (err) {
+    handleProposalError(err, null, setReceiptToast);
+  }
+}
+
+async function runTradeoffDecision(deps: {
+  projectId: string;
+  proposalId: string;
+  tradeoffId: string;
+  input: DecideTradeoffInput;
+  setProposals: React.Dispatch<React.SetStateAction<ChangeProposalResponse[]>>;
+  setReceiptToast: ProposalGateActionsDeps["setReceiptToast"];
+  refreshProposals: () => Promise<void>;
+}) {
+  const { projectId, proposalId, tradeoffId, input, setProposals, setReceiptToast, refreshProposals } = deps;
+  try {
+    const updated = await apiChangeProposal.decideTradeoff(projectId, proposalId, tradeoffId, input);
+    setProposals((prev) =>
+      prev.map((item) => (item.id !== proposalId ? item : { ...item, tradeoffs: (item.tradeoffs ?? []).map((tr) => (tr.id === updated.id ? updated : tr)) }))
+    );
+    if (input.decision === "disagreed_instead") void refreshProposals();
+  } catch (err) {
+    handleProposalError(err, null, setReceiptToast);
+  }
+}
+
+function useProposalDiffAndTradeoffs(deps: {
+  projectId: string | undefined;
+  activeProposal: ChangeProposalResponse | null;
+  setProposals: React.Dispatch<React.SetStateAction<ChangeProposalResponse[]>>;
+  setReceiptToast: ProposalGateActionsDeps["setReceiptToast"];
+  refreshProposals: () => Promise<void>;
+}) {
+  const { projectId, activeProposal, setProposals, setReceiptToast, refreshProposals } = deps;
   const [isComputingDiff, setIsComputingDiff] = useState(false);
   const [diffFrameUrls, setDiffFrameUrls] = useState<Record<string, { beforeImageUrl?: string; afterImageUrl?: string }>>({});
 
   const computeVisualDiff = useCallback(async (proposalId: string) => {
     if (!projectId) return;
     setIsComputingDiff(true);
-    try {
-      const target = activeProposal?.id === proposalId ? activeProposal : null;
-      const frames = target ? rasterizeProposalVisualFrames(target) : { requestPayload: {} };
-      if (frames.beforeImageUrl || frames.afterImageUrl) {
-        setDiffFrameUrls((prev) => ({
-          ...prev,
-          [proposalId]: { beforeImageUrl: frames.beforeImageUrl, afterImageUrl: frames.afterImageUrl },
-        }));
-      }
-      const visualDiff = await apiChangeProposal.computeVisualDiff(projectId, proposalId, frames.requestPayload);
-      setProposals((prev) => prev.map((item) => (item.id === proposalId ? { ...item, visualDiff } : item)));
-    } finally {
-      setIsComputingDiff(false);
-    }
-  }, [activeProposal, projectId, setProposals]);
+    await runVisualDiffComputation({ projectId, proposalId, activeProposal, setDiffFrameUrls, setProposals, setReceiptToast });
+    setIsComputingDiff(false);
+  }, [activeProposal, projectId, setProposals, setReceiptToast]);
 
   const decideTradeoff = useCallback(async (tradeoffId: string, input: DecideTradeoffInput) => {
     if (!projectId || !activeProposal) return;
-    const updated = await apiChangeProposal.decideTradeoff(projectId, activeProposal.id, tradeoffId, input);
-    setProposals((prev) =>
-      prev.map((item) => item.id !== activeProposal.id ? item : { ...item, tradeoffs: (item.tradeoffs ?? []).map((tr) => (tr.id === updated.id ? updated : tr)) })
-    );
-    if (input.decision === "disagreed_instead") void refreshProposals();
-  }, [activeProposal, projectId, refreshProposals, setProposals]);
+    await runTradeoffDecision({ projectId, proposalId: activeProposal.id, tradeoffId, input, setProposals, setReceiptToast, refreshProposals });
+  }, [activeProposal, projectId, refreshProposals, setProposals, setReceiptToast]);
 
-  const activeDiffFrames = activeProposal ? diffFrameUrls[activeProposal.id] : undefined;
-  return { isComputingDiff, computeVisualDiff, decideTradeoff, activeDiffFrames };
+  return { isComputingDiff, computeVisualDiff, decideTradeoff, activeDiffFrames: activeProposal ? diffFrameUrls[activeProposal.id] : undefined };
+}
+
+async function executeQuickDraftCreation(deps: {
+  opts: NodeProposalControllerOptions;
+  t: (key: string, fallback: string) => string;
+  setSelectedProposalId: React.Dispatch<React.SetStateAction<string | null>>;
+  setReceiptToast: React.Dispatch<React.SetStateAction<{ tone: "success" | "danger"; message: string } | null>>;
+}) {
+  const { opts, t, setSelectedProposalId, setReceiptToast } = deps;
+  if (!opts.projectId) return;
+  try {
+    const scopeText = opts.selectedNodeKey || opts.selectedNodeId || t("proposals.defaultScope", "Checkout Flow");
+    const prompt = t("proposals.quickDraftPrompt", "Refine {{scope}} hierarchy & primary CTA contrast").replace("{{scope}}", scopeText);
+    const created = await apiChangeProposal.createProposal(
+      opts.projectId,
+      buildUiChangeProposalInput({ prompt, nodeId: opts.selectedNodeId, screenKey: opts.selectedNodeKey })
+    );
+    setSelectedProposalId(created.id);
+    notifyProposalsChanged(opts.projectId);
+  } catch (err) {
+    if (err instanceof Error && err.message) setReceiptToast({ tone: "danger", message: err.message });
+  }
 }
 
 export function useNodeProposalController(opts: NodeProposalControllerOptions) {
+  const { t } = useTranslation();
   const { proposals, setProposals, refreshProposals } = useProposalFetchEffect(
     opts.disabled ? undefined : opts.projectId,
     opts.selectedNodeId
@@ -184,38 +253,20 @@ export function useNodeProposalController(opts: NodeProposalControllerOptions) {
 
   const activeProposal = proposals.find((p) => p.id === selectedProposalId) ?? proposals[0] ?? null;
   useDesignerTalkToggleHotkey(Boolean(opts.isModalOpen || opts.disabled), opts.isInlineCodeOpen, setIsDesignerTalkOpen);
-  const gates = useProposalGateActions(opts.projectId, setProposals, setErrorBanner, setReceiptToast, refreshProposals);
-  const extras = useProposalDiffAndTradeoffs(opts.projectId, activeProposal, setProposals, refreshProposals);
+  const gates = useProposalGateActions({ projectId: opts.projectId, setProposals, setErrorBanner, setReceiptToast, refreshProposals });
+  const extras = useProposalDiffAndTradeoffs({ projectId: opts.projectId, activeProposal, setProposals, setReceiptToast, refreshProposals });
 
-  const createQuickDraftProposal = useCallback(async () => {
-    if (!opts.projectId) return;
-    const scopeText = opts.selectedNodeKey || opts.selectedNodeId || "Checkout Flow";
-    const created = await apiChangeProposal.createProposal(
-      opts.projectId,
-      buildUiChangeProposalInput({
-        prompt: `Refine ${scopeText} hierarchy & primary CTA contrast`,
-        nodeId: opts.selectedNodeId,
-        screenKey: opts.selectedNodeKey,
-      })
-    );
-    setSelectedProposalId(created.id);
-    notifyProposalsChanged(opts.projectId);
-  }, [opts.projectId, opts.selectedNodeId, opts.selectedNodeKey]);
+  const createQuickDraftProposal = useCallback(
+    () => executeQuickDraftCreation({
+      opts: { projectId: opts.projectId, selectedNodeId: opts.selectedNodeId, selectedNodeKey: opts.selectedNodeKey, isModalOpen: false, isInlineCodeOpen: false },
+      t, setSelectedProposalId, setReceiptToast,
+    }),
+    [opts.projectId, opts.selectedNodeId, opts.selectedNodeKey, t]
+  );
 
   return {
-    proposals,
-    proposalsCount: proposals.length,
-    activeProposal,
-    setSelectedProposalId,
-    createQuickDraftProposal,
-    isDrawerOpen,
-    setIsDrawerOpen,
-    isDesignerTalkOpen,
-    setIsDesignerTalkOpen,
-    errorBanner,
-    receiptToast,
-    dismissToast: () => setReceiptToast(null),
-    ...gates,
-    ...extras,
+    proposals, proposalsCount: proposals.length, activeProposal, setSelectedProposalId, createQuickDraftProposal,
+    isDrawerOpen, setIsDrawerOpen, isDesignerTalkOpen, setIsDesignerTalkOpen, errorBanner, receiptToast,
+    dismissToast: () => setReceiptToast(null), ...gates, ...extras,
   };
 }

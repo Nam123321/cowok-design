@@ -117,7 +117,15 @@
     "scopeLabel": "スコープ",
     "daemonConnectError": "Rust デーモンに接続できません",
     "daemonSyncError": "SDI デーモン同期エラー",
-    "quoteToChat": "チャットに引用"
+    "quoteToChat": "チャットに引用",
+    "sseProposalReady": "変更提案 (ChangeProposal) を生成しました。提案パネルを開いて確認・適用してください。",
+    "sseGithubPrSuccess": "GitHub Pull Request を作成しました ({{branch}})。",
+    "sseGithubPrFallback": "GitHub PR を直接作成できません ({{reason}}) — オフライン ZIP をダウンロードしてください。",
+    "sseGithubPrMissingConfig": "remote/token 設定が必要です",
+    "sseSnapshotReverted": "SQLite とワークスペースのスナップショットを安全に復元しました。",
+    "sseEventCompleted": "イベント {{event}} が完了しました。",
+    "proposalCompileWarning": "現在 ChangeProposal を生成できません。入力内容をご確認ください。",
+    "intentStatusLabel": "状態"
   },
   "canvas": {
     "userflowLens": "ユーザーフロー",
@@ -236,7 +244,19 @@
     "slideCmsLensTooltip": "スライド発表＆Zero-Code CMS: コード不要でスライド見出し・要点・KPI数値を直感的に編集できます。",
     "viewportDesktop": "デスクトップ表示",
     "viewportTablet": "タブレット表示",
-    "viewportMobile": "モバイル表示"
+    "viewportMobile": "モバイル表示",
+    "substateLoadingTitle": "画面状態を同期中...",
+    "substateLoadingBody": "Rust SQLite WAL からライブフィクスチャを読み込んでいます。",
+    "substateEmptyTitle": "データがありません (0件)",
+    "substateEmptyBody": "新規作成またはサンプルフィクスチャを注入してプレビューします。",
+    "substateErrorTitle": "入力検証エラー (422 Unprocessable)",
+    "substateErrorBody": "ERR_INSUFFICIENT_QUORUM: 追加の署名または制約チェックが必要です。",
+    "fallbackEyebrow": "画面",
+    "fallbackHeadline": "画面ステータス",
+    "fallbackSubtitle": "プレビュー",
+    "fallbackStatus": "準備完了",
+    "fallbackActionTitle": "操作",
+    "fallbackCtaLabel": "開く"
   },
   "settings": {
     "title": "システム設定と環境設定",
@@ -540,7 +560,10 @@
     "suggestionLabel": "提案ヒント",
     "suggestionTooltip": "デザイン提案とトレードオフ (ショートカット T)",
     "proposalLabel": "変更提案",
-    "proposalTooltip": "変更提案一覧"
+    "proposalTooltip": "変更提案一覧",
+    "turnReceiptPrefix": "ターンスナップショット受領証",
+    "defaultScope": "チェックアウトフロー",
+    "quickDraftPrompt": "{{scope}} の階層と主要 CTA コントラストを調整"
   },
   "sdi": {
     "ambiguityScoreLabel": "曖昧さスコア:",
@@ -745,7 +768,8 @@
     "loadSamplePrdBtn": "サンプルPRDを読み込む",
     "dropPrdPrompt": "PRDファイルをドロップまたは選択 (.md / .txt / .pdf)",
     "selectedFilePrefix": "選択済みファイル:",
-    "openHubFromNewProject": "または4ルートLaunchpadハブを開く (PRD / テンプレート / URL / Git)"
+    "openHubFromNewProject": "または4ルートLaunchpadハブを開く (PRD / テンプレート / URL / Git)",
+    "createError": "Launchpad プロジェクトを作成できませんでした: {{message}}"
   },
   "sampleData": {
     "title": "サンプルデータスタジオ — フィクスチャ連携",
@@ -753,6 +777,7 @@
     "colKey": "属性キー",
     "colType": "データ型",
     "colValue": "サンプル値",
-    "footerSummary": "{{count}} 件の属性を読み込み • プリセット: {{preset}}"
+    "footerSummary": "{{count}} 件の属性を読み込み • プリセット: {{preset}}",
+    "saveError": "サンプルフィクスチャを保存できませんでした: {{message}}"
   }
 }

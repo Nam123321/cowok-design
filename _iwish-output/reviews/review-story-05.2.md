@@ -18,3 +18,12 @@
 ## 2. Adversarial Boundary Verification
 - **RPN Threshold:** All RPN scores `<= 10` (`< 100` threshold).
 - **Verdict:** All FMEA edge-case mitigations bound into `data-spec.md`, `impl-plan.md`, and automated tests.
+
+## 3. Formal-verify candidates Triage
+- **Formal-verify candidates:** `ProposalCasApplyAndHmacReceiptGate` (`crates/flow-graph/src/lib.rs` / `crates/flow-graph/src/deploy_draft.rs` `TransactionBehavior::Immediate` WAL write serialization + `base_file_hashes_json` `409 PROPOSAL_STALE_BASE_HASH` CAS + HMAC-SHA256 `proposal_gate_receipts` atomic apply + `pre_apply_safety` snapshot). Verified deterministically via Rust integration suite (`crates/harness-daemon/tests/story_05_2_proposals.rs`) and Playwright E2E (`tests/e2e/story-05.2.spec.ts`); dedicated TLA+/TLC model deferred beyond the `01.2`/`04.2` formal pilot scope.
+
+## 4. Audit-360 Post-Hardening Delta Review (Reviewer `ff0ec11e-a43c-4101-93bc-20394cb68b20`)
+- **Round 4 Verdict:** `VERDICT: APPROVED` — Score: **9.3 / 10**
+- **Verified Fixes:**
+  - `src/features/proposals/hooks/useNodeProposalController.ts`: extracted `useProposalGateActions`, `useProposalDiffAndTradeoffs`, `runVisualDiffComputation`, `runTradeoffDecision`, and `executeQuickDraftCreation` (`CC <= 15`), added `try/catch` error surfacing, and localized receipt/draft strings (`9`-locale parity).
+  - `src/features/flow/hooks/dispatchNodeExecution.ts` & `src/features/flow/components/CompanionCanvasTab.tsx`: localized SSE formatting, mutable `activeStreams` listener refs, localized proposal synthesis warning + daemon coordinator reconciliation without premature local completion/failure, and `flushPending(true)` persistence.

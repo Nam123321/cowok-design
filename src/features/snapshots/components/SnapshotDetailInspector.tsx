@@ -53,6 +53,30 @@ function resolveFileList(selected: SelectedHistoryEntry): Array<{ path: string; 
   return selected.item.files.map((f) => ({ path: f.path, size: f.sizeBytes ?? f.content.length }));
 }
 
+const DetailModeIconBtn: React.FC<{
+  mode: DetailViewMode;
+  activeMode: DetailViewMode;
+  tooltip: string;
+  testId: string;
+  iconName: string;
+  badgeCount?: number;
+  onSelect: (m: DetailViewMode) => void;
+}> = ({ mode, activeMode, tooltip, testId, iconName, badgeCount, onSelect }) => (
+  <button
+    type="button"
+    role="tab"
+    aria-selected={activeMode === mode}
+    title={tooltip}
+    aria-label={tooltip}
+    className={`snap-detail-icon-btn${activeMode === mode ? " snap-detail-icon-btn--active" : ""}`}
+    data-testid={testId}
+    onClick={() => onSelect(mode)}
+  >
+    <BrandIcon name={iconName} size={13} color="currentColor" />
+    {badgeCount !== undefined && badgeCount > 0 && <span className="snap-detail-count-badge">{badgeCount}</span>}
+  </button>
+);
+
 const DetailHeaderSwitcher: React.FC<{
   title: string;
   hash: string;
@@ -64,56 +88,21 @@ const DetailHeaderSwitcher: React.FC<{
 }> = ({ title, hash, isSlideDeck, effectiveMode, fileCount, onSetMode, onCloseDetail }) => {
   const { t, locale } = useTranslation();
   const { formatNumber } = useFormatter({ locale });
-  const htmlTooltip = isSlideDeck
+  const htmlTip = isSlideDeck
     ? t("snapshots.slidePreviewTabTooltip", "Xem trước Slide 16:9")
     : t("snapshots.htmlPreviewTabTooltip", "Xem trước giao diện HTML");
-  const userflowTooltip = t("snapshots.userflowTabTooltip", "Xem sơ đồ Luồng người dùng");
-  const filesTooltip = `${t("snapshots.filesTab", "Tệp nguồn")} (${formatNumber(fileCount)})`;
+  const filesTip = `${t("snapshots.filesTab", "Tệp nguồn")} (${formatNumber(fileCount)})`;
 
   return (
     <div className="snap-detail-header">
       <div className="snap-item-tag">{title} · <code>{hash}</code></div>
       <div className="snap-item-actions">
         <div className="snap-detail-switcher" role="tablist" data-testid="detail-view-switcher">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={effectiveMode === "html"}
-            title={htmlTooltip}
-            aria-label={htmlTooltip}
-            className={`snap-detail-icon-btn${effectiveMode === "html" ? " snap-detail-icon-btn--active" : ""}`}
-            data-testid="detail-mode-html"
-            onClick={() => onSetMode("html")}
-          >
-            <BrandIcon name={isSlideDeck ? "presentation" : "eye"} size={13} color="currentColor" />
-          </button>
+          <DetailModeIconBtn mode="html" activeMode={effectiveMode} tooltip={htmlTip} testId="detail-mode-html" iconName={isSlideDeck ? "presentation" : "eye"} onSelect={onSetMode} />
           {!isSlideDeck && (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={effectiveMode === "userflow"}
-              title={userflowTooltip}
-              aria-label={userflowTooltip}
-              className={`snap-detail-icon-btn${effectiveMode === "userflow" ? " snap-detail-icon-btn--active" : ""}`}
-              data-testid="detail-mode-userflow"
-              onClick={() => onSetMode("userflow")}
-            >
-              <BrandIcon name="workflow" size={13} color="currentColor" />
-            </button>
+            <DetailModeIconBtn mode="userflow" activeMode={effectiveMode} tooltip={t("snapshots.userflowTabTooltip", "Xem sơ đồ Luồng người dùng")} testId="detail-mode-userflow" iconName="workflow" onSelect={onSetMode} />
           )}
-          <button
-            type="button"
-            role="tab"
-            aria-selected={effectiveMode === "files"}
-            title={filesTooltip}
-            aria-label={filesTooltip}
-            className={`snap-detail-icon-btn${effectiveMode === "files" ? " snap-detail-icon-btn--active" : ""}`}
-            data-testid="detail-mode-files"
-            onClick={() => onSetMode("files")}
-          >
-            <BrandIcon name="file-text" size={13} color="currentColor" />
-            {fileCount > 0 && <span className="snap-detail-count-badge">{formatNumber(fileCount)}</span>}
-          </button>
+          <DetailModeIconBtn mode="files" activeMode={effectiveMode} tooltip={filesTip} testId="detail-mode-files" iconName="file-text" badgeCount={fileCount} onSelect={onSetMode} />
         </div>
         <button type="button" className="snap-drawer-close-btn" onClick={onCloseDetail} title={t("common.close", "Đóng")} aria-label={t("common.close", "Đóng")}>✕</button>
       </div>

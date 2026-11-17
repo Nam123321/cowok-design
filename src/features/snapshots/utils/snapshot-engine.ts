@@ -119,7 +119,8 @@ export function createSnapshotFromInput(
   const now = new Date().toISOString();
   const nextVerNum = existingSnapshotsCount + 1;
   const versionTag = input.versionTag || `v1.${nextVerNum}.0`;
-  const treeSha256 = computeTreeSha256(input.files);
+  const files = input.files ?? [];
+  const treeSha256 = computeTreeSha256(files);
   const id = input.id || crypto.randomUUID();
   const description = input.description || "";
   const trigger = input.trigger || "manual";
@@ -136,7 +137,7 @@ export function createSnapshotFromInput(
     proposalId: input.proposalId ?? null,
     parentSnapshotId: input.parentSnapshotId ?? null,
     chatArtifactSnapshotId: input.chatArtifactSnapshotId ?? null,
-    files: input.files,
+    files,
     metadata: input.metadata || {},
     createdAt: now,
   };

@@ -8,6 +8,7 @@ import {
   generateBootSecret,
   generateEpochNonce,
   wrapUserHtmlSrcDoc,
+  type SandboxSubStateLabels,
 } from "../utils/html-sandbox-wrapper";
 import type { FixtureVariant } from "../../../lib/validations/screen-fixture";
 
@@ -51,6 +52,7 @@ export interface SandboxedBridgeParams {
   activeSubState: FixtureVariant;
   effectiveCustomHtml?: string;
   rawHtml: string;
+  subStateLabels?: SandboxSubStateLabels;
   onRegionClick: (regionId: string, label: string, ffId?: string, domHash?: string, rect?: ElementRectBox) => void;
   onQuoteText?: (text: string) => void;
 }
@@ -67,7 +69,14 @@ function isSandboxFrameAllowedToBind(iframeEl: HTMLIFrameElement): boolean {
   return true;
 }
 
-function createKeepAliveSlot(opts: { cacheKey: string; projectId: string; nodeId: string; artifactSha256: string; rawHtml: string }): IframeKeepAliveSlot {
+function createKeepAliveSlot(opts: {
+  cacheKey: string;
+  projectId: string;
+  nodeId: string;
+  artifactSha256: string;
+  rawHtml: string;
+  subStateLabels?: SandboxSubStateLabels;
+}): IframeKeepAliveSlot {
   const epoch = generateEpochNonce();
   const bootSecret = generateBootSecret();
   const scriptNonce = generateBootSecret();
@@ -81,7 +90,13 @@ function createKeepAliveSlot(opts: { cacheKey: string; projectId: string; nodeId
     epoch,
     bootSecret,
     scriptNonce,
-    wrappedSrcDoc: wrapUserHtmlSrcDoc(opts.rawHtml, { epoch, bootSecret, scriptNonce, artifactSha256: opts.artifactSha256 }),
+    wrappedSrcDoc: wrapUserHtmlSrcDoc(opts.rawHtml, {
+      epoch,
+      bootSecret,
+      scriptNonce,
+      artifactSha256: opts.artifactSha256,
+      subStateLabels: opts.subStateLabels,
+    }),
     port1: null,
     isPortVerified: false,
     elementRects: {},
@@ -151,7 +166,14 @@ function processValidSlotMessage(ev: MessageEvent, deps: InboundHandlerDeps): vo
   dispatchSlotMessageByType(msg, deps);
 }
 
-function useKeepAlivePoolState(projectId: string, nodeId: string, rawHtml: string, activeSubState: FixtureVariant) {
+function useKeepAlivePoolState(opts: {
+  projectId: string;
+  nodeId: string;
+  rawHtml: string;
+  activeSubState: FixtureVariant;
+  subStateLabels?: SandboxSubStateLabels;
+}) {
+  const { projectId, nodeId, rawHtml, activeSubState, subStateLabels } = opts;
   const [resolvedSha256, setResolvedSha256] = useState<string>(() => computeArtifactSha256Sync(rawHtml));
   const [slots, setSlots] = useState<IframeKeepAliveSlot[]>([]);
   const [activeSlotKey, setActiveSlotKey] = useState<string>("");
@@ -170,10 +192,10 @@ function useKeepAlivePoolState(projectId: string, nodeId: string, rawHtml: strin
     const existing = slotsRef.current.find((s) => s.cacheKey === targetCacheKey);
     if (existing) { existing.lastUsedAt = Date.now(); setActiveSlotKey(targetCacheKey); return; }
     const nextSlots = evictOldestSlotIfFull(slotsRef.current);
-    nextSlots.push(createKeepAliveSlot({ cacheKey: targetCacheKey, projectId, nodeId, artifactSha256: resolvedSha256, rawHtml }));
+    nextSlots.push(createKeepAliveSlot({ cacheKey: targetCacheKey, projectId, nodeId, artifactSha256: resolvedSha256, rawHtml, subStateLabels }));
     setSlots(nextSlots);
     setActiveSlotKey(targetCacheKey);
-  }, [nodeId, projectId, rawHtml, resolvedSha256, targetCacheKey]);
+  }, [nodeId, projectId, rawHtml, resolvedSha256, subStateLabels, targetCacheKey]);
 
   const activeSlot = slots.find((s) => s.cacheKey === activeSlotKey) || slots[0] || null;
   useEffect(() => {
@@ -208,7 +230,7 @@ export function useSandboxedIframeBridge(params: SandboxedBridgeParams) {
   const projectId = params.projectId || "default-proj";
   const nodeId = resolveTargetNodeId(params);
   const fallbackRef = useRef<HTMLIFrameElement>(null);
-  const pool = useKeepAlivePoolState(projectId, nodeId, params.rawHtml, params.activeSubState);
+  const pool = useKeepAlivePoolState({ projectId, nodeId, rawHtml: params.rawHtml, activeSubState: params.activeSubState, subStateLabels: params.subStateLabels });
   const { activeSlot, resolvedSha256, slots, setSlots, slotsRef, seqRef } = pool;
   const nodeLabel = params.selectedNodeKey || params.selectedNodeId || "SCR-02";
 

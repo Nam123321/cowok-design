@@ -117,7 +117,15 @@
     "scopeLabel": "范围",
     "daemonConnectError": "无法连接到 Rust 守护进程",
     "daemonSyncError": "SDI 守护进程同步错误",
-    "quoteToChat": "引用至聊天"
+    "quoteToChat": "引用至聊天",
+    "sseProposalReady": "已生成变更提案 (ChangeProposal)。请打开“提案”面板检查并应用。",
+    "sseGithubPrSuccess": "已创建 GitHub Pull Request ({{branch}})。",
+    "sseGithubPrFallback": "无法直接创建 GitHub PR ({{reason}}) — 可下载离线 ZIP 包。",
+    "sseGithubPrMissingConfig": "需要配置 remote/token",
+    "sseSnapshotReverted": "已在 SQLite 与工作区安全回滚快照。",
+    "sseEventCompleted": "事件 {{event}} 已完成。",
+    "proposalCompileWarning": "暂时无法生成变更提案 (ChangeProposal)，请检查输入参数。",
+    "intentStatusLabel": "状态"
   },
   "canvas": {
     "userflowLens": "用户流程",
@@ -236,7 +244,19 @@
     "slideCmsLensTooltip": "幻灯片演示与 Zero-Code CMS：无需编写代码即可可视化编辑标题、要点与 KPI 指标。",
     "viewportDesktop": "桌面视口",
     "viewportTablet": "平板视口",
-    "viewportMobile": "手机视口"
+    "viewportMobile": "手机视口",
+    "substateLoadingTitle": "正在同步屏幕状态...",
+    "substateLoadingBody": "正在从 Rust SQLite WAL 加载实时测试数据。",
+    "substateEmptyTitle": "暂无数据 (0 条记录)",
+    "substateEmptyBody": "新建记录或注入示例数据以预览界面。",
+    "substateErrorTitle": "数据校验错误 (422 Unprocessable)",
+    "substateErrorBody": "ERR_INSUFFICIENT_QUORUM：需要补充签名或通过约束检查。",
+    "fallbackEyebrow": "屏幕",
+    "fallbackHeadline": "屏幕状态",
+    "fallbackSubtitle": "预览",
+    "fallbackStatus": "就绪",
+    "fallbackActionTitle": "操作",
+    "fallbackCtaLabel": "打开"
   },
   "settings": {
     "title": "系统设置与偏好",
@@ -540,7 +560,10 @@
     "suggestionLabel": "建议",
     "suggestionTooltip": "设计建议与权衡 (快捷键 T)",
     "proposalLabel": "变更提案",
-    "proposalTooltip": "变更提案列表"
+    "proposalTooltip": "变更提案列表",
+    "turnReceiptPrefix": "轮次快照回执",
+    "defaultScope": "结账流程",
+    "quickDraftPrompt": "优化 {{scope}} 视觉层级与主按钮对比度"
   },
   "sdi": {
     "ambiguityScoreLabel": "歧义度评分:",
@@ -745,7 +768,8 @@
     "loadSamplePrdBtn": "加载示例 PRD",
     "dropPrdPrompt": "拖放或选择 PRD 文件 (.md / .txt / .pdf)",
     "selectedFilePrefix": "已选文件:",
-    "openHubFromNewProject": "或打开 4 路径启动中心 (PRD / 模板 / 设计链接 / Git)"
+    "openHubFromNewProject": "或打开 4 路径启动中心 (PRD / 模板 / 设计链接 / Git)",
+    "createError": "无法从 Launchpad 创建项目：{{message}}"
   },
   "sampleData": {
     "title": "示例数据工作室 — 夹具数据绑定",
@@ -753,6 +777,7 @@
     "colKey": "属性键名",
     "colType": "数据类型",
     "colValue": "示例值",
-    "footerSummary": "已加载 {{count}} 个属性 • 预设: {{preset}}"
+    "footerSummary": "已加载 {{count}} 个属性 • 预设: {{preset}}",
+    "saveError": "无法保存示例数据：{{message}}"
   }
 }

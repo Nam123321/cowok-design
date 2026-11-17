@@ -52,7 +52,7 @@ export const CreateSnapshotSchema = z.object({
   proposalId: z.string().uuid().optional(),
   parentSnapshotId: z.string().uuid().optional(),
   chatArtifactSnapshotId: z.string().uuid().optional(),
-  files: z.array(SnapshotFileItemSchema).min(1, "At least one file is required"),
+  files: z.array(SnapshotFileItemSchema).default([]),
   metadata: z.record(z.string()).optional(),
 });
 

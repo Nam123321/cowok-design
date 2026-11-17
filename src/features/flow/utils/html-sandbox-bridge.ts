@@ -6,8 +6,28 @@ const EPOCH_JITTER_MARGIN = 1024;
 const EPOCH_PRIME_STEP = 7919;
 const BOOT_SECRET_BYTES = 16;
 const HEX_RADIX = 16;
+const HEX_BYTE_PAD = 2;
 const HEX_WORD_PAD = 8;
-const SHA_WORDS = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+const FNV_PRIME_32 = 0x01000193;
+const MIX_PRIME_B = 0x85ebca6b;
+const MIX_PRIME_C = 0xc2b2ae35;
+const MIX_PRIME_D = 0x27d4eb2f;
+const AVALANCHE_A = 0x165667b1;
+const GOLDEN_RATIO_32 = 0x9e3779b9;
+const SPLITMIX_A = 0x94d049bb;
+const SPLITMIX_B = 0xbf58476d;
+const BYTE_SALT_1 = 17;
+const BYTE_SALT_2 = 31;
+const BYTE_SALT_3 = 53;
+const SHA_H0 = 0x6a09e667;
+const SHA_H1 = 0xbb67ae85;
+const SHA_H2 = 0x3c6ef372;
+const SHA_H3 = 0xa54ff53a;
+const SHA_H4 = 0x510e527f;
+const SHA_H5 = 0x9b05688c;
+const SHA_H6 = 0x1f83d9ab;
+const SHA_H7 = 0x5be0cd19;
+const SHA_WORDS = [SHA_H0, SHA_H1, SHA_H2, SHA_H3, SHA_H4, SHA_H5, SHA_H6, SHA_H7];
 let lastEpochCounter = 1;
 
 export function generateEpochNonce(): number {
@@ -30,7 +50,7 @@ export function generateBootSecret(): string {
   }
   const bytes = new Uint8Array(BOOT_SECRET_BYTES);
   globalThis.crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(HEX_RADIX).padStart(2, "0")).join("");
+  return Array.from(bytes, (b) => b.toString(HEX_RADIX).padStart(HEX_BYTE_PAD, "0")).join("");
 }
 
 export async function computeArtifactSha256(rawHtml: string): Promise<string> {
@@ -40,7 +60,7 @@ export async function computeArtifactSha256(rawHtml: string): Promise<string> {
   const utf8 = new TextEncoder().encode(rawHtml);
   const hashBuffer = await globalThis.crypto.subtle.digest("SHA-256", utf8);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(HEX_RADIX).padStart(2, "0")).join("");
+  return hashArray.map((b) => b.toString(HEX_RADIX).padStart(HEX_BYTE_PAD, "0")).join("");
 }
 
 export function computeArtifactSha256Sync(input: string): string {
@@ -48,16 +68,25 @@ export function computeArtifactSha256Sync(input: string): string {
   let [h0, h1, h2, h3, h4, h5, h6, h7] = SHA_WORDS;
   for (let i = 0; i < utf8.length; i++) {
     const b = utf8[i]!;
-    h0 = Math.imul(h0 ^ b, 0x01000193) >>> 0;
-    h1 = Math.imul(h1 ^ (b + 17), 0x85ebca6b) >>> 0;
-    h2 = Math.imul(h2 ^ (b + 31), 0xc2b2ae35) >>> 0;
-    h3 = Math.imul(h3 ^ (b + 53), 0x27d4eb2f) >>> 0;
-    h4 = Math.imul(h4 ^ h0, 0x165667b1) >>> 0;
-    h5 = Math.imul(h5 ^ h1, 0x9e3779b9) >>> 0;
-    h6 = Math.imul(h6 ^ h2, 0x94d049bb) >>> 0;
-    h7 = Math.imul(h7 ^ h3, 0xbf58476d) >>> 0;
+    h0 = Math.imul(h0 ^ b, FNV_PRIME_32) >>> 0;
+    h1 = Math.imul(h1 ^ (b + BYTE_SALT_1), MIX_PRIME_B) >>> 0;
+    h2 = Math.imul(h2 ^ (b + BYTE_SALT_2), MIX_PRIME_C) >>> 0;
+    h3 = Math.imul(h3 ^ (b + BYTE_SALT_3), MIX_PRIME_D) >>> 0;
+    h4 = Math.imul(h4 ^ h0, AVALANCHE_A) >>> 0;
+    h5 = Math.imul(h5 ^ h1, GOLDEN_RATIO_32) >>> 0;
+    h6 = Math.imul(h6 ^ h2, SPLITMIX_A) >>> 0;
+    h7 = Math.imul(h7 ^ h3, SPLITMIX_B) >>> 0;
   }
-  return [h0, h1, h2, h3, h4, h5, h6, h7].map((w) => w.toString(16).padStart(8, "0")).join("");
+  return [h0, h1, h2, h3, h4, h5, h6, h7].map((w) => w.toString(HEX_RADIX).padStart(HEX_WORD_PAD, "0")).join("");
+}
+
+export interface SandboxSubStateLabels {
+  loadingTitle?: string;
+  loadingBody?: string;
+  emptyTitle?: string;
+  emptyBody?: string;
+  errorTitle?: string;
+  errorBody?: string;
 }
 
 export interface BridgeScriptOptions {
@@ -67,6 +96,7 @@ export interface BridgeScriptOptions {
   domAnchorHash: string;
   scriptNonce?: string;
   parentOrigin?: string;
+  subStateLabels?: SandboxSubStateLabels;
 }
 
 function buildUrlAndDomHashSnippet(): string {
@@ -107,7 +137,27 @@ function buildUrlAndDomHashSnippet(): string {
   }`;
 }
 
-function buildHtmlPatchSnippet(): string {
+const DEFAULT_SUBSTATE_LABELS: Required<SandboxSubStateLabels> = {
+  loadingTitle: "Synchronizing screen state...",
+  loadingBody: "Loading live fixture data from Rust SQLite WAL.",
+  emptyTitle: "No data available (0 Records)",
+  emptyBody: "Create a record or inject sample fixtures to preview this screen.",
+  errorTitle: "Validation error (422 Unprocessable)",
+  errorBody: "ERR_INSUFFICIENT_QUORUM: Additional signature or constraint check required.",
+};
+
+const NONCE_SAFE_RE = /^[A-Za-z0-9+/_=-]+$/;
+
+function safeInlineJson(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
+function buildApplySanitizedHtmlSnippet(): string {
   return `  function applySanitizedHtml(raw) {
     if (typeof raw !== "string" || !document.body || typeof DOMParser === "undefined") return;
     var parsed = new DOMParser().parseFromString(raw, "text/html");
@@ -123,58 +173,52 @@ function buildHtmlPatchSnippet(): string {
     var h = document.documentElement ? document.documentElement.scrollHeight : 0;
     if (bridgePort) bridgePort.postMessage({ type: "HEIGHT_CHANGED", epoch: EPOCH, bootSecretAck: BOOT_SECRET, channelSecret: BOOT_SECRET, seq: ++localSeq, height: h });
     publishElementRects();
+  }`;
+}
+
+function buildFixtureHydrationSnippet(labels?: SandboxSubStateLabels): string {
+  const merged = { ...DEFAULT_SUBSTATE_LABELS, ...labels };
+  const labelMapJson = safeInlineJson({
+    LOADING: [merged.loadingTitle, merged.loadingBody],
+    EMPTY: [merged.emptyTitle, merged.emptyBody],
+    ERROR: [merged.errorTitle, merged.errorBody],
+  });
+  return `  var SUBSTATE_TEXT = ${labelMapJson};
+  function applyHeaderSubState(hdr, norm, parsedRows) {
+    if (!hdr) return;
+    var h2 = hdr.querySelector("h2"), p = hdr.querySelector("p");
+    if (h2 && !h2.getAttribute("data-orig")) h2.setAttribute("data-orig", h2.textContent || "");
+    if (p && !p.getAttribute("data-orig")) p.setAttribute("data-orig", p.textContent || "");
+    var copy = SUBSTATE_TEXT[norm];
+    if (copy && h2 && p) { h2.textContent = copy[0]; p.textContent = copy[1]; }
+    else if (h2 && p) { h2.textContent = h2.getAttribute("data-orig") || h2.textContent; p.textContent = p.getAttribute("data-orig") || p.textContent; }
+    if (parsedRows.length > 0 && h2 && p) {
+      var r0 = parsedRows[0] || {}, r1 = parsedRows[1] || r0;
+      if (r0.value) h2.textContent = String(r0.key ? (r0.key + ": " + r0.value) : r0.value);
+      if (r1.value && r1 !== r0) p.textContent = String(r1.key ? (r1.key + ": " + r1.value) : r1.value);
+    }
   }
   function applyFixtureHydration(variant, fixtureJson) {
     if (!document.body) return;
     var norm = String(variant || "DEFAULT").toUpperCase();
     document.body.setAttribute("data-ff-substate", norm);
     document.querySelectorAll("[data-ff-fixture-slot]").forEach(function(el){ el.textContent = norm; });
-    var hdr = document.querySelector('[data-ff-id="sec-header"]');
-    var kpi = document.querySelector('[data-ff-id="sec-kpi"]');
-    var bio = document.querySelector('[data-ff-id="sec-biometric"]');
     var parsedRows = [];
     try {
       var rawObj = fixtureJson ? JSON.parse(String(fixtureJson)) : null;
-      if (rawObj && Array.isArray(rawObj.rows)) {
-        parsedRows = rawObj.rows;
-      } else if (rawObj && typeof rawObj === "object") {
-        parsedRows = Object.keys(rawObj).map(function(k){ return { key: k, value: String(rawObj[k]) }; });
-      }
+      if (rawObj && Array.isArray(rawObj.rows)) parsedRows = rawObj.rows;
+      else if (rawObj && typeof rawObj === "object") parsedRows = Object.keys(rawObj).map(function(k){ return { key: k, value: String(rawObj[k]) }; });
     } catch (_) {}
-    if (hdr) {
-      var h2 = hdr.querySelector("h2");
-      var p = hdr.querySelector("p");
-      if (h2 && !h2.getAttribute("data-orig")) h2.setAttribute("data-orig", h2.textContent || "");
-      if (p && !p.getAttribute("data-orig")) p.setAttribute("data-orig", p.textContent || "");
-      if (norm === "LOADING") {
-        if (h2) h2.textContent = "Đang đồng bộ trạng thái màn hình...";
-        if (p) p.textContent = "Skeleton shimmer đang nạp dữ liệu từ Rust SQLite WAL.";
-      } else if (norm === "EMPTY") {
-        if (h2) h2.textContent = "Chưa có dữ liệu (0 Records)";
-        if (p) p.textContent = "Nhấn tạo mới hoặc nạp bộ dữ liệu mẫu để xem trước nội dung.";
-      } else if (norm === "ERROR") {
-        if (h2) h2.textContent = "Lỗi xác thực dữ liệu (422 Unprocessable)";
-        if (p) p.textContent = "ERR_INSUFFICIENT_QUORUM: Cần bổ sung chữ ký hoặc kiểm tra ràng buộc.";
-      } else if (h2 && p) {
-        h2.textContent = h2.getAttribute("data-orig") || h2.textContent;
-        p.textContent = p.getAttribute("data-orig") || p.textContent;
-      }
-      if (parsedRows.length > 0 && h2 && p) {
-        var r0 = parsedRows[0] || {};
-        var r1 = parsedRows[1] || r0;
-        if (r0.value) h2.textContent = String(r0.key ? (r0.key + ": " + r0.value) : r0.value);
-        if (r1.value && r1 !== r0) p.textContent = String(r1.key ? (r1.key + ": " + r1.value) : r1.value);
-      }
-    }
-    if (kpi) {
-      kpi.style.opacity = norm === "LOADING" ? "0.55" : "1";
-      kpi.style.borderColor = norm === "ERROR" ? "var(--state-danger, #dc2626)" : "";
-    }
-    if (bio) {
-      bio.style.display = norm === "EMPTY" ? "none" : "flex";
-    }
+    applyHeaderSubState(document.querySelector('[data-ff-id="sec-header"]'), norm, parsedRows);
+    var kpi = document.querySelector('[data-ff-id="sec-kpi"]'), bio = document.querySelector('[data-ff-id="sec-biometric"]');
+    if (kpi) { kpi.style.opacity = norm === "LOADING" ? "0.55" : "1"; kpi.style.borderColor = norm === "ERROR" ? "var(--state-danger, #dc2626)" : ""; }
+    if (bio) bio.style.display = norm === "EMPTY" ? "none" : "flex";
     publishElementRects();
   }`;
+}
+
+function buildHtmlPatchSnippet(labels?: SandboxSubStateLabels): string {
+  return `${buildApplySanitizedHtmlSnippet()}\n${buildFixtureHydrationSnippet(labels)}`;
 }
 
 function buildFfIdPatchAndRectsSnippet(): string {
@@ -281,16 +325,17 @@ export function buildByteZeroBridgeScript(opts: BridgeScriptOptions): string {
   const safeEpoch = Number.isInteger(opts.epoch) && opts.epoch >= 1 ? opts.epoch : 1;
   const safeOrigin =
     typeof opts.parentOrigin === "string" && opts.parentOrigin.length > 0 && opts.parentOrigin !== "null"
-      ? JSON.stringify(opts.parentOrigin)
+      ? safeInlineJson(opts.parentOrigin)
       : "null";
-  const nonceAttr = opts.scriptNonce ? ` nonce="${opts.scriptNonce}"` : "";
+  const cleanNonce = opts.scriptNonce && NONCE_SAFE_RE.test(opts.scriptNonce) ? opts.scriptNonce : "";
+  const nonceAttr = cleanNonce ? ` nonce="${cleanNonce}"` : "";
 
   return `<script data-cowok-sandbox-bridge="v1"${nonceAttr}>(function(){
   "use strict";
   var EPOCH = ${safeEpoch};
-  var BOOT_SECRET = ${JSON.stringify(opts.bootSecret)};
-  var ARTIFACT_SHA256 = ${JSON.stringify(opts.artifactSha256)};
-  var DOM_ANCHOR_HASH = ${JSON.stringify(opts.domAnchorHash)};
+  var BOOT_SECRET = ${safeInlineJson(opts.bootSecret)};
+  var ARTIFACT_SHA256 = ${safeInlineJson(opts.artifactSha256)};
+  var DOM_ANCHOR_HASH = ${safeInlineJson(opts.domAnchorHash)};
   var EXPECTED_PARENT_ORIGIN = ${safeOrigin};
   var channelBound = false;
   var bridgePort = null;
@@ -299,7 +344,7 @@ export function buildByteZeroBridgeScript(opts: BridgeScriptOptions): string {
   if (typeof MessagePort !== "undefined" && MessagePort.prototype) Object.freeze(MessagePort.prototype);
   window.addEventListener("submit", function(e) { e.preventDefault(); e.stopImmediatePropagation(); }, true);
 ${buildUrlAndDomHashSnippet()}
-${buildHtmlPatchSnippet()}
+${buildHtmlPatchSnippet(opts.subStateLabels)}
 ${buildFfIdPatchAndRectsSnippet()}
 ${buildBridgeListenersSnippet()}
 })();</script>`;
