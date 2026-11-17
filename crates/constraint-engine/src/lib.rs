@@ -2256,7 +2256,9 @@ export const Card = () => (
         assert!(violations.iter().any(|v| v.message.contains("flex")));
         assert!(violations.iter().any(|v| v.message.contains("p-4")));
         assert!(violations.iter().any(|v| v.message.contains("rounded-md")));
-        assert!(violations.iter().any(|v| v.message.contains("inline-block")));
+        assert!(violations
+            .iter()
+            .any(|v| v.message.contains("inline-block")));
 
         // Test standalone cn(...) and clsx(...) calls
         let tsx_calls = r#"
@@ -2265,12 +2267,19 @@ export const Card = () => (
             const classes = cn("flex items-center", active && "bg-red-500");
             const other = clsx("grid gap-4", "text-sm");
         "#;
-        let call_violations = AstLinter::lint_source(tsx_calls, &rules).expect("Linting should succeed");
+        let call_violations =
+            AstLinter::lint_source(tsx_calls, &rules).expect("Linting should succeed");
         assert!(call_violations.iter().any(|v| v.message.contains("flex")));
-        assert!(call_violations.iter().any(|v| v.message.contains("items-center")));
-        assert!(call_violations.iter().any(|v| v.message.contains("bg-red-500")));
+        assert!(call_violations
+            .iter()
+            .any(|v| v.message.contains("items-center")));
+        assert!(call_violations
+            .iter()
+            .any(|v| v.message.contains("bg-red-500")));
         assert!(call_violations.iter().any(|v| v.message.contains("grid")));
         assert!(call_violations.iter().any(|v| v.message.contains("gap-4")));
-        assert!(call_violations.iter().any(|v| v.message.contains("text-sm")));
+        assert!(call_violations
+            .iter()
+            .any(|v| v.message.contains("text-sm")));
     }
 }

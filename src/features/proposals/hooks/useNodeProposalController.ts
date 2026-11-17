@@ -6,12 +6,20 @@ import { HarnessDaemonApiError } from "../../../api/harness-daemon-transport";
 import type { ChangeProposalResponse, DecideTradeoffInput } from "../../../lib/validations/change-proposal";
 import type { ProposalGateErrorBanner } from "../components/ValidationGateBadge";
 import { shouldSuppressProposalHotkey } from "../utils/diff-engine";
+import {
+  buildUiChangeProposalInput,
+  notifyProposalsChanged,
+  subscribeProposalsChanged,
+} from "../utils/proposal-events";
+import { rasterizeProposalVisualFrames } from "../utils/visual-rasterizer";
 
 export interface NodeProposalControllerOptions {
   projectId?: string;
   selectedNodeId?: string | null;
+  selectedNodeKey?: string | null;
   isModalOpen: boolean;
   isInlineCodeOpen: boolean;
+  disabled?: boolean;
 }
 
 function replaceProposalItem(list: ChangeProposalResponse[], updated: ChangeProposalResponse): ChangeProposalResponse[] {
@@ -37,6 +45,13 @@ function useProposalFetchEffect(projectId: string | undefined, selectedNodeId: s
   useEffect(() => {
     void refreshProposals();
   }, [refreshProposals]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    return subscribeProposalsChanged((changedPid) => {
+      if (changedPid === projectId) void refreshProposals();
+    });
+  }, [projectId, refreshProposals]);
 
   return { proposals, setProposals, refreshProposals };
 }
@@ -116,17 +131,26 @@ function useProposalDiffAndTradeoffs(
   refreshProposals: () => Promise<void>
 ) {
   const [isComputingDiff, setIsComputingDiff] = useState(false);
+  const [diffFrameUrls, setDiffFrameUrls] = useState<Record<string, { beforeImageUrl?: string; afterImageUrl?: string }>>({});
 
   const computeVisualDiff = useCallback(async (proposalId: string) => {
     if (!projectId) return;
     setIsComputingDiff(true);
     try {
-      const visualDiff = await apiChangeProposal.computeVisualDiff(projectId, proposalId, {});
+      const target = activeProposal?.id === proposalId ? activeProposal : null;
+      const frames = target ? rasterizeProposalVisualFrames(target) : { requestPayload: {} };
+      if (frames.beforeImageUrl || frames.afterImageUrl) {
+        setDiffFrameUrls((prev) => ({
+          ...prev,
+          [proposalId]: { beforeImageUrl: frames.beforeImageUrl, afterImageUrl: frames.afterImageUrl },
+        }));
+      }
+      const visualDiff = await apiChangeProposal.computeVisualDiff(projectId, proposalId, frames.requestPayload);
       setProposals((prev) => prev.map((item) => (item.id === proposalId ? { ...item, visualDiff } : item)));
     } finally {
       setIsComputingDiff(false);
     }
-  }, [projectId, setProposals]);
+  }, [activeProposal, projectId, setProposals]);
 
   const decideTradeoff = useCallback(async (tradeoffId: string, input: DecideTradeoffInput) => {
     if (!projectId || !activeProposal) return;
@@ -137,24 +161,47 @@ function useProposalDiffAndTradeoffs(
     if (input.decision === "disagreed_instead") void refreshProposals();
   }, [activeProposal, projectId, refreshProposals, setProposals]);
 
-  return { isComputingDiff, computeVisualDiff, decideTradeoff };
+  const activeDiffFrames = activeProposal ? diffFrameUrls[activeProposal.id] : undefined;
+  return { isComputingDiff, computeVisualDiff, decideTradeoff, activeDiffFrames };
 }
 
 export function useNodeProposalController(opts: NodeProposalControllerOptions) {
-  const { proposals, setProposals, refreshProposals } = useProposalFetchEffect(opts.projectId, opts.selectedNodeId);
+  const { proposals, setProposals, refreshProposals } = useProposalFetchEffect(
+    opts.disabled ? undefined : opts.projectId,
+    opts.selectedNodeId
+  );
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isDesignerTalkOpen, setIsDesignerTalkOpen] = useState(false);
   const [errorBanner, setErrorBanner] = useState<ProposalGateErrorBanner | null>(null);
   const [receiptToast, setReceiptToast] = useState<{ tone: "success" | "danger"; message: string } | null>(null);
 
-  const activeProposal = proposals[0] ?? null;
-  useDesignerTalkToggleHotkey(opts.isModalOpen, opts.isInlineCodeOpen, setIsDesignerTalkOpen);
+  const activeProposal = proposals.find((p) => p.id === selectedProposalId) ?? proposals[0] ?? null;
+  useDesignerTalkToggleHotkey(Boolean(opts.isModalOpen || opts.disabled), opts.isInlineCodeOpen, setIsDesignerTalkOpen);
   const gates = useProposalGateActions(opts.projectId, setProposals, setErrorBanner, setReceiptToast);
   const extras = useProposalDiffAndTradeoffs(opts.projectId, activeProposal, setProposals, refreshProposals);
 
+  const createQuickDraftProposal = useCallback(async () => {
+    if (!opts.projectId) return;
+    const scopeText = opts.selectedNodeKey || opts.selectedNodeId || "Checkout Flow";
+    const created = await apiChangeProposal.createProposal(
+      opts.projectId,
+      buildUiChangeProposalInput({
+        prompt: `Refine ${scopeText} hierarchy & primary CTA contrast`,
+        nodeId: opts.selectedNodeId,
+        screenKey: opts.selectedNodeKey,
+      })
+    );
+    setSelectedProposalId(created.id);
+    notifyProposalsChanged(opts.projectId);
+  }, [opts.projectId, opts.selectedNodeId, opts.selectedNodeKey]);
+
   return {
+    proposals,
     proposalsCount: proposals.length,
     activeProposal,
+    setSelectedProposalId,
+    createQuickDraftProposal,
     isDrawerOpen,
     setIsDrawerOpen,
     isDesignerTalkOpen,

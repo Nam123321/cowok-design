@@ -4,7 +4,7 @@ id: "05.3"
 title: "Story 05.3: Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17)"
 description: "Mỗi lượt sửa đều lưu một bản chụp bất biến trong chat_artifact_snapshots kèm thẻ biên nhận thay đổi (Per-Turn Undoable Receipt) hỗ trợ Historical Preview, Undo Turn hoặc Fork Session; kết nối thật gh CLI / GitHub OAuth Token mở PR kèm bảng tóm tắt thị giác; đóng gói tệp cowok-handoff-manifest.json và nút 1-Click mở trong Antigravity/Cursor/VSCode/Claude Code."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-05/Story-05.3/story.md"
-status: refactored
+status: completed
 risk_tier: 2
 delivery: core
 timestamp: "2026-11-12T16:10:00+07:00"
@@ -28,7 +28,7 @@ consumes_apis: []
 
 - **FR Covered:** [FR-08, FR-09: Lịch sử Phiên bản (VersionSnapshot / Revert) & Xuất bản Full Repo ZIP / GitHub PR](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 05: Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-05/epic.md)
-- **Status:** refactored
+- **Status:** completed
 - **Risk Tier:** `2`
 
 ## 1. Story Description & Context
@@ -40,7 +40,7 @@ Quản lý lịch sử bản chụp và xuất bản bàn giao kỹ thuật:
    - Xóa bỏ hoàn toàn hàm giả lập `prSequenceCounter`; kết nối thật với `gh` CLI / GitHub OAuth Token để tạo nhánh, commit code và mở Pull Request thật kèm bảng tóm tắt thay đổi thị giác.
    - Đóng gói tệp `cowok-handoff-manifest.json` và nút 1-Click mở trong Antigravity / Cursor / VS Code / Claude Code.
 3. **Thanh Tẩy Mã Sạch**:
-   - `[EDGE-CASE] EC-EXPORT-002`: Thanh tẩy 100% class Tailwind trong `src/features/snapshots/**` (`ExportBundleModal.tsx`, `RevertConfirmModal.tsx`, `DrawerSidebar.tsx`) sang Pure CSS tokens.
+   - **AC-06 (`[EDGE-CASE]` EC-EXPORT-002)**: Thanh tẩy 100% class Tailwind trong `src/features/snapshots/**` (`ExportBundleModal.tsx`, `RevertConfirmModal.tsx`, `DrawerSidebar.tsx`) sang Pure CSS tokens.
 
 ## 2. Plan-Tune Heuristic & Complexity Score
 - **Complexity Score (CS):** `CS = 5.0` (Scope=1, Data=1, Integration=1, UI=1, Security=0.5, Unknowns=0.5 $\rightarrow$ `CS = 5.0 < 7`, đạt ngưỡng an toàn).
@@ -51,25 +51,25 @@ Quản lý lịch sử bản chụp và xuất bản bàn giao kỹ thuật:
 - **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Đảm bảo gói ZIP xuất ra luôn bao gồm đầy đủ tokens.css, icon-manifest.json, fixtures và chạy được lệnh pnpm install && pnpm build ngay lập tức.
 - **AC-04 (Immutable Per-Turn Snapshot Cards, 1-Click Revert Receipt & Conversation Forking):** Mỗi lượt sửa đều lưu một bản chụp bất biến trong `chat_artifact_snapshots` kèm thẻ Biên nhận Thay đổi ngay trong luồng Chat; cho phép bấm xem lại giao diện tại thời điểm đó (Historical Preview), Hoàn tác lượt này (Undo Turn), hoặc Tạo nhánh hội thoại mới từ đây (Fork Session).
 - **AC-05 (Real GitHub Commit/PR Pipeline, cowok-handoff-manifest.json & 1-Click IDE Handoff — GAP-16, GAP-17):** Xóa bỏ hoàn toàn hàm giả lập `prSequenceCounter`; kết nối thật với `gh` CLI / GitHub OAuth Token để kiểm tra quyền, tạo nhánh, commit gói mã nguồn và mở Pull Request thật kèm bảng tóm tắt thay đổi thị giác; đóng gói tệp `cowok-handoff-manifest.json` kèm nút 1-Click Mở trong Antigravity / Cursor / VS Code / Claude Code.
-- **[EDGE-CASE] EC-EXPORT-002 (Tailwind Purge in Snapshots Modals):** Thanh tẩy 100% class Tailwind trong `src/features/snapshots/**` ([ExportBundleModal.tsx](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/src/features/snapshots/components/ExportBundleModal.tsx), [RevertConfirmModal.tsx](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/src/features/snapshots/components/RevertConfirmModal.tsx), [DrawerSidebar.tsx](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/src/features/snapshots/components/DrawerSidebar.tsx)) sang Pure Vanilla CSS (`tokens.css`).
+- **AC-06 ([EDGE-CASE] Tailwind Purge in Snapshots Modals):** Thanh tẩy 100% class Tailwind trong `src/features/snapshots/**` ([ExportBundleModal.tsx](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/src/features/snapshots/components/ExportBundleModal.tsx), [RevertConfirmModal.tsx](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/src/features/snapshots/components/RevertConfirmModal.tsx), [DrawerSidebar.tsx](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/src/features/snapshots/components/DrawerSidebar.tsx)) sang Pure Vanilla CSS (`tokens.css`).
 
 ## 4. Tasks
-- [ ] **Task 05.3.1**: Thiết kế và cài đặt mô-đun cốt lõi cho Lịch sử Phiên bản VersionSnapshot và Revert (thỏa mãn `AC-01`).
-- [ ] **Task 05.3.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu SQLite WAL (thỏa mãn `AC-02`).
-- [ ] **Task 05.3.3**: Cài đặt chốt chặn xử lý tình huống biên kiểm tra tính toàn vẹn của gói ZIP (thỏa mãn `AC-03`).
-- [ ] **Task 05.3.4**: Xây dựng thẻ Biên nhận Thay đổi Per-Turn Snapshot trong Chat, Historical Preview và rẽ nhánh hội thoại Fork Session (thỏa mãn `AC-04`).
-- [ ] **Task 05.3.5**: Triển khai đường ống GitHub PR thật qua `gh` CLI, tạo `cowok-handoff-manifest.json` và nút 1-Click mở IDE (thỏa mãn `AC-05`).
-- [ ] **Task 05.3.6**: Cài đặt chốt chặn `EC-EXPORT-002` và thanh tẩy 100% Tailwind trong `src/features/snapshots/**` (thỏa mãn `EC-EXPORT-002`).
+- [x] **Task 05.3.1**: Thiết kế và cài đặt mô-đun cốt lõi cho Lịch sử Phiên bản VersionSnapshot và Revert (thỏa mãn `AC-01`).
+- [x] **Task 05.3.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu SQLite WAL (thỏa mãn `AC-02`).
+- [x] **Task 05.3.3**: Cài đặt chốt chặn xử lý tình huống biên kiểm tra tính toàn vẹn của gói ZIP (thỏa mãn `AC-03`).
+- [x] **Task 05.3.4**: Xây dựng thẻ Biên nhận Thay đổi Per-Turn Snapshot trong Chat, Historical Preview và rẽ nhánh hội thoại Fork Session (thỏa mãn `AC-04`).
+- [x] **Task 05.3.5**: Triển khai đường ống GitHub PR thật qua `gh` CLI, tạo `cowok-handoff-manifest.json` và nút 1-Click mở IDE (thỏa mãn `AC-05`).
+- [x] **Task 05.3.6**: Cài đặt chốt chặn Tailwind Purge (`EC-EXPORT-002`) và thanh tẩy 100% Tailwind trong `src/features/snapshots/**` (thỏa mãn `AC-06`).
 
 ## 5. AC-to-Task Traceability Matrix
 | AC ID | Description | Mapped Implementation Tasks | Verification Method | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **AC-01** | Core VersionSnapshot & Revert | `Task 05.3.1` | Unit & Integration Test | pending |
-| **AC-02** | Spec Registry & SQLite WAL Integration | `Task 05.3.2` | Contract & Schema Verification | pending |
-| **AC-03** | [EDGE-CASE] Full Repo ZIP Self-Contained Integrity | `Task 05.3.3` | Zip Extraction & Build Test | pending |
-| **AC-04** | Immutable Per-Turn Snapshots & Fork Session | `Task 05.3.4` | Turn Snapshot & Fork Integration Test | pending |
-| **AC-05** | Real GitHub PR Pipeline & IDE Handoff Manifest | `Task 05.3.5` | GitHub CLI & Handoff Manifest Test | pending |
-| **EC-EXPORT-002** | [EDGE-CASE] Tailwind Purge in Snapshots Modals | `Task 05.3.6` | Clean Code Guardian & AST Linter Test | pending |
+| **AC-01** | Core VersionSnapshot & Revert | `Task 05.3.1` | Unit & Integration Test | completed |
+| **AC-02** | Spec Registry & SQLite WAL Integration | `Task 05.3.2` | Contract & Schema Verification | completed |
+| **AC-03** | [EDGE-CASE] Full Repo ZIP Self-Contained Integrity | `Task 05.3.3` | Zip Extraction & Build Test | completed |
+| **AC-04** | Immutable Per-Turn Snapshots & Fork Session | `Task 05.3.4` | Turn Snapshot & Fork Integration Test | completed |
+| **AC-05** | Real GitHub PR Pipeline & IDE Handoff Manifest | `Task 05.3.5` | GitHub CLI & Handoff Manifest Test | completed |
+| **AC-06** | [EDGE-CASE] Tailwind Purge in Snapshots Modals (EC-EXPORT-002) | `Task 05.3.6` | Clean Code Guardian & AST Linter Test | completed |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** ["05.2"]

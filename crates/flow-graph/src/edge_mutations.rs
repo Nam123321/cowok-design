@@ -57,7 +57,10 @@ pub(crate) fn insert_transition_in_tx(
             return Err(FlowServiceError::new(
                 400,
                 "VALIDATION_ERROR",
-                format!("maxLoopIterations must be between 1 and 10, got {}", input.max_loop_iterations),
+                format!(
+                    "maxLoopIterations must be between 1 and 10, got {}",
+                    input.max_loop_iterations
+                ),
             ));
         }
         if input.allow_confirmed_loopback != Some(true) {
@@ -205,7 +208,9 @@ pub(crate) fn update_transition_in_tx(
             .unwrap_or(&existing.flow_type)
             .trim(),
     )?;
-    let max_loop_iter = input.max_loop_iterations.unwrap_or(existing.max_loop_iterations);
+    let max_loop_iter = input
+        .max_loop_iterations
+        .unwrap_or(existing.max_loop_iterations);
     if flow_type == "loopback" {
         if !(1..=10).contains(&max_loop_iter) {
             return Err(FlowServiceError::new(

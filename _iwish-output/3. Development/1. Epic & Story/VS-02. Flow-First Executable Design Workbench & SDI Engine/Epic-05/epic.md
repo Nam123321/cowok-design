@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-05"
 title: "Epic 05: Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR"
-status: in-progress
+status: completed
 track: "Stream-2"
 wave: 3
 provides: ["Option 5 2D Storyboard", "Entry-First Live HTML Stage", "Per-Node ChangeProposal & cowok-design-diff", "Turn Snapshots & Real GitHub PR Pipeline"]

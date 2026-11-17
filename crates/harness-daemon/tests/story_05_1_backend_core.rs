@@ -248,7 +248,11 @@ async fn story_05_1_loopback_vs_dag_cycle_and_cas() {
         })),
     )
     .await;
-    assert_eq!(st_loopback, StatusCode::CREATED, "loopback edge should succeed: {res_loopback}");
+    assert_eq!(
+        st_loopback,
+        StatusCode::CREATED,
+        "loopback edge should succeed: {res_loopback}"
+    );
     assert_eq!(res_loopback["flowType"], "loopback");
     assert_eq!(res_loopback["maxLoopIterations"], 3);
     assert_eq!(res_loopback["revision"], 1);
@@ -329,13 +333,19 @@ async fn story_05_1_two_phase_idempotency_and_sdi_grounding() {
         })),
     )
     .await;
-    assert_eq!(st_vague, StatusCode::CREATED, "vague sdi compile: {res_vague}");
+    assert_eq!(
+        st_vague,
+        StatusCode::CREATED,
+        "vague sdi compile: {res_vague}"
+    );
     assert_eq!(res_vague["status"], "clarifying");
     assert_eq!(res_vague["routingMode"], "clarification_required");
     assert!(res_vague["ambiguityScore"].as_f64().unwrap() >= 0.45);
     let gap_q = res_vague["gapQuestions"].as_array().expect("gapQuestions");
     assert!(!gap_q.is_empty() && gap_q.len() <= 3);
-    let variants = res_vague["clarificationVariants"].as_array().expect("variants");
+    let variants = res_vague["clarificationVariants"]
+        .as_array()
+        .expect("variants");
     assert_eq!(variants.len(), 3);
     let intent_id = res_vague["id"].as_str().unwrap().to_string();
 
@@ -367,7 +377,10 @@ async fn story_05_1_two_phase_idempotency_and_sdi_grounding() {
     )
     .await;
     assert_eq!(st_mismatch, StatusCode::UNPROCESSABLE_ENTITY);
-    assert_eq!(res_mismatch["code"], "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD");
+    assert_eq!(
+        res_mismatch["code"],
+        "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD"
+    );
 
     // 5. Vague prompt with executeImmediately: true triggers 409 CLARIFICATION_REQUIRED and cleans up TX1 idempotency lease
     let (st_clar_req, res_clar_req) = send_req(
@@ -396,7 +409,11 @@ async fn story_05_1_two_phase_idempotency_and_sdi_grounding() {
         })),
     )
     .await;
-    assert_eq!(st_after_abort, StatusCode::CREATED, "lease should be cleaned up on early 409 abort: {res_after_abort}");
+    assert_eq!(
+        st_after_abort,
+        StatusCode::CREATED,
+        "lease should be cleaned up on early 409 abort: {res_after_abort}"
+    );
 
     // 6. Targeted prompt on existing node produces direct_edit & ambiguityScore < 0.45
     let (st_target, res_target) = send_req(
@@ -462,23 +479,24 @@ async fn story_05_1_cross_tenant_anti_idor_and_fixture_cas() {
         })),
     )
     .await;
-    assert_eq!(st_create, StatusCode::CREATED, "create fixture: {res_create}");
+    assert_eq!(
+        st_create,
+        StatusCode::CREATED,
+        "create fixture: {res_create}"
+    );
     let fixture_id = res_create["id"].as_str().unwrap().to_string();
     assert_eq!(res_create["presetKey"], "happy");
     assert_eq!(res_create["revision"], 1);
 
     // 2. Cross-tenant anti-IDOR: tenant-b accessing tenant-a's project/fixtures returns 404 NOT_FOUND (never 403)
-    let single_fix_uri = format!("/api/v1/projects/{proj_id}/flow/nodes/{node_id}/fixtures/{fixture_id}");
-    let (st_cross, _) = send_req(
-        &router,
-        "GET",
-        &single_fix_uri,
-        &tok_tenant_b,
-        &[],
-        None,
-    )
-    .await;
-    assert_eq!(st_cross, StatusCode::NOT_FOUND, "cross-tenant fixture access must be 404");
+    let single_fix_uri =
+        format!("/api/v1/projects/{proj_id}/flow/nodes/{node_id}/fixtures/{fixture_id}");
+    let (st_cross, _) = send_req(&router, "GET", &single_fix_uri, &tok_tenant_b, &[], None).await;
+    assert_eq!(
+        st_cross,
+        StatusCode::NOT_FOUND,
+        "cross-tenant fixture access must be 404"
+    );
 
     let sdi_uri = format!("/api/v1/projects/{proj_id}/sdi/intent");
     let (st_cross_sdi, _) = send_req(
@@ -490,7 +508,11 @@ async fn story_05_1_cross_tenant_anti_idor_and_fixture_cas() {
         Some(json!({ "rawPrompt": "test" })),
     )
     .await;
-    assert_eq!(st_cross_sdi, StatusCode::NOT_FOUND, "cross-tenant sdi access must be 404");
+    assert_eq!(
+        st_cross_sdi,
+        StatusCode::NOT_FOUND,
+        "cross-tenant sdi access must be 404"
+    );
 
     // 3. Stale revision CAS on ScreenFixture: expectedRevision: 99 returns 409 STALE_REVISION with currentRevision
     let (st_fix_stale, res_fix_stale) = send_req(

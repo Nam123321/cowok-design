@@ -847,7 +847,13 @@ pub async fn handle_get_fixture(
         )
         .optional()
         .map_err(|e| map_harness_resp(map_sqlite_error(e, "get_fixture"), "get_fixture"))?
-        .ok_or_else(|| json_err(StatusCode::NOT_FOUND, "FIXTURE_NOT_FOUND", format!("Fixture '{fid}' was not found")))
+        .ok_or_else(|| {
+            json_err(
+                StatusCode::NOT_FOUND,
+                "FIXTURE_NOT_FOUND",
+                format!("Fixture '{fid}' was not found"),
+            )
+        })
     })
     .await?;
 

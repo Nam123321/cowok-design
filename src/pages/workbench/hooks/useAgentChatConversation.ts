@@ -1,8 +1,10 @@
 // @story 04.1, 04.4
 // @implements AC-02, AC-04 (Shared Left-Open Chat Conversation & Reactive V7 Node Sub-Sessions Sync)
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { apiChangeProposal } from "@/api/change-proposal";
 import { apiFlowExecution } from "@/api/flow-execution";
 import { apiSdiEngine } from "@/api/sdi-engine";
+import { buildUiChangeProposalInput, notifyProposalsChanged } from "@/features/proposals/utils/proposal-events";
 import { useFormatter } from "@/hooks/useFormatter";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { ChatMessage } from "@/components/workbench/ChatPrimitivesBridge";
@@ -55,12 +57,27 @@ function sendSdiCompile(params: {
 }) {
   void apiSdiEngine
     .compileIntent(params.projectId, { rawPrompt: params.sentPrompt, targetNodeId: params.primaryNodeId })
-    .then((intent) => {
+    .then(async (intent) => {
       const now = Date.now();
       sharedChatStore.appendMessage(params.targetKey, {
         id: `msg-agent-${intent.id}`, sender: "agent", createdAtMs: now, timestamp: params.formatTime(now), nodeId: params.primaryNodeId,
         text: buildCompiledIntentReply(intent, params.formatNumber, params.t),
       });
+      if (UUID_RE.test(params.projectId)) {
+        try {
+          await apiChangeProposal.createProposal(
+            params.projectId,
+            buildUiChangeProposalInput({
+              prompt: params.sentPrompt,
+              nodeId: params.primaryNodeId,
+              screenKey: params.primaryNodeId ? undefined : "BATCH",
+            })
+          );
+          notifyProposalsChanged(params.projectId);
+        } catch {
+          /* ignore if offline or scratch */
+        }
+      }
     })
     .catch((err) => {
       const now = Date.now();

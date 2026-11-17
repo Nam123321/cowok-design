@@ -1,8 +1,13 @@
 // @story 04.4
 // @implements AC-01, AC-02, AC-03 (Daemon Enqueue, Lifecycle SSE Stream & CAS Dispatch Helper)
 import React from "react";
+import { apiChangeProposal } from "@/api/change-proposal";
 import { apiFlowExecution } from "@/api/flow-execution";
 import { apiSdiEngine } from "@/api/sdi-engine";
+import {
+  buildUiChangeProposalInput,
+  notifyProposalsChanged,
+} from "@/features/proposals/utils/proposal-events";
 import { WorkbenchNode } from "../store/flow-workbench-store";
 import { globalKeyedParallelCoordinator } from "../store/keyed-parallel-coordinator";
 import { sharedChatStore, toSessionChatKey } from "../store/shared-chat-sync";
@@ -86,6 +91,45 @@ export function ensureProjectSseStream(
   });
 }
 
+async function synthesizeProposalAndCompleteJobs(
+  params: DispatchExecutionParams,
+  jobs: Awaited<ReturnType<typeof apiFlowExecution.enqueueJobs>>["jobs"],
+  intentType: string
+): Promise<void> {
+  try {
+    await apiChangeProposal.createProposal(
+      params.projectId,
+      buildUiChangeProposalInput({
+        prompt: params.prompt,
+        nodeId: params.primaryNode?.id,
+        nodeIds: params.selectedNodeIds,
+        screenKey: (params.primaryNode as { screenKey?: string } | null)?.screenKey || null,
+      })
+    );
+    notifyProposalsChanged(params.projectId);
+  } catch {
+    /* keep running job open when proposal service is unavailable/rejected */
+    return;
+  }
+  for (const job of jobs) {
+    if (job.status !== "RUNNING") continue;
+    try {
+      await apiFlowExecution.postJobEvent(params.projectId, {
+        jobId: job.id,
+        nodeId: job.nodeId,
+        sessionId: params.sessionId,
+        eventKind: "proposal_ready",
+        payloadText: `Synthesized ChangeProposal for ${intentType}`,
+        jobStatus: "COMPLETED",
+        expectedFencingToken: job.fencingToken,
+      });
+    } catch {
+      /* ignore fencing mismatch if externally modified */
+    }
+  }
+  await syncCoordinatorFromDaemon(params.projectId, params.coordinator);
+}
+
 async function runEnqueueAndCompile(params: DispatchExecutionParams): Promise<void> {
   const enq = await apiFlowExecution.enqueueJobs(params.projectId, {
     sessionId: params.sessionId,
@@ -102,6 +146,7 @@ async function runEnqueueAndCompile(params: DispatchExecutionParams): Promise<vo
     ? `${params.t("chat.clarifyPrefix", "Cần làm rõ")} (${clarifyPct}%): ${intent.clarificationVariants?.map((v) => v.title).join(" | ") || intent.intentType}`
     : `${params.t("floatingChat.compiledIntent", "Đã biên dịch intent")} (${intent.intentType}) · status=${intent.status}`;
   params.onAppendMsg({ id: `resp-${intent.id}`, nodeId: params.primaryNode?.id || "unknown", role: "assistant", content: summary, timestamp: Date.now() });
+  await synthesizeProposalAndCompleteJobs(params, enq.jobs, intent.intentType);
 }
 
 export async function dispatchNodeExecutionToDaemon(params: DispatchExecutionParams) {

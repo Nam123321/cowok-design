@@ -530,18 +530,21 @@ model ExecutionEvent {
 // ============================================================================
 
 model ChatSession {
-  id            String  @id @default(uuid())
-  tenantId      String  @default("local-default") @map("tenant_id")
-  projectId     String  @map("project_id")
-  title         String
-  modelProvider String  @default("gemini") @map("model_provider")
-  archivedAt    BigInt? @map("archived_at")
-  createdAt     BigInt  @map("created_at")
-  updatedAt     BigInt  @map("updated_at")
+  id                  String  @id @default(uuid())
+  tenantId            String  @default("local-default") @map("tenant_id")
+  projectId           String  @map("project_id")
+  title               String
+  modelProvider       String  @default("gemini") @map("model_provider")
+  archivedAt          BigInt? @map("archived_at")
+  forkedFromSessionId String? @map("forked_from_session_id")
+  forkedFromMessageId String? @map("forked_from_message_id")
+  createdAt           BigInt  @map("created_at")
+  updatedAt           BigInt  @map("updated_at")
 
   messages ChatMessage[]
 
   @@index([projectId, createdAt])
+  @@index([forkedFromSessionId, forkedFromMessageId], map: "idx_chat_sessions_forked_from")
   @@map("chat_sessions")
 }
 
@@ -582,19 +585,25 @@ model ChatMessageNodeScope {
 }
 
 model ChatArtifactSnapshot {
-  id           String  @id @default(uuid())
-  projectId    String  @map("project_id")
-  sessionId    String  @map("session_id")
-  messageId    String  @map("message_id")
-  nodeId       String? @map("node_id")
-  artifactType String  @map("artifact_type")
-  contentHash  String  @map("content_hash")
-  manifestJson String  @map("manifest_json")
-  createdAt    BigInt  @map("created_at")
+  id               String  @id @default(uuid())
+  tenantId         String  @default("local-default") @map("tenant_id")
+  projectId        String  @map("project_id")
+  sessionId        String  @map("session_id")
+  messageId        String  @map("message_id")
+  nodeId           String? @map("node_id")
+  proposalId       String? @map("proposal_id")
+  parentSnapshotId String? @map("parent_snapshot_id")
+  artifactType     String  @map("artifact_type")
+  contentHash      String  @map("content_hash")
+  manifestJson     String  @map("manifest_json")
+  nodeSnapshotJson String  @default("{}") @map("node_snapshot_json")
+  createdAt        BigInt  @map("created_at")
 
   message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([projectId, sessionId, messageId])
+  @@index([proposalId], map: "idx_artifact_snapshots_proposal")
+  @@index([parentSnapshotId], map: "idx_artifact_snapshots_parent")
   @@map("chat_artifact_snapshots")
 }
 
@@ -731,36 +740,45 @@ model ProposalTradeoff {
 }
 
 model VersionSnapshot {
-  id             String   @id @default(uuid())
-  tenantId       String   @default("local-default") @map("tenant_id")
-  projectId      String   @map("project_id")
-  snapshotTag    String   @map("snapshot_tag")
-  versionTag     String   @default("") @map("version_tag")
-  label          String   @default("")
-  description    String   @default("")
-  trigger        String   @default("manual")
-  treeSha256     String   @default("") @map("tree_sha256")
-  filesJson      String   @default("[]") @map("files_json")
-  manifestSha256 String   @map("manifest_sha256")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @default(now()) @map("updated_at")
+  id                     String   @id @default(uuid())
+  tenantId               String   @default("local-default") @map("tenant_id")
+  projectId              String   @map("project_id")
+  snapshotTag            String   @map("snapshot_tag")
+  versionTag             String   @default("") @map("version_tag")
+  label                  String   @default("")
+  description            String   @default("")
+  trigger                String   @default("manual")
+  treeSha256             String   @default("") @map("tree_sha256")
+  filesJson              String   @default("[]") @map("files_json")
+  manifestSha256         String   @map("manifest_sha256")
+  proposalId             String?  @map("proposal_id")
+  parentSnapshotId       String?  @map("parent_snapshot_id")
+  chatArtifactSnapshotId String?  @map("chat_artifact_snapshot_id")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @default(now()) @map("updated_at")
 
   @@index([projectId, createdAt])
+  @@index([proposalId], map: "idx_version_snapshots_proposal")
+  @@index([parentSnapshotId], map: "idx_version_snapshots_parent")
   @@map("version_snapshots")
 }
 
 model GithubPullRequest {
-  id         String   @id @default(uuid())
-  tenantId   String   @default("local-default") @map("tenant_id")
-  projectId  String   @map("project_id")
-  prNumber   Int      @map("pr_number")
-  branchName String   @map("branch_name")
-  title      String
-  prUrl      String   @default("") @map("pr_url")
-  status     String   @default("OPEN")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @default(now()) @map("updated_at")
+  id                     String   @id @default(uuid())
+  tenantId               String   @default("local-default") @map("tenant_id")
+  projectId              String   @map("project_id")
+  prNumber               Int      @map("pr_number")
+  branchName             String   @map("branch_name")
+  title                  String
+  prUrl                  String   @default("") @map("pr_url")
+  status                 String   @default("OPEN")
+  snapshotId             String?  @map("snapshot_id")
+  handoffManifestSha256  String   @default("") @map("handoff_manifest_sha256")
+  visualDiffSummaryJson  String   @default("{}") @map("visual_diff_summary_json")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @default(now()) @map("updated_at")
 
+  @@index([snapshotId], map: "idx_github_prs_snapshot")
   @@map("github_pull_requests")
 }
 

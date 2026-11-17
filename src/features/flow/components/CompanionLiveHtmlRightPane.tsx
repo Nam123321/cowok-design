@@ -111,6 +111,8 @@ export interface CompanionLiveHtmlRightPaneProps {
   onToggleSampleData?: () => void;
   isWalkthroughActive?: boolean;
   onToggleWalkthrough?: () => void;
+  versionMenuNode?: React.ReactNode;
+  isReadOnly?: boolean;
 }
 
 const PreviewDeviceFrame: React.FC<{
@@ -345,6 +347,7 @@ export const CompanionLiveHtmlRightPane: React.FC<CompanionLiveHtmlRightPaneProp
     postFixtureHydrate: bridge.postFixtureHydrate,
     onSetViewportPreset: props.onSetViewportPreset,
     onSelectSubState: handleSelectSubState,
+    isReadOnly: props.isReadOnly,
   });
 
   const handleApplyInlineHtml = useCallback(() => {
@@ -424,6 +427,7 @@ export const CompanionLiveHtmlRightPane: React.FC<CompanionLiveHtmlRightPaneProp
         onToggleSampleData={props.onToggleSampleData}
         isWalkthroughActive={props.isWalkthroughActive}
         onToggleWalkthrough={props.onToggleWalkthrough}
+        versionMenuNode={props.versionMenuNode}
       />
       <div
         style={{

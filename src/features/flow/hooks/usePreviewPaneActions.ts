@@ -75,14 +75,16 @@ function useInitialNodePreviewSync(params: {
 
 function useCreateCommentAction(args: {
   canPersist: boolean;
+  isReadOnly?: boolean;
   projectId?: string;
   selectedNodeId?: string | null;
   artifactSha256: string;
   setComments: React.Dispatch<React.SetStateAction<ElementCommentResponse[]>>;
   setToastState: React.Dispatch<React.SetStateAction<CommentToastState | null>>;
 }) {
-  const { canPersist, projectId, selectedNodeId, artifactSha256, setComments, setToastState } = args;
+  const { canPersist, isReadOnly, projectId, selectedNodeId, artifactSha256, setComments, setToastState } = args;
   return useCallback(async (content: string, elementFfId: string): Promise<boolean> => {
+    if (isReadOnly) return false;
     if (!canPersist || !projectId || !selectedNodeId) {
       setComments((prev) => [...prev, buildLocalComment({ projectId, nodeId: selectedNodeId, elementFfId, content, sha256: artifactSha256 })]);
       setToastState(null);
@@ -100,18 +102,20 @@ function useCreateCommentAction(args: {
       else if (err instanceof Error) setToastState({ message: err.message, tone: "danger" });
       return false;
     }
-  }, [artifactSha256, canPersist, projectId, selectedNodeId, setComments, setToastState]);
+  }, [artifactSha256, canPersist, isReadOnly, projectId, selectedNodeId, setComments, setToastState]);
 }
 
 function useResolveCommentAction(args: {
   canPersist: boolean;
+  isReadOnly?: boolean;
   projectId?: string;
   selectedNodeId?: string | null;
   setComments: React.Dispatch<React.SetStateAction<ElementCommentResponse[]>>;
   setToastState: React.Dispatch<React.SetStateAction<CommentToastState | null>>;
 }) {
-  const { canPersist, projectId, selectedNodeId, setComments, setToastState } = args;
+  const { canPersist, isReadOnly, projectId, selectedNodeId, setComments, setToastState } = args;
   return useCallback(async (commentId: string) => {
+    if (isReadOnly) return;
     if (!canPersist || !projectId || !selectedNodeId) {
       setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, anchorStatus: "resolved" } : c)));
       return;
@@ -128,11 +132,12 @@ function useResolveCommentAction(args: {
         setToastState({ message: err.message, tone: "danger" });
       }
     }
-  }, [canPersist, projectId, selectedNodeId, setComments, setToastState]);
+  }, [canPersist, isReadOnly, projectId, selectedNodeId, setComments, setToastState]);
 }
 
 function useReanchorCommentAction(args: {
   canPersist: boolean;
+  isReadOnly?: boolean;
   projectId?: string;
   selectedNodeId?: string | null;
   artifactSha256: string;
@@ -140,8 +145,9 @@ function useReanchorCommentAction(args: {
   setComments: React.Dispatch<React.SetStateAction<ElementCommentResponse[]>>;
   setToastState: React.Dispatch<React.SetStateAction<CommentToastState | null>>;
 }) {
-  const { canPersist, projectId, selectedNodeId, artifactSha256, prefillFfId, setComments, setToastState } = args;
+  const { canPersist, isReadOnly, projectId, selectedNodeId, artifactSha256, prefillFfId, setComments, setToastState } = args;
   return useCallback(async (commentId: string) => {
+    if (isReadOnly) return;
     const targetFfId = prefillFfId || "sec-header";
     const nextDomHash = artifactSha256.slice(0, DOM_HASH_LEN);
     if (!canPersist || !projectId || !selectedNodeId) {
@@ -156,7 +162,7 @@ function useReanchorCommentAction(args: {
     } catch (err) {
       if (err instanceof Error) setToastState({ message: err.message, tone: "danger" });
     }
-  }, [artifactSha256, canPersist, prefillFfId, projectId, selectedNodeId, setComments, setToastState]);
+  }, [artifactSha256, canPersist, isReadOnly, prefillFfId, projectId, selectedNodeId, setComments, setToastState]);
 }
 
 export function usePreviewPaneActions(params: {
@@ -167,20 +173,22 @@ export function usePreviewPaneActions(params: {
   postFixtureHydrate: (variant: FixtureVariant, fixtureJson: string) => void;
   onSelectSubState?: (variant: FixtureVariant) => void;
   onSetViewportPreset: (vp: ViewportPreset) => void;
+  isReadOnly?: boolean;
 }) {
   const [comments, setComments] = useState<ElementCommentResponse[]>([]);
   const [fixturesByVariant, setFixturesByVariant] = useState<Record<string, string>>({});
   const [prefillFfId, setPrefillFfId] = useState<string>("sec-header");
   const [toastState, setToastState] = useState<CommentToastState | null>(null);
-  const { projectId, selectedNodeId, postFixtureHydrate, onSelectSubState, onSetViewportPreset } = params;
+  const { projectId, selectedNodeId, postFixtureHydrate, onSelectSubState, onSetViewportPreset, isReadOnly } = params;
   const canPersist = Boolean(projectId && UUID_RE.test(projectId) && selectedNodeId);
 
   useInitialNodePreviewSync({ canPersist, projectId, selectedNodeId, setComments, setFixturesByVariant, setToastState, onSelectSubState });
-  const handleAddComment = useCreateCommentAction({ canPersist, projectId, selectedNodeId, artifactSha256: params.artifactSha256, setComments, setToastState });
-  const handleResolveComment = useResolveCommentAction({ canPersist, projectId, selectedNodeId, setComments, setToastState });
-  const handleReanchorComment = useReanchorCommentAction({ canPersist, projectId, selectedNodeId, artifactSha256: params.artifactSha256, prefillFfId, setComments, setToastState });
+  const handleAddComment = useCreateCommentAction({ canPersist, isReadOnly, projectId, selectedNodeId, artifactSha256: params.artifactSha256, setComments, setToastState });
+  const handleResolveComment = useResolveCommentAction({ canPersist, isReadOnly, projectId, selectedNodeId, setComments, setToastState });
+  const handleReanchorComment = useReanchorCommentAction({ canPersist, isReadOnly, projectId, selectedNodeId, artifactSha256: params.artifactSha256, prefillFfId, setComments, setToastState });
 
   const handleSelectFixtureVariant = useCallback(async (variant: FixtureVariant) => {
+    if (isReadOnly) return;
     const normalized = normalizeFixtureRef(variant);
     onSelectSubState?.(normalized);
     const payloadJson = fixturesByVariant[normalized] || JSON.stringify({ substate: normalized });
@@ -192,9 +200,10 @@ export function usePreviewPaneActions(params: {
         if (err instanceof Error) setToastState({ message: err.message, tone: "danger" });
       }
     }
-  }, [canPersist, fixturesByVariant, onSelectSubState, postFixtureHydrate, projectId, selectedNodeId]);
+  }, [canPersist, fixturesByVariant, isReadOnly, onSelectSubState, postFixtureHydrate, projectId, selectedNodeId]);
 
   const handlePersistViewport = useCallback(async (vp: ViewportPreset) => {
+    if (isReadOnly) return;
     onSetViewportPreset(vp);
     if (canPersist && projectId && selectedNodeId) {
       try {
@@ -203,7 +212,7 @@ export function usePreviewPaneActions(params: {
         if (err instanceof Error) setToastState({ message: err.message, tone: "danger" });
       }
     }
-  }, [canPersist, onSetViewportPreset, projectId, selectedNodeId]);
+  }, [canPersist, isReadOnly, onSetViewportPreset, projectId, selectedNodeId]);
 
   const collapsedCommentIds = comments.filter((c) => { const r = params.elementRects[c.elementFfId]; return !r || r.width <= 0 || r.height <= 0; }).map((c) => c.id);
   const staleToastMessage = toastState?.message ?? null;
