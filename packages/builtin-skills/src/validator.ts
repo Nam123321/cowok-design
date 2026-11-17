@@ -35,6 +35,7 @@ export interface ValidationResult {
     name?: string;
     version?: string;
     description?: string;
+    entry_point?: string;
     risk_tier?: number;
     capabilities_required?: string[];
   };
@@ -124,15 +125,21 @@ export function validateSkillFrontmatter(rawContent: string): ValidationResult {
   const nameRes = getStrictString(doc.contents, ["name", "id", "title"]);
   const descRes = getStrictString(doc.contents, ["description", "desc"]);
   const verRes = getStrictString(doc.contents, ["version"]);
+  const entryRes = getStrictString(doc.contents, ["entry_point"]);
+  const entryNode = doc.get("entry_point", true);
+  const emptyEntryErr =
+    entryNode !== undefined && !entryRes.error && !entryRes.value
+      ? "Field 'entry_point' must not be empty"
+      : undefined;
   const capsRes = getStringList(doc, ["capabilities_required", "capabilities", "permissions"]);
   const tierRes = parseRiskTier(doc);
-  const firstErr = nameRes.error ?? (!nameRes.value ? "Missing required field in frontmatter: name" : undefined) ?? descRes.error ?? (!descRes.value ? "Missing required field in frontmatter: description" : undefined) ?? verRes.error ?? capsRes.error ?? tierRes.error;
+  const firstErr = nameRes.error ?? (!nameRes.value ? "Missing required field in frontmatter: name" : undefined) ?? descRes.error ?? (!descRes.value ? "Missing required field in frontmatter: description" : undefined) ?? verRes.error ?? entryRes.error ?? emptyEntryErr ?? capsRes.error ?? tierRes.error;
   if (firstErr) return { valid: false, tokens, bytes: byteLen, error: firstErr };
 
   return {
     valid: true,
     tokens,
     bytes: byteLen,
-    fields: { name: nameRes.value, version: verRes.value, description: descRes.value, risk_tier: tierRes.value, capabilities_required: capsRes.values },
+    fields: { name: nameRes.value, version: verRes.value, description: descRes.value, entry_point: entryRes.value, risk_tier: tierRes.value, capabilities_required: capsRes.values },
   };
 }

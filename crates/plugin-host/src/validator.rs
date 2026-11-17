@@ -30,6 +30,7 @@ pub struct FrontmatterMetadata {
     pub name: String,
     pub version: Option<String>,
     pub description: String,
+    pub entry_point: Option<String>,
     pub capabilities_required: Vec<String>,
     pub risk_tier: Option<u8>,
     pub tags: Vec<String>,
@@ -229,6 +230,21 @@ pub fn parse_and_validate_skill_frontmatter(
         .ok_or_else(|| ValidationError::MissingRequiredField("description".to_string()))?
         .to_string();
     let version = mapping_str(map, &["version"])?.map(|s| s.to_string());
+    let entry_key = serde_yaml::Value::String("entry_point".to_string());
+    let entry_point = if let Some(val) = map.get(&entry_key) {
+        let s = val.as_str().ok_or_else(|| {
+            ValidationError::YamlParseError("Field 'entry_point' must be a string".to_string())
+        })?;
+        let trimmed = s.trim();
+        if trimmed.is_empty() {
+            return Err(ValidationError::YamlParseError(
+                "Field 'entry_point' must not be empty".to_string(),
+            ));
+        }
+        Some(trimmed.to_string())
+    } else {
+        None
+    };
 
     let tier_key = serde_yaml::Value::String("risk_tier".to_string());
     let risk_tier = if let Some(val) = map.get(&tier_key) {
@@ -251,6 +267,7 @@ pub fn parse_and_validate_skill_frontmatter(
         name,
         version,
         description,
+        entry_point,
         capabilities_required,
         risk_tier,
         tags,

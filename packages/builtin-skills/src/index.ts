@@ -1,8 +1,15 @@
 /**
  * @cowok-design/builtin-skills public contract entrypoint.
- * Per D2 Single Core Port (Story 08.1 AC-02), `crates/plugin-host` is the sole
- * authoritative runtime; this package exposes asset schemas, Zod contracts, and typed errors.
+ * Preserves backwards-compatible package root exports across lifecycle, registry,
+ * staging, validator, triangle-linter, repackager, and typed domain contracts.
  */
 export * from "./types";
 export * from "./lifecycle-types";
 export * from "./lifecycle-errors";
+export * from "./validator";
+export * from "./triangle-linter";
+export * from "./staging";
+export * from "./registry";
+export * from "./repackager";
+export * from "./lifecycle";
+export * from "./breaking-diff";

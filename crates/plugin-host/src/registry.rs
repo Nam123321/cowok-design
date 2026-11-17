@@ -48,6 +48,12 @@ fn verify_frontmatter_parity(
             meta.risk_tier, manifest.risk_tier
         ));
     }
+    if meta.entry_point.as_deref().unwrap_or("SKILL.md") != manifest.entry_point {
+        return Err(format!(
+            "SKILL.md entry_point '{:?}' does not match plugin.json entry_point '{}'",
+            meta.entry_point, manifest.entry_point
+        ));
+    }
     Ok(())
 }
 
@@ -212,7 +218,7 @@ impl SkillRegistry {
                 name: meta.name,
                 version: meta.version.unwrap_or_else(|| "1.0.0".to_string()),
                 description: meta.description,
-                entry_point: "SKILL.md".to_string(),
+                entry_point: meta.entry_point.unwrap_or_else(|| "SKILL.md".to_string()),
                 capabilities_required: meta.capabilities_required,
                 risk_tier: meta.risk_tier.unwrap_or(1),
                 parameters: None,

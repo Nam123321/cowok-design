@@ -1,14 +1,33 @@
 # Edge Case Guardian & Adversarial Review Report — Story 08.3
 
-- **Story:** Story 08.3 — Quản lý Vòng đời Plugin 6 Trạng thái & Cron Job Tự động Cập nhật từ GitHub (tokio-cron-scheduler)
-- **Epic:** Epic 08 (agentskills.io Repackager Engine, 6 Built-in Harness Skills & GitHub Cron Lifecycle)
-- **Reviewer:** Review Agent (Edge Case Guardian Skill)
-- **Verdict:** APPROVED (PASS)
+- **Story:** Story 08.3 — 6-State Plugin Lifecycle Machine, Structural Breaking-Change Diff & `HUMAN_ONLY` LEARN Domain Core
+- **Epic:** Epic 08 (`agentskills.io` Repackager Engine, Built-in Skills & Plugin Lifecycle)
+- **Reviewer:** Review Agent (Edge Case Guardian + Party-Mode Wave 2 Adversarial Audit)
+- **Verdict:** APPROVED (PASS — Hardened Remediation Plan Locked)
 
-## 1. FMEA & Boundary Evaluation
-- **Identified Edge Case:** Giữ nguyên phiên bản Active hiện tại và đưa bản cập nhật mới vào vùng Staging nếu phát hiện thay đổi làm gãy schema (Breaking Change).
-- **Mitigation Verified:** Embedded into `[EDGE-CASE]` Acceptance Criterion `AC-03` and mapped to `Task 08.3.3`.
-- **Complexity Score (CS):** `4/10` (< 7 threshold — No story split required).
+## 1. Full 13-Pillar FMEA & Boundary Evaluation
 
-## 2. Final Verdict
-**VERDICT: PASS / APPROVED**
+| Pillar | Failure Mode (`file:line` Ref) | L/I/D | RPN | Mitigation & Verification (`UT-083-*`) |
+| :--- | :--- | :---: | :---: | :--- |
+| 1. Clean Code & Exports | TS module > 20 exports or WMC > 80 (`lifecycle-types.ts` already at 20 exports; `lifecycle.ts` throws untyped strings) | 3/4/3 | 36 | Split typed TS error subclasses into `breaking-diff.ts` / `lifecycle-errors` or stay `<= 20` exports per file; verify via `audit_clean_code.py --story 08.3` |
+| 2. Input & Control Guards | TS `NaN` expiry bypass (`lifecycle.ts:282,364`), UTF-8 vs UTF-16 length drift, TS misses C1 controls `U+0080..=U+009F`, untrimmed `scope` reads | 4/5/3 | 60 | `Number.isSafeInteger` + `now_s > 0`, UTF-8 byte checks in TS via `TextEncoder`, C1 control block, `.trim()` on read queries |
+| 3. Staged Payload Promote | `promote_staging` omits `risk_tier`/`capabilities_required` & `entry_point`; path validator permits control/bidi/non-script ext bypass (`plugin_state_machine.rs:126-140,386-405`); no disk `O_NOFOLLOW`/`nlink==1` helper | 4/5/3 | 60 | Enforce strict `risk_tier` + `capabilities_required` + `entry_point` + `SCRIPT_EXTENSIONS` + control/bidi/reserved blocks + additive `load_verified_staged_bundle_from_dir` (`O_NOFOLLOW`, `nlink==1`, `skills-lock.json`) |
+| 4. Quarantine & Encapsulation | Rust `ManagedPlugin` fields are `pub` + unvalidated `Deserialize` (`plugin_state_machine.rs:110-124`); non-Active breaking/downgrade bypass; `ACTIVE -> DEPRECATED` leaves stale `staging_*` | 4/5/3 | 60 | Privatize `ManagedPlugin` fields + validated `from_persisted(...)`, block downgrades/unstaged breaking updates across all states, clear staging on terminal/deprecation |
+| 5. Indirect Prompt Injection (`EC-LEARN-001`) | `escape_xml_text` omits `&apos;`; `U+2028`/`U+2029` & `U+E0001..=U+E007F` bypasses; fullwidth homoglyphs bypass checks; multiline `![x]\n[ref]` missed in `repackager-assets.ts:57`; `manifest` description/overview unscanned; `id`/`tenant`/`project` unscanned | 5/5/3 | 75 | Add `&apos;`, validate IDs/scopes, block `U+2028`/`U+2029`/`U+E0001..=U+E007F`, read-only NFKC shadow IPI/YAML scan, align `repackager-assets.ts` regex, scan manifest metadata |
+| 6. Key Exposure & Confused Deputy | Rust `#[derive(Debug)]` & TS enumerable `this.signingKey` leak `[u8; 32]` (`SEC-083-01`); `HumanApproverToken` omits `card_id`/`content_sha256`/`action`/`expected_revision`/`kid` (`SEC-083-02`); weak CSPRNG fallback (`SEC-083-10`); nonce burn before CAS (`SEC-083-09`) | 5/5/3 | 75 | Manual redacted `fmt::Debug` + volatile zeroize `Drop` + TS `WeakMap`; bind `(kid, card_id, content_sha256, action, expected_revision)`; fail-closed OS CSPRNG; verify card/CAS before consuming scoped nonce |
+| 7. Concurrent Mutation / Hydration / Re-entrancy | Optional `expected_revision: None` bypass; mutate-then-`Err` in `apply_manifest_update` rolls back SQLite txns (`GAP-083-03`); `LearnPipeline` & TS `PluginStateMachine` are RAM-only with no `from_persisted_state` / `export_consumed_nonces` / `prune_expired_nonces` (`GAP-083-01..02`) | 5/4/4 | 80 | Return `Result<ManifestUpdateOutcome, ...>`, store `staging_diff_reasons`, deprecate/remove un-checked CAS bypasses, add `from_persisted` + `from_persisted_state` + `export_consumed_nonces` + `prune_expired_nonces` + TTL/capacity bounds |
+| 8. Exact `cl100k_base` BPE & Encoding | TS `.encode(trimmed)` throws on `<|endoftext|>` without empty disallowed list; quadratic re-tokenization per card (`learn_pipeline.rs:736-743`) | 4/4/3 | 48 | Pass empty disallowed-special array in TS `countExactCl100kTokens` and avoid quadratic repeated BPE passes |
+| 9. Schema & Wire Parity (`AC-02`) | Zero `ts-rs` exports in `crates/plugin-host`; `SkillManifest` defaults (`0` vs `1` vs `2`); `stableJsonEqual` `undefined`-key asymmetry; `StorageConstraintTarget` string-matching brittleness | 4/4/3 | 48 | Add `ts-rs` exports for `08.3` DTOs + `ManagedPlugin::to_domain_plugin()`, align `SkillManifest` defaults, ignore `undefined` values in `stableJsonEqual`, introduce `StorageConstraintTarget` enum |
+| 10. Structural Diff Accuracy | Union `"type": ["string", "null"]` broken in both Rust (`.as_str()`) and TS (`!==`); `risk_tier` escalation ignored | 4/5/3 | 60 | Compare normalized union `"type"` sets (`BTreeSet` / sorted `Set`) and flag `candidate.risk_tier > current.risk_tier` as breaking |
+| 11. AC-04 & Gate/ECC Traceability | Missing `propose_card_from_gate_report` & `idempotency_key`; missing `Story-08.3-evidence.json` (`P5` FAIL); missing domain `data-spec.md` (`P4` FAIL) | 4/4/3 | 48 | Add `propose_card_from_gate_report` + `idempotency_key`, generate ECC evidence + `.sig`, add clean non-Prisma domain `data-spec.md` |
+| 12. Multi-Tenant Isolation | Global `c.id == cid` check & bare `nonce` key allow cross-tenant probing/DoS; `get_active_prompt_injections` ignores tenant/project when reading `id` (`SEC-083-03`) | 5/5/3 | 75 | Scope card ID uniqueness, `consumed_nonces`, and `get_active_prompt_injections` lookups strictly by `(tenant_id, project_id)` |
+| 13. Dual-Runtime Golden Verification | Dual runtime suites + `audit-360` verification | 3/4/3 | 36 | Shared `story-08.3-golden.json` adversarial suite across `cargo test -p plugin-host` & `vitest` + full `audit_360` 13-pillar pass |
+
+## 2. Complexity Score (CS) & Scope Check
+- **Complexity Score:** `CS = 5.5/10` (< 7 threshold; pure domain core remains cleanly decoupled from Story `08.4` SQLite WAL / `tokio-cron-scheduler` / Axum HTTP / Workbench UI — no story split required).
+
+## 3. Formal-verify candidates Triage (`audit-360` P10)
+- **Formal-verify candidates:** Evaluated for `risk_tier: 3` Story `08.3` pure domain core: `PluginLifecycleAndStagingCas` (`Discovered | Validated | Installed | Active | Deprecated | Archived`, single `staging_manifest` isolation slot, permanent `quarantined` lockout forbidding `Deprecated -> Active`, monotonic optimistic `revision` CAS) and `LearnCardSingleUseNonceCas` (`Proposed -> Accepted | Rejected`, strict `(tenant_id, project_id)` isolation, single-use `(tenant_id, project_id, nonce)` consumption gated strictly after signature + card lookup + CAS checks). Because Story `08.3` executes synchronously in-memory as a pure library without OS threads, `tokio` tasks, distributed locks, or physical SQLite WAL pools (the asynchronous `LeaseReaper`, `tokio-cron-scheduler` single-flight locks, and `BEGIN IMMEDIATE` persistence belong to `Story 08.4`), full `.tla` model checking is deferred to **Story `08.4`**, while Story `08.3`'s deterministic state-chart & CAS invariants are exhausted directly by dual-runtime Rust + TypeScript adversarial parity tests (`story_08_3_parity.rs` & `lifecycle-learn.test.ts`).
+
+## 4. Final Verdict
+**VERDICT: PASS / APPROVED (Ready for Plan-Safe Verification & Hardening Wave)**
