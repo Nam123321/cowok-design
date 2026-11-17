@@ -120,8 +120,8 @@
     "quoteToChat": "채팅에 인용"
   },
   "canvas": {
-    "userflowLens": "사용자 흐름 (Userflow)",
-    "slideCmsLens": "슬라이드 덱 / CMS",
+    "userflowLens": "사용자 흐름",
+    "slideCmsLens": "슬라이드 덱",
     "presentButton": "발표하기",
     "exitPresent": "발표 종료",
     "openNewTab": "프로젝트 파일을 열거나 새 디자인 생성",
@@ -231,7 +231,9 @@
     "walkthroughFullMode": "전체 디자인",
     "exitWalkthrough": "워크스루 나가기 (Esc)",
     "walkthroughDagSyncLabel": "듀얼 화면 — DAG 동기화",
-    "viewportSwitcherAria": "뷰포트 크기"
+    "viewportSwitcherAria": "뷰포트 크기",
+    "userflowLensTooltip": "2D 사용자 흐름 DAG: 화면 구조, 조건 분기 및 상태 전환을 설계합니다.",
+    "slideCmsLensTooltip": "슬라이드 프레젠테이션 & Zero-Code CMS: 코드 없이 슬라이드 제목, 요약, KPI 수치를 직관적으로 편집합니다."
   },
   "settings": {
     "title": "시스템 설정 및 환경설정",
@@ -651,7 +653,8 @@
     "originLabel": "원격 (origin):",
     "charsUnit": "자",
     "exportShortLabel": "내보내기",
-    "exportMenuTooltip": "내보내기: ZIP 다운로드, GitHub PR, IDE 열기"
+    "exportMenuTooltip": "내보내기: ZIP 다운로드, GitHub PR, IDE 열기",
+    "emptyDetailPlaceholder": "버전을 선택하거나 스냅샷을 생성하면 HTML, 사용자 흐름 및 파일 목록을 미리 볼 수 있습니다."
   },
   "onboarding": {
     "authNeeded": "로그인 필요",

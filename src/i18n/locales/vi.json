@@ -120,8 +120,8 @@
     "quoteToChat": "Quote vào Chat"
   },
   "canvas": {
-    "userflowLens": "Luồng người dùng (Userflow)",
-    "slideCmsLens": "Trình chiếu Slide / CMS",
+    "userflowLens": "Luồng người dùng",
+    "slideCmsLens": "Trình chiếu Slide",
     "presentButton": "Trình chiếu (Present)",
     "exitPresent": "Thoát trình chiếu",
     "openNewTab": "Mở tệp dự án hoặc tạo thiết kế mới",
@@ -231,7 +231,9 @@
     "walkthroughFullMode": "Toàn bộ thiết kế",
     "exitWalkthrough": "Thoát Walkthrough (Esc)",
     "walkthroughDagSyncLabel": "Walkthrough Dual Screen — Đồng bộ DAG",
-    "viewportSwitcherAria": "Kích thước màn hình"
+    "viewportSwitcherAria": "Kích thước màn hình",
+    "userflowLensTooltip": "Sơ đồ luồng người dùng 2D (Userflow DAG): thiết kế cấu trúc màn hình, điều kiện rẽ nhánh và luồng chuyển trạng thái.",
+    "slideCmsLensTooltip": "Trình chiếu Slide & Zero-Code CMS: biên tập nội dung slide, tiêu đề và chỉ số KPI trực quan không cần viết mã."
   },
   "settings": {
     "title": "Cài đặt & Tùy biến Hệ thống",
@@ -651,7 +653,8 @@
     "originLabel": "Kho gốc (origin):",
     "charsUnit": "ký tự",
     "exportShortLabel": "Xuất bản",
-    "exportMenuTooltip": "Xuất bản: Tải ZIP, Tạo GitHub PR hoặc Mở IDE"
+    "exportMenuTooltip": "Xuất bản: Tải ZIP, Tạo GitHub PR hoặc Mở IDE",
+    "emptyDetailPlaceholder": "Chọn một bản chụp hoặc tạo Snapshot đầu tiên để xem trước HTML / Userflow / Danh sách tệp."
   },
   "onboarding": {
     "authNeeded": "Cần đăng nhập",

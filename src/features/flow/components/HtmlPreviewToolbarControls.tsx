@@ -11,7 +11,7 @@ import {
 } from "../../../lib/validations/screen-fixture";
 import type { ExportInitialSection } from "../../snapshots/components/ExportBundleModal";
 
-export const NARROW_TOOLBAR_BREAKPOINT_PX = 620;
+export const NARROW_TOOLBAR_BREAKPOINT_PX = 505;
 const DROPDOWN_OFFSET_PX = 4;
 const PORTAL_Z_INDEX = 9999;
 
@@ -28,14 +28,14 @@ const GROUP_WRAP_STYLE: React.CSSProperties = {
 
 export const TOOLBAR_BTN_BASE: React.CSSProperties = {
   height: "24px",
-  padding: "0 8px",
+  padding: "0 6px",
   border: "none",
   borderRadius: "4px",
   cursor: "pointer",
   display: "inline-flex",
   alignItems: "center",
-  gap: "5px",
-  fontSize: "11px",
+  gap: "4px",
+  fontSize: "10.5px",
   whiteSpace: "nowrap",
   flexShrink: 0,
   transition: "all var(--duration-fast) var(--ease-standard)",

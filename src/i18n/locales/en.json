@@ -121,7 +121,7 @@
   },
   "canvas": {
     "userflowLens": "Userflow",
-    "slideCmsLens": "Slide Deck / CMS",
+    "slideCmsLens": "Slide Deck",
     "presentButton": "Present",
     "exitPresent": "Exit Present",
     "openNewTab": "Open project file or create new design",
@@ -231,7 +231,9 @@
     "walkthroughFullMode": "Full Design",
     "exitWalkthrough": "Exit Walkthrough (Esc)",
     "walkthroughDagSyncLabel": "Walkthrough Dual Screen — DAG Sync",
-    "viewportSwitcherAria": "Viewport width"
+    "viewportSwitcherAria": "Viewport width",
+    "userflowLensTooltip": "2D Userflow DAG: design screen architecture, branching conditions, and interactive state transitions.",
+    "slideCmsLensTooltip": "Slide Presentation & Zero-Code CMS: edit slide headlines, takeaways, and KPI metrics visually without coding."
   },
   "settings": {
     "title": "System Settings & Preferences",
@@ -651,7 +653,8 @@
     "originLabel": "Origin:",
     "charsUnit": "chars",
     "exportShortLabel": "Export",
-    "exportMenuTooltip": "Export: Download ZIP, Push GitHub PR, or Open IDE"
+    "exportMenuTooltip": "Export: Download ZIP, Push GitHub PR, or Open IDE",
+    "emptyDetailPlaceholder": "Select a version or create a checkpoint to inspect HTML, Userflow, and snapshot files."
   },
   "onboarding": {
     "authNeeded": "Login required",

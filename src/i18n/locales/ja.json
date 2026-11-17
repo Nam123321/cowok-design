@@ -120,8 +120,8 @@
     "quoteToChat": "チャットに引用"
   },
   "canvas": {
-    "userflowLens": "ユーザーフロー (Userflow)",
-    "slideCmsLens": "スライドデッキ / CMS",
+    "userflowLens": "ユーザーフロー",
+    "slideCmsLens": "スライド構成",
     "presentButton": "プレゼンテーション",
     "exitPresent": "プレゼンテーションを終了",
     "openNewTab": "プロジェクトファイルを開くか新規デザインを作成",
@@ -231,7 +231,9 @@
     "walkthroughFullMode": "全体デザイン",
     "exitWalkthrough": "終了 (Esc)",
     "walkthroughDagSyncLabel": "デュアル画面 — DAG連動",
-    "viewportSwitcherAria": "ビューポート幅"
+    "viewportSwitcherAria": "ビューポート幅",
+    "userflowLensTooltip": "2DユーザーフローDAG: 画面構成・条件分岐・状態遷移を設計します。",
+    "slideCmsLensTooltip": "スライド発表＆Zero-Code CMS: コード不要でスライド見出し・要点・KPI数値を直感的に編集できます。"
   },
   "settings": {
     "title": "システム設定と環境設定",
@@ -651,7 +653,8 @@
     "originLabel": "リモート (origin):",
     "charsUnit": "文字",
     "exportShortLabel": "出力",
-    "exportMenuTooltip": "出力: ZIP保存・GitHub PR・IDE起動"
+    "exportMenuTooltip": "出力: ZIP保存・GitHub PR・IDE起動",
+    "emptyDetailPlaceholder": "履歴を選択するか最初のスナップショットを作成すると、HTML・フロー・ファイル一覧をプレビューできます。"
   },
   "onboarding": {
     "authNeeded": "ログインが必要です",

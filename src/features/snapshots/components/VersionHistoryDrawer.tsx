@@ -68,9 +68,35 @@ export interface VersionHistoryDrawerProps {
   onSetDefaultIde?: (ide: IdeTarget) => Promise<void> | void;
 }
 
+function resolveDefaultHistoryEntry(
+  snapshots: VersionSnapshotResponse[],
+  turnSnapshots?: ChatArtifactSnapshotResponse[],
+  activePreviewTurnId?: string | null
+): SelectedHistoryEntry | null {
+  if (activePreviewTurnId && turnSnapshots?.length) {
+    const activeTurn = turnSnapshots.find((item) => item.id === activePreviewTurnId);
+    if (activeTurn) return { kind: "turn", item: activeTurn };
+  }
+  if (snapshots.length > 0) return { kind: "snapshot", item: snapshots[0] };
+  if (turnSnapshots && turnSnapshots.length > 0) return { kind: "turn", item: turnSnapshots[0] };
+  return null;
+}
+
+const EmptyDetailPlaceholder: React.FC = () => {
+  const { t } = useTranslation();
+  return (
+    <section className="snap-detail-pane" data-testid="version-detail-pane">
+      <div className="snap-drawer-empty" style={{ margin: "auto", maxWidth: "320px", textAlign: "center" }}>
+        <span>{t("snapshots.emptyDetailPlaceholder", "Chọn một bản chụp hoặc tạo Snapshot đầu tiên để xem trước HTML / Userflow / Danh sách tệp.")}</span>
+      </div>
+    </section>
+  );
+};
+
 const DrawerOverlayHost: React.FC<{
   props: VersionHistoryDrawerProps;
   selected: SelectedHistoryEntry | null;
+  detailCollapsed: boolean;
   onInspectSnapshot: (s: VersionSnapshotResponse) => void;
   onInspectTurn: (t: ChatArtifactSnapshotResponse) => void;
   onClearDetail: () => void;
@@ -79,6 +105,7 @@ const DrawerOverlayHost: React.FC<{
 }> = ({
   props,
   selected,
+  detailCollapsed,
   onInspectSnapshot,
   onInspectTurn,
   onClearDetail,
@@ -86,17 +113,25 @@ const DrawerOverlayHost: React.FC<{
   onOpenExport,
 }) => {
   if (!props.isOpen) return null;
-  const selectedKey = selected ? `${selected.kind === "snapshot" ? "snap" : "turn"}:${selected.item.id}` : null;
-  const detailNode = selected ? (
+  const effectiveSelected =
+    detailCollapsed
+      ? null
+      : (selected ?? resolveDefaultHistoryEntry(props.snapshots, props.turnSnapshots, props.activePreviewTurnId));
+  const selectedKey = effectiveSelected
+    ? `${effectiveSelected.kind === "snapshot" ? "snap" : "turn"}:${effectiveSelected.item.id}`
+    : null;
+  const detailNode = detailCollapsed ? null : effectiveSelected ? (
     <SnapshotDetailInspector
-      selected={selected}
+      selected={effectiveSelected}
       artifactFormat={props.artifactFormat}
       onCloseDetail={onClearDetail}
       onRequestRevertSnapshot={onSelectSnap}
       onPreviewTurn={props.onPreviewTurn}
       onForkTurn={props.onForkTurn}
     />
-  ) : null;
+  ) : (
+    <EmptyDetailPlaceholder />
+  );
 
   return (
     <>
@@ -114,7 +149,10 @@ const DrawerOverlayHost: React.FC<{
         onInspectTurn={onInspectTurn}
         onOpenExport={onOpenExport}
         onCreateCheckpoint={props.onCreateCheckpoint}
-        onPreviewTurn={props.onPreviewTurn}
+        onPreviewTurn={(turn) => {
+          onInspectTurn(turn);
+          props.onPreviewTurn?.(turn);
+        }}
         onUndoTurn={props.onUndoTurn}
         onForkTurn={props.onForkTurn}
       />
@@ -153,6 +191,7 @@ function useDrawerRevertModalState(onRevert: VersionHistoryDrawerProps["onRevert
 export const VersionHistoryDrawer: React.FC<VersionHistoryDrawerProps> = (props) => {
   const rev = useDrawerRevertModalState(props.onRevert);
   const [selected, setSelected] = useState<SelectedHistoryEntry | null>(null);
+  const [detailCollapsed, setDetailCollapsed] = useState(false);
   const [internalExportOpen, setInternalExportOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -164,7 +203,16 @@ export const VersionHistoryDrawer: React.FC<VersionHistoryDrawerProps> = (props)
 
   return (
     <>
-      <DrawerOverlayHost props={props} selected={selected} onInspectSnapshot={(s) => setSelected({ kind: "snapshot", item: s })} onInspectTurn={(t) => setSelected({ kind: "turn", item: t })} onClearDetail={() => setSelected(null)} onSelectSnap={(s) => { rev.resetRevert(); rev.setTarget(s); }} onOpenExport={() => setExportOpen(true)} />
+      <DrawerOverlayHost
+        props={props}
+        selected={selected}
+        detailCollapsed={detailCollapsed}
+        onInspectSnapshot={(s) => { setDetailCollapsed(false); setSelected({ kind: "snapshot", item: s }); }}
+        onInspectTurn={(t) => { setDetailCollapsed(false); setSelected({ kind: "turn", item: t }); }}
+        onClearDetail={() => { setDetailCollapsed(true); setSelected(null); }}
+        onSelectSnap={(s) => { rev.resetRevert(); rev.setTarget(s); }}
+        onOpenExport={() => setExportOpen(true)}
+      />
       <RevertConfirmModal isOpen={Boolean(rev.target)} targetSnapshot={rev.target} isReverting={rev.isReverting} requiresGraphRestore={rev.requiresGraphRestore} restoreMissingNodes={rev.restoreMissingNodes} errorMessage={rev.revertError} onToggleRestoreMissingNodes={rev.setRestoreMissingNodes} onConfirm={() => void rev.handleRevert()} onClose={rev.resetRevert} />
       <ExportBundleModal isOpen={exportOpen} metadata={props.exportMetadata ?? null} isExporting={isExporting} initialSection={props.exportInitialSection} integrationsStatus={props.integrationsStatus} integrationBusy={props.integrationBusy} prResult={props.prResult} prError={props.prError} handoffResult={props.handoffResult} handoffError={props.handoffError} onDownloadZip={() => void withBusy(props.onExportZip)} onCreateGitHubPR={(inVal) => void withBusy(() => props.onCreatePR(inVal))} onOpenIde={props.onOpenIde ? (ide) => void withBusy(() => props.onOpenIde!(ide)) : undefined} onConnectGitHub={props.onConnectGitHub} onSelectGitHubAccount={props.onSelectGitHubAccount} onBindGitRemote={props.onBindGitRemote} onSetDefaultIde={props.onSetDefaultIde} onClose={() => setExportOpen(false)} />
     </>

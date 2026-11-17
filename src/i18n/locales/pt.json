@@ -120,8 +120,8 @@
     "quoteToChat": "Citar no chat"
   },
   "canvas": {
-    "userflowLens": "Fluxo de usuário (Userflow)",
-    "slideCmsLens": "Apresentação de slides / CMS",
+    "userflowLens": "Fluxo de usuário",
+    "slideCmsLens": "Slides",
     "presentButton": "Apresentar",
     "exitPresent": "Sair da apresentação",
     "openNewTab": "Abrir arquivo do projeto ou criar novo design",
@@ -231,7 +231,9 @@
     "walkthroughFullMode": "Design completo",
     "exitWalkthrough": "Sair do tour (Esc)",
     "walkthroughDagSyncLabel": "Tela dupla — Sincronização DAG",
-    "viewportSwitcherAria": "Largura da tela"
+    "viewportSwitcherAria": "Largura da tela",
+    "userflowLensTooltip": "DAG de fluxo de usuário 2D: projete arquitetura de telas, ramificações e transições de estado.",
+    "slideCmsLensTooltip": "Apresentação de Slides e CMS Zero-Code: edite títulos, resumos e métricas KPI visualmente sem código."
   },
   "settings": {
     "title": "Configurações e preferências do sistema",
@@ -651,7 +653,8 @@
     "originLabel": "Origem:",
     "charsUnit": "caracteres",
     "exportShortLabel": "Exportar",
-    "exportMenuTooltip": "Exportar: Baixar ZIP, PR GitHub ou Abrir IDE"
+    "exportMenuTooltip": "Exportar: Baixar ZIP, PR GitHub ou Abrir IDE",
+    "emptyDetailPlaceholder": "Selecione uma versão ou crie um checkpoint para inspecionar HTML, fluxo e arquivos."
   },
   "onboarding": {
     "authNeeded": "Login necessário",

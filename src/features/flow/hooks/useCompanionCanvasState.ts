@@ -7,7 +7,7 @@ import type { FixtureVariant, ViewportPreset } from "../../../lib/validations/sc
 
 export const ReadOnlyCanvasContext = createContext<boolean>(false);
 
-export const DEFAULT_LEFT_PANE_PCT = 48;
+export const DEFAULT_LEFT_PANE_PCT = 38;
 export const MIN_LEFT_PANE_PCT = 26;
 export const MAX_LEFT_PANE_PCT = 72;
 export const PERCENT_MULTIPLIER = 100;
