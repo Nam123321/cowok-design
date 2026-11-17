@@ -63,7 +63,9 @@ function useDesignerTalkToggleHotkey(
 ) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (shouldSuppressProposalHotkey(e, { isModalOpen, isInlineEditorOpen: isInlineCodeOpen })) return;
+      const domModal = typeof document !== "undefined" && Boolean(document.querySelector('[aria-modal="true"]'));
+      const domInlineEditor = typeof document !== "undefined" && Boolean(document.querySelector('[data-inline-code-editor="true"], [data-testid="inline-code-editor-panel"]'));
+      if (shouldSuppressProposalHotkey(e, { isModalOpen: isModalOpen || domModal, isInlineEditorOpen: isInlineCodeOpen || domInlineEditor })) return;
       if (e.key.toLowerCase() === "t") {
         e.preventDefault();
         setIsDesignerTalkOpen((prev) => !prev);

@@ -98,9 +98,9 @@ test.describe("Story 04.1: Direct Browser Acceptance Suite with Video & Screensh
           return { bg: cs.backgroundColor, borderBottomWidth: cs.borderBottomWidth, borderBottomColor: cs.borderBottomColor };
         });
       expect(activeTabStyles.borderBottomWidth).toBe("2px");
-      expect(activeTabStyles.borderBottomColor).toBe("rgb(255, 154, 47)");
+      expect(activeTabStyles.borderBottomColor).toBe("rgb(241, 245, 249)");
       expect(activeTabStyles.bg).not.toBe("rgb(0, 87, 255)");
-      s1.assertions.push("Active tab uses 2px #FF9A2F bottom line and neutral surface (non-solid blue)");
+      s1.assertions.push("Active tab uses 2px #F1F5F9 bottom line (DESIGN.md Zero-Amber) and neutral surface (non-solid blue)");
 
       const composerBorderTop = await page
         .getByTestId("chat-composer-wrapper")

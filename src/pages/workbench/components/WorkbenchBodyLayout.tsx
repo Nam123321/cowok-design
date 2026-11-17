@@ -45,6 +45,7 @@ export interface WorkbenchBodyLayoutProps {
   splitter: ReturnType<typeof useWorkbenchSplitter>;
   attachments: ReturnType<typeof useWorkbenchAttachments>;
   graphHandlers: ReturnType<typeof useWorkbenchGraphHandlers>;
+  isModalOpen?: boolean;
   state: FlowWorkbenchState;
   store: ReturnType<typeof createNewFlowWorkbenchStore>;
 }
@@ -81,7 +82,7 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
     projectId: resolvedProjectId,
     selectedNodeId: p.state.selectedNodeId,
     selectedNodeKey: primaryNode?.screenKey || null,
-    isModalOpen: false,
+    isModalOpen: Boolean(p.isModalOpen),
     isInlineCodeOpen: false,
   });
 

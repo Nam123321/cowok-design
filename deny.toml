@@ -15,6 +15,7 @@ yanked = "deny"
 unmaintained = "workspace"
 ignore = [
     "RUSTSEC-2026-0459", # Bundled SQLite 3.53.2 WAL cache vulnerability in rusqlite 0.32; tracked for rusqlite 0.41 upgrade
+    { id = "RUSTSEC-2026-0543", reason = "chrono 0.4.45 marked unmaintained upstream (chronotope/chrono#1768); no safe chrono upgrade available — scheduled for isolated post-Epic-05 jiff/SystemTime migration" },
 ]
 
 [licenses]

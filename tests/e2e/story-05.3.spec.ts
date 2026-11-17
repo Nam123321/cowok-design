@@ -248,6 +248,8 @@ test.describe("Story 05.3 Live E2E Acceptance Suite", () => {
       expect(nightCheck.actionPrimary).not.toBe("#ff9a2f");
       expect(nightCheck.humanAccent).not.toBe("#ff9a2f");
       expect(nightCheck.humanAccent).not.toBe("#e89a35");
+      expect(nightCheck.actionPrimary).toBe("#f1f5f9");
+      expect(nightCheck.humanAccent).toBe("#6a96ff");
       await saveShot("02-story-05-3-version-history-drawer-night.png");
 
       // Open ExportBundleModal from the drawer footer -> inline GitHub Setup, 1-Click IDE Handoff, & real PR 501 ZIP fallback

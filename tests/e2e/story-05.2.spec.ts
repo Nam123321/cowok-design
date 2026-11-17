@@ -278,12 +278,16 @@ test.describe("Story 05.2 Live E2E Acceptance Suite", () => {
       await expect(page.getByTestId("change-proposal-drawer")).toBeHidden();
       await saveShot("01-story-05-2-canvas-toolbar-closed-drawer.png");
 
-      // Trigger Designer Talk hotkey T & verify Night mode Zero-Amber Pure CSS tokens
-      await page.evaluate(() => document.documentElement.setAttribute("data-theme", "night"));
+      // Trigger Designer Talk hotkey T & verify Night mode DESIGN.md Zero-Amber Pure CSS tokens
+      await page.evaluate(() => {
+        document.documentElement.setAttribute("data-theme", "night");
+        document.querySelector(".workbench-shell")?.setAttribute("data-theme", "night");
+      });
       await page.getByTestId("toggle-designer-talk-btn").click();
       await expect(page.getByTestId("toggle-designer-talk-btn")).toHaveAttribute("aria-pressed", "true");
       const nightCheck = await page.evaluate(() => {
-        const cs = getComputedStyle(document.documentElement);
+        const target = document.querySelector(".workbench-shell") || document.documentElement;
+        const cs = getComputedStyle(target);
         return {
           actionPrimary: cs.getPropertyValue("--action-primary").trim().toLowerCase(),
           humanAccent: cs.getPropertyValue("--human-accent").trim().toLowerCase(),
@@ -292,6 +296,8 @@ test.describe("Story 05.2 Live E2E Acceptance Suite", () => {
       expect(nightCheck.actionPrimary).not.toBe("#ff9a2f");
       expect(nightCheck.humanAccent).not.toBe("#ff9a2f");
       expect(nightCheck.humanAccent).not.toBe("#e89a35");
+      expect(nightCheck.actionPrimary).toBe("#f1f5f9");
+      expect(nightCheck.humanAccent).toBe("#6a96ff");
       await saveShot("02-story-05-2-designer-talk-night-zero-amber.png");
 
       await page.getByTestId("toggle-change-proposal-drawer-btn").click();

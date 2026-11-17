@@ -64,7 +64,7 @@ Epic 05 xây dựng hệ thống chuyển hóa ngôn ngữ tự nhiên thành ý
 | :--- | :--- | :---: | :---: | :--- |
 | **Story 05.1** | Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11) | `completed` | `2` | `['02.2', '04.5']` |
 | **Story 05.2** | Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup | `completed` | `3` | `['05.1']` |
-| **Story 05.3** | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | `refactored` | `2` | `['05.2']` |
+| **Story 05.3** | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | `completed` | `2` | `['05.2']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 
@@ -173,9 +173,9 @@ flowchart TD
 
 | Story ID | Title | Dependencies | Status |
 | :--- | :--- | :--- | :--- |
-| [Story-05.1](./Story-05.1/story.md) | Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11) | 02.2, 04.5 | refactored |
-| [Story-05.2](./Story-05.2/story.md) | Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup | 05.1 | refactored |
-| [Story-05.3](./Story-05.3/story.md) | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | 05.2 | refactored |
+| [Story-05.1](./Story-05.1/story.md) | Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11) | 02.2, 04.5 | completed |
+| [Story-05.2](./Story-05.2/story.md) | Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup | 05.1 | completed |
+| [Story-05.3](./Story-05.3/story.md) | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | 05.2 | completed |
 
 ## Layer Documents
 - [Layer-Epic-FE](./layer-epic-fe.md)

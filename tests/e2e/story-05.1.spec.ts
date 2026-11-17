@@ -24,6 +24,7 @@ async function mintEditorHeaders(page: Page, request: APIRequestContext, baseUrl
 
 async function verifyLiveWorkbenchUi(page: Page, saveShot: (name: string) => Promise<void>) {
   await expect(page.locator(".workbench-main-sidebar")).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.workbench-shell[data-flow-hydrated="true"]')).toBeVisible({ timeout: 15_000 });
   if ((await page.locator(".dag-node-card").count()) === 0) {
     await page.locator(".dag-right-vertical-dock button").first().click();
   }
@@ -79,10 +80,14 @@ async function verifyLiveWorkbenchUi(page: Page, saveShot: (name: string) => Pro
   await page.getByTestId("sample-data-cancel-btn").click();
   await expect(sampleModal).toBeHidden();
 
-  // Verify Night mode Zero-Amber CSS token compliance at runtime
-  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "night"));
+  // Verify Night mode DESIGN.md Zero-Amber CSS token compliance at runtime
+  await page.evaluate(() => {
+    document.documentElement.setAttribute("data-theme", "night");
+    document.querySelector(".workbench-shell")?.setAttribute("data-theme", "night");
+  });
   const nightTokens = await page.evaluate(() => {
-    const cs = getComputedStyle(document.documentElement);
+    const target = document.querySelector(".workbench-shell") || document.documentElement;
+    const cs = getComputedStyle(target);
     return {
       actionPrimary: cs.getPropertyValue("--action-primary").trim().toLowerCase(),
       humanAccent: cs.getPropertyValue("--human-accent").trim().toLowerCase(),
@@ -93,8 +98,14 @@ async function verifyLiveWorkbenchUi(page: Page, saveShot: (name: string) => Pro
     expect(val).not.toBe("#ff9a2f");
     expect(val).not.toBe("#e89a35");
   }
+  expect(nightTokens.actionPrimary).toBe("#f1f5f9");
+  expect(nightTokens.humanAccent).toBe("#6a96ff");
+  expect(nightTokens.agentAccent).toBe("#f2ac4e");
   await saveShot("03-night-mode-zero-amber.png");
-  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "warm"));
+  await page.evaluate(() => {
+    document.documentElement.setAttribute("data-theme", "warm");
+    document.querySelector(".workbench-shell")?.setAttribute("data-theme", "warm");
+  });
 }
 
 async function verifyLiveSdiLoopbackAndFixturesApi(
