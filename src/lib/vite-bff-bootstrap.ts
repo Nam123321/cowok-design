@@ -201,5 +201,22 @@ export async function handleBootstrapSession(req: IncomingMessage, res: ServerRe
   if (headerRole) {
     res.setHeader("x-cowok-role", headerRole);
   }
-  return writeJson(res, HTTP_OK, issueBffLoopbackSession({ tenantId: requestedTenant, userId: data.userId, role: effectiveRole }));
+  const hasDaemonNonceProof = req.headers["x-cowok-daemon-nonce"] !== undefined;
+  const sfs = singleHeader(req.headers["sec-fetch-site"]);
+  const isHumanWorkbench =
+    !hasDaemonNonceProof &&
+    !isAuthorizedAdminBearer(req.headers.authorization) &&
+    effectiveRole !== "viewer" &&
+    isValidBootCapHeader(req.headers["x-cowok-boot-cap"]) &&
+    (!sfs || sfs === "same-origin");
+  return writeJson(
+    res,
+    HTTP_OK,
+    issueBffLoopbackSession({
+      tenantId: requestedTenant,
+      userId: data.userId,
+      role: effectiveRole,
+      ...(isHumanWorkbench ? { isHumanWorkbench: true } : {}),
+    })
+  );
 }

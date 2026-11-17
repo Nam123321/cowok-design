@@ -16,6 +16,8 @@ pub mod legacy_sdi;
 pub mod legacy_sessions;
 pub mod legacy_specs;
 pub mod legacy_workbench_v6;
+pub mod plugins;
+pub mod plugins_cron;
 pub mod project_trash;
 
 use std::sync::Arc;
@@ -30,7 +32,8 @@ use serde::{Deserialize, Serialize};
 use spec_registry::SpecRegistry;
 
 use crate::daemon_auth::{
-    cors_and_loopback_middleware, handle_issue_local_session, DaemonAuthState,
+    cors_and_loopback_middleware, handle_issue_human_workbench_session, handle_issue_local_session,
+    DaemonAuthState,
 };
 use crate::flow_routes::build_flow_subrouter;
 use crate::lockfile::CURRENT_SCHEMA_VERSION;
@@ -135,6 +138,10 @@ pub fn build_router(state: DaemonAppState) -> Router {
         .route(
             "/api/v1/auth/local-session",
             post(handle_issue_local_session),
+        )
+        .route(
+            "/api/v1/auth/workbench-session",
+            post(handle_issue_human_workbench_session),
         )
         .merge(protected_legacy_router)
         .merge(flow_router)

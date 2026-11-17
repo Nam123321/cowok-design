@@ -116,7 +116,8 @@ fn reject_unsafe_yaml_tokens(yaml_body: &str) -> Result<(), ValidationError> {
                     let prev_ok = idx == 0
                         || bytes[idx - 1].is_ascii_whitespace()
                         || matches!(bytes[idx - 1], b':' | b'[' | b',');
-                    let next_non_ws = idx + 1 < bytes.len() && !bytes[idx + 1].is_ascii_whitespace();
+                    let next_non_ws =
+                        idx + 1 < bytes.len() && !bytes[idx + 1].is_ascii_whitespace();
                     if prev_ok && next_non_ws {
                         let kind = match b {
                             b'&' => "YAML anchors (&)",
@@ -137,7 +138,10 @@ fn reject_unsafe_yaml_tokens(yaml_body: &str) -> Result<(), ValidationError> {
 fn check_duplicate_top_level_keys(yaml_body: &str) -> Result<(), ValidationError> {
     let mut seen = BTreeSet::new();
     for line in yaml_body.lines() {
-        if line.starts_with(char::is_whitespace) || line.trim().is_empty() || line.trim_start().starts_with('#') {
+        if line.starts_with(char::is_whitespace)
+            || line.trim().is_empty()
+            || line.trim_start().starts_with('#')
+        {
             continue;
         }
         if let Some((key, _)) = line.split_once(':') {
@@ -217,11 +221,11 @@ pub fn parse_and_validate_skill_frontmatter(
         });
     }
 
-    let parsed: serde_yaml::Value =
-        serde_yaml::from_str(yaml_body).map_err(|e| ValidationError::YamlParseError(e.to_string()))?;
-    let map = parsed
-        .as_mapping()
-        .ok_or_else(|| ValidationError::YamlParseError("Frontmatter must be a YAML mapping".to_string()))?;
+    let parsed: serde_yaml::Value = serde_yaml::from_str(yaml_body)
+        .map_err(|e| ValidationError::YamlParseError(e.to_string()))?;
+    let map = parsed.as_mapping().ok_or_else(|| {
+        ValidationError::YamlParseError("Frontmatter must be a YAML mapping".to_string())
+    })?;
 
     let name = mapping_str(map, &["name", "id", "title"])?
         .ok_or_else(|| ValidationError::MissingRequiredField("name".to_string()))?
@@ -248,9 +252,9 @@ pub fn parse_and_validate_skill_frontmatter(
 
     let tier_key = serde_yaml::Value::String("risk_tier".to_string());
     let risk_tier = if let Some(val) = map.get(&tier_key) {
-        let raw_num = val
-            .as_u64()
-            .ok_or_else(|| ValidationError::YamlParseError("risk_tier must be an integer".to_string()))?;
+        let raw_num = val.as_u64().ok_or_else(|| {
+            ValidationError::YamlParseError("risk_tier must be an integer".to_string())
+        })?;
         let tier = u8::try_from(raw_num).unwrap_or(u8::MAX);
         if !(1..=3).contains(&tier) {
             return Err(ValidationError::InvalidRiskTier(tier));
@@ -324,6 +328,9 @@ version: 1.0.0
 tags: [test]
 ---"#;
         let err = validate_skill_frontmatter(fm).unwrap_err();
-        assert_eq!(err, ValidationError::MissingRequiredField("name".to_string()));
+        assert_eq!(
+            err,
+            ValidationError::MissingRequiredField("name".to_string())
+        );
     }
 }

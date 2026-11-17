@@ -132,7 +132,10 @@ impl SkillRegistry {
         Ok(count)
     }
 
-    fn load_skill_with_hash(&self, folder: &Path) -> Result<(SkillManifest, Option<String>), String> {
+    fn load_skill_with_hash(
+        &self,
+        folder: &Path,
+    ) -> Result<(SkillManifest, Option<String>), String> {
         let folder_meta = std::fs::symlink_metadata(folder).map_err(|e| e.to_string())?;
         if folder_meta.file_type().is_symlink() || !folder_meta.is_dir() {
             return Err("skill folder must be a real non-symlink directory".to_string());
@@ -192,9 +195,13 @@ impl SkillRegistry {
             if let Some(params) = &manifest.parameters {
                 if !matches!(
                     params,
-                    serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Object(_)
+                    serde_json::Value::Null
+                        | serde_json::Value::Bool(_)
+                        | serde_json::Value::Object(_)
                 ) {
-                    return Err("plugin.json parameters must be an object, boolean, or null".to_string());
+                    return Err(
+                        "plugin.json parameters must be an object, boolean, or null".to_string()
+                    );
                 }
             }
             if manifest.tags.iter().any(|t| t == "repackaged") && !verified_repackaged {
@@ -258,12 +265,14 @@ impl SkillRegistry {
     pub fn to_domain_plugins(&self) -> Vec<SkillPlugin> {
         self.list()
             .into_iter()
-            .map(|s| SkillPlugin {
-                id: s.name.clone(),
-                name: s.name.clone(),
-                version: s.version.clone(),
-                entry_point: s.entry_point.clone(),
-                permissions: s.capabilities_required.clone(),
+            .map(|s| {
+                SkillPlugin::from_core(
+                    s.name.clone(),
+                    s.name.clone(),
+                    s.version.clone(),
+                    s.entry_point.clone(),
+                    s.capabilities_required.clone(),
+                )
             })
             .collect()
     }

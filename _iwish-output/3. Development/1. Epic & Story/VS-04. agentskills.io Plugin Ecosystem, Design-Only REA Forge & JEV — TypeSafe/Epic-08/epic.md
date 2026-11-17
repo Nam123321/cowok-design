@@ -43,7 +43,7 @@ links_to:
 | [Story 08.1](./Story-08.1/story.md) | Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (`packages/builtin-skills` & `crates/plugin-host`) | `completed` | `2` | `['01.1', '01.2']` |
 | [Story 08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (`crates/plugin-host` & `packages/builtin-skills`) | `completed` | `3` | `['08.1']` |
 | [Story 08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (`crates/plugin-host` Domain Core) | `completed` | `3` | `['08.2']` |
-| [Story 08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon `HUMAN_ONLY` Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | `ready-for-dev` | `3` | `['04.3', '04.4', '08.1', '08.2', '08.3']` |
+| [Story 08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon `HUMAN_ONLY` Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | `completed` | `3` | `['04.3', '04.4', '08.1', '08.2', '08.3']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 
@@ -89,7 +89,7 @@ links_to:
 | **Story-08.1** | `completed` | **AC-02 (D2 Single Core Port & Domain Contracts):** Khóa `crates/plugin-host` là runtime thẩm quyền  | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
 | **Story-08.2** | `completed` | Cung cấp năng lực đóng gói, băm khóa SHA-256 và kiểm duyệt an toàn plugin cho `Story 08.3` và tầng t | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
 | **Story-08.3** | `completed` | Chặn bước nhảy trạng thái trái phép và cung cấp bộ mapping tương thích ngược `'ENABLED' -> 'ACTIVE'` | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
-| **Story-08.4** | `ready-for-dev` | Chức năng Story 08.4: SQLite Additive Convergence, | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
+| **Story-08.4** | `completed` | Chức năng Story 08.4: SQLite Additive Convergence, | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
 
 ---
 
@@ -110,7 +110,7 @@ flowchart TD
     end
 
     subgraph S4["Sprint 4: Phân kỳ Thực thi"]
-        Story_08_4["Story-08.4 (Ready-for-dev)<br>Story 08.4: SQLite Additive Convergence, Daem"]
+        Story_08_4["Story-08.4 (Completed)<br>Story 08.4: SQLite Additive Convergence, Daem"]
     end
 
     E2E_GATE["E2E Platform Gate<br>Zero-Trust Verification"]
@@ -159,7 +159,7 @@ flowchart TD
 #### Sprint 4: Phân kỳ Tác vụ
 - **Mô hình**: Các câu chuyện được phát triển **tuần tự (Sequential)**.
 - **Phạm vi thực thi**:
-  1. **`Story-08.4`** (ready-for-dev): Story 08.4: SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI
+  1. **`Story-08.4`** (completed): Story 08.4: SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI
 - **Tiêu chí Hoàn thành (Sprint Done Criteria)**:
   - Toàn bộ Zod schemas và Unit tests cho các story trong sprint vượt qua 100%.
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
@@ -170,22 +170,22 @@ flowchart TD
 | [Story-08.1](./Story-08.1/story.md) | Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host) | 01.1, 01.2 | completed |
 | [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills) | 08.1 | completed |
 | [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core) | 08.2 | completed |
-| [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | ready-for-dev |
+| [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | completed |
 | Story ID | Title | Dependencies | Status |
 |---|---|---|---|
 | [Story-08.1](./Story-08.1/story.md) | Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host) | 01.1, 01.2 | completed |
 | [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills) | 08.1 | completed |
 | [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core) | 08.2 | completed |
-| [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | ready-for-dev |
+| [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | completed |
 | Story ID | Title | Dependencies | Status |
 |---|---|---|---|
 | [Story-08.1](./Story-08.1/story.md) | Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host) | 01.1, 01.2 | completed |
 | [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills) | 08.1 | completed |
 | [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core) | 08.2 | completed |
-| [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | ready-for-dev |
+| [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | completed |
 | Story ID | Title | Dependencies | Status |
 |---|---|---|---|
 | [Story-08.1](./Story-08.1/story.md) | Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host) | 01.1, 01.2 | completed |
 | [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills) | 08.1 | completed |
 | [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core) | 08.2 | completed |
-| [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | ready-for-dev |
+| [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | completed |

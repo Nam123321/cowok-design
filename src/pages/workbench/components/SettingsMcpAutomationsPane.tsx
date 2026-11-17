@@ -1,11 +1,17 @@
-// @story 04.1
-import React, { useEffect, useState } from "react";
+// @story 04.1, 08.4
+import React, { useState } from "react";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { apiWorkbenchSettings } from "../../../api/workbench-settings";
-import type { McpServerDto } from "../../../lib/validations/workbench-settings";
+import { PluginRegistryPanel } from "../../../features/plugins/PluginRegistryPanel";
+import { LearnCardReviewQueue } from "../../../features/plugins/LearnCardReviewQueue";
+import { CronSyncStatus } from "../../../features/plugins/CronSyncStatus";
+import { usePluginRegistry } from "../../../features/plugins/hooks/usePluginRegistry";
+import { DEFAULT_FLOW_PROJECT_ID } from "../constants";
+import { useAutomationsHealthState, useMcpServersState } from "../hooks/useSettingsModalState";
 
 interface SettingsMcpAutomationsPaneProps {
   selectedTab: "mcp" | "automations";
+  projectId?: string;
 }
 
 const McpHostNoticeCard: React.FC = () => {
@@ -13,12 +19,12 @@ const McpHostNoticeCard: React.FC = () => {
   return (
     <div style={{ padding: "12px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)" }}>
       <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "3px" }}>
-        {t("settings.mcpHostTitle", "Máy chủ MCP Cowok-Design (Host MCP Server)")}
+        {t("settings.mcpHostTitle", "Máy chủ MCP Cowok-Design & AgentSkills Ecosystem")}
       </div>
       <div style={{ fontSize: "10.5px", color: "var(--text-muted)", lineHeight: "1.4" }}>
         {t(
-          "settings.mcpHostStory043Notice",
-          "Cấp phát khóa Host MCP và kiểm tra health probe trực tiếp sẽ được kích hoạt qua Daemon Keychain ở Story 04.4. Hiện chỉ quản lý danh sách Client MCP trong SQLite V7."
+          "settings.mcpHostStory084Notice",
+          "Quản lý Client MCPs, AgentSkills Plugin Registry, Isolated Staging (HUMAN_ONLY), và LEARN Knowledge Cards trên SQLite WAL V9."
         )}
       </div>
     </div>
@@ -27,28 +33,10 @@ const McpHostNoticeCard: React.FC = () => {
 
 const McpClientRegistryList: React.FC = () => {
   const { t } = useTranslation();
-  const [servers, setServers] = useState<McpServerDto[]>([]);
+  const { servers, setServers, mcpError, setMcpError } = useMcpServersState();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newCommand, setNewCommand] = useState("");
-  const [mcpError, setMcpError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    void apiWorkbenchSettings.listMcpServers()
-      .then((rows) => {
-        if (active) {
-          setServers(rows);
-          setMcpError(null);
-        }
-      })
-      .catch((err) => {
-        if (!active) return;
-        const detail = err instanceof Error ? `: ${err.message}` : "";
-        setMcpError(`${t("settings.mcpDaemonError", "Không thể kết nối daemon MCP")}${detail}`);
-      });
-    return () => { active = false; };
-  }, [t]);
 
   const handleAddServer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,28 +146,39 @@ const McpClientRegistryList: React.FC = () => {
   );
 };
 
-export const SettingsMcpAutomationsPane: React.FC<SettingsMcpAutomationsPaneProps> = ({ selectedTab }) => {
+export const SettingsMcpAutomationsPane: React.FC<SettingsMcpAutomationsPaneProps> = ({
+  selectedTab,
+  projectId = DEFAULT_FLOW_PROJECT_ID,
+}) => {
   const { t } = useTranslation();
-  const [daemonHealth, setDaemonHealth] = useState<"checking" | "online" | "offline">("checking");
-
-  useEffect(() => {
-    if (selectedTab !== "automations") return;
-    let active = true;
-    void apiWorkbenchSettings.getDoctorCliMatrix("passive")
-      .then(() => {
-        if (active) setDaemonHealth("online");
-      })
-      .catch(() => {
-        if (active) setDaemonHealth("offline");
-      });
-    return () => { active = false; };
-  }, [selectedTab]);
+  const daemonHealth = useAutomationsHealthState(selectedTab);
+  const pluginRegistry = usePluginRegistry(projectId, selectedTab);
 
   if (selectedTab === "mcp") {
     return (
       <>
         <McpHostNoticeCard />
         <McpClientRegistryList />
+        <PluginRegistryPanel
+          plugins={pluginRegistry.plugins}
+          loading={pluginRegistry.loading}
+          error={pluginRegistry.error}
+          pendingActionId={pluginRegistry.actionPendingId}
+          actionFeedback={pluginRegistry.actionFeedback}
+          onRefresh={() => void pluginRegistry.refreshAll()}
+          onTransition={(plugin, target) => void pluginRegistry.transitionPlugin(plugin, target)}
+          onPromoteStaging={(plugin, reason) => void pluginRegistry.promoteStaging(plugin, reason)}
+          onDiscardStaging={(plugin, reason) => void pluginRegistry.discardStaging(plugin, reason)}
+        />
+        <LearnCardReviewQueue
+          cards={pluginRegistry.learnCards}
+          loading={pluginRegistry.loading}
+          error={pluginRegistry.error}
+          pendingActionId={pluginRegistry.actionPendingId}
+          onRefresh={() => void pluginRegistry.refreshAll()}
+          onApprove={(card, reason) => void pluginRegistry.approveLearnCard(card, reason)}
+          onReject={(card, reason) => void pluginRegistry.rejectLearnCard(card, reason)}
+        />
       </>
     );
   }
@@ -219,6 +218,16 @@ export const SettingsMcpAutomationsPane: React.FC<SettingsMcpAutomationsPaneProp
           </span>
         </div>
       </div>
+      <CronSyncStatus
+        plugins={pluginRegistry.plugins}
+        schedulesByPlugin={pluginRegistry.schedulesByPlugin}
+        loading={pluginRegistry.loading}
+        error={pluginRegistry.error}
+        pendingActionId={pluginRegistry.actionPendingId}
+        onRefresh={() => void pluginRegistry.refreshAll()}
+        onSyncNow={(plugin, refreshAuth) => void pluginRegistry.triggerSyncNow(plugin, refreshAuth)}
+        onSaveSchedule={(plugin, cronExpr, url) => void pluginRegistry.saveSchedule(plugin, cronExpr, url)}
+      />
     </>
   );
 };

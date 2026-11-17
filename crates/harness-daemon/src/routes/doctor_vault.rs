@@ -1164,6 +1164,8 @@ pub async fn handle_upsert_vault_key(
     }
 
     let pool = state.registry.pool().clone();
+    let tenant_id_for_clear = principal.tenant_id.clone();
+    let provider_id_for_clear = provider_id.clone();
     let saved = run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
         let now_ms = Utc::now().timestamp_millis();
@@ -1226,6 +1228,20 @@ pub async fn handle_upsert_vault_key(
         Ok(dto)
     })
     .await?;
+
+    if matches!(provider_id_for_clear.as_str(), "github" | "github_plugins") {
+        let pool_clear = state.registry.pool().clone();
+        let tid_clear = tenant_id_for_clear;
+        let _ = run_db(move || {
+            spec_registry::plugin_store::clear_auth_required_schedules_for_tenant(
+                &pool_clear,
+                &tid_clear,
+                Utc::now().timestamp_millis(),
+            )
+            .map_err(|e| map_harness_resp(e, "clear_auth_required_schedules"))
+        })
+        .await;
+    }
 
     Ok(Json(saved))
 }
@@ -1385,85 +1401,4 @@ pub async fn handle_update_vault_settings(
         encrypted_vault_present: store.vault_path().exists(),
         updated_at: Utc::now().to_rfc3339(),
     }))
-}
-
-// -----------------------------------------------------------------------------
-// 5. Skill Plugins Registry (`GET /api/v1/plugins`)
-// -----------------------------------------------------------------------------
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ListPluginsQuery {
-    pub enabled: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillPluginDto {
-    pub id: String,
-    pub project_id: String,
-    pub plugin_slug: String,
-    pub version: String,
-    pub lifecycle_state: String,
-    pub enabled: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub source_repo_url: Option<String>,
-    pub manifest_json: serde_json::Value,
-    pub updated_at: String,
-}
-
-pub async fn handle_list_plugins(
-    State(state): State<DaemonAppState>,
-    Extension(principal): Extension<FlowPrincipal>,
-    Query(query): Query<ListPluginsQuery>,
-) -> Result<Json<Vec<SkillPluginDto>>, Response> {
-    let pool = state.registry.pool().clone();
-    let only_enabled = query.enabled.as_deref() == Some("true");
-    let tenant_id = principal.tenant_id;
-    let rows = run_db(move || {
-        let conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
-        let mut stmt = conn
-            .prepare(
-                "SELECT sp.id, sp.project_id, sp.plugin_slug, sp.version, sp.lifecycle_state, sp.source_repo_url, sp.manifest_json, sp.updated_at \
-                 FROM skill_plugins sp LEFT JOIN projects pr ON pr.id = sp.project_id \
-                 WHERE (pr.tenant_id = ?1 OR pr.tenant_id IS NULL OR pr.tenant_id = 'local-default' OR pr.tenant_id = 'default') \
-                 ORDER BY sp.updated_at DESC",
-            )
-            .map_err(|e| json_err(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
-        let mapped = stmt
-            .query_map(params![tenant_id], |r| {
-                let state_str: String = r.get(4)?;
-                let raw_manifest: String = r.get(6)?;
-                let parsed = serde_json::from_str::<serde_json::Value>(&raw_manifest)
-                    .unwrap_or_else(|_| serde_json::json!({}));
-                let enabled = matches!(state_str.to_ascii_uppercase().as_str(), "ENABLED" | "ACTIVE");
-                let updated_ms: i64 = r.get(7)?;
-                Ok(SkillPluginDto {
-                    id: r.get(0)?,
-                    project_id: r.get(1)?,
-                    plugin_slug: r.get(2)?,
-                    version: r.get(3)?,
-                    lifecycle_state: state_str,
-                    enabled,
-                    source_repo_url: r.get(5)?,
-                    manifest_json: parsed,
-                    updated_at: chrono::DateTime::from_timestamp_millis(updated_ms)
-                        .map(|d| d.to_rfc3339())
-                        .unwrap_or_default(),
-                })
-            })
-            .map_err(|e| json_err(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string()))?;
-        let mut out = Vec::new();
-        for item in mapped {
-            let dto = item.map_err(|e| {
-                json_err(StatusCode::INTERNAL_SERVER_ERROR, "DB_ERROR", e.to_string())
-            })?;
-            if !only_enabled || dto.enabled {
-                out.push(dto);
-            }
-        }
-        Ok::<Vec<SkillPluginDto>, Response>(out)
-    })
-    .await?;
-    Ok(Json(rows))
 }

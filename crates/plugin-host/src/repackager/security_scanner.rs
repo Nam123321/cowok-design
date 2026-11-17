@@ -146,7 +146,8 @@ fn fold_template_and_array_joins(line: &str) -> String {
             i += 1;
             continue;
         }
-        if (chars[i] == '"' || chars[i] == '\'') && i + 1 < chars.len() && chars[i + 1] == chars[i] {
+        if (chars[i] == '"' || chars[i] == '\'') && i + 1 < chars.len() && chars[i + 1] == chars[i]
+        {
             let prev_id = i > 0 && is_ident_char(chars[i - 1]);
             let next_id = i + 2 < chars.len() && is_ident_char(chars[i + 2]);
             if prev_id && next_id {
@@ -234,8 +235,11 @@ fn contains_call_or_indirect(haystack: &str, ident: &str) -> bool {
     let mut start = 0usize;
     while let Some(pos) = haystack[start..].find(ident) {
         let abs = start + pos;
-        let left_ok =
-            abs == 0 || !haystack[..abs].chars().next_back().is_some_and(is_ident_char);
+        let left_ok = abs == 0
+            || !haystack[..abs]
+                .chars()
+                .next_back()
+                .is_some_and(is_ident_char);
         let after_ident = &haystack[abs + ident.len()..];
         let right_ok = after_ident.chars().next().is_none_or(|c| !is_ident_char(c));
         if left_ok && right_ok {
@@ -345,7 +349,11 @@ fn detect_command_tell(filename: &str, lower: &str) -> Option<&'static str> {
         "rm -rf /",
         "env -s",
     ];
-    if let Some(found) = shell_tells.iter().copied().find(|tell| lower.contains(tell)) {
+    if let Some(found) = shell_tells
+        .iter()
+        .copied()
+        .find(|tell| lower.contains(tell))
+    {
         return Some(found);
     }
     if contains_bracket_quoted(lower, "exec") || contains_bracket_quoted(lower, "execsync") {
@@ -461,7 +469,10 @@ pub fn scan_external_script_security(
     filename: &str,
     content: &str,
 ) -> Result<(), RepackageSecurityError> {
-    for (idx, (cased, lower)) in normalize_script_for_scan_dual(content).into_iter().enumerate() {
+    for (idx, (cased, lower)) in normalize_script_for_scan_dual(content)
+        .into_iter()
+        .enumerate()
+    {
         let line_num = idx + 1;
         if let Some(tell) = detect_command_tell(filename, &lower) {
             return Err(RepackageSecurityError::CommandInjectionTell {
@@ -525,7 +536,10 @@ fn contains_event_handler_attr(lower: &str) -> bool {
             bytes[i - 1],
             b' ' | b'\t' | b'\n' | b'\r' | b'/' | b'"' | b'\''
         );
-        if prev_sep && bytes[i] == b'o' && bytes[i + 1] == b'n' && bytes[i + 2].is_ascii_alphabetic()
+        if prev_sep
+            && bytes[i] == b'o'
+            && bytes[i + 1] == b'n'
+            && bytes[i + 2].is_ascii_alphabetic()
         {
             let mut j = i + 2;
             while j < bytes.len() && bytes[j].is_ascii_alphabetic() {
@@ -615,7 +629,10 @@ fn scan_normalized_markdown_slice(label: &str, text: &str) -> Result<(), Repacka
 }
 
 /// Validates Markdown, SKILL.md metadata, references, SVG, and HTML against IPI, XSS, and beacons.
-pub fn scan_skill_markdown_safety(label: &str, content: &str) -> Result<(), RepackageSecurityError> {
+pub fn scan_skill_markdown_safety(
+    label: &str,
+    content: &str,
+) -> Result<(), RepackageSecurityError> {
     validate_staged_prompt_content(content).map_err(|err| {
         RepackageSecurityError::PromptInjectionOrBeacon {
             label: label.to_string(),
@@ -632,7 +649,10 @@ pub fn scan_skill_markdown_safety(label: &str, content: &str) -> Result<(), Repa
 }
 
 /// Rejects metadata strings containing YAML delimiter breakout lines (`---`) or IPI markers.
-pub fn validate_skill_metadata_text(field: &str, value: &str) -> Result<(), RepackageSecurityError> {
+pub fn validate_skill_metadata_text(
+    field: &str,
+    value: &str,
+) -> Result<(), RepackageSecurityError> {
     scan_skill_markdown_safety(field, value)?;
     for candidate in [value.to_string(), shadow_nfkc_fold(value)] {
         let normalized = candidate

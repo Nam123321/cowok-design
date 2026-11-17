@@ -7,6 +7,8 @@ export interface LoopbackSessionRecord {
   userId: string;
   role: "viewer" | "editor" | "admin";
   expiresAt: number;
+  isHumanWorkbench?: boolean;
+  humanSessionToken?: string;
 }
 
 const globalSessionRegistryKey = Symbol.for("cowok.loopback.sessionRegistry");
@@ -70,6 +72,8 @@ export function issueBffLoopbackSession(input?: {
   role?: "viewer" | "editor" | "admin";
   ttlMs?: number;
   maxCapacity?: number;
+  isHumanWorkbench?: boolean;
+  humanSessionToken?: string;
 }): { sessionToken: string } & LoopbackSessionRecord {
   const now = Date.now();
   pruneExpiredBffSessions(now);
@@ -86,9 +90,20 @@ export function issueBffLoopbackSession(input?: {
     userId: input?.userId?.trim() || "local-operator",
     role: input?.role || "editor",
     expiresAt: now + ttlMs,
+    ...(input?.isHumanWorkbench !== undefined ? { isHumanWorkbench: input.isHumanWorkbench } : {}),
+    ...(input?.humanSessionToken ? { humanSessionToken: input.humanSessionToken } : {}),
   };
   sessionRegistry.set(token, rec);
   return { sessionToken: token, ...rec };
+}
+
+/** Attaches a daemon-minted HumanWorkbenchSession token onto a server-side BFF session record. */
+export function setBffSessionHumanToken(sessionToken: string, humanSessionToken: string): void {
+  const rec = sessionRegistry.get(sessionToken);
+  if (rec && humanSessionToken.trim()) {
+    rec.humanSessionToken = humanSessionToken.trim();
+    rec.isHumanWorkbench = true;
+  }
 }
 
 /** Validates that a Host/Origin host string is loopback and matches the expected port when pinned. */
@@ -121,7 +136,7 @@ function isOriginAllowed(origin: string, hostHeader: string, boundPort: number |
 export function verifyStrictLoopback(
   req: Request,
   fallbackUrl: URL
-): { ok: true; session: LoopbackSessionRecord } | { ok: false; response: Response } {
+): { ok: true; session: LoopbackSessionRecord; sessionToken: string } | { ok: false; response: Response } {
   const boundPort = getBoundBffPort();
   const hostHeader = req.headers.get("host") || fallbackUrl.host;
   const sfs = req.headers.get("sec-fetch-site");
@@ -142,5 +157,5 @@ export function verifyStrictLoopback(
   if (session.role === "viewer" && req.method !== "GET" && req.method !== "HEAD") {
     return { ok: false, response: jsonResp(HTTP_FORBIDDEN, { code: "INSUFFICIENT_ROLE", error: "INSUFFICIENT_ROLE" }) };
   }
-  return { ok: true, session };
+  return { ok: true, session, sessionToken: token };
 }

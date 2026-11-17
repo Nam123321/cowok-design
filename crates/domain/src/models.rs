@@ -365,6 +365,74 @@ pub struct SkillPlugin {
     pub version: String,
     pub entry_point: String,
     pub permissions: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub plugin_slug: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub lifecycle_state: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub tenant_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub project_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub source_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub source_repo_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub upstream_repo_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub upstream_commit_sha: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub cron_schedule: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub revision: Option<SafeJsInteger>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub breaking_change_isolated: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
+    pub quarantined: Option<bool>,
+}
+
+impl SkillPlugin {
+    /// Constructs a core backward-compatible `SkillPlugin` from mandatory Story 08.1/08.2 fields.
+    pub fn from_core(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        version: impl Into<String>,
+        entry_point: impl Into<String>,
+        permissions: Vec<String>,
+    ) -> Self {
+        let slug = id.into();
+        Self {
+            plugin_slug: Some(slug.clone()),
+            id: slug,
+            name: name.into(),
+            version: version.into(),
+            entry_point: entry_point.into(),
+            permissions,
+            lifecycle_state: None,
+            tenant_id: None,
+            project_id: None,
+            source_type: None,
+            source_repo_url: None,
+            upstream_repo_url: None,
+            upstream_commit_sha: None,
+            cron_schedule: None,
+            revision: None,
+            breaking_change_isolated: None,
+            quarantined: None,
+        }
+    }
 }
 
 /// Asynchronous background worker task in the harness bot fleet

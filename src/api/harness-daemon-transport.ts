@@ -164,4 +164,24 @@ export class HarnessDaemonTransport {
     }
     return schema.parse(JSON.parse(rawText));
   }
+
+  /** Opens an authenticated SSE Response using the loopback BFF session token header. */
+  async openEventStream(path: string, signal?: AbortSignal, retried = false): Promise<Response> {
+    const token = await this.ensureSessionToken(retried);
+    const headers = new Headers({
+      Accept: "text/event-stream",
+      "X-Cowok-Session-Token": token,
+      "X-Correlation-Id": nextCorrelationId(),
+    });
+    const doFetch = this.resolveFetch();
+    const res = await doFetch(`${this.baseUrl}${path}`, { method: "GET", headers, signal });
+    if (res.status === HTTP_STATUS_UNAUTHORIZED && !retried) {
+      this.cachedToken = null;
+      return this.openEventStream(path, signal, true);
+    }
+    if (!res.ok || !res.body) {
+      throw await parseErrorResponse(res);
+    }
+    return res;
+  }
 }

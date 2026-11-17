@@ -321,7 +321,8 @@
     "runtimeDefaultTag": "既定",
     "customizeRuntimeBtn": "カスタマイズ",
     "vaultStorageShort": "保存方式",
-    "permissionShort": "承認レベル"
+    "permissionShort": "承認レベル",
+    "mcpHostStory084Notice": "SQLite WAL V9 上の Client MCP、AgentSkills プラグインレジストリ、分離ステージング (HUMAN_ONLY)、および LEARN ナレッジカードを管理します。"
   },
   "flow": {
     "dagCanvas": "DAG 2D キャンバス",
@@ -552,5 +553,52 @@
     "searchModels": "モデルを検索...",
     "thinkingEffort": "思考レベル",
     "manageAiAccounts": "AI アカウント管理"
+  },
+  "plugins": {
+    "validateBtn": "検証",
+    "installBtn": "インストール",
+    "activateBtn": "有効化 (HUMAN_ONLY)",
+    "deprecateBtn": "非推奨にする",
+    "loadingState": "SQLite WAL デーモンから SkillPlugins を読み込み中...",
+    "emptyState": "このプロジェクトに登録された SkillPlugins はまだありません。",
+    "revLabel": "リビジョン",
+    "registryTitle": "AgentSkills レジストリ & ステージング",
+    "retryBtn": "再試行",
+    "stagingHeader": "分離されたステージング候補",
+    "promoting": "昇格中...",
+    "promoteBtn": "ステージングを ACTIVE に昇格",
+    "discarding": "破棄中...",
+    "discardBtn": "候補を破棄",
+    "rationalePlaceholder": "理由を入力（4文字以上）...",
+    "quarantinedLabel": "隔離中"
+  },
+  "learn": {
+    "revLabel": "リビジョン",
+    "approveBtn": "承認して確定",
+    "rejectBtn": "却下",
+    "loadingState": "LEARN カードを読み込み中...",
+    "emptyState": "このプロジェクトに提案された LEARN カードはまだありません。",
+    "queueTitle": "LEARN ナレッジ承認キュー",
+    "retryBtn": "再試行",
+    "rationalePlaceholder": "承認/却下の理由を入力（4文字以上）...",
+    "budgetLabel": "プロンプト予算",
+    "filterAll": "すべて",
+    "filterProposed": "提案中",
+    "filterAccepted": "承認済み",
+    "filterRejected": "却下済み"
+  },
+  "cron": {
+    "failuresLabel": "失敗数",
+    "authRequiredNotice": "上流 401/403 エラー",
+    "refreshAuthSync": "認証を更新して同期",
+    "syncNowBtn": "今すぐ同期",
+    "loadingState": "Cron 同期スケジュールを確認中...",
+    "emptyState": "有効な上流 Cron 同期スケジュールはありません。",
+    "statusTitle": "プラグイン上流 Cron 同期",
+    "refreshBtn": "更新",
+    "retryBtn": "再試行",
+    "cronPlaceholder": "0 */5 * * * *",
+    "upstreamUrlPlaceholder": "https://github.com/soshiki/repo",
+    "saveScheduleBtn": "スケジュール保存"
   }
 }

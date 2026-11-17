@@ -332,11 +332,17 @@ fn validate_manifest_contract(manifest: &SkillManifest) -> Result<(), PluginLife
     Ok(())
 }
 
-fn validate_staged_bundle_contents(bundle: &StagedPluginBundle) -> Result<(), PluginLifecycleError> {
+fn validate_staged_bundle_contents(
+    bundle: &StagedPluginBundle,
+) -> Result<(), PluginLifecycleError> {
     let fm = parse_and_validate_skill_frontmatter(&bundle.skill_md).map_err(|e| {
         PluginLifecycleError::StagingPromotionRejected(format!("Invalid SKILL.md: {e}"))
     })?;
-    let fm_caps: BTreeSet<&str> = fm.capabilities_required.iter().map(String::as_str).collect();
+    let fm_caps: BTreeSet<&str> = fm
+        .capabilities_required
+        .iter()
+        .map(String::as_str)
+        .collect();
     let man_caps: BTreeSet<&str> = bundle
         .manifest
         .capabilities_required
@@ -375,7 +381,8 @@ fn validate_staged_bundle_contents(bundle: &StagedPluginBundle) -> Result<(), Pl
             ))
         })?;
     }
-    if bundle.manifest.entry_point != "SKILL.md" && !seen_paths.contains(&bundle.manifest.entry_point)
+    if bundle.manifest.entry_point != "SKILL.md"
+        && !seen_paths.contains(&bundle.manifest.entry_point)
     {
         return Err(PluginLifecycleError::StagingPromotionRejected(format!(
             "Manifest entry_point '{}' missing from verified staged scripts",
@@ -578,13 +585,23 @@ impl ManagedPlugin {
 
     /// Projects active lifecycle manifest onto backward-compatible `domain::models::SkillPlugin` (AC-02).
     pub fn to_domain_plugin(&self) -> SkillPlugin {
-        SkillPlugin {
-            id: self.id.clone(),
-            name: self.manifest.name.clone(),
-            version: self.version.clone(),
-            entry_point: self.manifest.entry_point.clone(),
-            permissions: self.manifest.capabilities_required.clone(),
-        }
+        let mut dto = SkillPlugin::from_core(
+            self.id.clone(),
+            self.manifest.name.clone(),
+            self.version.clone(),
+            self.manifest.entry_point.clone(),
+            self.manifest.capabilities_required.clone(),
+        );
+        dto.plugin_slug = Some(self.plugin_slug.clone());
+        dto.lifecycle_state = Some(self.state.as_wire_str().to_string());
+        dto.tenant_id = Some(self.tenant_id.clone());
+        dto.project_id = Some(self.project_id.clone());
+        dto.revision = i64::try_from(self.revision)
+            .ok()
+            .and_then(|v| domain::SafeJsInteger::new(v).ok());
+        dto.breaking_change_isolated = Some(self.breaking_change_isolated);
+        dto.quarantined = Some(self.quarantined);
+        dto
     }
 
     fn check_revision(&self, expected: u64) -> Result<(), PluginLifecycleError> {

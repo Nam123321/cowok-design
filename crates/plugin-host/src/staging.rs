@@ -148,7 +148,15 @@ pub fn validate_staged_prompt_content(overview: &str) -> std::io::Result<()> {
     }
     let shadow = shadow_nfkc_fold(overview);
     for candidate in [overview.to_ascii_lowercase(), shadow.to_ascii_lowercase()] {
-        for forbidden in ["<important", "</important", "<system", "</system", "<!--", "-->", "<img"] {
+        for forbidden in [
+            "<important",
+            "</important",
+            "<system",
+            "</system",
+            "<!--",
+            "-->",
+            "<img",
+        ] {
             if candidate.contains(forbidden) {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
@@ -193,7 +201,10 @@ fn ensure_safe_base_dir(base: &Path) -> std::io::Result<PathBuf> {
     if anchor_meta.file_type().is_symlink() || !anchor_meta.is_dir() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            format!("Symlink component disallowed in staging anchor: {}", cur.display()),
+            format!(
+                "Symlink component disallowed in staging anchor: {}",
+                cur.display()
+            ),
         ));
     }
 
@@ -209,7 +220,10 @@ fn ensure_safe_base_dir(base: &Path) -> std::io::Result<PathBuf> {
         if meta.file_type().is_symlink() || !meta.is_dir() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                format!("Symlink component disallowed in staging path: {}", resolved.display()),
+                format!(
+                    "Symlink component disallowed in staging path: {}",
+                    resolved.display()
+                ),
             ));
         }
     }
@@ -286,7 +300,10 @@ impl PerRunStager {
             let params_str = skill.parameters.as_ref().map(canonicalize_json);
             hash_optional_bytes(&mut hasher, params_str.as_deref().map(str::as_bytes));
             hash_sorted_unique(&mut hasher, &skill.tags);
-            hash_optional_bytes(&mut hasher, skill.prompt_overview.as_deref().map(str::as_bytes));
+            hash_optional_bytes(
+                &mut hasher,
+                skill.prompt_overview.as_deref().map(str::as_bytes),
+            );
             hash_optional_bytes(&mut hasher, md_sha.map(str::as_bytes));
         }
 
@@ -295,8 +312,7 @@ impl PerRunStager {
 
     /// Computes deterministic stable_prompt_hash across sorted skill manifests.
     pub fn compute_stable_prompt_hash(skills: &[SkillManifest]) -> String {
-        let refs: Vec<(&SkillManifest, Option<&str>)> =
-            skills.iter().map(|s| (s, None)).collect();
+        let refs: Vec<(&SkillManifest, Option<&str>)> = skills.iter().map(|s| (s, None)).collect();
         Self::compute_stable_prompt_hash_with_sources(&refs)
     }
 
@@ -412,8 +428,7 @@ impl PerRunStager {
         run_id: &str,
         skills: &[SkillManifest],
     ) -> std::io::Result<StagingRunReceipt> {
-        let refs: Vec<(&SkillManifest, Option<&str>)> =
-            skills.iter().map(|s| (s, None)).collect();
+        let refs: Vec<(&SkillManifest, Option<&str>)> = skills.iter().map(|s| (s, None)).collect();
         self.stage_run_with_sources(run_id, &refs)
     }
 

@@ -73,11 +73,37 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  // Mirror pool.rs idempotent V9 column guards prior to V9 12-step rebuild of skill_plugins
+  db.exec(`
+    ALTER TABLE skill_plugins ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
+    ALTER TABLE skill_plugins ADD COLUMN source_type TEXT NOT NULL DEFAULT 'local';
+    ALTER TABLE skill_plugins ADD COLUMN upstream_repo_url TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN upstream_commit_sha TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN cron_schedule TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN skill_md_path TEXT NOT NULL DEFAULT 'SKILL.md';
+    ALTER TABLE skill_plugins ADD COLUMN plugin_json_path TEXT NOT NULL DEFAULT 'plugin.json';
+    ALTER TABLE skill_plugins ADD COLUMN last_synced_at BIGINT;
+    ALTER TABLE skill_plugins ADD COLUMN revision BIGINT NOT NULL DEFAULT 1;
+    ALTER TABLE skill_plugins ADD COLUMN staging_version TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN staging_manifest_json TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN staging_diff_reasons_json TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN staging_bundle_dir TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN staging_package_sha256 TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN breaking_change_isolated INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE skill_plugins ADD COLUMN quarantined INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE skill_plugins ADD COLUMN quarantine_reason TEXT;
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V9__epic08_plugins_learn_cron.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
 
-describe("P1 Persistence Contract & SQLite WAL V1-V8 Mirror Verification (ADR-091)", () => {
+describe("P1 Persistence Contract & SQLite WAL V1-V9 Mirror Verification (ADR-091)", () => {
   const schemaPath = path.resolve(__dirname, "schema.prisma");
   const migrationsDir = path.resolve(__dirname, "../crates/spec-registry/migrations");
 
@@ -95,10 +121,13 @@ describe("P1 Persistence Contract & SQLite WAL V1-V8 Mirror Verification (ADR-09
     expect(mappedTables).toContain("daemon_sessions");
     expect(mappedTables).toContain("daemon_replay_nonces");
     expect(mappedTables).toContain("workspace_sync_intents");
-    expect(mappedTables).toHaveLength(42);
+    expect(mappedTables).toContain("knowledge_cards");
+    expect(mappedTables).toContain("learn_consumed_nonces");
+    expect(mappedTables).toContain("plugin_cron_schedules");
+    expect(mappedTables).toHaveLength(45);
   });
 
-  it("UT-DB-02: executes V1-V8 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V9 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 
@@ -217,5 +246,48 @@ describe("P1 Persistence Contract & SQLite WAL V1-V8 Mirror Verification (ADR-09
     db.prepare("DELETE FROM flow_nodes WHERE id = 'node-1'").run();
     const remainingEdges = db.prepare("SELECT COUNT(*) as count FROM flow_edges").get() as { count: number };
     expect(remainingEdges.count).toBe(0);
+  });
+
+  it("UT-DB-06: verifies Story 08.4 V9 SQLite index parity with Prisma partialIndexes metadata", () => {
+    const db = openMigratedMemoryDb();
+    const schemaText = fs.readFileSync(path.resolve(__dirname, "schema.prisma"), "utf8");
+    const sqliteIndexes = db
+      .prepare(
+        "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name IN ('skill_plugins', 'knowledge_cards', 'plugin_cron_schedules')"
+      )
+      .all() as Array<{ name: string; sql: string | null }>;
+    const byName = new Map(sqliteIndexes.map((idx) => [idx.name, idx.sql ?? ""]));
+
+    expect(byName.has("uq_skill_plugins_scope_slug_ver")).toBe(true);
+    expect(byName.has("uq_skill_plugins_active_slug")).toBe(true);
+    expect(byName.get("uq_skill_plugins_active_slug")).toContain("WHERE lifecycle_state = 'ACTIVE'");
+    expect(byName.has("uq_knowledge_cards_idempotency")).toBe(true);
+    expect(byName.get("uq_knowledge_cards_idempotency")).toContain("WHERE idempotency_key IS NOT NULL");
+    expect(byName.has("uq_plugin_cron_schedules_scope_plugin")).toBe(true);
+    expect(byName.has("skill_plugins_project_slug_ver_key")).toBe(false);
+
+    expect(schemaText).toContain('previewFeatures = ["partialIndexes"]');
+    expect(schemaText).toContain('map: "uq_skill_plugins_active_slug"');
+    expect(schemaText).toContain('map: "uq_knowledge_cards_idempotency"');
+    expect(schemaText).toContain('map: "uq_plugin_cron_schedules_scope_plugin"');
+
+    const now = Date.now();
+    db.prepare(
+      "INSERT INTO projects (id, tenant_id, name, slug, created_at, updated_at) VALUES ('p-084', 'tenant-a', 'Proj 084', 'p-084', ?, ?)"
+    ).run(now, now);
+    db.prepare(
+      "INSERT INTO skill_plugins (id, tenant_id, project_id, plugin_slug, version, lifecycle_state, source_type, source_repo_url, updated_at) VALUES ('sp-1', 'tenant-a', 'p-084', 'tokens-skill', '1.0.0', 'ACTIVE', 'local', 'https://github.com/org/repo', ?)"
+    ).run(now);
+    db.prepare(
+      "INSERT INTO skill_plugins (id, tenant_id, project_id, plugin_slug, version, lifecycle_state, source_type, source_repo_url, updated_at) VALUES ('sp-2', 'tenant-a', 'p-084', 'tokens-skill', '2.0.0', 'INSTALLED', 'local', 'https://github.com/org/repo', ?)"
+    ).run(now);
+    expect(() => {
+      db.prepare(
+        "INSERT INTO skill_plugins (id, tenant_id, project_id, plugin_slug, version, lifecycle_state, source_type, source_repo_url, updated_at) VALUES ('sp-3', 'tenant-a', 'p-084', 'tokens-skill', '3.0.0', 'ACTIVE', 'local', 'https://github.com/org/repo', ?)"
+      ).run(now);
+    }).toThrow();
+    db.prepare(
+      "INSERT INTO skill_plugins (id, tenant_id, project_id, plugin_slug, version, lifecycle_state, source_type, source_repo_url, updated_at) VALUES ('sp-4', 'tenant-b', 'p-084', 'tokens-skill', '1.0.0', 'ACTIVE', 'local', 'https://github.com/org/repo', ?)"
+    ).run(now);
   });
 });

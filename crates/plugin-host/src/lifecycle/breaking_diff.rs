@@ -106,9 +106,8 @@ fn diff_parameter_schemas(
                         .and_then(|r| r.as_array())
                         .is_some_and(|a| !a.is_empty()) =>
                 {
-                    reasons.push(
-                        "Added new required parameters without existing schema".to_string(),
-                    );
+                    reasons
+                        .push("Added new required parameters without existing schema".to_string());
                 }
                 Some(_) => {}
                 None => {
@@ -158,7 +157,8 @@ fn diff_parameter_schemas(
             match np.get(prop_name) {
                 None => reasons.push(format!("Removed parameter property '{prop_name}'")),
                 Some(new_schema) => {
-                    if extract_schema_type_kind(old_schema) != extract_schema_type_kind(new_schema) {
+                    if extract_schema_type_kind(old_schema) != extract_schema_type_kind(new_schema)
+                    {
                         reasons.push(format!("Parameter '{prop_name}' type changed"));
                     }
                 }

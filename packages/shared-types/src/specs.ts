@@ -137,6 +137,18 @@ export const SkillPluginSchema = z
     version: z.string(),
     entry_point: z.string(),
     permissions: z.array(z.string()),
+    plugin_slug: z.string().nullable().optional(),
+    lifecycle_state: z.string().nullable().optional(),
+    tenant_id: z.string().nullable().optional(),
+    project_id: z.string().nullable().optional(),
+    source_type: z.string().nullable().optional(),
+    source_repo_url: z.string().nullable().optional(),
+    upstream_repo_url: z.string().nullable().optional(),
+    upstream_commit_sha: z.string().nullable().optional(),
+    cron_schedule: z.string().nullable().optional(),
+    revision: SafeJsIntegerSchema.nullable().optional(),
+    breaking_change_isolated: z.boolean().nullable().optional(),
+    quarantined: z.boolean().nullable().optional(),
   })
   .strict();
 

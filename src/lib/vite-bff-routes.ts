@@ -17,6 +17,7 @@ import {
   type RouteEntry,
   type RouteFn,
 } from "./vite-bff-flow-routes";
+import { PLUGIN_ECOSYSTEM_ROUTES } from "./vite-bff-plugins-routes";
 import * as doctorRoute from "../app/api/doctor/route";
 import * as snapshotRoute from "../app/api/projects/[id]/flow/snapshot/route";
 import * as nodesRoute from "../app/api/projects/[id]/flow/nodes/route";
@@ -68,8 +69,6 @@ const ROUTE_TABLE: RouteEntry[] = [
   proxyRoute("GET", /^\/api\/doctor\/clis$/, () => "/api/v1/doctor/clis"),
   proxyRoute("GET", /^\/api\/doctor\/usage$/, () => "/api/v1/doctor/usage"),
   proxyRoute("POST", /^\/api\/doctor\/probe-cli$/, () => "/api/v1/doctor/probe-cli", ProbeCliInputSchema),
-  proxyRoute("GET", /^\/api\/plugins$/, () => "/api/v1/plugins"),
-  proxyRoute("GET", /^\/api\/plugins\/registry$/, () => "/api/v1/plugins/registry"),
   proxyRoute("POST", /^\/api\/doctor\/verify-key$/, () => "/api/v1/doctor/verify-key", VerifyProviderKeyInputSchema),
   proxyRoute("GET", /^\/api\/vault\/keys$/, () => "/api/v1/vault/keys"),
   proxyRoute("POST", /^\/api\/vault\/keys$/, () => "/api/v1/vault/keys", UpsertVaultKeyInputSchema),
@@ -130,6 +129,7 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/sdi\/intent$/, extractParams: idOnly, resolveHandler: () => sdiIntentRoute.POST },
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/sdi\/intent\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent/${safeEncodeSegment(m[2])}`),
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/sdi\/clarification$/, extractParams: idOnly, resolveHandler: () => sdiClarificationRoute.POST },
+  ...PLUGIN_ECOSYSTEM_ROUTES,
   ...FLOW_AND_WORKBENCH_ROUTES,
 ];
 

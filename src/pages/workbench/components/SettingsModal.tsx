@@ -1,19 +1,22 @@
-// @story 04.1, 04.2
-import React, { useEffect, useState } from "react";
+// @story 04.1, 04.2, 08.4
+import React from "react";
 import { apiWorkbenchSettings } from "../../../api/workbench-settings";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "../../../hooks/useTranslation";
-import { loadPersistedSettings, savePersistedSettings } from "../hooks/useWorkbenchSessionSettings";
+import { DEFAULT_FLOW_PROJECT_ID } from "../constants";
+import { useSettingsDialogState, type SettingsTab } from "../hooks/useSettingsModalState";
+import { savePersistedSettings } from "../hooks/useWorkbenchSessionSettings";
 import { FONT_SIZES, SettingsGeneralModelsPane, SUPPORTED_LOCALES } from "./SettingsGeneralModelsPane";
 import { SettingsMcpAutomationsPane } from "./SettingsMcpAutomationsPane";
 import type { ThemeMode } from "./WorkbenchTopNav";
 
 export { FONT_SIZES, SUPPORTED_LOCALES };
-export type SettingsTab = "general" | "models" | "mcp" | "automations";
+export type { SettingsTab };
 
 export interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  projectId?: string;
   currentTheme: ThemeMode;
   onThemeChange: (theme: ThemeMode) => void;
   currentLocale: string;
@@ -59,61 +62,6 @@ const SettingsTabStrip: React.FC<{
     </div>
   );
 };
-
-function applyDefaultAgentSettingRow(
-  rows: Awaited<ReturnType<typeof apiWorkbenchSettings.listAgentSettings>>,
-  setters: {
-    setDefaultModel: (v: string) => void;
-    setByosEndpoint: (v: string) => void;
-    setVaultMode: (v: string) => void;
-    setPermissionMode: (v: string) => void;
-    setOnboardingDone: (v: boolean) => void;
-  }
-) {
-  if (rows.length === 0) return;
-  const def = rows.find((r) => r.isDefault) || rows[0];
-  if (def.modelId) setters.setDefaultModel(def.modelId);
-  if (def.endpointUrl) setters.setByosEndpoint(def.endpointUrl);
-  const nextVault = def.vaultMode || def.credentialRef;
-  if (nextVault) setters.setVaultMode(nextVault);
-  const nextPerm = def.permissionMode || def.status;
-  if (nextPerm) setters.setPermissionMode(nextPerm);
-  if (typeof def.onboardingDone === "boolean") setters.setOnboardingDone(def.onboardingDone);
-}
-
-function useSettingsDialogState(isOpen: boolean, onClose: () => void, activeTab: SettingsTab) {
-  const initial = loadPersistedSettings();
-  const [selectedTab, setSelectedTab] = useState<SettingsTab>(activeTab);
-  const [defaultModel, setDefaultModel] = useState(initial.defaultModel || "cowok-swarm");
-  const [byosEndpoint, setByosEndpoint] = useState(initial.byosEndpoint || "");
-  const [vaultMode, setVaultMode] = useState<string>("vault_0600");
-  const [permissionMode, setPermissionMode] = useState<string>("auto_sandbox");
-  const [onboardingDone, setOnboardingDone] = useState<boolean>(false);
-  const [ephemeralKeys, setEphemeralKeys] = useState({ gemini: "", claude: "", openai: "", byosToken: "" });
-  const [showKeys, setShowKeys] = useState(false);
-  const [savedFeedback, setSavedFeedback] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [syncWarning, setSyncWarning] = useState<string | null>(null);
-
-  useEffect(() => { if (activeTab) setSelectedTab(activeTab); }, [activeTab]);
-  useEffect(() => {
-    if (!isOpen) return;
-    let active = true;
-    void apiWorkbenchSettings.listAgentSettings().then((rows) => {
-      if (!active) return;
-      setSyncWarning(null);
-      applyDefaultAgentSettingRow(rows, { setDefaultModel, setByosEndpoint, setVaultMode, setPermissionMode, setOnboardingDone });
-    }).catch((err: unknown) => {
-      if (!active) return;
-      setSyncWarning(err instanceof Error ? err.message : "daemon_sync_failed");
-    });
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => { active = false; window.removeEventListener("keydown", onKey); };
-  }, [isOpen, onClose]);
-
-  return { selectedTab, setSelectedTab, defaultModel, setDefaultModel, byosEndpoint, setByosEndpoint, vaultMode, setVaultMode, permissionMode, setPermissionMode, onboardingDone, setOnboardingDone, ephemeralKeys, setEphemeralKeys, showKeys, setShowKeys, savedFeedback, setSavedFeedback, isSaving, setIsSaving, syncWarning, setSyncWarning };
-}
 
 const SettingsModalFooter: React.FC<{
   savedFeedback: boolean;
@@ -238,7 +186,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = (p) => {
               onAgentPrefsChange={(v, pm) => { s.setVaultMode(v); s.setPermissionMode(pm); }}
             />
           ) : (
-            <SettingsMcpAutomationsPane selectedTab={s.selectedTab} />
+            <SettingsMcpAutomationsPane
+              selectedTab={s.selectedTab}
+              projectId={p.projectId || DEFAULT_FLOW_PROJECT_ID}
+            />
           )}
         </div>
         <SettingsModalFooter savedFeedback={s.savedFeedback} isSaving={s.isSaving} syncWarning={s.syncWarning} closeText={closeText} onClose={p.onClose} onSave={() => void executeSaveSettings(p, s)} />

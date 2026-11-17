@@ -12,8 +12,25 @@ import {
   type DaemonLockRecord,
 } from "./daemon-hmac";
 import { logger } from "./logger.ts";
+import { setBffSessionHumanToken } from "./api-guard-session.ts";
 
 export { buildCanonicalHmacHeaders, stripSpoofedHeaders };
+
+const WORKBENCH_HUMAN_SECRET_SYMBOL = Symbol.for("cowok.workbenchHumanSecret");
+const WORKBENCH_SECRET_BYTES = 32;
+
+function getOrInitWorkbenchHumanSecret(): string {
+  const existing = process.env.COWOK_WORKBENCH_HUMAN_SECRET?.trim();
+  if (existing) return existing;
+  const g = globalThis as Record<PropertyKey, unknown>;
+  if (typeof g[WORKBENCH_HUMAN_SECRET_SYMBOL] === "string" && (g[WORKBENCH_HUMAN_SECRET_SYMBOL] as string).length > 0) {
+    return g[WORKBENCH_HUMAN_SECRET_SYMBOL] as string;
+  }
+  const generated = crypto.randomBytes(WORKBENCH_SECRET_BYTES).toString("hex");
+  g[WORKBENCH_HUMAN_SECRET_SYMBOL] = generated;
+  process.env.COWOK_WORKBENCH_HUMAN_SECRET = generated;
+  return generated;
+}
 
 /**
  * Local workspace bootstrap default IDs.
@@ -172,9 +189,15 @@ export async function ensureRunningDaemon(): Promise<DaemonLockRecord> {
   if (spawningPromise) return spawningPromise;
   spawningPromise = (async () => {
     try {
+      const humanSecret = getOrInitWorkbenchHumanSecret();
       const child = spawn(resolveDaemonBinaryPath(), [], {
         cwd: wsRoot,
-        env: { ...process.env, UXUI_OS_WORKSPACE_ROOT: wsRoot, UXUI_OS_DAEMON_PORT: "0" },
+        env: {
+          ...process.env,
+          UXUI_OS_WORKSPACE_ROOT: wsRoot,
+          UXUI_OS_DAEMON_PORT: "0",
+          COWOK_WORKBENCH_HUMAN_SECRET: humanSecret,
+        },
         detached: true,
         stdio: "ignore",
       });
@@ -196,6 +219,45 @@ export async function ensureRunningDaemon(): Promise<DaemonLockRecord> {
   return spawningPromise;
 }
 
+async function resolveHumanSessionHeader(
+  lock: DaemonLockRecord,
+  opts: {
+    bffSessionToken?: string;
+    isHumanWorkbench?: boolean;
+    humanSessionToken?: string;
+    principal: { tenantId: string; userId: string; role: "viewer" | "editor" | "admin" };
+  }
+): Promise<string | undefined> {
+  if (opts.humanSessionToken?.trim()) return opts.humanSessionToken.trim();
+  if (!opts.isHumanWorkbench || opts.principal.role === "viewer") return undefined;
+  const secret = process.env.COWOK_WORKBENCH_HUMAN_SECRET?.trim();
+  if (!secret) return undefined;
+  try {
+    const res = await fetch(`http://127.0.0.1:${lock.port}/api/v1/auth/workbench-session`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Host: `127.0.0.1:${lock.port}`,
+        "X-Cowok-Workbench-Secret": secret,
+      },
+      body: JSON.stringify({
+        tenantId: opts.principal.tenantId,
+        userId: opts.principal.userId,
+        role: opts.principal.role === "admin" ? "admin" : "editor",
+      }),
+    });
+    if (!res.ok) return undefined;
+    const data = (await res.json()) as { sessionToken?: string };
+    const tok = data.sessionToken?.trim();
+    if (tok && opts.bffSessionToken) {
+      setBffSessionHumanToken(opts.bffSessionToken, tok);
+    }
+    return tok || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function forwardToDaemonFlow(opts: {
   method: string;
   daemonPath: string;
@@ -205,18 +267,25 @@ export async function forwardToDaemonFlow(opts: {
   extraHeaders?: Record<string, string>;
   principal: { tenantId: string; userId: string; role: "viewer" | "editor" | "admin" };
   correlationId?: string;
+  bffSessionToken?: string;
+  isHumanWorkbench?: boolean;
+  humanSessionToken?: string;
 }): Promise<Response> {
   const safeInbound = opts.inboundHeaders ? stripSpoofedHeaders(opts.inboundHeaders) : {};
   const lock = await ensureRunningDaemon();
   const rawQuery = (opts.rawQuery || "").replace(/^\?/, "");
   const rawBody = opts.body !== undefined ? JSON.stringify(opts.body) : "";
   const correlationId = opts.correlationId || crypto.randomUUID();
+  const resolvedHumanTok = await resolveHumanSessionHeader(lock, opts);
   const signedHeaders = buildCanonicalHmacHeaders({
     daemonNonce: lock.daemon_nonce, hmacKeyHex: lock.hmac_key_hex,
     method: opts.method, canonicalPath: opts.daemonPath, rawQuery,
     principal: opts.principal, rawBody, correlationId,
   });
-  const headers = assembleForwardHeaders(safeInbound, signedHeaders, opts.extraHeaders);
+  const extraHeaders = resolvedHumanTok
+    ? { ...(opts.extraHeaders || {}), "X-Cowok-Human-Session": resolvedHumanTok }
+    : opts.extraHeaders;
+  const headers = assembleForwardHeaders(safeInbound, signedHeaders, extraHeaders);
   headers["X-Cowok-Role"] = opts.principal.role;
   const targetUrl = `http://127.0.0.1:${lock.port}${opts.daemonPath}${rawQuery ? `?${rawQuery}` : ""}`;
   logger.info("bff_forward_daemon", { method: opts.method, path: opts.daemonPath, correlationId });
@@ -230,7 +299,15 @@ export async function forwardToDaemonFlow(opts: {
 
 export function forwardFromGuardedContext(
   req: Request,
-  ctx: { tenantId?: string; userId?: string; role?: "viewer" | "editor" | "admin"; correlationId?: string },
+  ctx: {
+    tenantId?: string;
+    userId?: string;
+    role?: "viewer" | "editor" | "admin";
+    correlationId?: string;
+    bffSessionToken?: string;
+    isHumanWorkbench?: boolean;
+    humanSessionToken?: string;
+  },
   daemonPath: string,
   body?: unknown
 ): Promise<Response> {
@@ -247,5 +324,8 @@ export function forwardFromGuardedContext(
       role: ctx.role || "viewer",
     },
     correlationId: ctx.correlationId,
+    bffSessionToken: ctx.bffSessionToken,
+    isHumanWorkbench: ctx.isHumanWorkbench,
+    humanSessionToken: ctx.humanSessionToken,
   });
 }

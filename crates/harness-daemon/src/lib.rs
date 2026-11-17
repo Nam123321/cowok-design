@@ -48,6 +48,7 @@ pub struct DaemonServer {
     router: Router,
     active_workers: crate::routes::execution_reaper::ActiveWorkerRegistry,
     sse_tx: tokio::sync::broadcast::Sender<String>,
+    pool: SqlitePool,
 }
 
 impl DaemonServer {
@@ -58,9 +59,10 @@ impl DaemonServer {
         registry: Arc<SpecRegistry>,
     ) -> Result<Self, HarnessError> {
         let (listener, lock_info, lock_path) = bind_loopback_with_lockfile(config)?;
+        let pool = registry.pool().clone();
         let auth = crate::daemon_auth::DaemonAuthState::from_lock_info_with_pool(
             &lock_info,
-            Some(registry.pool().clone()),
+            Some(pool.clone()),
         )?;
         let state =
             DaemonAppState::with_auth(registry, lock_info.host.clone(), lock_info.port, auth);
@@ -74,6 +76,7 @@ impl DaemonServer {
             router,
             active_workers,
             sse_tx,
+            pool,
         })
     }
 
@@ -103,16 +106,31 @@ impl DaemonServer {
 
     /// Serves the bound loopback listener using Axum's async server loop.
     pub async fn serve(self) -> Result<(), HarnessError> {
+        let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+        let cron_pool = self.pool.clone();
+        let cron_ws = self.pool.workspace_root().to_path_buf();
+        let cron_sse = self.sse_tx.clone();
+        tokio::spawn(async move {
+            crate::routes::plugins_cron::spawn_plugin_cron_runtime(
+                cron_pool,
+                cron_ws,
+                Some(cron_sse),
+                shutdown_rx,
+            )
+            .await;
+        });
         let tokio_listener = tokio::net::TcpListener::from_std(self.listener).map_err(|e| {
             HarnessError::ValidationFailed {
                 reason: format!("DAEMON_TOKIO_LISTENER_FAILED: {e}"),
             }
         })?;
-        axum::serve(tokio_listener, self.router)
-            .await
-            .map_err(|e| HarnessError::ValidationFailed {
+        let serve_res = axum::serve(tokio_listener, self.router).await.map_err(|e| {
+            HarnessError::ValidationFailed {
                 reason: format!("DAEMON_SERVE_FAILED: {e}"),
-            })
+            }
+        });
+        let _ = shutdown_tx.send(true);
+        serve_res
     }
 }
 
@@ -222,6 +240,27 @@ impl DaemonHttpClient {
         let ceiling = req.token_ceiling.unwrap_or(domain::TOKEN_BUDGET_CEILING);
         let compiler = domain::DeterministicPromptCompiler::new(ceiling);
         compiler.compile(input)
+    }
+
+    /// Compiles immutable per-run `.cowok-design/.cowok-skills/<run_id>/` catalog & fenced LEARN prompt (`<= 1,500` tokens).
+    pub fn compile_skill_prompt_bundle(
+        &self,
+        tenant_id: &str,
+        project_id: Uuid,
+        req: &crate::routes::plugins::CompilePromptBundleRequest,
+    ) -> Result<crate::routes::plugins::CompiledPromptSnapshotDto, HarnessError> {
+        crate::routes::plugins::compile_skill_prompt_bundle_sync(
+            self.state.registry.pool(),
+            tenant_id,
+            &project_id.to_string(),
+            req,
+        )
+        .map_err(|resp| HarnessError::ValidationFailed {
+            reason: format!(
+                "COMPILE_SKILL_PROMPT_BUNDLE_FAILED: status={}",
+                resp.status()
+            ),
+        })
     }
 
     /// Adapts model capabilities across 3 profiles (Profile A, Profile B, Profile C)

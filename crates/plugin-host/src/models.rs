@@ -26,10 +26,7 @@ pub struct SkillManifest {
     #[serde(default = "default_risk_tier")]
     pub risk_tier: u8,
     #[serde(default)]
-    #[cfg_attr(
-        feature = "ts",
-        ts(type = "Record<string, unknown> | boolean | null")
-    )]
+    #[cfg_attr(feature = "ts", ts(type = "Record<string, unknown> | boolean | null"))]
     pub parameters: Option<serde_json::Value>,
     #[serde(default)]
     pub tags: Vec<String>,

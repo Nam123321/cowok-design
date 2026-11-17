@@ -28,7 +28,15 @@ fn check_line_layout_rules(lower: &str, line: &str, line_num: usize, issues: &mu
         && lower.contains("padding")
         && lower.contains("inner")
     {
-        issues.push(geo_issue("RULE_GEO_01_CONCENTRIC_RADIUS", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Verify concentric border radius: R_inner = max(4, R_outer - P/2)", line_num, Some(line), true));
+        issues.push(geo_issue(
+            "RULE_GEO_01_CONCENTRIC_RADIUS",
+            LintIssueCategory::GeometricLayout,
+            LintSeverity::Warning,
+            "Verify concentric border radius: R_inner = max(4, R_outer - P/2)",
+            line_num,
+            Some(line),
+            true,
+        ));
     }
     if (lower.contains("width:") || lower.contains("w-["))
         && (lower.contains("<p") || lower.contains("<span") || lower.contains("<h"))
@@ -38,59 +46,178 @@ fn check_line_layout_rules(lower: &str, line: &str, line_num: usize, issues: &mu
         && lower.contains("px")
         && !lower.contains("overflow")
     {
-        issues.push(geo_issue("RULE_GEO_03_TEXT_OVERFLOW", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Fixed width text element lacks overflow/ellipsis or word-break guard.", line_num, Some(line), true));
+        issues.push(geo_issue(
+            "RULE_GEO_03_TEXT_OVERFLOW",
+            LintIssueCategory::GeometricLayout,
+            LintSeverity::Warning,
+            "Fixed width text element lacks overflow/ellipsis or word-break guard.",
+            line_num,
+            Some(line),
+            true,
+        ));
     }
     if (lower.contains("<button") || lower.contains("class=\"btn\""))
-        && (lower.contains("height: 24px") || lower.contains("height: 28px") || lower.contains("height: 32px"))
+        && (lower.contains("height: 24px")
+            || lower.contains("height: 28px")
+            || lower.contains("height: 32px"))
     {
-        issues.push(geo_issue("RULE_GEO_04_TOUCH_TARGET", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Interactive button height < 44px without touch target expansion.", line_num, Some(line), false));
+        issues.push(geo_issue(
+            "RULE_GEO_04_TOUCH_TARGET",
+            LintIssueCategory::GeometricLayout,
+            LintSeverity::Warning,
+            "Interactive button height < 44px without touch target expansion.",
+            line_num,
+            Some(line),
+            false,
+        ));
     }
     if (lower.contains("line-height: 1;") || lower.contains("leading-none"))
         && (lower.contains("<p") || lower.contains("body") || lower.contains("prose"))
     {
-        issues.push(geo_issue("RULE_GEO_05_LINE_HEIGHT_RATIO", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Paragraph line-height is 1.0; body text requires line-height between 1.4 and 1.6.", line_num, Some(line), true));
+        issues.push(geo_issue(
+            "RULE_GEO_05_LINE_HEIGHT_RATIO",
+            LintIssueCategory::GeometricLayout,
+            LintSeverity::Warning,
+            "Paragraph line-height is 1.0; body text requires line-height between 1.4 and 1.6.",
+            line_num,
+            Some(line),
+            true,
+        ));
     }
-    if ["padding: 13px", "padding: 15px", "margin: 7px", "gap: 11px"].iter().any(|p| lower.contains(p)) {
-        issues.push(geo_issue("RULE_GEO_06_SPACING_GRID_SCALE", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Off-grid spacing pixel literal detected; align to 4px/8px geometric rhythm.", line_num, Some(line), false));
+    if ["padding: 13px", "padding: 15px", "margin: 7px", "gap: 11px"]
+        .iter()
+        .any(|p| lower.contains(p))
+    {
+        issues.push(geo_issue(
+            "RULE_GEO_06_SPACING_GRID_SCALE",
+            LintIssueCategory::GeometricLayout,
+            LintSeverity::Warning,
+            "Off-grid spacing pixel literal detected; align to 4px/8px geometric rhythm.",
+            line_num,
+            Some(line),
+            false,
+        ));
     }
-    if ["font-size: 8px", "font-size: 9px", "text-[8px]", "text-[9px]"].iter().any(|p| lower.contains(p)) {
-        issues.push(geo_issue("RULE_GEO_08_MIN_FONT_SIZE", LintIssueCategory::GeometricLayout, LintSeverity::Error, "Font size < 10px violates minimum readability standard.", line_num, Some(line), true));
+    if [
+        "font-size: 8px",
+        "font-size: 9px",
+        "text-[8px]",
+        "text-[9px]",
+    ]
+    .iter()
+    .any(|p| lower.contains(p))
+    {
+        issues.push(geo_issue(
+            "RULE_GEO_08_MIN_FONT_SIZE",
+            LintIssueCategory::GeometricLayout,
+            LintSeverity::Error,
+            "Font size < 10px violates minimum readability standard.",
+            line_num,
+            Some(line),
+            true,
+        ));
     }
-    if ["min-width: 1200px", "width: 1440px", "w-[1200px]", "w-[1440px]"].iter().any(|p| lower.contains(p))
+    if [
+        "min-width: 1200px",
+        "width: 1440px",
+        "w-[1200px]",
+        "w-[1440px]",
+    ]
+    .iter()
+    .any(|p| lower.contains(p))
         && !lower.contains("max-width")
     {
-        issues.push(geo_issue("RULE_GEO_09_HORIZONTAL_OVERFLOW", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Large fixed pixel width risks horizontal overflow on tablet/mobile viewports.", line_num, Some(line), false));
+        issues.push(geo_issue(
+            "RULE_GEO_09_HORIZONTAL_OVERFLOW",
+            LintIssueCategory::GeometricLayout,
+            LintSeverity::Warning,
+            "Large fixed pixel width risks horizontal overflow on tablet/mobile viewports.",
+            line_num,
+            Some(line),
+            false,
+        ));
     }
-    if lower.contains("<img") && !lower.contains("aspect-ratio") && !lower.contains("object-fit") && !lower.contains("width=") {
+    if lower.contains("<img")
+        && !lower.contains("aspect-ratio")
+        && !lower.contains("object-fit")
+        && !lower.contains("width=")
+    {
         issues.push(geo_issue("RULE_GEO_11_ASPECT_RATIO_DISTORTION", LintIssueCategory::GeometricLayout, LintSeverity::Info, "Image element lacks explicit aspect-ratio or object-fit styling to prevent layout shift.", line_num, Some(line), false));
     }
     if (lower.contains("truncate") || lower.contains("text-overflow: ellipsis"))
         && !lower.contains("title=")
         && !lower.contains("aria-label=")
     {
-        issues.push(geo_issue("RULE_GEO_13_TRUNCATION_TOOLTIP", LintIssueCategory::GeometricLayout, LintSeverity::Info, "Truncated text element lacks accessible title or aria-label fallback.", line_num, Some(line), false));
+        issues.push(geo_issue(
+            "RULE_GEO_13_TRUNCATION_TOOLTIP",
+            LintIssueCategory::GeometricLayout,
+            LintSeverity::Info,
+            "Truncated text element lacks accessible title or aria-label fallback.",
+            line_num,
+            Some(line),
+            false,
+        ));
     }
-    if lower.contains("z-index: 99999") || lower.contains("z-index: 999999") || lower.contains("z-[99999]") {
-        issues.push(geo_issue("RULE_GEO_14_Z_INDEX_INFLATION", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Uncontrolled z-index inflation (>9999). Use structured stacking context layers.", line_num, Some(line), true));
+    if lower.contains("z-index: 99999")
+        || lower.contains("z-index: 999999")
+        || lower.contains("z-[99999]")
+    {
+        issues.push(geo_issue(
+            "RULE_GEO_14_Z_INDEX_INFLATION",
+            LintIssueCategory::GeometricLayout,
+            LintSeverity::Warning,
+            "Uncontrolled z-index inflation (>9999). Use structured stacking context layers.",
+            line_num,
+            Some(line),
+            true,
+        ));
     }
-    if lower.contains("backdrop-filter") && !lower.contains("background") && !lower.contains("bg-") {
-        issues.push(geo_issue("RULE_GEO_18_BACKDROP_FILTER_FALLBACK", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "'backdrop-filter' used without fallback background color for unsupported browsers.", line_num, Some(line), true));
+    if lower.contains("backdrop-filter") && !lower.contains("background") && !lower.contains("bg-")
+    {
+        issues.push(geo_issue(
+            "RULE_GEO_18_BACKDROP_FILTER_FALLBACK",
+            LintIssueCategory::GeometricLayout,
+            LintSeverity::Warning,
+            "'backdrop-filter' used without fallback background color for unsupported browsers.",
+            line_num,
+            Some(line),
+            true,
+        ));
     }
     if (lower.contains("transition:") || lower.contains("transition-all"))
-        && (lower.contains("width") || lower.contains("height") || lower.contains("top") || lower.contains("left"))
+        && (lower.contains("width")
+            || lower.contains("height")
+            || lower.contains("top")
+            || lower.contains("left"))
     {
         issues.push(geo_issue("RULE_GEO_24_TRANSITION_PERFORMANCE", LintIssueCategory::GeometricLayout, LintSeverity::Warning, "Animating layout properties (width/height/top/left) triggers reflow. Use transform/opacity.", line_num, Some(line), false));
     }
-    if lower.contains("position: sticky") && lower.contains("top: 0") && !lower.contains("border") && !lower.contains("shadow") {
+    if lower.contains("position: sticky")
+        && lower.contains("top: 0")
+        && !lower.contains("border")
+        && !lower.contains("shadow")
+    {
         issues.push(geo_issue("RULE_GEO_25_STICKY_HEADER_SHADOW", LintIssueCategory::GeometricLayout, LintSeverity::Info, "Sticky header lacks bottom border or elevation shadow to separate from scrolled content.", line_num, Some(line), true));
     }
 }
 
 fn check_line_wcag_rules(lower: &str, line: &str, line_num: usize, issues: &mut Vec<LintIssue>) {
-    if (lower.contains("color: #999") || lower.contains("color: #aaa") || lower.contains("color: #bbb"))
-        && (lower.contains("background: #fff") || lower.contains("background-color: #fff") || lower.contains("bg-white"))
+    if (lower.contains("color: #999")
+        || lower.contains("color: #aaa")
+        || lower.contains("color: #bbb"))
+        && (lower.contains("background: #fff")
+            || lower.contains("background-color: #fff")
+            || lower.contains("bg-white"))
     {
-        issues.push(geo_issue("RULE_GEO_02_WCAG_CONTRAST_AA", LintIssueCategory::WcagContrast, LintSeverity::Error, "Contrast ratio falls below WCAG 2.2 AA (4.5:1). Darken foreground text.", line_num, Some(line), true));
+        issues.push(geo_issue(
+            "RULE_GEO_02_WCAG_CONTRAST_AA",
+            LintIssueCategory::WcagContrast,
+            LintSeverity::Error,
+            "Contrast ratio falls below WCAG 2.2 AA (4.5:1). Darken foreground text.",
+            line_num,
+            Some(line),
+            true,
+        ));
     }
     if (lower.contains("outline: none") || lower.contains("outline: 0"))
         && !lower.contains("focus-visible")
@@ -104,40 +231,124 @@ fn check_line_wcag_rules(lower: &str, line: &str, line_num: usize, issues: &mut 
         && !lower.contains("aria-label")
         && (lower.contains("></") || lower.contains("status-dot"))
     {
-        issues.push(geo_issue("RULE_GEO_12_COLOR_ONLY_STATUS", LintIssueCategory::WcagContrast, LintSeverity::Warning, "Status badge conveys state via color only without label or icon indicator.", line_num, Some(line), false));
+        issues.push(geo_issue(
+            "RULE_GEO_12_COLOR_ONLY_STATUS",
+            LintIssueCategory::WcagContrast,
+            LintSeverity::Warning,
+            "Status badge conveys state via color only without label or icon indicator.",
+            line_num,
+            Some(line),
+            false,
+        ));
     }
     if (lower.contains("<svg") || lower.contains("<i class=\"icon"))
         && !lower.contains("aria-hidden")
         && !lower.contains("aria-label")
     {
-        issues.push(geo_issue("RULE_GEO_16_ICON_ALIGNMENT", LintIssueCategory::WcagContrast, LintSeverity::Info, "Icon missing 'aria-hidden=\"true\"' or accessible 'aria-label'.", line_num, Some(line), true));
+        issues.push(geo_issue(
+            "RULE_GEO_16_ICON_ALIGNMENT",
+            LintIssueCategory::WcagContrast,
+            LintSeverity::Info,
+            "Icon missing 'aria-hidden=\"true\"' or accessible 'aria-label'.",
+            line_num,
+            Some(line),
+            true,
+        ));
     }
     if (lower.contains("<video") || lower.contains("<audio")) && !lower.contains("controls") {
-        issues.push(geo_issue("RULE_GEO_17_MEDIA_CONTROLS_A11Y", LintIssueCategory::WcagContrast, LintSeverity::Warning, "Media element lacks native 'controls' attribute for keyboard/assistive playback.", line_num, Some(line), false));
+        issues.push(geo_issue(
+            "RULE_GEO_17_MEDIA_CONTROLS_A11Y",
+            LintIssueCategory::WcagContrast,
+            LintSeverity::Warning,
+            "Media element lacks native 'controls' attribute for keyboard/assistive playback.",
+            line_num,
+            Some(line),
+            false,
+        ));
     }
     if lower.contains("<button") && !lower.contains("type=") {
-        issues.push(geo_issue("RULE_GEO_21_BUTTON_TYPE_EXPLICIT", LintIssueCategory::WcagContrast, LintSeverity::Info, "Button element lacks explicit type=\"button|submit|reset\" attribute.", line_num, Some(line), false));
+        issues.push(geo_issue(
+            "RULE_GEO_21_BUTTON_TYPE_EXPLICIT",
+            LintIssueCategory::WcagContrast,
+            LintSeverity::Info,
+            "Button element lacks explicit type=\"button|submit|reset\" attribute.",
+            line_num,
+            Some(line),
+            false,
+        ));
     }
-    if lower.contains("<input") && !lower.contains("type=\"hidden\"") && !lower.contains("aria-label") && !lower.contains("id=") {
-        issues.push(geo_issue("RULE_GEO_22_FORM_LABEL_ASSOCIATION", LintIssueCategory::WcagContrast, LintSeverity::Warning, "Form input lacks id (for <label for=\"...\">) or aria-label attribute.", line_num, Some(line), false));
+    if lower.contains("<input")
+        && !lower.contains("type=\"hidden\"")
+        && !lower.contains("aria-label")
+        && !lower.contains("id=")
+    {
+        issues.push(geo_issue(
+            "RULE_GEO_22_FORM_LABEL_ASSOCIATION",
+            LintIssueCategory::WcagContrast,
+            LintSeverity::Warning,
+            "Form input lacks id (for <label for=\"...\">) or aria-label attribute.",
+            line_num,
+            Some(line),
+            false,
+        ));
     }
-    if lower.contains("tabindex=\"1\"") || lower.contains("tabindex=\"2\"") || lower.contains("tabindex=\"3\"") {
-        issues.push(geo_issue("RULE_GEO_23_TAB_ORDER_INTEGRITY", LintIssueCategory::WcagContrast, LintSeverity::Error, "Positive tabindex disrupts natural DOM reading order. Use tabindex=\"0\" or \"-1\".", line_num, Some(line), true));
+    if lower.contains("tabindex=\"1\"")
+        || lower.contains("tabindex=\"2\"")
+        || lower.contains("tabindex=\"3\"")
+    {
+        issues.push(geo_issue(
+            "RULE_GEO_23_TAB_ORDER_INTEGRITY",
+            LintIssueCategory::WcagContrast,
+            LintSeverity::Error,
+            "Positive tabindex disrupts natural DOM reading order. Use tabindex=\"0\" or \"-1\".",
+            line_num,
+            Some(line),
+            true,
+        ));
     }
 }
 
 fn check_document_level_rules(lower_full: &str, issues: &mut Vec<LintIssue>) {
     if lower_full.contains("<h1") && lower_full.contains("<h3") && !lower_full.contains("<h2") {
-        issues.push(geo_issue("RULE_GEO_07_HEADING_HIERARCHY", LintIssueCategory::WcagContrast, LintSeverity::Warning, "Heading hierarchy skips <h2> between <h1> and <h3>.", 1, None, false));
+        issues.push(geo_issue(
+            "RULE_GEO_07_HEADING_HIERARCHY",
+            LintIssueCategory::WcagContrast,
+            LintSeverity::Warning,
+            "Heading hierarchy skips <h2> between <h1> and <h3>.",
+            1,
+            None,
+            false,
+        ));
     }
     if lower_full.contains("<html") && !lower_full.contains("name=\"viewport\"") {
         issues.push(geo_issue("RULE_GEO_15_VIEWPORT_META", LintIssueCategory::GeometricLayout, LintSeverity::Error, "HTML document missing '<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">'.", 1, None, true));
     }
-    if (lower_full.contains("@keyframes") || lower_full.contains("animation:")) && !lower_full.contains("prefers-reduced-motion") {
-        issues.push(geo_issue("RULE_GEO_19_MOTION_REDUCED_PREF", LintIssueCategory::WcagContrast, LintSeverity::Warning, "CSS animation lacks '@media (prefers-reduced-motion: reduce)' guard.", 1, None, false));
+    if (lower_full.contains("@keyframes") || lower_full.contains("animation:"))
+        && !lower_full.contains("prefers-reduced-motion")
+    {
+        issues.push(geo_issue(
+            "RULE_GEO_19_MOTION_REDUCED_PREF",
+            LintIssueCategory::WcagContrast,
+            LintSeverity::Warning,
+            "CSS animation lacks '@media (prefers-reduced-motion: reduce)' guard.",
+            1,
+            None,
+            false,
+        ));
     }
-    if lower_full.contains("@font-face") && !lower_full.contains("font-display: swap") && !lower_full.contains("font-display: optional") {
-        issues.push(geo_issue("RULE_GEO_20_FONT_DISPLAY_SWAP", LintIssueCategory::GeometricLayout, LintSeverity::Info, "@font-face declaration lacks font-display: swap or optional to avoid FOIT.", 1, None, false));
+    if lower_full.contains("@font-face")
+        && !lower_full.contains("font-display: swap")
+        && !lower_full.contains("font-display: optional")
+    {
+        issues.push(geo_issue(
+            "RULE_GEO_20_FONT_DISPLAY_SWAP",
+            LintIssueCategory::GeometricLayout,
+            LintSeverity::Info,
+            "@font-face declaration lacks font-display: swap or optional to avoid FOIT.",
+            1,
+            None,
+            false,
+        ));
     }
 }
 
@@ -170,12 +381,24 @@ mod tests {
 </div>
 </html>"#;
         let issues = check_geometric_and_wcag_rules(snippet);
-        assert!(issues.iter().any(|i| i.rule_id == "RULE_GEO_02_WCAG_CONTRAST_AA"));
-        assert!(issues.iter().any(|i| i.rule_id == "RULE_GEO_10_INTERACTIVE_ROLE_FOCUS"));
-        assert!(issues.iter().any(|i| i.rule_id == "RULE_GEO_22_FORM_LABEL_ASSOCIATION"));
-        assert!(issues.iter().any(|i| i.rule_id == "RULE_GEO_23_TAB_ORDER_INTEGRITY"));
-        assert!(issues.iter().any(|i| i.rule_id == "RULE_GEO_16_ICON_ALIGNMENT"));
-        assert!(issues.iter().any(|i| i.rule_id == "RULE_GEO_15_VIEWPORT_META"));
+        assert!(issues
+            .iter()
+            .any(|i| i.rule_id == "RULE_GEO_02_WCAG_CONTRAST_AA"));
+        assert!(issues
+            .iter()
+            .any(|i| i.rule_id == "RULE_GEO_10_INTERACTIVE_ROLE_FOCUS"));
+        assert!(issues
+            .iter()
+            .any(|i| i.rule_id == "RULE_GEO_22_FORM_LABEL_ASSOCIATION"));
+        assert!(issues
+            .iter()
+            .any(|i| i.rule_id == "RULE_GEO_23_TAB_ORDER_INTEGRITY"));
+        assert!(issues
+            .iter()
+            .any(|i| i.rule_id == "RULE_GEO_16_ICON_ALIGNMENT"));
+        assert!(issues
+            .iter()
+            .any(|i| i.rule_id == "RULE_GEO_15_VIEWPORT_META"));
     }
 
     #[test]
@@ -201,6 +424,11 @@ mod tests {
         let issues = check_geometric_and_wcag_rules(all_violations);
         let distinct: std::collections::BTreeSet<&str> =
             issues.iter().map(|i| i.rule_id.as_str()).collect();
-        assert!(distinct.len() >= 25, "Expected >= 25 rules, got {}: {:?}", distinct.len(), distinct);
+        assert!(
+            distinct.len() >= 25,
+            "Expected >= 25 rules, got {}: {:?}",
+            distinct.len(),
+            distinct
+        );
     }
 }

@@ -44,7 +44,9 @@ fn run() -> Result<String, String> {
         .read_to_string(&mut input)
         .map_err(|e| format!("Failed reading stdin JSON: {e}"))?;
     if input.len() > MAX_IPC_JSON_BYTES {
-        return Err(format!("IPC payload exceeds {MAX_IPC_JSON_BYTES} byte limit"));
+        return Err(format!(
+            "IPC payload exceeds {MAX_IPC_JSON_BYTES} byte limit"
+        ));
     }
 
     match mode.as_str() {
@@ -62,14 +64,14 @@ fn run() -> Result<String, String> {
             serde_json::to_string(&receipt).map_err(|e| e.to_string())
         }
         "verify-bundle" => {
-            let req: VerifyBundleRequest =
-                serde_json::from_str(&input).map_err(|e| format!("Invalid verify-bundle JSON: {e}"))?;
+            let req: VerifyBundleRequest = serde_json::from_str(&input)
+                .map_err(|e| format!("Invalid verify-bundle JSON: {e}"))?;
             let lock = SkillRepackager::verify_repackaged_bundle(&req.bundle_dir)?;
             serde_json::to_string(&lock).map_err(|e| e.to_string())
         }
         "stage-bundle" => {
-            let req: RepackageRequest =
-                serde_json::from_str(&input).map_err(|e| format!("Invalid stage-bundle JSON: {e}"))?;
+            let req: RepackageRequest = serde_json::from_str(&input)
+                .map_err(|e| format!("Invalid stage-bundle JSON: {e}"))?;
             let staged = SkillRepackager::stage_directory(
                 &req.source_dir,
                 &req.dest_dir,
@@ -81,8 +83,8 @@ fn run() -> Result<String, String> {
             serde_json::to_string(&staged).map_err(|e| e.to_string())
         }
         "commit-bundle" => {
-            let req: CommitBundleRequest =
-                serde_json::from_str(&input).map_err(|e| format!("Invalid commit-bundle JSON: {e}"))?;
+            let req: CommitBundleRequest = serde_json::from_str(&input)
+                .map_err(|e| format!("Invalid commit-bundle JSON: {e}"))?;
             SkillRepackager::commit_staged_bundle_atomic(
                 &req.tmp_dir,
                 &req.dst_dir,
@@ -91,8 +93,8 @@ fn run() -> Result<String, String> {
             Ok("{}".to_string())
         }
         "video-intake" => {
-            let req: VideoIntakeRequest =
-                serde_json::from_str(&input).map_err(|e| format!("Invalid video-intake JSON: {e}"))?;
+            let req: VideoIntakeRequest = serde_json::from_str(&input)
+                .map_err(|e| format!("Invalid video-intake JSON: {e}"))?;
             let receipt =
                 VideoIntakeProcessor::parse_storyboard_text_strict(&req.video_source, &req.raw_log)
                     .map_err(|e| e.to_string())?;

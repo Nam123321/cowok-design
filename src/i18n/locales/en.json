@@ -321,7 +321,8 @@
     "runtimeDefaultTag": "Default",
     "customizeRuntimeBtn": "Customize",
     "vaultStorageShort": "Storage",
-    "permissionShort": "Approval"
+    "permissionShort": "Approval",
+    "mcpHostStory084Notice": "Manage Client MCPs, AgentSkills Plugin Registry, Isolated Staging (HUMAN_ONLY), and LEARN Knowledge Cards on SQLite WAL V9."
   },
   "flow": {
     "dagCanvas": "DAG 2D Canvas",
@@ -552,5 +553,52 @@
     "searchModels": "Search models...",
     "thinkingEffort": "Thinking",
     "manageAiAccounts": "Manage AI accounts"
+  },
+  "plugins": {
+    "validateBtn": "Validate",
+    "installBtn": "Install",
+    "activateBtn": "Activate (HUMAN_ONLY)",
+    "deprecateBtn": "Deprecate",
+    "loadingState": "Loading SkillPlugins from SQLite WAL daemon...",
+    "emptyState": "No SkillPlugins registered in this project scope yet.",
+    "revLabel": "Revision",
+    "registryTitle": "AgentSkills Registry & Staging",
+    "retryBtn": "Retry",
+    "stagingHeader": "Isolated Staging Candidate",
+    "promoting": "Promoting...",
+    "promoteBtn": "Promote Staging -> ACTIVE",
+    "discarding": "Discarding...",
+    "discardBtn": "Discard Candidate",
+    "rationalePlaceholder": "Enter rationale (>= 4 chars)...",
+    "quarantinedLabel": "QUARANTINED"
+  },
+  "learn": {
+    "revLabel": "Revision",
+    "approveBtn": "Approve & Seal",
+    "rejectBtn": "Reject",
+    "loadingState": "Loading LEARN cards...",
+    "emptyState": "No LEARN cards proposed for this project yet.",
+    "queueTitle": "LEARN Knowledge Review Queue",
+    "retryBtn": "Retry",
+    "rationalePlaceholder": "Enter approval/rejection rationale (>= 4 chars)...",
+    "budgetLabel": "Prompt Budget",
+    "filterAll": "ALL",
+    "filterProposed": "PROPOSED",
+    "filterAccepted": "ACCEPTED",
+    "filterRejected": "REJECTED"
+  },
+  "cron": {
+    "failuresLabel": "Failures",
+    "authRequiredNotice": "Upstream 401/403",
+    "refreshAuthSync": "Refresh Auth & Sync",
+    "syncNowBtn": "Sync Now",
+    "loadingState": "Checking cron sync schedules...",
+    "emptyState": "No upstream cron sync schedules active.",
+    "statusTitle": "Plugin Upstream Cron Sync",
+    "refreshBtn": "Refresh",
+    "retryBtn": "Retry",
+    "cronPlaceholder": "0 */5 * * * *",
+    "upstreamUrlPlaceholder": "https://github.com/org/repo",
+    "saveScheduleBtn": "Save Schedule"
   }
 }

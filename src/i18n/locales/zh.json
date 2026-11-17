@@ -321,7 +321,8 @@
     "runtimeDefaultTag": "默认",
     "customizeRuntimeBtn": "自定义",
     "vaultStorageShort": "密钥存储",
-    "permissionShort": "审批权限"
+    "permissionShort": "审批权限",
+    "mcpHostStory084Notice": "在 SQLite WAL V9 上管理客户端 MCP、AgentSkills 插件注册表、隔离暂存区 (HUMAN_ONLY) 和 LEARN 知识卡片。"
   },
   "flow": {
     "dagCanvas": "DAG 2D 画布",
@@ -552,5 +553,52 @@
     "searchModels": "搜索模型...",
     "thinkingEffort": "推理深度",
     "manageAiAccounts": "管理 AI 账号"
+  },
+  "plugins": {
+    "validateBtn": "验证",
+    "installBtn": "安装",
+    "activateBtn": "激活 (HUMAN_ONLY)",
+    "deprecateBtn": "弃用",
+    "loadingState": "正在从 SQLite WAL 守护进程加载 SkillPlugins...",
+    "emptyState": "此项目尚未注册任何 SkillPlugins。",
+    "revLabel": "修订版",
+    "registryTitle": "AgentSkills 注册表与暂存区",
+    "retryBtn": "重试",
+    "stagingHeader": "隔离的暂存候选版本",
+    "promoting": "正在提升...",
+    "promoteBtn": "提升暂存 -> ACTIVE",
+    "discarding": "正在丢弃...",
+    "discardBtn": "丢弃候选版本",
+    "rationalePlaceholder": "输入理由（至少 4 个字符）...",
+    "quarantinedLabel": "已隔离"
+  },
+  "learn": {
+    "revLabel": "修订版",
+    "approveBtn": "批准并封装",
+    "rejectBtn": "拒绝",
+    "loadingState": "正在加载 LEARN 知识卡片...",
+    "emptyState": "此项目尚未提出 LEARN 知识卡片。",
+    "queueTitle": "LEARN 知识审核队列",
+    "retryBtn": "重试",
+    "rationalePlaceholder": "输入批准或拒绝理由（至少 4 个字符）...",
+    "budgetLabel": "提示词预算",
+    "filterAll": "全部",
+    "filterProposed": "待审核",
+    "filterAccepted": "已批准",
+    "filterRejected": "已拒绝"
+  },
+  "cron": {
+    "failuresLabel": "失败次数",
+    "authRequiredNotice": "上游 401/403 认证失败",
+    "refreshAuthSync": "刷新认证并同步",
+    "syncNowBtn": "立即同步",
+    "loadingState": "正在检查 Cron 同步计划...",
+    "emptyState": "当前没有活动的上游 Cron 同步计划。",
+    "statusTitle": "插件上游 Cron 同步",
+    "refreshBtn": "刷新",
+    "retryBtn": "重试",
+    "cronPlaceholder": "0 */5 * * * *",
+    "upstreamUrlPlaceholder": "https://github.com/zuzhi/cangku",
+    "saveScheduleBtn": "保存计划"
   }
 }

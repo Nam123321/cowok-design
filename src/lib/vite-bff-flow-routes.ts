@@ -23,7 +23,6 @@ import * as flowResumeRoute from "../app/api/projects/[id]/flow/jobs/resume/rout
 import * as flowCancelRoute from "../app/api/projects/[id]/flow/jobs/cancel/route";
 import * as flowNodeSessionsRoute from "../app/api/projects/[id]/flow/node-sessions/route";
 import * as flowNodeSessionsReadRoute from "../app/api/projects/[id]/flow/node-sessions/read/route";
-import * as pluginsRoute from "../app/api/plugins/route";
 
 export type RouteFn = (req: Request, ctx: { params?: Record<string, string> }) => Promise<Response>;
 export interface RouteEntry {
@@ -67,6 +66,9 @@ export function forwardGuardedDaemon<B = unknown>(
           role: ctx.role || (req.method === "GET" ? "viewer" : "editor"),
         },
         correlationId: ctx.correlationId,
+        bffSessionToken: ctx.bffSessionToken,
+        isHumanWorkbench: ctx.isHumanWorkbench,
+        humanSessionToken: ctx.humanSessionToken,
       }),
     { authMode: "strict-loopback", ...options }
   );
@@ -111,7 +113,6 @@ const SurgicalPatchInputSchema = z.object({
 });
 
 export const FLOW_AND_WORKBENCH_ROUTES: RouteEntry[] = [
-  { method: "GET", pattern: /^\/api\/plugins$/, extractParams: noParams, resolveHandler: () => pluginsRoute.GET },
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/comments$/, extractParams: (m) => ({ id: m[1], nodeId: m[2] }), resolveHandler: () => commentsRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/comments$/, extractParams: (m) => ({ id: m[1], nodeId: m[2] }), resolveHandler: () => commentsRoute.POST },
   proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/comments\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/nodes/${safeEncodeSegment(m[2])}/comments/${safeEncodeSegment(m[3])}`, UpdateElementCommentSchema),

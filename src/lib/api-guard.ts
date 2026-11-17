@@ -10,6 +10,7 @@ export {
   isAllowedLoopbackHost,
   issueBffLoopbackSession,
   pruneExpiredBffSessions,
+  setBffSessionHumanToken,
   setBoundBffPort,
   type LoopbackSessionRecord,
 } from "./api-guard-session.ts";
@@ -25,6 +26,9 @@ export interface GuardedContext {
   projectId?: string;
   correlationId?: string;
   params?: Record<string, string>;
+  bffSessionToken?: string;
+  isHumanWorkbench?: boolean;
+  humanSessionToken?: string;
 }
 
 export interface GuardedRouteOptions<B = unknown, Q = unknown> {
@@ -46,7 +50,15 @@ function resolveAuthIdentity<B, Q>(
   url: URL,
   options: GuardedRouteOptions<B, Q>,
   _context: { tenantId?: string }
-): { ok: true; tenantId: string; userId: string; role: "viewer" | "editor" | "admin" } | { ok: false; response: Response } {
+): {
+  ok: true;
+  tenantId: string;
+  userId: string;
+  role: "viewer" | "editor" | "admin";
+  sessionToken: string;
+  isHumanWorkbench?: boolean;
+  humanSessionToken?: string;
+} | { ok: false; response: Response } {
   const verified = verifyStrictLoopback(req, url);
   if (!verified.ok) return verified;
   if (options.roles && options.roles.length > 0) {
@@ -55,7 +67,7 @@ function resolveAuthIdentity<B, Q>(
       return { ok: false, response: jsonResp(HTTP_FORBIDDEN, { error: "FORBIDDEN", message: "Insufficient permissions" }) };
     }
   }
-  return { ok: true, ...verified.session };
+  return { ok: true, ...verified.session, sessionToken: verified.sessionToken };
 }
 
 async function parseGuardedBody<B, Q>(
@@ -110,6 +122,9 @@ async function executeGuardedRequest<B, Q>(
       projectId: context.projectId || context.params?.id || "",
       correlationId: req.headers.get("x-correlation-id") || crypto.randomUUID(),
       params: context.params || {},
+      bffSessionToken: auth.sessionToken,
+      isHumanWorkbench: auth.isHumanWorkbench,
+      humanSessionToken: auth.humanSessionToken,
     };
     return await handler(req, ctx, { body: bodyOutcome.body, query: parsedQuery });
   } catch (err: unknown) {

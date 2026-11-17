@@ -65,8 +65,8 @@ struct GoldenFixture {
 
 fn load_golden() -> GoldenFixture {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let p = manifest_dir
-        .join("../../packages/builtin-skills/tests/fixtures/story-08.2-golden.json");
+    let p =
+        manifest_dir.join("../../packages/builtin-skills/tests/fixtures/story-08.2-golden.json");
     let raw = fs::read_to_string(p).expect("golden fixture must exist");
     serde_json::from_str(&raw).expect("valid golden JSON")
 }
@@ -100,7 +100,10 @@ fn ut_082_golden_repackage_lock_and_verifier_parity() {
     )
     .expect("golden repackaging succeeds");
 
-    assert_eq!(receipt.discovery_stub.package_sha256, g.expected_package_sha256);
+    assert_eq!(
+        receipt.discovery_stub.package_sha256,
+        g.expected_package_sha256
+    );
     assert!(receipt.discovery_stub.stub_size_bytes <= g.max_stub_size_bytes);
     assert!(receipt.discovery_stub.stub_size_bytes <= MAX_DISCOVERY_STUB_BYTES);
     assert_eq!(receipt.skill_plugin.id, g.skill_name);
@@ -142,12 +145,20 @@ fn ut_082_golden_repackage_lock_and_verifier_parity() {
         Some("HTTPS://github.com/example/upper"),
     )
     .unwrap();
-    assert_eq!(upper_url.discovery_stub.upstream_url.as_deref(), Some("HTTPS://github.com/example/upper"));
-    let no_url_json: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(PathBuf::from(&no_url.target_dir).join("discovery-stub.json")).unwrap()).unwrap();
+    assert_eq!(
+        upper_url.discovery_stub.upstream_url.as_deref(),
+        Some("HTTPS://github.com/example/upper")
+    );
+    let no_url_json: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(PathBuf::from(&no_url.target_dir).join("discovery-stub.json")).unwrap(),
+    )
+    .unwrap();
     assert!(no_url_json.get("upstream_url").is_none());
     let stub_disk_bytes = fs::read(bundle_dir.join("discovery-stub.json")).unwrap();
-    assert_eq!(stub_disk_bytes.len(), receipt.discovery_stub.stub_size_bytes);
+    assert_eq!(
+        stub_disk_bytes.len(),
+        receipt.discovery_stub.stub_size_bytes
+    );
 }
 
 #[test]
@@ -173,29 +184,50 @@ fn ut_082_evasion_binary_and_routing_guards() {
         RepackageAssetBucket::Scripts
     );
     assert_eq!(
-        classify_and_validate_source_asset("cfg.yaml", b"mode: strict\nonline=true\none=1").unwrap(),
+        classify_and_validate_source_asset("cfg.yaml", b"mode: strict\nonline=true\none=1")
+            .unwrap(),
         RepackageAssetBucket::References
     );
     assert!(scan_external_script_security("clean-fn.js", "export default function() { return 1; }\nconst x = (function() { return 2; })();\nconst data = fetchedItems;").is_ok());
-    assert!(scan_external_script_security("bad-fn.js", "const bad = new Function('return 1');").is_err());
+    assert!(
+        scan_external_script_security("bad-fn.js", "const bad = new Function('return 1');")
+            .is_err()
+    );
     assert!(scan_external_script_security("self-eval.js", "self['eval']('1+1');").is_err());
     assert!(scan_external_script_security("alias-fetch.js", "const go = fetch;").is_err());
     assert_eq!(
         classify_and_validate_source_asset("icon.svg", b"<svg viewBox='0 0 10 10'/>").unwrap(),
         RepackageAssetBucket::AssetsText
     );
-    assert!(classify_and_validate_source_asset("notes.txt", b"<IMPORTANT>pwn</IMPORTANT>").is_err());
+    assert!(
+        classify_and_validate_source_asset("notes.txt", b"<IMPORTANT>pwn</IMPORTANT>").is_err()
+    );
     assert!(classify_and_validate_source_asset("bad-slash.svg", b"<svg/onload=alert(1)>").is_err());
-    assert!(classify_and_validate_source_asset("bad-attr.html", b"<div x=\"1\"onload=alert(1)></div>").is_err());
+    assert!(classify_and_validate_source_asset(
+        "bad-attr.html",
+        b"<div x=\"1\"onload=alert(1)></div>"
+    )
+    .is_err());
     assert!(classify_and_validate_source_asset("bad-nl.svg", b"<svg onload\n=alert(1)>").is_err());
-    assert!(classify_and_validate_source_asset("bad-gt.html", b"<a title=\">\" onclick=alert(1)>x</a>").is_err());
+    assert!(classify_and_validate_source_asset(
+        "bad-gt.html",
+        b"<a title=\">\" onclick=alert(1)>x</a>"
+    )
+    .is_err());
     assert!(classify_and_validate_source_asset("bad.svg", b"<svg onload=\"x=1\"/>").is_err());
     assert!(scan_skill_markdown_safety("ref.md", "<!-- hide -->").is_err());
     assert!(scan_skill_markdown_safety("ref.md", "bad \u{202E} text").is_err());
     assert!(scan_skill_markdown_safety("ref.md", "![beacon](https://evil.test/a.png)").is_err());
-    assert!(scan_skill_markdown_safety("ref.md", "![beacon][ref]\n[ref]: https://evil.test/a.png").is_err());
-    assert!(scan_skill_markdown_safety("page.svg", "<svg><script>alert(1)</script></svg>").is_err());
-    assert!(scan_skill_markdown_safety("page.html", "<a href='javascript&#58;alert(1)'>x</a>").is_err());
+    assert!(
+        scan_skill_markdown_safety("ref.md", "![beacon][ref]\n[ref]: https://evil.test/a.png")
+            .is_err()
+    );
+    assert!(
+        scan_skill_markdown_safety("page.svg", "<svg><script>alert(1)</script></svg>").is_err()
+    );
+    assert!(
+        scan_skill_markdown_safety("page.html", "<a href='javascript&#58;alert(1)'>x</a>").is_err()
+    );
 }
 
 #[test]
@@ -322,7 +354,11 @@ fn ut_082_preflight_jail_toctou_symlink_swap_and_verifier() {
     // Verifier rejects '..' packaged_path traversal
     let mut tampered: serde_json::Value = serde_json::from_str(&orig_lock).unwrap();
     tampered["source_files"][0]["packaged_path"] = serde_json::json!("../outside.txt");
-    fs::write(bundle.join("skills-lock.json"), serde_json::to_string_pretty(&tampered).unwrap()).unwrap();
+    fs::write(
+        bundle.join("skills-lock.json"),
+        serde_json::to_string_pretty(&tampered).unwrap(),
+    )
+    .unwrap();
     assert!(SkillRepackager::verify_repackaged_bundle(&bundle).is_err());
 
     // Verifier rejects generated_files missing SKILL.md
@@ -331,7 +367,11 @@ fn ut_082_preflight_jail_toctou_symlink_swap_and_verifier() {
         missing_gen["generated_files"][1].clone(),
         missing_gen["generated_files"][2].clone()
     ]);
-    fs::write(bundle.join("skills-lock.json"), serde_json::to_string_pretty(&missing_gen).unwrap()).unwrap();
+    fs::write(
+        bundle.join("skills-lock.json"),
+        serde_json::to_string_pretty(&missing_gen).unwrap(),
+    )
+    .unwrap();
     assert!(SkillRepackager::verify_repackaged_bundle(&bundle).is_err());
     fs::write(bundle.join("skills-lock.json"), &orig_lock).unwrap();
 
@@ -400,18 +440,37 @@ fn ut_082_quotas_and_strict_video() {
             sb.id
         );
     }
-    assert!(VideoIntakeProcessor::parse_storyboard_text_strict("   ", "[frame: 00:01.00] -> CTA: Click").is_err());
+    assert!(VideoIntakeProcessor::parse_storyboard_text_strict(
+        "   ",
+        "[frame: 00:01.00] -> CTA: Click"
+    )
+    .is_err());
 }
 
 #[cfg(unix)]
 #[test]
 fn ut_082_party_mode_hardening_invariants() {
     // 1. Scanner fixes: case-insensitive hex entity, CSS @import, bracket/backtick tells, and == non-false-positive
-    assert!(scan_skill_markdown_safety("page.html", "<a href='javascript&#x3A;alert(1)'>x</a>").is_err());
-    assert!(scan_skill_markdown_safety("style.html", "<style>@import url(https://evil.test/s.css);</style>").is_err());
-    assert!(scan_external_script_security("bracket.js", "const mod = require('child_process'); mod['exec']('id');").is_err());
+    assert!(
+        scan_skill_markdown_safety("page.html", "<a href='javascript&#x3A;alert(1)'>x</a>")
+            .is_err()
+    );
+    assert!(scan_skill_markdown_safety(
+        "style.html",
+        "<style>@import url(https://evil.test/s.css);</style>"
+    )
+    .is_err());
+    assert!(scan_external_script_security(
+        "bracket.js",
+        "const mod = require('child_process'); mod['exec']('id');"
+    )
+    .is_err());
     assert!(scan_external_script_security("tmpl.js", "globalThis[`eval`]('1+1');").is_err());
-    assert!(scan_external_script_security("cmp.js", "const ok = mode == 'safe' && target != 'fetch';").is_ok());
+    assert!(scan_external_script_security(
+        "cmp.js",
+        "const ok = mode == 'safe' && target != 'fetch';"
+    )
+    .is_ok());
 
     // 2. Untracked file & hardlink rejection + pre-commit verification in verify_repackaged_bundle / commit_staged_bundle_atomic
     let src_dir = tempfile::tempdir().unwrap();
@@ -440,18 +499,33 @@ fn ut_082_party_mode_hardening_invariants() {
     // Staging dir with untracked file or hardlink rejected by commit_staged_bundle_atomic without creating dst
     let staged = dst_dir.path().join(".tmp-manual-stage");
     fs::create_dir_all(staged.join("scripts")).unwrap();
-    fs::write(staged.join("SKILL.md"), fs::read(bundle.join("SKILL.md")).unwrap()).unwrap();
-    fs::write(staged.join("plugin.json"), fs::read(bundle.join("plugin.json")).unwrap()).unwrap();
+    fs::write(
+        staged.join("SKILL.md"),
+        fs::read(bundle.join("SKILL.md")).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        staged.join("plugin.json"),
+        fs::read(bundle.join("plugin.json")).unwrap(),
+    )
+    .unwrap();
     fs::write(
         staged.join("discovery-stub.json"),
         fs::read(bundle.join("discovery-stub.json")).unwrap(),
     )
     .unwrap();
-    fs::write(staged.join("skills-lock.json"), fs::read(bundle.join("skills-lock.json")).unwrap()).unwrap();
+    fs::write(
+        staged.join("skills-lock.json"),
+        fs::read(bundle.join("skills-lock.json")).unwrap(),
+    )
+    .unwrap();
     let hl_outside = src_dir.path().join("clean.ts");
     fs::hard_link(&hl_outside, staged.join("scripts/clean.ts")).unwrap();
     let blocked_dst = dst_dir.path().join("blocked-commit");
-    assert!(SkillRepackager::commit_staged_bundle_atomic(&staged, &blocked_dst, &"b".repeat(64)).is_err());
+    assert!(
+        SkillRepackager::commit_staged_bundle_atomic(&staged, &blocked_dst, &"b".repeat(64))
+            .is_err()
+    );
     assert!(!blocked_dst.exists());
 }
 
@@ -461,9 +535,18 @@ fn ut_082_boundary_quotas_evasions_and_tamper_parity() {
     // Mixed-quote multi-space join, empty-quote split, zero-padded entity & data:text/html
     assert!(scan_external_script_security("mq.js", "window[\"ev\",   'al']('1+1');").is_err());
     assert!(scan_external_script_security("sh.sh", "ev\"\"al id").is_err());
-    assert!(scan_skill_markdown_safety("zp.html", "<a href='javascript&#058;alert(1)'>x</a>").is_err());
-    assert!(scan_skill_markdown_safety("zh.html", "<a href='javascript&#x003A;alert(1)'>x</a>").is_err());
-    assert!(scan_skill_markdown_safety("dt.html", "<iframe src='data:text/html,<script>1</script>'>").is_err());
+    assert!(
+        scan_skill_markdown_safety("zp.html", "<a href='javascript&#058;alert(1)'>x</a>").is_err()
+    );
+    assert!(
+        scan_skill_markdown_safety("zh.html", "<a href='javascript&#x003A;alert(1)'>x</a>")
+            .is_err()
+    );
+    assert!(scan_skill_markdown_safety(
+        "dt.html",
+        "<iframe src='data:text/html,<script>1</script>'>"
+    )
+    .is_err());
 
     let src = tempfile::tempdir().unwrap();
     let dst = tempfile::tempdir().unwrap();
@@ -471,63 +554,169 @@ fn ut_082_boundary_quotas_evasions_and_tamper_parity() {
 
     // Stub field limits & combined >1536B ceiling
     assert!(SkillRepackager::repackage_directory(
-        src.path(), dst.path(), "cap-count", "Ok", (0..17).map(|i| format!("cap_{i}")).collect(), None
-    ).is_err());
+        src.path(),
+        dst.path(),
+        "cap-count",
+        "Ok",
+        (0..17).map(|i| format!("cap_{i}")).collect(),
+        None
+    )
+    .is_err());
     assert!(SkillRepackager::repackage_directory(
-        src.path(), dst.path(), "cap-len", "Ok", vec!["c".repeat(49)], None
-    ).is_err());
+        src.path(),
+        dst.path(),
+        "cap-len",
+        "Ok",
+        vec!["c".repeat(49)],
+        None
+    )
+    .is_err());
     assert!(SkillRepackager::repackage_directory(
-        src.path(), dst.path(), "url-len", "Ok", vec![], Some(&format!("https://example.com/{}", "a".repeat(250)))
-    ).is_err());
+        src.path(),
+        dst.path(),
+        "url-len",
+        "Ok",
+        vec![],
+        Some(&format!("https://example.com/{}", "a".repeat(250)))
+    )
+    .is_err());
     assert!(SkillRepackager::repackage_directory(
-        src.path(), dst.path(), "stub-sum", &"d".repeat(315), vec!["k".repeat(48); 12], Some(&format!("https://example.com/{}", "p".repeat(235)))
-    ).is_err());
+        src.path(),
+        dst.path(),
+        "stub-sum",
+        &"d".repeat(315),
+        vec!["k".repeat(48); 12],
+        Some(&format!("https://example.com/{}", "p".repeat(235)))
+    )
+    .is_err());
 
     // Package quotas: >1MiB single file, >256 files
     let big_src = tempfile::tempdir().unwrap();
     fs::write(big_src.path().join("big.txt"), vec![b'a'; 1_048_577]).unwrap();
-    assert!(SkillRepackager::repackage_directory(big_src.path(), dst.path(), "big-file", "Too big", vec![], None).unwrap_err().contains("PackageQuotaExceeded"));
+    assert!(SkillRepackager::repackage_directory(
+        big_src.path(),
+        dst.path(),
+        "big-file",
+        "Too big",
+        vec![],
+        None
+    )
+    .unwrap_err()
+    .contains("PackageQuotaExceeded"));
 
     let many_src = tempfile::tempdir().unwrap();
     for i in 0..257 {
         fs::write(many_src.path().join(format!("f_{i:03}.txt")), "ok").unwrap();
     }
-    assert!(SkillRepackager::repackage_directory(many_src.path(), dst.path(), "many-files", "Too many", vec![], None).unwrap_err().contains("PackageQuotaExceeded"));
+    assert!(SkillRepackager::repackage_directory(
+        many_src.path(),
+        dst.path(),
+        "many-files",
+        "Too many",
+        vec![],
+        None
+    )
+    .unwrap_err()
+    .contains("PackageQuotaExceeded"));
 
     // Single-use engine capability staging + commit + replay/tamper rejection + cross-dir rejection
-    let rec = SkillRepackager::repackage_directory(src.path(), dst.path(), "tamper-ok", "Clean", vec!["ui".into()], None).unwrap();
+    let rec = SkillRepackager::repackage_directory(
+        src.path(),
+        dst.path(),
+        "tamper-ok",
+        "Clean",
+        vec!["ui".into()],
+        None,
+    )
+    .unwrap();
     let staged_cap = SkillRepackager::stage_directory(
-        src.path(), dst.path(), "committed-ok", "Clean", vec!["ui".into()], None
-    ).unwrap();
+        src.path(),
+        dst.path(),
+        "committed-ok",
+        "Clean",
+        vec!["ui".into()],
+        None,
+    )
+    .unwrap();
     let ok_committed = dst.path().join("committed-ok");
-    SkillRepackager::commit_staged_bundle_atomic(&staged_cap.tmp_dir, &ok_committed, &staged_cap.staging_token).unwrap();
+    SkillRepackager::commit_staged_bundle_atomic(
+        &staged_cap.tmp_dir,
+        &ok_committed,
+        &staged_cap.staging_token,
+    )
+    .unwrap();
     assert!(ok_committed.join("skills-lock.json").is_file());
     // Replaying consumed single-use token must fail closed
-    assert!(SkillRepackager::commit_staged_bundle_atomic(&staged_cap.tmp_dir, dst.path().join("replay-dst"), &staged_cap.staging_token).unwrap_err().contains("MissingOrInvalidStagingCapability"));
+    assert!(SkillRepackager::commit_staged_bundle_atomic(
+        &staged_cap.tmp_dir,
+        dst.path().join("replay-dst"),
+        &staged_cap.staging_token
+    )
+    .unwrap_err()
+    .contains("MissingOrInvalidStagingCapability"));
 
     let other_parent = tempfile::tempdir().unwrap();
     let cross_cap = SkillRepackager::stage_directory(
-        src.path(), dst.path(), "x", "Clean", vec!["ui".into()], None
-    ).unwrap();
-    assert!(SkillRepackager::commit_staged_bundle_atomic(&cross_cap.tmp_dir, other_parent.path().join("x"), &cross_cap.staging_token).unwrap_err().contains("CrossDirectoryCommitRejected"));
-    assert!(SkillRepackager::commit_staged_bundle_atomic(&ok_committed, dst.path().join("non-tmp"), &cross_cap.staging_token).unwrap_err().contains("InvalidStagingPrefix"));
+        src.path(),
+        dst.path(),
+        "x",
+        "Clean",
+        vec!["ui".into()],
+        None,
+    )
+    .unwrap();
+    assert!(SkillRepackager::commit_staged_bundle_atomic(
+        &cross_cap.tmp_dir,
+        other_parent.path().join("x"),
+        &cross_cap.staging_token
+    )
+    .unwrap_err()
+    .contains("CrossDirectoryCommitRejected"));
+    assert!(SkillRepackager::commit_staged_bundle_atomic(
+        &ok_committed,
+        dst.path().join("non-tmp"),
+        &cross_cap.staging_token
+    )
+    .unwrap_err()
+    .contains("InvalidStagingPrefix"));
 
-    fs::write(ok_committed.join("scripts/clean.ts"), "export const ok = 999;").unwrap();
-    assert!(SkillRepackager::verify_repackaged_bundle(&ok_committed).unwrap_err().contains("BundleIntegrityMismatch"));
+    fs::write(
+        ok_committed.join("scripts/clean.ts"),
+        "export const ok = 999;",
+    )
+    .unwrap();
+    assert!(SkillRepackager::verify_repackaged_bundle(&ok_committed)
+        .unwrap_err()
+        .contains("BundleIntegrityMismatch"));
 
     // Intermediate ancestor symlink rejected by component-wise open_root_nofollow
     let anc_root = tempfile::tempdir().unwrap();
     let anc_real = anc_root.path().join("real");
     fs::create_dir_all(anc_real.join("leaf")).unwrap();
     std::os::unix::fs::symlink(&anc_real, anc_root.path().join("sym_anc")).unwrap();
-    assert!(SkillRepackager::verify_repackaged_bundle(anc_root.path().join("sym_anc/leaf")).is_err());
+    assert!(
+        SkillRepackager::verify_repackaged_bundle(anc_root.path().join("sym_anc/leaf")).is_err()
+    );
 
     // Total package bytes cap (> 8 MiB) rejected
     let total_cap_src = tempfile::tempdir().unwrap();
     for i in 0..9 {
-        fs::write(total_cap_src.path().join(format!("chunk_{i}.txt")), vec![b'a'; 1_000_000]).unwrap();
+        fs::write(
+            total_cap_src.path().join(format!("chunk_{i}.txt")),
+            vec![b'a'; 1_000_000],
+        )
+        .unwrap();
     }
-    assert!(SkillRepackager::repackage_directory(total_cap_src.path(), dst.path(), "over-8mb", "Too large total", vec![], None).unwrap_err().contains("PackageQuotaExceeded"));
+    assert!(SkillRepackager::repackage_directory(
+        total_cap_src.path(),
+        dst.path(),
+        "over-8mb",
+        "Too large total",
+        vec![],
+        None
+    )
+    .unwrap_err()
+    .contains("PackageQuotaExceeded"));
 
     // Scanner catches recursive empty quotes, backslash splits, and spaced bracket indexing
     for payload in [
@@ -536,7 +725,10 @@ fn ut_082_boundary_quotas_evasions_and_tamper_parity() {
         "globalThis[ 'eval' ]('1+1')",
         "window[ 'fetch' ]('https://evil.test')",
     ] {
-        assert!(plugin_host::scan_external_script_security("bad.sh", payload).is_err(), "Missed payload: {payload}");
+        assert!(
+            plugin_host::scan_external_script_security("bad.sh", payload).is_err(),
+            "Missed payload: {payload}"
+        );
     }
 
     // Deleted skills-lock.json on repackaged bundle fails closed in SkillRegistry, whereas valid bundle loads cleanly
@@ -544,11 +736,17 @@ fn ut_082_boundary_quotas_evasions_and_tamper_parity() {
     let del_lock_skill = reg_root.path().join("tampered-del");
     fs::create_dir_all(&del_lock_skill).unwrap();
     for name in ["SKILL.md", "plugin.json", "discovery-stub.json"] {
-        fs::copy(PathBuf::from(&rec.target_dir).join(name), del_lock_skill.join(name)).unwrap();
+        fs::copy(
+            PathBuf::from(&rec.target_dir).join(name),
+            del_lock_skill.join(name),
+        )
+        .unwrap();
     }
     let reg = plugin_host::SkillRegistry::new();
     assert!(reg.load_skill_from_folder(&del_lock_skill).is_err());
-    assert!(reg.load_skill_from_folder(std::path::Path::new(&rec.target_dir)).is_ok());
+    assert!(reg
+        .load_skill_from_folder(std::path::Path::new(&rec.target_dir))
+        .is_ok());
 
     // World-writable sticky 0o1777 staging capability dir is rejected fail-closed
     {
@@ -558,22 +756,44 @@ fn ut_082_boundary_quotas_evasions_and_tamper_parity() {
         fs::create_dir_all(&bad_caps).unwrap();
         fs::set_permissions(&bad_caps, fs::Permissions::from_mode(0o1777)).unwrap();
         let stage_err = SkillRepackager::stage_directory(
-            src.path(), bad_caps_dst.path(), "sticky-test", "Clean", vec!["ui".into()], None
-        ).unwrap_err();
+            src.path(),
+            bad_caps_dst.path(),
+            "sticky-test",
+            "Clean",
+            vec!["ui".into()],
+            None,
+        )
+        .unwrap_err();
         fs::set_permissions(&bad_caps, fs::Permissions::from_mode(0o700)).ok();
-        assert!(stage_err.contains("UntrustedDirectoryPermissions"), "Got: {stage_err}");
+        assert!(
+            stage_err.contains("UntrustedDirectoryPermissions"),
+            "Got: {stage_err}"
+        );
     }
 
     // Failed EEXIST commit cleans up consumed .tmp-* directory without leaking orphans
     let leak_dst = tempfile::tempdir().unwrap();
     let staged_leak = SkillRepackager::stage_directory(
-        src.path(), leak_dst.path(), "collide-skill", "Clean", vec!["ui".into()], None
-    ).unwrap();
+        src.path(),
+        leak_dst.path(),
+        "collide-skill",
+        "Clean",
+        vec!["ui".into()],
+        None,
+    )
+    .unwrap();
     fs::create_dir_all(leak_dst.path().join("collide-skill")).unwrap();
     assert!(SkillRepackager::commit_staged_bundle_atomic(
-        &staged_leak.tmp_dir, leak_dst.path().join("collide-skill"), &staged_leak.staging_token
-    ).unwrap_err().contains("DestinationAlreadyExists"));
-    assert!(!PathBuf::from(&staged_leak.tmp_dir).exists(), "Failed commit leaked temp dir");
+        &staged_leak.tmp_dir,
+        leak_dst.path().join("collide-skill"),
+        &staged_leak.staging_token
+    )
+    .unwrap_err()
+    .contains("DestinationAlreadyExists"));
+    assert!(
+        !PathBuf::from(&staged_leak.tmp_dir).exists(),
+        "Failed commit leaked temp dir"
+    );
 
     // Crash orphan recovery: unsealed private dir with .cowok-inflight (missing skills-lock.json) is rejected by verifier and recovered on retry, whereas unmarked partial dir stays EEXIST
     let crash_dst = tempfile::tempdir().unwrap();
@@ -581,16 +801,31 @@ fn ut_082_boundary_quotas_evasions_and_tamper_parity() {
     fs::create_dir_all(&orphan_dir).unwrap();
     fs::write(orphan_dir.join("SKILL.md"), "partial").unwrap();
     fs::write(orphan_dir.join(".cowok-inflight"), "cowok-inflight\n").unwrap();
-    assert!(SkillRepackager::verify_repackaged_bundle(&orphan_dir).unwrap_err().contains("IncompleteOrTamperedBundle"));
+    assert!(SkillRepackager::verify_repackaged_bundle(&orphan_dir)
+        .unwrap_err()
+        .contains("IncompleteOrTamperedBundle"));
     let recovered = SkillRepackager::repackage_directory(
-        src.path(), crash_dst.path(), "crash-skill", "Recovered cleanly", vec!["ui".into()], None
-    ).unwrap();
+        src.path(),
+        crash_dst.path(),
+        "crash-skill",
+        "Recovered cleanly",
+        vec!["ui".into()],
+        None,
+    )
+    .unwrap();
     assert!(SkillRepackager::verify_repackaged_bundle(&recovered.target_dir).is_ok());
 
     let foreign_dir = crash_dst.path().join("foreign-partial");
     fs::create_dir_all(&foreign_dir).unwrap();
     fs::write(foreign_dir.join("SKILL.md"), "unmarked").unwrap();
     assert!(SkillRepackager::repackage_directory(
-        src.path(), crash_dst.path(), "foreign-partial", "Should not clobber", vec!["ui".into()], None
-    ).unwrap_err().contains("DestinationAlreadyExists"));
+        src.path(),
+        crash_dst.path(),
+        "foreign-partial",
+        "Should not clobber",
+        vec!["ui".into()],
+        None
+    )
+    .unwrap_err()
+    .contains("DestinationAlreadyExists"));
 }

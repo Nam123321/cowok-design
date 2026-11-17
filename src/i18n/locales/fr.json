@@ -321,7 +321,8 @@
     "runtimeDefaultTag": "Par défaut",
     "customizeRuntimeBtn": "Personnaliser",
     "vaultStorageShort": "Stockage",
-    "permissionShort": "Approbation"
+    "permissionShort": "Approbation",
+    "mcpHostStory084Notice": "Gérez les MCP clients, le registre AgentSkills, le staging isolé (HUMAN_ONLY) et les cartes LEARN sur SQLite WAL V9."
   },
   "flow": {
     "dagCanvas": "Canevas DAG 2D",
@@ -552,5 +553,52 @@
     "searchModels": "Rechercher des modèles...",
     "thinkingEffort": "Réflexion",
     "manageAiAccounts": "Gérer les comptes IA"
+  },
+  "plugins": {
+    "validateBtn": "Valider",
+    "installBtn": "Installer",
+    "activateBtn": "Activer (HUMAN_ONLY)",
+    "deprecateBtn": "Déprécier",
+    "loadingState": "Chargement des SkillPlugins depuis le daemon SQLite WAL...",
+    "emptyState": "Aucun SkillPlugin enregistré dans ce projet pour le moment.",
+    "revLabel": "Révision",
+    "registryTitle": "Registre AgentSkills et Staging",
+    "retryBtn": "Réessayer",
+    "stagingHeader": "Candidat de Staging Isolé",
+    "promoting": "Promotion...",
+    "promoteBtn": "Promouvoir Staging -> ACTIVE",
+    "discarding": "Suppression...",
+    "discardBtn": "Rejeter le Candidat",
+    "rationalePlaceholder": "Saisir une justification (>= 4 car.)...",
+    "quarantinedLabel": "EN QUARANTAINE"
+  },
+  "learn": {
+    "revLabel": "Révision",
+    "approveBtn": "Approuver et Sceller",
+    "rejectBtn": "Rejeter",
+    "loadingState": "Chargement des cartes LEARN...",
+    "emptyState": "Aucune carte LEARN proposée pour ce projet pour le moment.",
+    "queueTitle": "File de Validation des Connaissances LEARN",
+    "retryBtn": "Réessayer",
+    "rationalePlaceholder": "Justification d'approbation/rejet (>= 4 car.)...",
+    "budgetLabel": "Budget Prompt",
+    "filterAll": "TOUS",
+    "filterProposed": "PROPOSÉ",
+    "filterAccepted": "ACCEPTÉ",
+    "filterRejected": "REJETÉ"
+  },
+  "cron": {
+    "failuresLabel": "Échecs",
+    "authRequiredNotice": "Amont 401/403",
+    "refreshAuthSync": "Actualiser Auth et Synchroniser",
+    "syncNowBtn": "Synchroniser",
+    "loadingState": "Vérification des tâches cron de synchronisation...",
+    "emptyState": "Aucune tâche cron de synchronisation active.",
+    "statusTitle": "Synchronisation Cron des Plugins",
+    "refreshBtn": "Actualiser",
+    "retryBtn": "Réessayer",
+    "cronPlaceholder": "0 */5 * * * *",
+    "upstreamUrlPlaceholder": "https://github.com/organisation/depot",
+    "saveScheduleBtn": "Enregistrer Planif."
   }
 }

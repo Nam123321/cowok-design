@@ -6,7 +6,8 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
 }
 
 // ============================================================================
@@ -732,21 +733,100 @@ model WordingSlot {
 }
 
 // ============================================================================
-// Bounded Context: plugin-ecosystem (Epic-09)
+// Bounded Context: plugin-ecosystem (Story 08.4 / V9 SQLite WAL Parity)
 // ============================================================================
 
 model SkillPlugin {
-  id             String @id @default(uuid())
-  projectId      String @map("project_id")
-  pluginSlug     String @map("plugin_slug")
-  version        String
-  lifecycleState String @default("DISCOVERED") @map("lifecycle_state")
-  sourceRepoUrl  String @map("source_repo_url")
-  manifestJson   String @default("{}") @map("manifest_json")
-  updatedAt      BigInt @map("updated_at")
+  id                     String  @id @default(uuid())
+  tenantId               String  @default("local-default") @map("tenant_id")
+  projectId              String  @map("project_id")
+  pluginSlug             String  @map("plugin_slug")
+  version                String
+  lifecycleState         String  @default("DISCOVERED") @map("lifecycle_state")
+  sourceType             String  @default("local") @map("source_type")
+  sourceRepoUrl          String  @map("source_repo_url")
+  upstreamRepoUrl        String? @map("upstream_repo_url")
+  upstreamCommitSha      String? @map("upstream_commit_sha")
+  cronSchedule           String? @map("cron_schedule")
+  skillMdPath            String  @default("SKILL.md") @map("skill_md_path")
+  pluginJsonPath         String  @default("plugin.json") @map("plugin_json_path")
+  manifestJson           String  @default("{}") @map("manifest_json")
+  lastSyncedAt           BigInt? @map("last_synced_at")
+  revision               BigInt  @default(1)
+  stagingVersion         String? @map("staging_version")
+  stagingManifestJson    String? @map("staging_manifest_json")
+  stagingDiffReasonsJson String? @map("staging_diff_reasons_json")
+  stagingBundleDir       String? @map("staging_bundle_dir")
+  stagingPackageSha256   String? @map("staging_package_sha256")
+  breakingChangeIsolated Int     @default(0) @map("breaking_change_isolated")
+  quarantined            Int     @default(0)
+  quarantineReason       String? @map("quarantine_reason")
+  updatedAt              BigInt  @map("updated_at")
 
-  @@unique([projectId, pluginSlug])
+  @@unique([tenantId, projectId, pluginSlug, version], map: "uq_skill_plugins_scope_slug_ver")
+  @@unique([tenantId, projectId, pluginSlug], where: { lifecycleState: "ACTIVE" }, map: "uq_skill_plugins_active_slug")
+  @@index([projectId])
+  @@index([tenantId, projectId, lifecycleState])
   @@map("skill_plugins")
+}
+
+model KnowledgeCard {
+  id             String  @map("id")
+  tenantId       String  @default("local-default") @map("tenant_id")
+  projectId      String  @map("project_id")
+  idempotencyKey String? @map("idempotency_key")
+  category       String
+  title          String
+  content        String
+  contentSha256  String  @map("content_sha256")
+  sourceEvidence String  @map("source_evidence")
+  status         String
+  revision       BigInt  @default(1)
+  reviewedBy     String? @map("reviewed_by")
+  decisionReason String? @map("decision_reason")
+  createdAt      BigInt  @map("created_at")
+  acceptedAt     BigInt? @map("accepted_at")
+
+  @@id([tenantId, projectId, id])
+  @@unique([tenantId, projectId, idempotencyKey], where: { idempotencyKey: { not: null } }, map: "uq_knowledge_cards_idempotency")
+  @@index([tenantId, projectId, status, createdAt, id])
+  @@map("knowledge_cards")
+}
+
+model LearnConsumedNonce {
+  tenantId   String @default("local-default") @map("tenant_id")
+  projectId  String @map("project_id")
+  nonce      String
+  expiresAtS BigInt @map("expires_at_s")
+  consumedAt BigInt @map("consumed_at")
+
+  @@id([tenantId, projectId, nonce])
+  @@index([expiresAtS])
+  @@map("learn_consumed_nonces")
+}
+
+model PluginCronSchedule {
+  id                  String  @id @default(uuid())
+  tenantId            String  @default("local-default") @map("tenant_id")
+  projectId           String  @map("project_id")
+  pluginId            String  @map("plugin_id")
+  cronExpression      String  @map("cron_expression")
+  upstreamRepoUrl     String  @map("upstream_repo_url")
+  lastEtag            String? @map("last_etag")
+  lastCommitSha       String? @map("last_commit_sha")
+  leaseOwner          String? @map("lease_owner")
+  fencingToken        BigInt  @default(0) @map("fencing_token")
+  staleAfterTimestamp BigInt? @map("stale_after_timestamp")
+  consecutiveFailures Int     @default(0) @map("consecutive_failures")
+  nextRetryAt         BigInt? @map("next_retry_at")
+  syncStatus          String  @default("IDLE") @map("sync_status")
+  lastErrorCode       String? @map("last_error_code")
+  lastErrorMessage    String? @map("last_error_message")
+  updatedAt           BigInt  @map("updated_at")
+
+  @@unique([tenantId, projectId, pluginId], map: "uq_plugin_cron_schedules_scope_plugin")
+  @@index([syncStatus, staleAfterTimestamp, nextRetryAt])
+  @@map("plugin_cron_schedules")
 }
 
 // ============================================================================

@@ -321,7 +321,8 @@
     "runtimeDefaultTag": "기본값",
     "customizeRuntimeBtn": "사용자 지정",
     "vaultStorageShort": "저장 방식",
-    "permissionShort": "승인 수준"
+    "permissionShort": "승인 수준",
+    "mcpHostStory084Notice": "SQLite WAL V9에서 Client MCP, AgentSkills 플러그인 레지스트리, 격리된 스테이징(HUMAN_ONLY) 및 LEARN 지식 카드를 관리합니다."
   },
   "flow": {
     "dagCanvas": "DAG 2D 캔버스",
@@ -552,5 +553,52 @@
     "searchModels": "모델 검색...",
     "thinkingEffort": "추론 수준",
     "manageAiAccounts": "AI 계정 관리"
+  },
+  "plugins": {
+    "validateBtn": "검증",
+    "installBtn": "설치",
+    "activateBtn": "활성화 (HUMAN_ONLY)",
+    "deprecateBtn": "지원 중단",
+    "loadingState": "SQLite WAL 데몬에서 SkillPlugins 불러오는 중...",
+    "emptyState": "이 프로젝트에 등록된 SkillPlugins가 아직 없습니다.",
+    "revLabel": "리비전",
+    "registryTitle": "AgentSkills 레지스트리 및 스테이징",
+    "retryBtn": "다시 시도",
+    "stagingHeader": "격리된 스테이징 후보",
+    "promoting": "승격 중...",
+    "promoteBtn": "스테이징을 ACTIVE로 승격",
+    "discarding": "폐기 중...",
+    "discardBtn": "후보 폐기",
+    "rationalePlaceholder": "사유 입력 (4자 이상)...",
+    "quarantinedLabel": "격리됨"
+  },
+  "learn": {
+    "revLabel": "리비전",
+    "approveBtn": "승인 및 봉인",
+    "rejectBtn": "거부",
+    "loadingState": "LEARN 카드 불러오는 중...",
+    "emptyState": "이 프로젝트에 제안된 LEARN 카드가 아직 없습니다.",
+    "queueTitle": "LEARN 지식 검토 대기열",
+    "retryBtn": "다시 시도",
+    "rationalePlaceholder": "승인/거부 사유 입력 (4자 이상)...",
+    "budgetLabel": "프롬프트 예산",
+    "filterAll": "전체",
+    "filterProposed": "제안됨",
+    "filterAccepted": "승인됨",
+    "filterRejected": "거부됨"
+  },
+  "cron": {
+    "failuresLabel": "실패 횟수",
+    "authRequiredNotice": "업스트림 401/403 오류",
+    "refreshAuthSync": "인증 갱신 및 동기화",
+    "syncNowBtn": "지금 동기화",
+    "loadingState": "Cron 동기화 일정 확인 중...",
+    "emptyState": "활성화된 업스트림 Cron 동기화 일정이 없습니다.",
+    "statusTitle": "플러그인 업스트림 Cron 동기화",
+    "refreshBtn": "새로 고침",
+    "retryBtn": "다시 시도",
+    "cronPlaceholder": "0 */5 * * * *",
+    "upstreamUrlPlaceholder": "https://github.com/jojik/jeojangso",
+    "saveScheduleBtn": "일정 저장"
   }
 }

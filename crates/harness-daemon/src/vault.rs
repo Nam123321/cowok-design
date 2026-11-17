@@ -43,6 +43,73 @@ pub struct VaultPayload {
     pub secrets: BTreeMap<String, String>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PersistedLearnKeyEntry {
+    kid: String,
+    key_b64: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PersistedLearnKeyRing {
+    active_kid: String,
+    active_key_b64: String,
+    #[serde(default)]
+    retired: Vec<PersistedLearnKeyEntry>,
+}
+
+#[derive(Clone)]
+pub struct LearnSigningKeyRing {
+    pub active_kid: String,
+    pub active_key: [u8; 32],
+    pub retired: Vec<(String, [u8; 32])>,
+}
+
+impl std::fmt::Debug for LearnSigningKeyRing {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LearnSigningKeyRing")
+            .field("active_kid", &self.active_kid)
+            .field("retired_count", &self.retired.len())
+            .finish()
+    }
+}
+
+impl Drop for LearnSigningKeyRing {
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.active_key);
+        for (_, k) in &mut self.retired {
+            zeroize::Zeroize::zeroize(k);
+        }
+    }
+}
+
+impl PersistedLearnKeyRing {
+    fn into_runtime(self) -> Result<LearnSigningKeyRing, String> {
+        let decode_32 = |raw: &str| -> Result<[u8; 32], String> {
+            let bytes = B64
+                .decode(raw.trim())
+                .map_err(|e| format!("Invalid LEARN key base64: {e}"))?;
+            if bytes.len() != 32 {
+                return Err("LEARN key must be 32 bytes".to_string());
+            }
+            let mut out = [0u8; 32];
+            out.copy_from_slice(&bytes);
+            Ok(out)
+        };
+        let active_key = decode_32(&self.active_key_b64)?;
+        let mut retired = Vec::with_capacity(self.retired.len());
+        for entry in self.retired {
+            retired.push((entry.kid, decode_32(&entry.key_b64)?));
+        }
+        Ok(LearnSigningKeyRing {
+            active_kid: self.active_kid,
+            active_key,
+            retired,
+        })
+    }
+}
+
 type RamVaultMap = HashMap<(String, String), Zeroizing<String>>;
 
 #[derive(Debug, Clone, Default)]
@@ -514,6 +581,99 @@ impl VaultStore {
             let _ = self.try_delete_os_keychain(&pid);
         }
         Ok(())
+    }
+
+    /// Loads or initializes the Vault `0o600` LEARN HMAC signing key ring (`active_kid` + retired `kid` entries)
+    /// so `HumanSessionAuthority::from_key_with_kid` & `LearnPipeline::register_authority` survive restarts and rotations.
+    pub fn ensure_or_load_learn_signing_ring(&self) -> Result<LearnSigningKeyRing, String> {
+        const RING_KEY: &str = "cowok_learn_hmac_ring_v1";
+        let secrets = if self.vault_path.exists() {
+            self.unseal_secrets(None)?
+        } else {
+            BTreeMap::new()
+        };
+        if let Some(raw_json) = secrets.get(RING_KEY) {
+            if let Ok(parsed) = serde_json::from_str::<PersistedLearnKeyRing>(raw_json) {
+                return parsed.into_runtime();
+            }
+        }
+        let mut active_key = [0u8; 32];
+        OsRng.fill_bytes(&mut active_key);
+        let active_kid = format!("kid-{}", Uuid::new_v4().simple());
+        let persisted = PersistedLearnKeyRing {
+            active_kid: active_kid.clone(),
+            active_key_b64: B64.encode(active_key),
+            retired: Vec::new(),
+        };
+        let mut next = secrets;
+        next.insert(
+            RING_KEY.to_string(),
+            serde_json::to_string(&persisted).map_err(|e| e.to_string())?,
+        );
+        self.seal_secrets(&next, None)?;
+        Ok(LearnSigningKeyRing {
+            active_kid,
+            active_key,
+            retired: Vec::new(),
+        })
+    }
+
+    /// Rotates the active LEARN HMAC signing key while preserving retired keys so prior card signatures remain valid.
+    pub fn rotate_learn_signing_key(&self) -> Result<LearnSigningKeyRing, String> {
+        const RING_KEY: &str = "cowok_learn_hmac_ring_v1";
+        let current = self.ensure_or_load_learn_signing_ring()?;
+        let mut retired_persisted: Vec<PersistedLearnKeyEntry> = current
+            .retired
+            .iter()
+            .map(|(kid, key)| PersistedLearnKeyEntry {
+                kid: kid.clone(),
+                key_b64: B64.encode(key),
+            })
+            .collect();
+        retired_persisted.push(PersistedLearnKeyEntry {
+            kid: current.active_kid.clone(),
+            key_b64: B64.encode(current.active_key),
+        });
+        if retired_persisted.len() > 8 {
+            let trim = retired_persisted.len() - 8;
+            retired_persisted.drain(0..trim);
+        }
+        let mut next_key = [0u8; 32];
+        OsRng.fill_bytes(&mut next_key);
+        let next_kid = format!("kid-{}", Uuid::new_v4().simple());
+        let persisted = PersistedLearnKeyRing {
+            active_kid: next_kid,
+            active_key_b64: B64.encode(next_key),
+            retired: retired_persisted,
+        };
+        let mut secrets = if self.vault_path.exists() {
+            self.unseal_secrets(None)?
+        } else {
+            BTreeMap::new()
+        };
+        secrets.insert(
+            RING_KEY.to_string(),
+            serde_json::to_string(&persisted).map_err(|e| e.to_string())?,
+        );
+        self.seal_secrets(&secrets, None)?;
+        persisted.into_runtime()
+    }
+
+    /// Loads optional GitHub PAT stored under `"github"` or `"github_plugins"` inside Vault `0o600`.
+    pub fn get_github_sync_token(&self) -> Result<Option<Zeroizing<String>>, String> {
+        if !self.vault_path.exists() {
+            return Ok(None);
+        }
+        let secrets = self.unseal_secrets(None)?;
+        for key in ["github_plugins", "github"] {
+            if let Some(val) = secrets.get(key) {
+                let trimmed = val.trim();
+                if !trimmed.is_empty() {
+                    return Ok(Some(Zeroizing::new(trimmed.to_string())));
+                }
+            }
+        }
+        Ok(None)
     }
 
     #[cfg(target_os = "macos")]

@@ -79,6 +79,14 @@ pub fn v8_migration_checksum() -> String {
     cached_migration_sha256(&CACHE, V8_MIGRATION_SQL)
 }
 
+pub const V9_MIGRATION_SQL: &str = include_str!("../migrations/V9__epic08_plugins_learn_cron.sql");
+pub const V9_MIGRATION_NAME: &str = "V9__epic08_plugins_learn_cron.sql";
+
+pub fn v9_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V9_MIGRATION_SQL)
+}
+
 /// Configuration for the embedded SQLite WAL connection pool.
 #[derive(Debug, Clone)]
 pub struct SqliteWalConfig {
@@ -333,6 +341,7 @@ impl SqlitePool {
             Self::apply_v6_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v7_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v8_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v9_migration_if_needed(&mut conn, &config.db_path)?;
         }
         harden_sqlite_files(&config.db_path)?;
 
@@ -762,6 +771,32 @@ impl SqlitePool {
         Ok(())
     }
 
+    fn apply_v9_columns(tx: &Connection) -> Result<(), HarnessError> {
+        Self::ensure_columns_idempotent(
+            tx,
+            "skill_plugins",
+            &[
+                ("tenant_id", "TEXT NOT NULL DEFAULT 'local-default'"),
+                ("source_type", "TEXT NOT NULL DEFAULT 'local'"),
+                ("upstream_repo_url", "TEXT"),
+                ("upstream_commit_sha", "TEXT"),
+                ("cron_schedule", "TEXT"),
+                ("skill_md_path", "TEXT NOT NULL DEFAULT 'SKILL.md'"),
+                ("plugin_json_path", "TEXT NOT NULL DEFAULT 'plugin.json'"),
+                ("last_synced_at", "BIGINT"),
+                ("revision", "BIGINT NOT NULL DEFAULT 1"),
+                ("staging_version", "TEXT"),
+                ("staging_manifest_json", "TEXT"),
+                ("staging_diff_reasons_json", "TEXT"),
+                ("staging_bundle_dir", "TEXT"),
+                ("staging_package_sha256", "TEXT"),
+                ("breaking_change_isolated", "INTEGER NOT NULL DEFAULT 0"),
+                ("quarantined", "INTEGER NOT NULL DEFAULT 0"),
+                ("quarantine_reason", "TEXT"),
+            ][..],
+        )
+    }
+
     fn cached_genesis_db_bytes(parent_dir: &Path) -> Result<&'static [u8], HarnessError> {
         static GENESIS_BYTES: OnceLock<Result<Vec<u8>, String>> = OnceLock::new();
         let res = GENESIS_BYTES.get_or_init(|| {
@@ -834,6 +869,9 @@ impl SqlitePool {
             .map_err(|e| map_sqlite_error(e, "genesis_v7"))?;
         tx.execute_batch(V8_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "genesis_v8"))?;
+        Self::apply_v9_columns(&tx)?;
+        tx.execute_batch(V9_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v9"))?;
 
         let now = Utc::now().timestamp_millis();
         for (version, name, sha) in [
@@ -843,6 +881,7 @@ impl SqlitePool {
             (6i64, V6_MIGRATION_NAME, v6_migration_checksum()),
             (7i64, V7_MIGRATION_NAME, v7_migration_checksum()),
             (8i64, V8_MIGRATION_NAME, v8_migration_checksum()),
+            (9i64, V9_MIGRATION_NAME, v9_migration_checksum()),
         ] {
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
@@ -1112,6 +1151,129 @@ impl SqlitePool {
         .map_err(|e| map_sqlite_error(e, "insert_v8_schema_migration"))?;
         tx.commit()
             .map_err(|e| map_sqlite_error(e, "commit_v8_migration"))?;
+        Ok(())
+    }
+
+    fn apply_v9_migration_if_needed(
+        conn: &mut Connection,
+        db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v9_migration_checksum();
+        // Key by symbolic migration name so Story 08.4 remains collision-free with parallel migrations (EC-E08-10).
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE name = ?1",
+                params![V9_MIGRATION_NAME],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v9_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V9]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+
+        let populated_rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM skill_plugins", [], |r| r.get(0))
+            .unwrap_or(0);
+        if populated_rows > 0 {
+            Self::create_versioned_backup(conn, db_path, "v9")?;
+        }
+
+        if !conn.is_autocommit() {
+            return Err(HarnessError::ValidationFailed {
+                reason: "V9_MIGRATION_PRECONDITION_FAILED: connection must be in autocommit mode"
+                    .to_string(),
+            });
+        }
+        conn.execute_batch(
+            "PRAGMA foreign_keys = OFF;
+             PRAGMA legacy_alter_table = OFF;",
+        )
+        .map_err(|e| map_sqlite_error(e, "disable_fk_for_v9_rebuild"))?;
+
+        let fk_off: i64 = conn
+            .query_row("PRAGMA foreign_keys;", [], |r| r.get(0))
+            .map_err(|e| map_sqlite_error(e, "verify_fk_off_v9"))?;
+        if fk_off != 0 {
+            return Err(HarnessError::ValidationFailed {
+                reason: "V9_MIGRATION_PRECONDITION_FAILED: PRAGMA foreign_keys remained ON"
+                    .to_string(),
+            });
+        }
+
+        let rebuild_res = (|| -> Result<(), HarnessError> {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Exclusive)
+                .map_err(|e| map_sqlite_error(e, "begin_exclusive_v9"))?;
+            Self::apply_v9_columns(&tx)?;
+            tx.execute_batch(V9_MIGRATION_SQL)
+                .map_err(|e| map_sqlite_error(e, "execute_v9_sql"))?;
+
+            let fk_violation_count: usize = {
+                let mut stmt = tx
+                    .prepare("PRAGMA foreign_key_check;")
+                    .map_err(|e| map_sqlite_error(e, "prepare_fk_check_v9"))?;
+                let rows = stmt
+                    .query_map([], |r| r.get::<_, String>(0))
+                    .map_err(|e| map_sqlite_error(e, "run_fk_check_v9"))?;
+                rows.count()
+            };
+            if fk_violation_count > 0 {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "V9_MIGRATION_FK_CHECK_FAILED: {fk_violation_count} foreign key violation(s)"
+                    ),
+                });
+            }
+
+            let max_version: i64 = tx
+                .query_row(
+                    "SELECT COALESCE(MAX(version), 8) FROM schema_migrations",
+                    [],
+                    |r| r.get(0),
+                )
+                .map_err(|e| map_sqlite_error(e, "max_schema_version_v9"))?;
+            let assigned_version = (max_version + 1).max(9);
+
+            tx.execute(
+                "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    assigned_version,
+                    V9_MIGRATION_NAME,
+                    expected_sha,
+                    Utc::now().timestamp_millis()
+                ],
+            )
+            .map_err(|e| map_sqlite_error(e, "insert_v9_schema_migration"))?;
+
+            tx.commit()
+                .map_err(|e| map_sqlite_error(e, "commit_v9_migration"))?;
+            Ok(())
+        })();
+
+        let restore_res = conn.execute_batch("PRAGMA foreign_keys = ON;");
+        rebuild_res?;
+        restore_res.map_err(|e| map_sqlite_error(e, "restore_fk_on_v9"))?;
+
+        let fk_on: i64 = conn
+            .query_row("PRAGMA foreign_keys;", [], |r| r.get(0))
+            .map_err(|e| map_sqlite_error(e, "verify_fk_on_v9"))?;
+        if fk_on != 1 {
+            return Err(HarnessError::ValidationFailed {
+                reason:
+                    "V9_MIGRATION_POSTCONDITION_FAILED: PRAGMA foreign_keys did not restore to 1"
+                        .to_string(),
+            });
+        }
         Ok(())
     }
 

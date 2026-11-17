@@ -1,7 +1,9 @@
 // @story 08.3
 // @implements AC-02, AC-04, AC-06
 use crate::models::LintIssue;
-use crate::repackager::security_scanner::{scan_skill_markdown_safety, validate_skill_metadata_text};
+use crate::repackager::security_scanner::{
+    scan_skill_markdown_safety, validate_skill_metadata_text,
+};
 use domain::models::GateReport;
 use domain::token_budget::get_cl100k_bpe;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -381,11 +383,13 @@ pub fn map_storage_constraint_error(err: &StorageConstraintError) -> DomainStora
                 }
             }
             StorageConstraintTarget::PluginActiveSlug
-            | StorageConstraintTarget::CronScheduleLease => DomainStorageAction::ConflictRetryable {
-                error: "ActivePluginConflict".to_string(),
-                retry_hint: "Re-read active revision & isolate breaking candidate into Staging"
-                    .to_string(),
-            },
+            | StorageConstraintTarget::CronScheduleLease => {
+                DomainStorageAction::ConflictRetryable {
+                    error: "ActivePluginConflict".to_string(),
+                    retry_hint: "Re-read active revision & isolate breaking candidate into Staging"
+                        .to_string(),
+                }
+            }
             StorageConstraintTarget::Other(name) => DomainStorageAction::UnmappedFatal {
                 error: format!("Unclassified unique constraint on '{name}': {}", err.detail),
             },
@@ -493,7 +497,8 @@ fn read_os_csprng_32() -> Result<[u8; 32], LearnError> {
     #[cfg(unix)]
     {
         use std::io::Read as _;
-        let mut f = std::fs::File::open("/dev/urandom").map_err(|_| LearnError::EntropyUnavailable)?;
+        let mut f =
+            std::fs::File::open("/dev/urandom").map_err(|_| LearnError::EntropyUnavailable)?;
         f.read_exact(&mut key)
             .map_err(|_| LearnError::EntropyUnavailable)?;
         Ok(key)
@@ -597,7 +602,9 @@ fn validate_scope_segment(label: &str, value: &str) -> Result<String, LearnError
 fn validate_card_field(label: &str, value: &str, max_bytes: usize) -> Result<String, LearnError> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        return Err(LearnError::InvalidInput(format!("{label} must not be empty")));
+        return Err(LearnError::InvalidInput(format!(
+            "{label} must not be empty"
+        )));
     }
     if trimmed.len() > max_bytes {
         return Err(LearnError::InvalidInput(format!(
@@ -1261,7 +1268,11 @@ impl LearnPipeline {
                 c.status == CardStatus::Accepted && c.tenant_id == tid && c.project_id == pid
             })
             .collect();
-        eligible.sort_by(|a, b| a.created_at.cmp(&b.created_at).then_with(|| a.id.cmp(&b.id)));
+        eligible.sort_by(|a, b| {
+            a.created_at
+                .cmp(&b.created_at)
+                .then_with(|| a.id.cmp(&b.id))
+        });
 
         let mut selected_ids = Vec::new();
         let mut body = String::new();

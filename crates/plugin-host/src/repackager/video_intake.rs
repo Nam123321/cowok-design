@@ -112,12 +112,13 @@ impl VideoIntakeProcessor {
                 detail: "Missing opening '[' frame header".to_string(),
             });
         }
-        let close_bracket = trimmed.find(']').ok_or_else(|| {
-            VideoIntakeError::InvalidLineFormat {
-                line: line_num,
-                detail: "Missing closing ']' in frame header".to_string(),
-            }
-        })?;
+        let close_bracket =
+            trimmed
+                .find(']')
+                .ok_or_else(|| VideoIntakeError::InvalidLineFormat {
+                    line: line_num,
+                    detail: "Missing closing ']' in frame header".to_string(),
+                })?;
         let header = &trimmed[1..close_bracket];
         let rest = trimmed[close_bracket + 1..].trim();
         let timestamp_s = Self::parse_timestamp_checked(line_num, header)?;
@@ -210,12 +211,12 @@ impl VideoIntakeProcessor {
     }
 
     fn parse_seconds_checked(line_num: usize, raw: &str) -> Result<f64, VideoIntakeError> {
-        let (whole_str, frac) = raw.split_once('.').ok_or_else(|| {
-            VideoIntakeError::InvalidTimestamp {
-                line: line_num,
-                detail: format!("Missing required fractional seconds '.xx' in '{raw}'"),
-            }
-        })?;
+        let (whole_str, frac) =
+            raw.split_once('.')
+                .ok_or_else(|| VideoIntakeError::InvalidTimestamp {
+                    line: line_num,
+                    detail: format!("Missing required fractional seconds '.xx' in '{raw}'"),
+                })?;
         let whole = Self::parse_uint_digits(line_num, whole_str, 2, 2, "seconds")?;
         if whole > 59 {
             return Err(VideoIntakeError::InvalidTimestamp {
@@ -226,7 +227,9 @@ impl VideoIntakeProcessor {
         if frac.len() != 2 || !frac.bytes().all(|b| b.is_ascii_digit()) {
             return Err(VideoIntakeError::InvalidTimestamp {
                 line: line_num,
-                detail: format!("Fractional seconds must be exactly '.xx' (2 digits), got '.{frac}'"),
+                detail: format!(
+                    "Fractional seconds must be exactly '.xx' (2 digits), got '.{frac}'"
+                ),
             });
         }
         raw.parse::<f64>()

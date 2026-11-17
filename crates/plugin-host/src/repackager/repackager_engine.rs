@@ -1,12 +1,12 @@
 // @story 08.2
 // @implements AC-01, AC-02, AC-05, AC-06, AC-07
 use crate::models::SkillManifest;
-use domain::models::SkillPlugin;
 use crate::repackager::security_scanner::{
     classify_and_validate_source_asset, is_reserved_root_filename, scan_skill_markdown_safety,
     validate_skill_metadata_text, RepackageAssetBucket,
 };
 use crate::validator::parse_and_validate_skill_frontmatter;
+use domain::models::SkillPlugin;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -93,13 +93,13 @@ pub struct RepackageReceipt {
 
 /// Maps a repackaged SkillManifest to canonical `domain::models::SkillPlugin` (AC-02).
 pub fn manifest_to_skill_plugin(manifest: &SkillManifest) -> SkillPlugin {
-    SkillPlugin {
-        id: manifest.name.clone(),
-        name: manifest.name.clone(),
-        version: manifest.version.clone(),
-        entry_point: manifest.entry_point.clone(),
-        permissions: manifest.capabilities_required.clone(),
-    }
+    SkillPlugin::from_core(
+        manifest.name.clone(),
+        manifest.name.clone(),
+        manifest.version.clone(),
+        manifest.entry_point.clone(),
+        manifest.capabilities_required.clone(),
+    )
 }
 
 #[derive(Serialize)]
@@ -142,7 +142,9 @@ fn validate_locked_rel_path(label: &str, rel_path: &str) -> Result<(), String> {
         || rel_path.contains('\0')
         || rel_path.chars().any(|c| c.is_control())
     {
-        return Err(format!("Unsafe path in skills-lock ({label}): '{rel_path}'"));
+        return Err(format!(
+            "Unsafe path in skills-lock ({label}): '{rel_path}'"
+        ));
     }
     for seg in rel_path.split('/') {
         if seg.is_empty() || seg == "." || seg == ".." {
@@ -161,9 +163,15 @@ fn validate_upstream_url(raw: &str) -> Result<(), String> {
             raw.len()
         ));
     }
-    let after_scheme = if raw.get(..8).is_some_and(|p| p.eq_ignore_ascii_case("https://")) {
+    let after_scheme = if raw
+        .get(..8)
+        .is_some_and(|p| p.eq_ignore_ascii_case("https://"))
+    {
         &raw[8..]
-    } else if raw.get(..7).is_some_and(|p| p.eq_ignore_ascii_case("http://")) {
+    } else if raw
+        .get(..7)
+        .is_some_and(|p| p.eq_ignore_ascii_case("http://"))
+    {
         &raw[7..]
     } else {
         return Err("Invalid upstream_url: must start with https:// or http://".to_string());
@@ -173,7 +181,9 @@ fn validate_upstream_url(raw: &str) -> Result<(), String> {
         || raw.contains('@')
         || raw.chars().any(|c| c.is_whitespace() || c.is_control())
     {
-        return Err("Invalid upstream_url: malformed authority or disallowed characters".to_string());
+        return Err(
+            "Invalid upstream_url: malformed authority or disallowed characters".to_string(),
+        );
     }
     Ok(())
 }
@@ -214,8 +224,10 @@ fn validate_stub_field_budgets(
     Ok(())
 }
 
-fn build_discovery_stub(
+fn build_discovery_stub_with_meta(
     skill_name: &str,
+    version: &str,
+    risk_tier: u8,
     description: &str,
     capabilities: Vec<String>,
     upstream_url: Option<&str>,
@@ -223,11 +235,11 @@ fn build_discovery_stub(
 ) -> Result<(DiscoveryStub, String), String> {
     let mut stub = DiscoveryStub {
         name: skill_name.to_string(),
-        version: "1.0.0".to_string(),
+        version: version.to_string(),
         description: description.to_string(),
         upstream_url: upstream_url.map(|s| s.to_string()),
         capabilities,
-        risk_tier: 2,
+        risk_tier,
         package_sha256,
         stub_size_bytes: 0,
     };
@@ -244,7 +256,29 @@ fn build_discovery_stub(
         }
         stub.stub_size_bytes = serialized.len();
     }
-    Err("DiscoveryStubFailClosed: stub_size_bytes failed to converge to serialized byte length".to_string())
+    Err(
+        "DiscoveryStubFailClosed: stub_size_bytes failed to converge to serialized byte length"
+            .to_string(),
+    )
+}
+
+#[cfg(test)]
+fn build_discovery_stub(
+    skill_name: &str,
+    description: &str,
+    capabilities: Vec<String>,
+    upstream_url: Option<&str>,
+    package_sha256: String,
+) -> Result<(DiscoveryStub, String), String> {
+    build_discovery_stub_with_meta(
+        skill_name,
+        "1.0.0",
+        2,
+        description,
+        capabilities,
+        upstream_url,
+        package_sha256,
+    )
 }
 
 fn compute_sha256_hex(bytes: &[u8]) -> String {
@@ -269,17 +303,19 @@ where
     format!("{:x}", hasher.finalize())
 }
 
-fn build_validated_skill_md(
+fn build_validated_skill_md_with_meta(
     skill_name: &str,
+    version: &str,
+    risk_tier: u8,
     description: &str,
     capabilities: &[String],
 ) -> Result<String, String> {
     let fm = RepackagedFrontmatter {
         name: skill_name,
-        version: "1.0.0",
+        version,
         description,
         capabilities_required: capabilities,
-        risk_tier: 2,
+        risk_tier,
     };
     let mut yaml_block = serde_yaml::to_string(&fm).map_err(|e| e.to_string())?;
     if let Some(stripped) = yaml_block.strip_prefix("---\n") {
@@ -337,10 +373,15 @@ mod unix_fd {
                     Component::RootDir => {}
                     Component::CurDir => {}
                     Component::ParentDir => {
-                        return Err(format!("Pre-flight rejected parent traversal '..' in '{}'", path.display()));
+                        return Err(format!(
+                            "Pre-flight rejected parent traversal '..' in '{}'",
+                            path.display()
+                        ));
                     }
                     Component::Normal(s) => {
-                        let seg = s.to_str().ok_or_else(|| "Non-UTF8 path component".to_string())?;
+                        let seg = s
+                            .to_str()
+                            .ok_or_else(|| "Non-UTF8 path component".to_string())?;
                         comps.push(seg.to_string());
                     }
                     Component::Prefix(_) => return Err("Unsupported path prefix".to_string()),
@@ -387,8 +428,9 @@ mod unix_fd {
         }
 
         pub fn open_subdir_nofollow(&self, seg: &str) -> Result<Self, std::io::Error> {
-            let c_seg = CString::new(seg)
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "NUL segment"))?;
+            let c_seg = CString::new(seg).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "NUL segment")
+            })?;
             let fd = unsafe {
                 libc::openat(
                     self.as_raw(),
@@ -403,8 +445,9 @@ mod unix_fd {
         }
 
         pub fn mkdirat(&self, seg: &str, mode: libc::mode_t) -> Result<(), std::io::Error> {
-            let c_seg = CString::new(seg)
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "NUL segment"))?;
+            let c_seg = CString::new(seg).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "NUL segment")
+            })?;
             let rc = unsafe { libc::mkdirat(self.as_raw(), c_seg.as_ptr(), mode) };
             if rc < 0 {
                 return Err(std::io::Error::last_os_error());
@@ -428,7 +471,9 @@ mod unix_fd {
             let file = unsafe { File::from_raw_fd(fd) };
             let meta = file.metadata().map_err(|e| e.to_string())?;
             if !meta.is_file() {
-                return Err(format!("Security scan failed: '{seg}' is not a regular file"));
+                return Err(format!(
+                    "Security scan failed: '{seg}' is not a regular file"
+                ));
             }
             if meta.nlink() > 1 {
                 return Err(format!(
@@ -658,10 +703,14 @@ fn collect_sources_fd(
     }
     for (name, is_dir, is_symlink) in dir_fd.read_entry_names()? {
         if is_symlink {
-            return Err(format!("Security scan failed: symlink rejected at '{prefix}{name}'"));
+            return Err(format!(
+                "Security scan failed: symlink rejected at '{prefix}{name}'"
+            ));
         }
         if name.contains('\\') || name.contains('\0') || name.chars().any(|c| c.is_control()) {
-            return Err(format!("Security scan failed: unsafe filename segment '{prefix}{name}'"));
+            return Err(format!(
+                "Security scan failed: unsafe filename segment '{prefix}{name}'"
+            ));
         }
         let rel_path = if prefix.is_empty() {
             name.clone()
@@ -669,9 +718,9 @@ fn collect_sources_fd(
             format!("{prefix}/{name}")
         };
         if is_dir {
-            let child_fd = dir_fd.open_subdir_nofollow(&name).map_err(|e| {
-                format!("Security scan failed: openat subdir '{rel_path}': {e}")
-            })?;
+            let child_fd = dir_fd
+                .open_subdir_nofollow(&name)
+                .map_err(|e| format!("Security scan failed: openat subdir '{rel_path}': {e}"))?;
             collect_sources_fd(&child_fd, &rel_path, depth + 1, total_bytes, out)?;
         } else {
             if is_reserved_root_filename(&rel_path) {
@@ -710,7 +759,9 @@ fn ensure_subdir_fd(root_fd: &SafeDirFd, rel_dir: &str) -> Result<SafeDirFd, Str
     if rel_dir.is_empty() {
         return root_fd.open_subdir_nofollow(".").map_err(|e| e.to_string());
     }
-    let mut cur = root_fd.open_subdir_nofollow(".").map_err(|e| e.to_string())?;
+    let mut cur = root_fd
+        .open_subdir_nofollow(".")
+        .map_err(|e| e.to_string())?;
     for seg in rel_dir.split('/') {
         if let Err(e) = cur.mkdirat(seg, 0o755) {
             if e.kind() != std::io::ErrorKind::AlreadyExists {
@@ -755,7 +806,10 @@ fn write_staged_payload(
 const INFLIGHT_COMMIT_MARKER: &str = ".cowok-inflight";
 
 #[cfg(unix)]
-fn recover_verified_inflight_orphan_fd(dest_fd: &SafeDirFd, skill_name: &str) -> Result<bool, String> {
+fn recover_verified_inflight_orphan_fd(
+    dest_fd: &SafeDirFd,
+    skill_name: &str,
+) -> Result<bool, String> {
     let dst_fd = match dest_fd.open_subdir_nofollow(skill_name) {
         Ok(fd) => fd,
         Err(_) => return Ok(false),
@@ -825,13 +879,19 @@ fn commit_repackaged_dir_fd(
         .unlink_at(INFLIGHT_COMMIT_MARKER, false)
         .map_err(|e| format!("unlink inflight marker failed: {e}"))?;
     if unsafe { libc::fsync(dst_fd.as_raw()) } < 0 {
-        return Err(format!("fsync '{skill_name}' directory failed: {}", std::io::Error::last_os_error()));
+        return Err(format!(
+            "fsync '{skill_name}' directory failed: {}",
+            std::io::Error::last_os_error()
+        ));
     }
     dest_fd
         .unlink_at(tmp_name, true)
         .map_err(|e| format!("unlink temp dir '{tmp_name}' failed: {e}"))?;
     if unsafe { libc::fsync(dest_fd.as_raw()) } < 0 {
-        return Err(format!("fsync parent dest_dir failed: {}", std::io::Error::last_os_error()));
+        return Err(format!(
+            "fsync parent dest_dir failed: {}",
+            std::io::Error::last_os_error()
+        ));
     }
     Ok(())
 }
@@ -869,7 +929,9 @@ fn open_nested_file_read(root_fd: &SafeDirFd, rel_path: &str) -> Result<Vec<u8>,
     let Some((file_seg, dirs)) = parts.split_last() else {
         return Err("Empty path in skills-lock verification".to_string());
     };
-    let mut cur = root_fd.open_subdir_nofollow(".").map_err(|e| e.to_string())?;
+    let mut cur = root_fd
+        .open_subdir_nofollow(".")
+        .map_err(|e| e.to_string())?;
     for seg in dirs {
         cur = cur
             .open_subdir_nofollow(seg)
@@ -884,7 +946,10 @@ fn generate_csprng_hex_token() -> Result<String, String> {
     let c_urand = std::ffi::CString::new("/dev/urandom").map_err(|e| e.to_string())?;
     let fd = unsafe { libc::open(c_urand.as_ptr(), libc::O_RDONLY | libc::O_CLOEXEC) };
     if fd < 0 {
-        return Err(format!("Failed opening /dev/urandom: {}", std::io::Error::last_os_error()));
+        return Err(format!(
+            "Failed opening /dev/urandom: {}",
+            std::io::Error::last_os_error()
+        ));
     }
     let mut file = unsafe { std::fs::File::from_raw_fd(fd) };
     file.read_exact(&mut buf)
@@ -899,8 +964,14 @@ fn generate_csprng_hex_token() -> Result<String, String> {
 
 #[cfg(unix)]
 fn validate_staging_token(token: &str) -> Result<(), String> {
-    if token.len() != 64 || !token.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
-        return Err("MissingOrInvalidStagingCapability: malformed 64-hex capability token".to_string());
+    if token.len() != 64
+        || !token
+            .bytes()
+            .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    {
+        return Err(
+            "MissingOrInvalidStagingCapability: malformed 64-hex capability token".to_string(),
+        );
     }
     Ok(())
 }
@@ -925,6 +996,30 @@ fn prepare_staged_payload(
     capabilities: Vec<String>,
     upstream_url: Option<&str>,
 ) -> Result<PreparedStage, String> {
+    prepare_staged_payload_inner(
+        source_dir,
+        dest_dir,
+        skill_name,
+        description,
+        capabilities,
+        upstream_url,
+        None,
+        None,
+    )
+}
+
+#[cfg(unix)]
+#[allow(clippy::too_many_arguments)]
+fn prepare_staged_payload_inner(
+    source_dir: &Path,
+    dest_dir: &Path,
+    skill_name: &str,
+    description: &str,
+    capabilities: Vec<String>,
+    upstream_url: Option<&str>,
+    manifest_override: Option<SkillManifest>,
+    skill_md_override: Option<&str>,
+) -> Result<PreparedStage, String> {
     validate_safe_segment("skill_name", skill_name)?;
     validate_skill_metadata_text("description", description).map_err(|e| e.to_string())?;
     validate_stub_field_budgets(skill_name, description, &capabilities, upstream_url)?;
@@ -946,10 +1041,25 @@ fn prepare_staged_payload(
     sources.sort_by(|a, b| a.rel_path.cmp(&b.rel_path));
 
     let package_sha256 = compute_package_sha256(
-        sources.iter().map(|s| (s.rel_path.as_str(), s.raw_bytes.as_slice())),
+        sources
+            .iter()
+            .map(|s| (s.rel_path.as_str(), s.raw_bytes.as_slice())),
     );
-    let skill_md = build_validated_skill_md(skill_name, description, &capabilities)?;
-    let manifest = SkillManifest {
+    let (manifest_version, manifest_risk_tier) = match &manifest_override {
+        Some(m) => (m.version.clone(), m.risk_tier),
+        None => ("1.0.0".to_string(), 2u8),
+    };
+    let skill_md = match skill_md_override {
+        Some(custom) => custom.to_string(),
+        None => build_validated_skill_md_with_meta(
+            skill_name,
+            &manifest_version,
+            manifest_risk_tier,
+            description,
+            &capabilities,
+        )?,
+    };
+    let manifest = manifest_override.unwrap_or_else(|| SkillManifest {
         name: skill_name.to_string(),
         version: "1.0.0".to_string(),
         description: description.to_string(),
@@ -959,12 +1069,14 @@ fn prepare_staged_payload(
         parameters: None,
         tags: vec!["repackaged".to_string()],
         prompt_overview: Some(description.to_string()),
-    };
+    });
     let manifest_json = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?;
-    let (stub, stub_json) = build_discovery_stub(
+    let (stub, stub_json) = build_discovery_stub_with_meta(
         skill_name,
-        description,
-        capabilities,
+        &manifest.version,
+        manifest.risk_tier,
+        &manifest.description,
+        manifest.capabilities_required.clone(),
         upstream_url,
         package_sha256.clone(),
     )?;
@@ -1001,7 +1113,7 @@ fn prepare_staged_payload(
     let lock_file = SkillsLockFile {
         schema_version: 1,
         skill_name: skill_name.to_string(),
-        version: "1.0.0".to_string(),
+        version: manifest.version.clone(),
         package_sha256: package_sha256.clone(),
         source_files: source_entries,
         generated_files: generated_entries,
@@ -1055,7 +1167,14 @@ impl SkillRepackager {
     ) -> Result<StagedBundleReceipt, String> {
         #[cfg(not(unix))]
         {
-            let _ = (source_dir, dest_dir, skill_name, description, capabilities, upstream_url);
+            let _ = (
+                source_dir,
+                dest_dir,
+                skill_name,
+                description,
+                capabilities,
+                upstream_url,
+            );
             return Err(
                 "UnsupportedPlatformSecurityCheck: FD-relative O_NOFOLLOW and hardlink nlink checks require Unix"
                     .to_string(),
@@ -1106,7 +1225,8 @@ impl SkillRepackager {
                     staging_token: token,
                 })
             })();
-            issue_res.map_err(|primary| cleanup_with_error(&prep.dest_fd, &prep.tmp_name, None, primary))
+            issue_res
+                .map_err(|primary| cleanup_with_error(&prep.dest_fd, &prep.tmp_name, None, primary))
         }
     }
 
@@ -1121,7 +1241,14 @@ impl SkillRepackager {
     ) -> Result<RepackageReceipt, String> {
         #[cfg(not(unix))]
         {
-            let _ = (source_dir, dest_dir, skill_name, description, capabilities, upstream_url);
+            let _ = (
+                source_dir,
+                dest_dir,
+                skill_name,
+                description,
+                capabilities,
+                upstream_url,
+            );
             return Err(
                 "UnsupportedPlatformSecurityCheck: FD-relative O_NOFOLLOW and hardlink nlink checks require Unix"
                     .to_string(),
@@ -1147,11 +1274,16 @@ impl SkillRepackager {
                     skill_name,
                     &mut owned_dst,
                 )?;
+                let version_out = prep.manifest.version.clone();
                 let skill_plugin = manifest_to_skill_plugin(&prep.manifest);
                 Ok(RepackageReceipt {
                     skill_name: skill_name.to_string(),
-                    version: "1.0.0".to_string(),
-                    target_dir: dest_dir.as_ref().join(skill_name).to_string_lossy().to_string(),
+                    version: version_out,
+                    target_dir: dest_dir
+                        .as_ref()
+                        .join(skill_name)
+                        .to_string_lossy()
+                        .to_string(),
                     files_repackaged: prep.sources_count + 4,
                     discovery_stub: prep.stub,
                     skill_plugin,
@@ -1163,6 +1295,79 @@ impl SkillRepackager {
                     &prep.dest_fd,
                     &prep.tmp_name,
                     if owned_dst { Some(skill_name) } else { None },
+                    primary,
+                )
+            })
+        }
+    }
+
+    /// Repackages staged updates while preserving exact manifest version/name/capabilities and `SKILL.md` contents.
+    pub fn repackage_directory_with_manifest<P: AsRef<Path>, Q: AsRef<Path>>(
+        source_dir: P,
+        dest_dir: Q,
+        target_folder_name: &str,
+        manifest: SkillManifest,
+        skill_md_override: Option<&str>,
+        upstream_url: Option<&str>,
+    ) -> Result<RepackageReceipt, String> {
+        #[cfg(not(unix))]
+        {
+            let _ = (
+                source_dir,
+                dest_dir,
+                target_folder_name,
+                manifest,
+                skill_md_override,
+                upstream_url,
+            );
+            return Err("UnsupportedPlatformSecurityCheck: requires Unix O_NOFOLLOW".to_string());
+        }
+        #[cfg(unix)]
+        {
+            let prep = prepare_staged_payload_inner(
+                source_dir.as_ref(),
+                dest_dir.as_ref(),
+                target_folder_name,
+                &manifest.description.clone(),
+                manifest.capabilities_required.clone(),
+                upstream_url,
+                Some(manifest),
+                skill_md_override,
+            )?;
+            let mut owned_dst = false;
+            let result = (|| -> Result<RepackageReceipt, String> {
+                commit_repackaged_dir_fd(
+                    &prep.dest_fd,
+                    &prep.tmp_name,
+                    &prep.tmp_fd,
+                    target_folder_name,
+                    &mut owned_dst,
+                )?;
+                let version_out = prep.manifest.version.clone();
+                let skill_plugin = manifest_to_skill_plugin(&prep.manifest);
+                Ok(RepackageReceipt {
+                    skill_name: prep.manifest.name.clone(),
+                    version: version_out,
+                    target_dir: dest_dir
+                        .as_ref()
+                        .join(target_folder_name)
+                        .to_string_lossy()
+                        .to_string(),
+                    files_repackaged: prep.sources_count + 4,
+                    discovery_stub: prep.stub,
+                    skill_plugin,
+                    created_at: chrono::Utc::now().timestamp(),
+                })
+            })();
+            result.map_err(|primary| {
+                cleanup_with_error(
+                    &prep.dest_fd,
+                    &prep.tmp_name,
+                    if owned_dst {
+                        Some(target_folder_name)
+                    } else {
+                        None
+                    },
                     primary,
                 )
             })
@@ -1225,12 +1430,17 @@ impl SkillRepackager {
             let tmp_parent_fd = SafeDirFd::open_root_nofollow(tmp_parent)?;
             let dest_fd = SafeDirFd::open_root_nofollow(dst_parent)?;
             if !tmp_parent_fd.same_dir_identity(&dest_fd)? {
-                return Err("CrossDirectoryCommitRejected: tmp_dir and dst_dir parents differ".to_string());
+                return Err(
+                    "CrossDirectoryCommitRejected: tmp_dir and dst_dir parents differ".to_string(),
+                );
             }
 
-            let caps_fd = dest_fd.open_subdir_nofollow(".cowok-stage-caps").map_err(|_| {
-                "MissingOrInvalidStagingCapability: staging capability registry absent".to_string()
-            })?;
+            let caps_fd = dest_fd
+                .open_subdir_nofollow(".cowok-stage-caps")
+                .map_err(|_| {
+                    "MissingOrInvalidStagingCapability: staging capability registry absent"
+                        .to_string()
+                })?;
             caps_fd.ensure_private_dir_mode(".cowok-stage-caps")?;
             let cap_filename = format!("{staging_token}.json");
             let cap_bytes = read_bounded_file(&caps_fd, &cap_filename).map_err(|_| {
@@ -1259,7 +1469,10 @@ impl SkillRepackager {
             // Re-verify full staging integrity, quotas, zero symlinks/hardlinks, and cross-artifact parity via pinned FD before mkdirat(dst).
             let verified_lock = verify_repackaged_dir_fd(&tmp_fd)?;
             if verified_lock.package_sha256 != record.package_sha256 {
-                return Err("StagingProvenanceMismatch: package_sha256 diverged from issued capability".to_string());
+                return Err(
+                    "StagingProvenanceMismatch: package_sha256 diverged from issued capability"
+                        .to_string(),
+                );
             }
 
             let mut owned_dst = false;
@@ -1276,7 +1489,10 @@ impl SkillRepackager {
                     errs.push(tmp_cleanup_err);
                 }
                 if !errs.is_empty() {
-                    return Err(format!("{primary} | rollback_cleanup_error: {}", errs.join("; ")));
+                    return Err(format!(
+                        "{primary} | rollback_cleanup_error: {}",
+                        errs.join("; ")
+                    ));
                 }
                 return Err(primary);
             }
@@ -1300,7 +1516,9 @@ fn collect_bundle_subtree_fd(
     }
     for (name, is_dir, is_symlink) in dir_fd.read_entry_names()? {
         if is_symlink {
-            return Err(format!("Security scan failed: symlink rejected at '{prefix}/{name}'"));
+            return Err(format!(
+                "Security scan failed: symlink rejected at '{prefix}/{name}'"
+            ));
         }
         if name.contains('\\') || name.contains('\0') || name.chars().any(|c| c.is_control()) {
             return Err(format!(
@@ -1309,9 +1527,9 @@ fn collect_bundle_subtree_fd(
         }
         let rel = format!("{prefix}/{name}");
         if is_dir {
-            let child_fd = dir_fd.open_subdir_nofollow(&name).map_err(|e| {
-                format!("Security scan failed: openat subdir '{rel}': {e}")
-            })?;
+            let child_fd = dir_fd
+                .open_subdir_nofollow(&name)
+                .map_err(|e| format!("Security scan failed: openat subdir '{rel}': {e}"))?;
             collect_bundle_subtree_fd(&child_fd, &rel, depth + 1, total_bytes, disk_files)?;
         } else {
             if disk_files.len() >= MAX_PACKAGE_FILES {
@@ -1334,17 +1552,24 @@ fn collect_bundle_subtree_fd(
 
 #[cfg(unix)]
 fn collect_all_bundle_disk_files_fd(root_fd: &SafeDirFd) -> Result<BTreeSet<String>, String> {
-    let allowed_root_files: BTreeSet<&str> =
-        ["SKILL.md", "discovery-stub.json", "plugin.json", "skills-lock.json"]
-            .into_iter()
-            .collect();
-    let allowed_root_dirs: BTreeSet<&str> = ["scripts", "references", "assets"].into_iter().collect();
+    let allowed_root_files: BTreeSet<&str> = [
+        "SKILL.md",
+        "discovery-stub.json",
+        "plugin.json",
+        "skills-lock.json",
+    ]
+    .into_iter()
+    .collect();
+    let allowed_root_dirs: BTreeSet<&str> =
+        ["scripts", "references", "assets"].into_iter().collect();
 
     let mut total_bytes = 0usize;
     let mut disk_files = BTreeSet::new();
     for (name, is_dir, is_symlink) in root_fd.read_entry_names()? {
         if is_symlink {
-            return Err(format!("Security scan failed: symlink rejected at '{name}'"));
+            return Err(format!(
+                "Security scan failed: symlink rejected at '{name}'"
+            ));
         }
         if is_dir {
             if !allowed_root_dirs.contains(name.as_str()) {
@@ -1352,9 +1577,9 @@ fn collect_all_bundle_disk_files_fd(root_fd: &SafeDirFd) -> Result<BTreeSet<Stri
                     "BundleIntegrityMismatch: untracked directory '{name}' in bundle root"
                 ));
             }
-            let sub_fd = root_fd.open_subdir_nofollow(&name).map_err(|e| {
-                format!("Security scan failed: openat subdir '{name}': {e}")
-            })?;
+            let sub_fd = root_fd
+                .open_subdir_nofollow(&name)
+                .map_err(|e| format!("Security scan failed: openat subdir '{name}': {e}"))?;
             collect_bundle_subtree_fd(&sub_fd, &name, 1, &mut total_bytes, &mut disk_files)?;
         } else {
             if !allowed_root_files.contains(name.as_str()) {
@@ -1391,7 +1616,8 @@ fn verify_repackaged_dir_fd(root_fd: &SafeDirFd) -> Result<SkillsLockFile, Strin
 
     let mut seen_src = BTreeSet::new();
     let mut seen_pkg = BTreeSet::new();
-    let mut expected_files: BTreeSet<String> = ["skills-lock.json".to_string()].into_iter().collect();
+    let mut expected_files: BTreeSet<String> =
+        ["skills-lock.json".to_string()].into_iter().collect();
     let mut recomputed_sources: BTreeMap<String, Vec<u8>> = BTreeMap::new();
     for entry in &lock.source_files {
         validate_locked_rel_path("source path", &entry.path)?;
@@ -1406,7 +1632,10 @@ fn verify_repackaged_dir_fd(root_fd: &SafeDirFd) -> Result<SkillsLockFile, Strin
             ));
         }
         if !seen_src.insert(entry.path.clone()) || !seen_pkg.insert(entry.packaged_path.clone()) {
-            return Err(format!("BundleIntegrityMismatch: duplicate entry '{}'", entry.path));
+            return Err(format!(
+                "BundleIntegrityMismatch: duplicate entry '{}'",
+                entry.path
+            ));
         }
         let bytes = open_nested_file_read(root_fd, &entry.packaged_path)?;
         let digest = compute_sha256_hex(&bytes);
@@ -1429,8 +1658,9 @@ fn verify_repackaged_dir_fd(root_fd: &SafeDirFd) -> Result<SkillsLockFile, Strin
         recomputed_sources.insert(entry.path.clone(), bytes);
     }
 
-    let required_gen: BTreeSet<&str> =
-        ["SKILL.md", "discovery-stub.json", "plugin.json"].into_iter().collect();
+    let required_gen: BTreeSet<&str> = ["SKILL.md", "discovery-stub.json", "plugin.json"]
+        .into_iter()
+        .collect();
     let mut seen_gen = BTreeSet::new();
     let mut fm_meta = None;
     let mut parsed_manifest: Option<SkillManifest> = None;
@@ -1458,15 +1688,18 @@ fn verify_repackaged_dir_fd(root_fd: &SafeDirFd) -> Result<SkillsLockFile, Strin
         }
         expected_files.insert(entry.packaged_path.clone());
         if entry.path == "SKILL.md" {
-            let text = std::str::from_utf8(&bytes)
-                .map_err(|_| "SKILL.md is invalid UTF-8".to_string())?;
+            let text =
+                std::str::from_utf8(&bytes).map_err(|_| "SKILL.md is invalid UTF-8".to_string())?;
             let meta = parse_and_validate_skill_frontmatter(text)
                 .map_err(|e| format!("SKILL.md frontmatter invalid: {e}"))?;
             scan_skill_markdown_safety("SKILL.md", text).map_err(|e| e.to_string())?;
             if meta.name != lock.skill_name
                 || meta.version.as_deref() != Some(lock.version.as_str())
             {
-                return Err("BundleIntegrityMismatch: SKILL.md identity does not match skills-lock.json".to_string());
+                return Err(
+                    "BundleIntegrityMismatch: SKILL.md identity does not match skills-lock.json"
+                        .to_string(),
+                );
             }
             fm_meta = Some(meta);
         } else if entry.path == "plugin.json" {
@@ -1479,7 +1712,10 @@ fn verify_repackaged_dir_fd(root_fd: &SafeDirFd) -> Result<SkillsLockFile, Strin
                 || manifest.name != lock.skill_name
                 || manifest.version != lock.version
             {
-                return Err("BundleIntegrityMismatch: plugin.json identity does not match skills-lock.json".to_string());
+                return Err(
+                    "BundleIntegrityMismatch: plugin.json identity does not match skills-lock.json"
+                        .to_string(),
+                );
             }
             parsed_manifest = Some(manifest);
         } else if entry.path == "discovery-stub.json" {
@@ -1497,7 +1733,8 @@ fn verify_repackaged_dir_fd(root_fd: &SafeDirFd) -> Result<SkillsLockFile, Strin
                 &stub.capabilities,
                 stub.upstream_url.as_deref(),
             )?;
-            validate_skill_metadata_text("description", &stub.description).map_err(|e| e.to_string())?;
+            validate_skill_metadata_text("description", &stub.description)
+                .map_err(|e| e.to_string())?;
             for cap in &stub.capabilities {
                 validate_skill_metadata_text("capability", cap).map_err(|e| e.to_string())?;
             }
@@ -1583,7 +1820,10 @@ pub fn load_verified_staged_bundle_from_dir(
             if entry.packaged_path.starts_with("scripts/") {
                 let raw = open_nested_file_read(&root_fd, &entry.packaged_path)?;
                 let content = String::from_utf8(raw).map_err(|_| {
-                    format!("Staged script '{}' must be valid UTF-8", entry.packaged_path)
+                    format!(
+                        "Staged script '{}' must be valid UTF-8",
+                        entry.packaged_path
+                    )
                 })?;
                 scripts.push(crate::lifecycle::StagedScriptFile {
                     rel_path: entry.packaged_path.clone(),
@@ -1680,8 +1920,9 @@ mod tests {
         dest_fd.mkdirat(tmp_name, 0o700).unwrap();
         let tmp_fd = dest_fd.open_subdir_nofollow(tmp_name).unwrap();
         let mut owned_dst = false;
-        let err = commit_repackaged_dir_fd(&dest_fd, tmp_name, &tmp_fd, "race-empty", &mut owned_dst)
-            .unwrap_err();
+        let err =
+            commit_repackaged_dir_fd(&dest_fd, tmp_name, &tmp_fd, "race-empty", &mut owned_dst)
+                .unwrap_err();
         let merged = cleanup_with_error(&dest_fd, tmp_name, None, err);
         assert!(merged.contains("DestinationAlreadyExists"));
         assert!(empty_dst.is_dir());
@@ -1714,19 +1955,31 @@ mod tests {
         std::fs::write(staged.join("SKILL.md"), "# Incomplete").unwrap();
 
         let forged_tok = "a".repeat(64);
-        let err = SkillRepackager::commit_staged_bundle_atomic(&staged, &dst, &forged_tok).unwrap_err();
+        let err =
+            SkillRepackager::commit_staged_bundle_atomic(&staged, &dst, &forged_tok).unwrap_err();
         assert!(err.contains("MissingOrInvalidStagingCapability"));
-        assert!(!dst.exists(), "destination must not be created with forged capability");
+        assert!(
+            !dst.exists(),
+            "destination must not be created with forged capability"
+        );
 
         let dest_fd = SafeDirFd::open_root_nofollow(root.path()).unwrap();
         let tmp_fd = dest_fd.open_subdir_nofollow(".tmp-incomplete").unwrap();
         let mut owned_dst = false;
-        let commit_err =
-            commit_repackaged_dir_fd(&dest_fd, ".tmp-incomplete", &tmp_fd, "partial-skill", &mut owned_dst)
-                .unwrap_err();
+        let commit_err = commit_repackaged_dir_fd(
+            &dest_fd,
+            ".tmp-incomplete",
+            &tmp_fd,
+            "partial-skill",
+            &mut owned_dst,
+        )
+        .unwrap_err();
         assert!(commit_err.contains("plugin.json") && owned_dst);
         cleanup_dir_fd_recursive(&dest_fd, "partial-skill").unwrap();
-        assert!(!dst.exists(), "partial destination must be rolled back on mid-commit failure");
+        assert!(
+            !dst.exists(),
+            "partial destination must be rolled back on mid-commit failure"
+        );
     }
 
     #[test]

@@ -232,8 +232,8 @@ fn mig_01_concurrent_open_wal_is_idempotent() {
             )
             .expect("count");
         assert_eq!(
-            table_count, 42,
-            "17 V1 tables + 8 V2 tables + flow_draft_deployments + schema_migrations + 4 V4 tables + 8 V6 tables + 3 V8 tables = 42"
+            table_count, 45,
+            "17 V1 tables + 8 V2 tables + flow_draft_deployments + schema_migrations + 4 V4 tables + 8 V6 tables + 3 V8 tables + 3 V9 tables = 45"
         );
     }
 }

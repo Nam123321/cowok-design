@@ -12,8 +12,8 @@ use std::time::Instant;
 
 fn golden_fixture() -> Value {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let fixture_path = manifest_dir
-        .join("../../packages/builtin-skills/tests/fixtures/story-08.1-golden.json");
+    let fixture_path =
+        manifest_dir.join("../../packages/builtin-skills/tests/fixtures/story-08.1-golden.json");
     let raw = fs::read_to_string(&fixture_path)
         .unwrap_or_else(|e| panic!("Failed reading {:?}: {}", fixture_path, e));
     serde_json::from_str(&raw).expect("Golden fixture must be valid JSON")
@@ -30,7 +30,9 @@ fn ut_081_yaml_and_bpe_ssot_gates() {
     let rust_ssot = &fixture["rust_ssot_bpe_vectors"];
 
     // 1. Valid YAML containing `---` inside quoted scalar must NOT truncate early
-    let valid_dash = shared["yaml_valid_with_triple_dash_scalar"].as_str().unwrap();
+    let valid_dash = shared["yaml_valid_with_triple_dash_scalar"]
+        .as_str()
+        .unwrap();
     let meta = parse_and_validate_skill_frontmatter(valid_dash)
         .expect("Quoted scalar containing '---' must parse cleanly");
     assert_eq!(meta.name, "dash-in-scalar");
@@ -42,7 +44,9 @@ fn ut_081_yaml_and_bpe_ssot_gates() {
     assert_eq!(meta.risk_tier, Some(1));
 
     // 2. Missing opening delimiter must FAIL (no raw-markdown fallback)
-    let no_open = shared["yaml_invalid_no_opening_delimiter"].as_str().unwrap();
+    let no_open = shared["yaml_invalid_no_opening_delimiter"]
+        .as_str()
+        .unwrap();
     assert!(validate_skill_frontmatter(no_open).is_err());
 
     // 3. > 1,024 UTF-8 bytes frontmatter must FAIL
@@ -84,14 +88,10 @@ fn ut_081_kv_hash_golden_parity_and_mutations() {
     let entries_a = parse_entries(kv["entries_variant_a"].as_array().unwrap());
     let entries_b = parse_entries(kv["entries_variant_b"].as_array().unwrap());
 
-    let refs_a: Vec<(&SkillManifest, Option<&str>)> = entries_a
-        .iter()
-        .map(|(m, s)| (m, s.as_deref()))
-        .collect();
-    let refs_b: Vec<(&SkillManifest, Option<&str>)> = entries_b
-        .iter()
-        .map(|(m, s)| (m, s.as_deref()))
-        .collect();
+    let refs_a: Vec<(&SkillManifest, Option<&str>)> =
+        entries_a.iter().map(|(m, s)| (m, s.as_deref())).collect();
+    let refs_b: Vec<(&SkillManifest, Option<&str>)> =
+        entries_b.iter().map(|(m, s)| (m, s.as_deref())).collect();
 
     let hash_a = PerRunStager::compute_stable_prompt_hash_with_sources(&refs_a);
     let hash_b = PerRunStager::compute_stable_prompt_hash_with_sources(&refs_b);
@@ -194,7 +194,10 @@ fn ut_081_atomic_readonly_staging_and_prompt_sanitization() {
 
     // Staged files and directories must be read-only
     let staged_prompt = non_existent_base.join("run-readonly/safe-skill/PROMPT.md");
-    assert!(fs::metadata(&staged_prompt).unwrap().permissions().readonly());
+    assert!(fs::metadata(&staged_prompt)
+        .unwrap()
+        .permissions()
+        .readonly());
     assert!(fs::write(&staged_prompt, "tamper").is_err());
 
     // Prompt injection / hidden Unicode / beacons must be rejected and leave no partial run dir
@@ -231,7 +234,11 @@ fn ut_081_registry_parity_and_builtin_skills_audit() {
     let skills_dir = builtin_skills_root().join("skills");
     let reg = SkillRegistry::with_directory(&skills_dir);
     let list = reg.list();
-    assert!(list.len() >= 9, "Expected >= 9 built-in skills, found {}", list.len());
+    assert!(
+        list.len() >= 9,
+        "Expected >= 9 built-in skills, found {}",
+        list.len()
+    );
 
     // Every built-in skill must have a recorded SKILL.md SHA-256 and match to_domain_plugins ordering
     let domain_plugins = reg.to_domain_plugins();
@@ -309,11 +316,17 @@ fn perf_081_linter_security_hygiene_and_budget() {
     for prefix in ["\u{1E9E}", "\u{0130}"] {
         let img_payload = format!("{prefix}<img src=\"https://tracker.invalid/p.gif\">");
         let rep = TriangleLinter::lint(&img_payload);
-        assert!(rep.issues.iter().any(|i| i.rule_id == "ANTI_SLOP_07_EXTERNAL_BEACON"));
+        assert!(rep
+            .issues
+            .iter()
+            .any(|i| i.rule_id == "ANTI_SLOP_07_EXTERNAL_BEACON"));
 
         let md_payload = format!("{prefix}![tracker](https://tracker.invalid/p.gif)");
         let rep_md = TriangleLinter::lint(&md_payload);
-        assert!(rep_md.issues.iter().any(|i| i.rule_id == "ANTI_SLOP_07_EXTERNAL_BEACON"));
+        assert!(rep_md
+            .issues
+            .iter()
+            .any(|i| i.rule_id == "ANTI_SLOP_07_EXTERNAL_BEACON"));
     }
 
     // Worst-case 100-iteration performance budget < 25ms
@@ -330,5 +343,8 @@ fn perf_081_linter_security_hygiene_and_budget() {
     durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let p95 = durations[94];
     let max = *durations.last().unwrap();
-    assert!(p95 < 25.0 && max < 25.0, "Linter exceeded 25ms: p95={p95:.2}ms max={max:.2}ms");
+    assert!(
+        p95 < 25.0 && max < 25.0,
+        "Linter exceeded 25ms: p95={p95:.2}ms max={max:.2}ms"
+    );
 }

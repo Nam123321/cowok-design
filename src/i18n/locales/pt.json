@@ -321,7 +321,8 @@
     "runtimeDefaultTag": "Padrão",
     "customizeRuntimeBtn": "Personalizar",
     "vaultStorageShort": "Armazenamento",
-    "permissionShort": "Aprovação"
+    "permissionShort": "Aprovação",
+    "mcpHostStory084Notice": "Gerencie Client MCPs, Registro de Plugins AgentSkills, Staging Isolado (HUMAN_ONLY) e Cartões LEARN no SQLite WAL V9."
   },
   "flow": {
     "dagCanvas": "Painel DAG 2D",
@@ -552,5 +553,52 @@
     "searchModels": "Buscar modelos...",
     "thinkingEffort": "Raciocínio",
     "manageAiAccounts": "Gerenciar contas de IA"
+  },
+  "plugins": {
+    "validateBtn": "Validar",
+    "installBtn": "Instalar",
+    "activateBtn": "Ativar (HUMAN_ONLY)",
+    "deprecateBtn": "Descontinuar",
+    "loadingState": "Carregando SkillPlugins do daemon SQLite WAL...",
+    "emptyState": "Nenhum SkillPlugin registrado neste projeto ainda.",
+    "revLabel": "Revisão",
+    "registryTitle": "Registro AgentSkills e Staging",
+    "retryBtn": "Tentar Novamente",
+    "stagingHeader": "Candidato de Staging Isolado",
+    "promoting": "Promovendo...",
+    "promoteBtn": "Promover Staging -> ACTIVE",
+    "discarding": "Descartando...",
+    "discardBtn": "Descartar Candidato",
+    "rationalePlaceholder": "Informe a justificativa (>= 4 caracteres)...",
+    "quarantinedLabel": "EM QUARENTENA"
+  },
+  "learn": {
+    "revLabel": "Revisão",
+    "approveBtn": "Aprovar e Selar",
+    "rejectBtn": "Rejeitar",
+    "loadingState": "Carregando cartões LEARN...",
+    "emptyState": "Nenhum cartão LEARN proposto para este projeto ainda.",
+    "queueTitle": "Fila de Revisão de Conhecimento LEARN",
+    "retryBtn": "Tentar Novamente",
+    "rationalePlaceholder": "Justificativa de aprovação/rejeição (>= 4 caracteres)...",
+    "budgetLabel": "Orçamento Prompt",
+    "filterAll": "TODOS",
+    "filterProposed": "PROPOSTOS",
+    "filterAccepted": "ACEITOS",
+    "filterRejected": "REJEITADOS"
+  },
+  "cron": {
+    "failuresLabel": "Falhas",
+    "authRequiredNotice": "Erro de origem 401/403",
+    "refreshAuthSync": "Atualizar Auth e Sincronizar",
+    "syncNowBtn": "Sincronizar Agora",
+    "loadingState": "Verificando agendamentos cron de sincronização...",
+    "emptyState": "Nenhum agendamento cron de sincronização ativo.",
+    "statusTitle": "Sincronização Cron de Plugins",
+    "refreshBtn": "Atualizar",
+    "retryBtn": "Tentar Novamente",
+    "cronPlaceholder": "0 */5 * * * *",
+    "upstreamUrlPlaceholder": "https://github.com/organizacao/repositorio",
+    "saveScheduleBtn": "Salvar Agendamento"
   }
 }

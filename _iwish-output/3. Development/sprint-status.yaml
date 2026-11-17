@@ -63,11 +63,11 @@ start_date: '2026-07-24'
 # ==================================================
 
 # Epic 08: agentskills.io Repackager Engine, 6 Built-in Harness Skills & GitHub Cron Lifecycle
-"Epic 08 - agentskills.io Repackager Engine, 6 Built-in Harness Skills & GitHub Cron Lifecycle": in-progress
+"Epic 08 - agentskills.io Repackager Engine, 6 Built-in Harness Skills & GitHub Cron Lifecycle": completed
 "Story 08.1 - Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host)": completed
 "Story 08.2 - Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills)": completed
 "Story 08.3 - Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core)": completed
-"Story 08.4 - SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI": ready-for-dev
+"Story 08.4 - SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI": completed
 
 # Epic 09: Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine
 "Epic 09 - Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine": planned

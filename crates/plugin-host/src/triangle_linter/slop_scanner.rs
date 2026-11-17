@@ -38,7 +38,8 @@ fn scan_multiline_external_beacons(content: &str, lower: &str, issues: &mut Vec<
             if let Some(close_paren) = after.find(')') {
                 let target = after[..close_paren].trim();
                 if target.starts_with("http://") || target.starts_with("https://") {
-                    let snippet = content[start..start + 2 + close_bracket + 2 + close_paren + 1].replace('\n', " ");
+                    let snippet = content[start..start + 2 + close_bracket + 2 + close_paren + 1]
+                        .replace('\n', " ");
                     issues.push(make_issue(
                         "ANTI_SLOP_07_EXTERNAL_BEACON",
                         LintIssueCategory::SyntaxIntegrity,
@@ -62,7 +63,10 @@ fn scan_multiline_external_beacons(content: &str, lower: &str, issues: &mut Vec<
         if next_char.is_none_or(|b| b.is_ascii_whitespace() || b == b'>' || b == b'/') {
             if let Some(tag_end) = lower[start..].find('>') {
                 let tag_lower = &lower[start..start + tag_end + 1];
-                let compact: String = tag_lower.chars().filter(|c| !c.is_ascii_whitespace()).collect();
+                let compact: String = tag_lower
+                    .chars()
+                    .filter(|c| !c.is_ascii_whitespace())
+                    .collect();
                 if compact.contains("src=\"http://")
                     || compact.contains("src=\"https://")
                     || compact.contains("src='http://")
@@ -95,7 +99,8 @@ pub fn scan_slop_and_tells(content: &str) -> Vec<LintIssue> {
     for (line_idx, line) in content.lines().enumerate() {
         let line_num = line_idx + 1;
 
-        if line.contains('“') || line.contains('”') || line.contains('‘') || line.contains('’') {
+        if line.contains('“') || line.contains('”') || line.contains('‘') || line.contains('’')
+        {
             issues.push(make_issue(
                 "ANTI_SLOP_01_SMART_QUOTES",
                 LintIssueCategory::SyntaxIntegrity,
