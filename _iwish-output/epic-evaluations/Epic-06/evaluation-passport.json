@@ -1,0 +1,174 @@
+{
+  "schema_version": "epic-evaluation-passport/v1",
+  "epic_id": "Epic-06",
+  "feature_group": "VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio",
+  "created_at": "2026-11-17T12:56:54Z",
+  "updated_at": "2026-11-17T23:59:45+07:00",
+  "prior_approved_digest": "590bbb96e9f14fac388c9f9a1a048b1e7f24e3a60ce325422fe59b1fcef33e94",
+  "context_digest": "bef0e9385fd57935d33c770bdcf13c9882e0f421ef6fca921f29044ea847b667",
+  "context_files": [
+    {
+      "path": "_iwish-output/2. Product Planning/2.1. product-brief-or-prd.md",
+      "sha256": "0d60d3b9ca369b9042f54374b36646feac944303d22b9ece52a194c1e1cd0c12"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.4. epics-and-stories.md",
+      "sha256": "534125cdd582d65c07350ef65f4457781208344bf4c2d3d2b0269a6faab94d70"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.6. feature-hierarchy.md",
+      "sha256": "0c4746949afdc8e5cdb8dd4a452f945a3ca408f6509d29a00b164d653e66baa8"
+    },
+    {
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/epic.md",
+      "sha256": "463ef612f41e1b52154715c8322bd14086e7b94a830200f732255c14e21aba25"
+    }
+  ],
+  "evaluation_integrity": "VERIFIED",
+  "epic_readiness": "CONDITIONAL",
+  "has_ui_stories": true,
+  "story_creation_envelope": {
+    "max_phase": "INVESTIGATE",
+    "allowed_story_ids": [
+      "06.1",
+      "06.2",
+      "06.3",
+      "06.4"
+    ],
+    "recommended_split": {
+      "06.3": [
+        "06.3",
+        "06.4"
+      ]
+    },
+    "blocked_story_ids": [],
+    "remediation_lane": true
+  },
+  "plugin_boundary": {
+    "applicability": "NOT_APPLICABLE",
+    "report_ref": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/plugin-boundary-review.md",
+    "candidate_parts": [
+      {
+        "id": "crates/presentation-cms",
+        "classification": "CORE_ONLY"
+      },
+      {
+        "id": "src/features/presentation",
+        "classification": "CORE_ONLY"
+      },
+      {
+        "id": "src/features/flow",
+        "classification": "CORE_ONLY"
+      }
+    ]
+  },
+  "agent_surface": {
+    "contract_level": "L2_HYBRID",
+    "report_ref": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/agent-surface-map.md"
+  },
+  "party_mode": {
+    "mode": "deep",
+    "rounds": 2,
+    "roles": [
+      "PM",
+      "Architect",
+      "Review",
+      "Dev",
+      "UX"
+    ],
+    "transcript_ref": "_iwish-output/epic-evaluations/Epic-06/party-mode-transcript.md",
+    "consensus_summary": "Converged on epic_readiness=CONDITIONAL and story_creation_envelope.max_phase=INVESTIGATE; reconciled PRD, DB Spec (V12), Architecture (TDR-005), DESIGN.md (§9.1 canonical over LAY-05 right-CMS), Epics/Hierarchy, Epic-06, Stories 06.1..06.4 (Tier 3 EARS + YAML oracles + EC-06-01..14), 3-Layer FE/DB/API contracts (H2/H3/H4 Watchmen-signed), reviews, and FMEA risk matrix.",
+    "pushback_patterns": [
+      "Reject TSX-only SurgicalPatcher and regex CSS comment stripping for HTML5 slides; enforce lol_html + html5ever SVG allowlist + CSS token sanitizer (TDR-005)",
+      "Decouple targetCacheKey from live PATCH_BY_FF_ID typing so resolvedSha256 never tears down IframeKeepAliveSlot under <16ms editing",
+      "Split Dual-Screen Presenter Mode into Story 06.4 while retaining speaker_notes in Story 06.2, scoping 06.3 to 2D charts only (3D widget deferred), and promoting risk_tier to 3"
+    ]
+  },
+  "unknowns": {
+    "depth": "full",
+    "quadrants": [
+      "known_unknowns",
+      "unknown_unknowns",
+      "assumptions",
+      "blind_spots"
+    ],
+    "critical_open": [],
+    "macro_open": [
+      "Technical Spikes S1-S5 verification in INVESTIGATE before /code"
+    ],
+    "report_ref": "_iwish-output/unknowns/reports/unknowns-report-epic-06.md"
+  },
+  "evidence_receipts": [
+    {
+      "id": "epic-06-party-mode-transcript",
+      "path": "_iwish-output/epic-evaluations/Epic-06/party-mode-transcript.md",
+      "sha256": "f25b49e458b697659db4426feb136571266173c47c36c5dbaaf251574712eba6"
+    },
+    {
+      "id": "epic-06-unknowns-report",
+      "path": "_iwish-output/unknowns/reports/unknowns-report-epic-06.md",
+      "sha256": "1eb1b9066c2a7a01d37240a64dc9009b5b6aae9dfa32e4cbd2c8de20afac1feb"
+    },
+    {
+      "id": "epic-06-evaluation-report",
+      "path": "_iwish-output/epic-evaluations/Epic-06/evaluation-report.md",
+      "sha256": "0ce343bcbcbf001ddd4f3241d2835aa3f9b7fe2730782246482c0bdf659a67ca"
+    },
+    {
+      "id": "epic-06-edge-case-seal",
+      "path": "_iwish-output/epic-evaluations/Epic-06/epic-06-evaluation-report_evidence.json",
+      "sha256": "1cb210290ed4dd7a69e1d94868b3ced52b2c04c8a818661b869942905d93155e"
+    },
+    {
+      "id": "epic-06-architecture-coherence-post-reconcile",
+      "path": "_iwish-output/adhoc-workspace/scratch/coherence-report-epic-06-post-reconcile.json",
+      "sha256": "fb2e36811578d952aaebf5ffea4c0ef31be28ecb8934f313b99516f724ba7782"
+    },
+    {
+      "id": "epic-06-grounding-probe",
+      "path": "_iwish-output/adhoc-workspace/scratch/plan-physical-grounding-report-epic-06.json",
+      "sha256": "a55f6d01b7c207ddedb563e0a18a399f552bc90cc824efd23bde4aeac790b8d7"
+    },
+    {
+      "id": "epic-06-plugin-boundary-review",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/plugin-boundary-review.md",
+      "sha256": "f453621d7aa745dac18a7ffe49fb5014308aea7193c97bc58aaaa35174c11a97"
+    },
+    {
+      "id": "epic-06-agent-surface-map",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/agent-surface-map.md",
+      "sha256": "80b1c706eadff62f9cda6f2aa1a95db1dbd56e189ed604f36c8153197b605626"
+    },
+    {
+      "id": "epic-06-nlm-evidence",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/nlm_evidence.json",
+      "sha256": "1a5a01fc2b69edc349b52c78f22504745481c1338e9fdc4a0b525d9dbb1e70e6"
+    },
+    {
+      "id": "epic-06-h2-layer-fe",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/H2-Layer-FE_evidence.json",
+      "sha256": "28dcc8bb9fe01bbb3946109f3070b68ea786b489d278e923daaf876afe1325f6"
+    },
+    {
+      "id": "epic-06-h3-layer-db",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/H3-Layer-DB_evidence.json",
+      "sha256": "88e3bebfc250efedd563c66377ca0630f9c57b15288fa8aae05757fb215b5ba6"
+    },
+    {
+      "id": "epic-06-h4-layer-api",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/H4-Layer-API_evidence.json",
+      "sha256": "c3509311c121964efb8ce6e018705bb8922806d22e7f69a1dcdfeaf939a63ab2"
+    },
+    {
+      "id": "epic-06-claims-validation",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/claims-validation-evidence.json",
+      "sha256": "1994dba575395b53ba51848b3dcfc573407cd0e42d7d67013659cd87e7f919b7"
+    }
+  ],
+  "approval": {
+    "approved": true,
+    "approved_by": "User",
+    "approved_at": "2026-11-17T23:59:00+07:00",
+    "context_digest": "bef0e9385fd57935d33c770bdcf13c9882e0f421ef6fca921f29044ea847b667"
+  }
+}

@@ -183,3 +183,14 @@ flowchart TD
 - [Layer-Epic-API](./layer-epic-api.md)
 - [Contract Claims](./contract_claims.yaml)
 
+
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-05.1](./Story-05.1/story.md) | Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11) | 02.2, 04.5 | completed |
+| [Story-05.2](./Story-05.2/story.md) | Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup | 05.1 | completed |
+| [Story-05.3](./Story-05.3/story.md) | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | 05.2 | completed |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-05.1](./Story-05.1/story.md) | Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11) | 02.2, 04.5 | completed |
+| [Story-05.2](./Story-05.2/story.md) | Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup | 05.1 | completed |
+| [Story-05.3](./Story-05.3/story.md) | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | 05.2 | completed |

@@ -1,0 +1,16 @@
+decisions:
+  - id: TDR-001
+    title: "Single-Authority Rust SQLite WAL V3 & Native SVG 2D DAG Engine"
+    status: "Active"
+  - id: TDR-002
+    title: "Dual-Ingress Loopback Capability Auth & Vite In-Process Guarded BFF Mount"
+    status: "Active"
+  - id: TDR-003
+    title: "Hybrid Preview Iframe Sandbox Isolation with Opt-In Design CDN"
+    status: "Active"
+  - id: TDR-004
+    title: "SSOT Anti-Split-Brain, Zero RAM-Shell & Live Daemon Execution Governance"
+    status: "Active"
+  - id: TDR-005
+    title: "Hybrid lol_html + html5ever HTML5 CMS Patcher, CSP-B 2D Charts, Non-Reloading MessageChannel Bridge & V12 Schema"
+    status: "Active"

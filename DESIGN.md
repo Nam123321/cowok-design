@@ -268,13 +268,12 @@ To cover every product capability in the `cowok-design` PRD (`flowforge-design-s
   - **Bottom / Right Drawer**: `CMP-06 ClarificationCardWidget` capturing explicit human rationale so the decision is persisted to `05_DESIGN_SYSTEM.md` / `04_SCREEN_SPECS.md`.
 - **Registered UX Patterns**: `PAT-04 (Approval Center)`, `MetricLine [5.10]`, `CMP-06`, `CMP-07`.
 
-### Layout 05 (`LAY-05`): Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Studio (Mode 2)
+### Layout 05 (`LAY-05`): Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Studio (Mode 2 — Canonical §9.1 Topology)
 - **Target Persona / Use Case**: Founders, PMs, and Design Leads creating executive pitch decks, architecture review decks, and sprint acceptance reports (`flowforge-design-spec/product/07-HTML-PRESENTATION-CMS-SPEC.md`).
-- **Zone Allocation**:
-  - **Left Rail (`220px`)**: Thumbnail Slide Sorter (`SLD-01..SLD-N`) with narrative arc badges (`Hook`, `Problem`, `Flow Demo`, `Architecture`, `Metrics`, `Roadmap`) and drag-and-drop reordering.
-  - **Center Stage (`60%`)**: Fixed-aspect `16:9` (`1920x1080` scale-fitted) Interactive HTML Slide Canvas with live embedded `cowok-design` components, Mermaid diagrams, and `ResizeObserver` overflow guard (`E3 Gate`).
-  - **Right CMS Pane (`40%`, `CMP-10 PresentationDualPaneView`)**: Zero-code Structured Markdown & Property Form Editor (`Headline`, `Key Takeaway`, `Metric Strip [5.10]`, `Chart DataTableView [5.21]`, `Brand Preset`). Keystrokes patch `[data-ff-id]` in `<16ms` via `MessageChannel` without reloading the slide stage.
-- **Registered UX Patterns**: `CMP-10`, `DataTableView [5.21]`, `MetricLine [5.10]`, `PAT-07`.
+- **Zone Allocation (Canonical §9.1 `CompanionDualPaneStage.tsx`, superseding legacy 3-column right-CMS draft)**:
+  - **Left Pane (`#structureSubPane`, fluid `min-width: 320px`)**: Houses the 1-click lens switcher (`[🔀 Userflow (2D DAG) | 📑 Slide / CMS]`) and horizontal `200%` track switching via `transform: translateX(-50%)` (`240ms cubic-bezier`) between `#slideListPane` (Slide Sorter `SLD-01..N` with narrative arc badges & ULID identities) and **Slide-Over Detailed CMS Editor** (`CmsBlockEditor [CMP-11]`, dynamic template fields + `speaker_notes`, `MetricLine [5.10]`, `DataTableView [5.21]`). Inactive offscreen track half MUST carry `inert` + `aria-hidden="true"` to eliminate focus leaks.
+  - **Right Stage (`#htmlSubPane`, `SlideStage16x9 [CMP-12]`)**: Auto-collapsed chat rail (`40px`) preset in Slide Studio achieves `--slide-scale >= 0.45` inside `1440px` viewports; isolated `<iframe sandbox="allow-scripts allow-forms">` (`0 allow-same-origin`, `srcDoc` owning deck `html, body` tokens immune to `.live-html-frame !important` light overrides) supporting `16:9` (`1920x1080`), `16:10` (`1920x1200`), and `Auto` via adaptive `--slide-w`/`--slide-h`, projection type scale (`display >= 56px`, `heading >= 32px`, `body >= 22px`, `micro >= 16px`), zoom pill (`Fit | 100% Pan`), unscaled `scrollHeight > clientHeight` `E3` overflow warning, single-`Esc` `Fullscreen` (`fullscreenchange`), and dual-screen `Presenter` (`Story 06.4` + Inline Split Night `#0B1220`/`#172033` fallback). Warm/Dim `--agent-accent` (`#E89A35` / `#C97B1D`) stays distinct from `--human-accent` across Copilot indicators.
+  - **Registered UX Patterns**: `CompanionDualPaneStage` (`§9.1` canonical `CMP-10`), `DataTableView [5.21]`, `MetricLine [5.10]`, `Toast [5.12]`, `PAT-07`.
 
 ### Layout 06 (`LAY-06`): ChangeProposal Review Inbox & `E1..E4` Governance Diff Studio
 - **Target Persona / Use Case**: Human Tech Lead / Design Lead reviewing pending AI-generated `ChangeProposals` (`DRAFT` $\rightarrow$ `APPROVED` $\rightarrow$ `EXECUTED`).
@@ -342,8 +341,8 @@ To cover every product capability in the `cowok-design` PRD (`flowforge-design-s
 ### Userflow 04 (`UF-04`): Dual-Pane 16:9 HTML Presentation Studio $\rightarrow$ `<16ms` Non-Tech CMS Editing $\rightarrow$ Export
 1. User switches `CMP-02 WorkbenchTopNav` to **Mode 2: Presentation 16:9 (`LAY-05`)**.
 2. Slide Copilot synthesizes a 16:9 HTML slide deck directly from `01_PROJECT_BRIEF`, `03_USER_FLOWS`, and live `SCR-*` components.
-3. Non-tech stakeholder edits slide headlines, KPI numbers (`MetricLine [5.10]`), or table rows (`DataTableView [5.21]`) in the Right CMS Editor (`CMP-10`).
-4. Every keystroke updates the left `1920x1080` HTML slide DOM node (`[data-ff-id]`) in `<16ms` while `ResizeObserver` enforces zero 16:9 overflow (`E3 Gate`).
+3. Non-tech stakeholder edits slide headlines, KPI numbers (`MetricLine [5.10]`), tabular chart data (`DataTableView [5.21]`), or `speaker_notes` in the **Left `#structureSubPane` Slide-Over CMS Editor** (`§9.1`, `translateX(-50%)` with `inert` guard).
+4. Every keystroke updates the right `#htmlSubPane` `1920x1080` HTML slide DOM node (`[data-ff-id]`) in `<16ms` via non-reloading `MessageChannel` (`PATCH_BY_FF_ID`) while unscaled `ResizeObserver` enforces zero 16:9 overflow (`E3 Gate`).
 
 ### Userflow 05 (`UF-05`): Autonomous OPC Fleet Execution (`$UIUX_LIVE_SPEC` `<50ms`) & `3-Strike Circuit Breaker` Escalation
 1. User switches to **Mode 3: Fleet & PTY (`LAY-07`, `CMP-11` + `CMP-12`)** and dispatches an implementation wave to `cowok` worker agents.

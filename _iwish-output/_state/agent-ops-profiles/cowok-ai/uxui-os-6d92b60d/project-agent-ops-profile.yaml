@@ -3,26 +3,26 @@ profile_kind: DERIVED_EVIDENCE_PROFILE
 repo_id: cowok-ai
 worktree_id: uxui-os-6d92b60d
 worktree_root: /Users/hatrang20061988/Desktop/AI Project/uxui-os
-git_head: d30ede5939703672ebcdaafe90107ed0e6e08528
+git_head: da8524537da695e12f7522fb2f92ad5a8099a401
 policy_version: 2.1.0
 probe_version: 2.1.0
-generated_at: '2026-11-16T05:22:52.985972+00:00'
-sha256_digest: sha256:b674f859ed58e357db6f5f6071f7eb1b193b68ced8504ad8aa233edfdfe7a9a0
+generated_at: '2026-11-17T12:43:23.416922+00:00'
+sha256_digest: sha256:d7d044ec62caad43575c40fbd13945eb2c6b55472a3b79b0069057a7ae59b2b8
 overall_status: NOT_READY
 delta_summary:
   previous_digest: sha256:b674f859ed58e357db6f5f6071f7eb1b193b68ced8504ad8aa233edfdfe7a9a0
-  digest_changed: false
+  digest_changed: true
   changed_probes: []
 source_manifest:
 - path: _iwish-output/2. Product Planning/2.5. architecture.md
   present: true
-  sha256: sha256:81b4aa35575cdee99df7c667d089c6b41ff89fdfd0fdb1a2b3d6c46158fcc1f9
+  sha256: sha256:ee0f48103742cf37c83d853c76e590611522179b20b3f887a0d9d571128dbab6
 - path: _iwish-output/3. Development/development-roadmap.md
   present: true
-  sha256: sha256:73878146fd6fa36ff493c6eb8c98c43f1086117470f1ac3cd6d80d0bf7635bfc
+  sha256: sha256:78841917ab1aef36c49e732ec44ddffd71f17c167c30b10e3297f71f0486438e
 - path: prisma/schema.prisma
   present: true
-  sha256: sha256:3369079d201ef35e95a54d867b821f2dbb6aa834f32a73a8374c42de54586f27
+  sha256: sha256:a021efe39d32efb7d8341f8212bbd86d5ac855aea70f9fcbd263e8ccc9368c3f
 - path: src/lib/api-guard.ts
   present: true
   sha256: sha256:972d9ae344106ef378c28c2c371821344063b9cecffe05c8f56d814703c2fd1b
@@ -55,7 +55,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: _iwish-output/3. Development/development-roadmap.md
-      sha256: sha256:73878146fd6fa36ff493c6eb8c98c43f1086117470f1ac3cd6d80d0bf7635bfc
+      sha256: sha256:78841917ab1aef36c49e732ec44ddffd71f17c167c30b10e3297f71f0486438e
       assertion: Intent Router & Discovery service verified
     blockers:
     - Missing Intent Router / Discovery service
@@ -78,7 +78,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: _iwish-output/2. Product Planning/2.5. architecture.md
-      sha256: sha256:81b4aa35575cdee99df7c667d089c6b41ff89fdfd0fdb1a2b3d6c46158fcc1f9
+      sha256: sha256:ee0f48103742cf37c83d853c76e590611522179b20b3f887a0d9d571128dbab6
       assertion: Execution services verified in src/
     blockers:
     - Missing plugin/tool execution service in src/
@@ -89,7 +89,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: prisma/schema.prisma
-      sha256: sha256:3369079d201ef35e95a54d867b821f2dbb6aa834f32a73a8374c42de54586f27
+      sha256: sha256:a021efe39d32efb7d8341f8212bbd86d5ac855aea70f9fcbd263e8ccc9368c3f
       assertion: Physical Prisma models verified
     blockers:
     - Missing required domain/registry models in Prisma schema
@@ -100,7 +100,7 @@ probes:
     physical_status: PASS
     evidence:
     - path: _iwish-output/3. Development/development-roadmap.md
-      sha256: sha256:73878146fd6fa36ff493c6eb8c98c43f1086117470f1ac3cd6d80d0bf7635bfc
+      sha256: sha256:78841917ab1aef36c49e732ec44ddffd71f17c167c30b10e3297f71f0486438e
       assertion: Feature surface verified
     blockers: []
   M8:
@@ -110,7 +110,7 @@ probes:
     physical_status: FAIL
     evidence:
     - path: prisma/schema.prisma
-      sha256: sha256:3369079d201ef35e95a54d867b821f2dbb6aa834f32a73a8374c42de54586f27
+      sha256: sha256:a021efe39d32efb7d8341f8212bbd86d5ac855aea70f9fcbd263e8ccc9368c3f
       assertion: PluginRegistry & CuratedPluginImportJob/CapabilityPackageVersion
         present
     blockers:

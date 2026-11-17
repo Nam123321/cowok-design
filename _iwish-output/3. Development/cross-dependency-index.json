@@ -1,11 +1,11 @@
 {
   "version": "1.0",
-  "compiled_at": "2026-11-13T06:58:14.347928+00:00",
+  "compiled_at": "2026-11-17T16:39:24.917374+00:00",
   "sources_used": {
-    "story_frontmatter": 38,
+    "story_frontmatter": 39,
     "epic_tables": 12,
     "cross_dependencies_md": true,
-    "data_specs": 15
+    "data_specs": 17
   },
   "epics": {
     "Epic-09": {
@@ -380,14 +380,46 @@
       ],
       "conflicts": []
     },
-    "Story-06.3": {
+    "Story-06.4": {
       "declared_deps": [
+        "06.1",
         "06.2"
       ],
       "analyzed_deps": [],
       "merged_deps": [
         {
+          "id": "06.1",
+          "confidence": 0.5,
+          "evidence": [
+            "frontmatter"
+          ]
+        },
+        {
           "id": "06.2",
+          "confidence": 0.5,
+          "evidence": [
+            "frontmatter"
+          ]
+        }
+      ],
+      "conflicts": []
+    },
+    "Story-06.3": {
+      "declared_deps": [
+        "06.2",
+        "04.4"
+      ],
+      "analyzed_deps": [],
+      "merged_deps": [
+        {
+          "id": "06.2",
+          "confidence": 0.5,
+          "evidence": [
+            "frontmatter"
+          ]
+        },
+        {
+          "id": "04.4",
           "confidence": 0.5,
           "evidence": [
             "frontmatter"
@@ -646,11 +678,19 @@
     },
     "Story-04.5": {
       "declared_deps": [
+        "04.1",
         "04.4",
         "03.3"
       ],
       "analyzed_deps": [],
       "merged_deps": [
+        {
+          "id": "04.1",
+          "confidence": 0.5,
+          "evidence": [
+            "frontmatter"
+          ]
+        },
         {
           "id": "04.4",
           "confidence": 0.5,
@@ -750,18 +790,10 @@
     },
     "Story-05.1": {
       "declared_deps": [
-        "02.2",
         "04.5"
       ],
       "analyzed_deps": [],
       "merged_deps": [
-        {
-          "id": "02.2",
-          "confidence": 0.5,
-          "evidence": [
-            "frontmatter"
-          ]
-        },
         {
           "id": "04.5",
           "confidence": 0.5,
