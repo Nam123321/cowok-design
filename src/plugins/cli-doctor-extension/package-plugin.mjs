@@ -154,9 +154,9 @@ export async function seedPlugin(dbPath = resolveDefaultDbPath(), pluginDir = PL
     const rowId = `plugin-${manifest.slug}-${manifest.version}`;
     db.prepare(
       `INSERT INTO skill_plugins (id, project_id, plugin_slug, version, lifecycle_state, source_repo_url, manifest_json, updated_at)
-       VALUES (?, ?, ?, ?, 'ENABLED', 'local://src/plugins/cli-doctor-extension', ?, ?)
+       VALUES (?, ?, ?, ?, 'ACTIVE', 'local://src/plugins/cli-doctor-extension', ?, ?)
        ON CONFLICT(project_id, plugin_slug, version)
-       DO UPDATE SET lifecycle_state = 'ENABLED', manifest_json = excluded.manifest_json, updated_at = excluded.updated_at`
+       DO UPDATE SET lifecycle_state = 'ACTIVE', manifest_json = excluded.manifest_json, updated_at = excluded.updated_at`
     ).run(rowId, projectId, manifest.slug, manifest.version, enrichedManifest, now);
     return { action: "seeded", projectId, slug: manifest.slug, version: manifest.version, packSha256, zipPath };
   } finally {

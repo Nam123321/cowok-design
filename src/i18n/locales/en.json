@@ -129,7 +129,7 @@
   },
   "canvas": {
     "userflowLens": "Userflow",
-    "slideCmsLens": "Slide Deck",
+    "slideCmsLens": "Slide Deck / CMS",
     "presentButton": "Present",
     "exitPresent": "Exit Present",
     "openNewTab": "Open project file or create new design",
@@ -374,7 +374,8 @@
     "customizeRuntimeBtn": "Customize",
     "vaultStorageShort": "Storage",
     "permissionShort": "Approval",
-    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · BYOS/Ollama"
+    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · BYOS/Ollama",
+    "mcpHostStory084Notice": "Manage Client MCPs, AgentSkills Plugin Registry, Isolated Staging (HUMAN_ONLY), and LEARN Knowledge Cards on SQLite WAL V9."
   },
   "flow": {
     "dagCanvas": "DAG 2D Canvas",
@@ -779,5 +780,61 @@
     "colValue": "Sample Value",
     "footerSummary": "{{count}} attributes loaded • Preset: {{preset}}",
     "saveError": "Unable to save sample fixture: {{message}}"
+  },
+  "plugins": {
+    "validateBtn": "Validate",
+    "installBtn": "Install",
+    "activateBtn": "Activate (HUMAN_ONLY)",
+    "deprecateBtn": "Deprecate",
+    "loadingState": "Loading SkillPlugins from SQLite WAL daemon...",
+    "emptyState": "No SkillPlugins registered in this project scope yet.",
+    "revLabel": "Revision",
+    "registryTitle": "AgentSkills Registry & Staging",
+    "retryBtn": "Retry",
+    "stagingHeader": "Isolated Staging Candidate",
+    "promoting": "Promoting...",
+    "promoteBtn": "Promote Staging -> ACTIVE",
+    "discarding": "Discarding...",
+    "discardBtn": "Discard Candidate",
+    "rationalePlaceholder": "Enter rationale (>= 4 chars)...",
+    "quarantinedLabel": "QUARANTINED",
+    "archiveBtn": "Archive",
+    "refreshBtn": "Refresh",
+    "navLink": "Plugins",
+    "backToWorkbench": "Workbench",
+    "stagingImpactSummary": "Updating v{{from}} -> v{{to}} introduces {{count}} breaking change(s); active runs stay pinned to v{{from}} until promoted.",
+    "quarantineBtn": "Quarantine",
+    "quarantinePlaceholder": "Quarantine reason (>= 4 chars)...",
+    "quarantineReasonLabel": "Quarantine reason"
+  },
+  "learn": {
+    "revLabel": "Revision",
+    "approveBtn": "Approve & Seal",
+    "rejectBtn": "Reject",
+    "loadingState": "Loading LEARN cards...",
+    "emptyState": "No LEARN cards proposed for this project yet.",
+    "queueTitle": "LEARN Knowledge Review Queue",
+    "retryBtn": "Retry",
+    "rationalePlaceholder": "Enter approval/rejection rationale (>= 4 chars)...",
+    "budgetLabel": "Prompt Budget",
+    "filterAll": "ALL",
+    "filterProposed": "PROPOSED",
+    "filterAccepted": "ACCEPTED",
+    "filterRejected": "REJECTED"
+  },
+  "cron": {
+    "failuresLabel": "Failures",
+    "authRequiredNotice": "Upstream 401/403",
+    "refreshAuthSync": "Refresh Auth & Sync",
+    "syncNowBtn": "Sync Now",
+    "loadingState": "Checking cron sync schedules...",
+    "emptyState": "No upstream cron sync schedules active.",
+    "statusTitle": "Plugin Upstream Cron Sync",
+    "refreshBtn": "Refresh",
+    "retryBtn": "Retry",
+    "cronPlaceholder": "0 */5 * * * *",
+    "upstreamUrlPlaceholder": "https://github.com/org/repo",
+    "saveScheduleBtn": "Save Schedule",
+    "vaultTokenRequired": "Vault github token required"
   }
 }

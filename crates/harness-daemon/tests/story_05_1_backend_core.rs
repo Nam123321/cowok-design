@@ -327,7 +327,7 @@ async fn story_05_1_two_phase_idempotency_and_sdi_grounding() {
         "POST",
         &sdi_uri,
         &tok,
-        &[("idempotency-key", "idemp-vague-01")],
+        &[("idempotency-key", "idem-a")],
         Some(json!({
             "rawPrompt": "làm đẹp giao diện"
         })),
@@ -355,7 +355,7 @@ async fn story_05_1_two_phase_idempotency_and_sdi_grounding() {
         "POST",
         &sdi_uri,
         &tok,
-        &[("idempotency-key", "idemp-vague-01")],
+        &[("idempotency-key", "idem-a")],
         Some(json!({
             "rawPrompt": "làm đẹp giao diện"
         })),
@@ -370,7 +370,7 @@ async fn story_05_1_two_phase_idempotency_and_sdi_grounding() {
         "POST",
         &sdi_uri,
         &tok,
-        &[("idempotency-key", "idemp-vague-01")],
+        &[("idempotency-key", "idem-a")],
         Some(json!({
             "rawPrompt": "thay đổi khác hẳn payload cũ"
         })),
@@ -388,7 +388,7 @@ async fn story_05_1_two_phase_idempotency_and_sdi_grounding() {
         "POST",
         &sdi_uri,
         &tok,
-        &[("idempotency-key", "idemp-clar-abort-01")],
+        &[("idempotency-key", "idem-b")],
         Some(json!({
             "rawPrompt": "fix giao diện",
             "executeImmediately": true
@@ -403,7 +403,7 @@ async fn story_05_1_two_phase_idempotency_and_sdi_grounding() {
         "POST",
         &sdi_uri,
         &tok,
-        &[("idempotency-key", "idemp-clar-abort-01")],
+        &[("idempotency-key", "idem-b")],
         Some(json!({
             "rawPrompt": "fix giao diện"
         })),

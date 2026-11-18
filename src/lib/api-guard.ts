@@ -10,6 +10,7 @@ export {
   isAllowedLoopbackHost,
   issueBffLoopbackSession,
   pruneExpiredBffSessions,
+  setBffSessionHumanToken,
   setBoundBffPort,
   type LoopbackSessionRecord,
 } from "./api-guard-session.ts";
@@ -25,6 +26,9 @@ export interface GuardedContext {
   projectId?: string;
   correlationId?: string;
   params?: Record<string, string>;
+  bffSessionToken?: string;
+  isHumanWorkbench?: boolean;
+  humanSessionToken?: string;
 }
 
 export interface GuardedRouteOptions<B = unknown, Q = unknown> {
@@ -33,6 +37,7 @@ export interface GuardedRouteOptions<B = unknown, Q = unknown> {
   query?: ZodSchema<Q>;
   roles?: string[];
   authMode?: "default" | "strict-loopback";
+  requireHumanAction?: boolean;
 }
 
 type RouteHandler<B, Q> = (
@@ -46,7 +51,15 @@ function resolveAuthIdentity<B, Q>(
   url: URL,
   options: GuardedRouteOptions<B, Q>,
   _context: { tenantId?: string }
-): { ok: true; tenantId: string; userId: string; role: "viewer" | "editor" | "admin" } | { ok: false; response: Response } {
+): {
+  ok: true;
+  tenantId: string;
+  userId: string;
+  role: "viewer" | "editor" | "admin";
+  sessionToken: string;
+  isHumanWorkbench?: boolean;
+  humanSessionToken?: string;
+} | { ok: false; response: Response } {
   const verified = verifyStrictLoopback(req, url);
   if (!verified.ok) return verified;
   if (options.roles && options.roles.length > 0) {
@@ -55,7 +68,17 @@ function resolveAuthIdentity<B, Q>(
       return { ok: false, response: jsonResp(HTTP_FORBIDDEN, { error: "FORBIDDEN", message: "Insufficient permissions" }) };
     }
   }
-  return { ok: true, ...verified.session };
+  if (options.requireHumanAction && !verified.session.isHumanWorkbench) {
+    return {
+      ok: false,
+      response: jsonResp(HTTP_FORBIDDEN, {
+        code: "HUMAN_APPROVAL_REQUIRED",
+        error: "HUMAN_APPROVAL_REQUIRED",
+        message: "Verified human workbench session required",
+      }),
+    };
+  }
+  return { ok: true, ...verified.session, sessionToken: verified.sessionToken };
 }
 
 async function parseGuardedBody<B, Q>(
@@ -65,7 +88,19 @@ async function parseGuardedBody<B, Q>(
   if (req.method === "GET" || req.method === "HEAD" || (!options.body && !options.rawJsonPassthrough)) {
     return { ok: true, body: undefined };
   }
-  const rawText = await req.text().catch(() => "");
+  let rawText: string;
+  try {
+    rawText = await req.text();
+  } catch {
+    return {
+      ok: false,
+      response: jsonResp(HTTP_BAD_REQUEST, {
+        code: "INVALID_JSON",
+        error: "INVALID_JSON",
+        message: "Failed to read request body",
+      }),
+    };
+  }
   if (rawText.trim() === "") {
     return { ok: true, body: options.body ? options.body.parse({}) : undefined };
   }
@@ -110,6 +145,9 @@ async function executeGuardedRequest<B, Q>(
       projectId: context.projectId || context.params?.id || "",
       correlationId: req.headers.get("x-correlation-id") || crypto.randomUUID(),
       params: context.params || {},
+      bffSessionToken: auth.sessionToken,
+      isHumanWorkbench: auth.isHumanWorkbench,
+      humanSessionToken: auth.humanSessionToken,
     };
     return await handler(req, ctx, { body: bodyOutcome.body, query: parsedQuery });
   } catch (err: unknown) {
@@ -117,7 +155,7 @@ async function executeGuardedRequest<B, Q>(
       return jsonResp(HTTP_BAD_REQUEST, { code: "VALIDATION_ERROR", error: "VALIDATION_ERROR", details: err.errors });
     }
     const message = err instanceof Error ? err.message : "INTERNAL_SERVER_ERROR";
-    return jsonResp(HTTP_INTERNAL_ERROR, { code: "INTERNAL_ERROR", error: message });
+    return jsonResp(HTTP_INTERNAL_ERROR, { code: "INTERNAL_ERROR", error: "INTERNAL_ERROR", message });
   }
 }
 

@@ -232,8 +232,8 @@ fn mig_01_concurrent_open_wal_is_idempotent() {
             )
             .expect("count");
         assert_eq!(
-            table_count, 46,
-            "17 V1 tables + 8 V2 tables + flow_draft_deployments + schema_migrations + 4 V4 tables + 8 V6 tables + 3 V8 tables + 1 V9 table (idempotency_records) + 3 V10 tables (proposal_target_nodes, proposal_gate_receipts, proposal_tradeoffs) = 46"
+            table_count, 49,
+            "17 V1 + 8 V2 + flow_draft_deployments + schema_migrations + 4 V4 + 8 V6 + 3 V8 + 1 V9 + 3 V10 + 3 V12 = 49 tables"
         );
     }
 }
@@ -519,6 +519,21 @@ fn tc_05_3_01_v11_migration_adds_snapshot_fork_handoff_columns_and_indexes() {
         )
         .expect("schema_migrations v11 row");
     assert_eq!(v11_sha, spec_registry::pool::v11_migration_checksum());
+
+    for (ver, expected_sha) in [
+        (12i64, spec_registry::pool::v12_migration_checksum()),
+        (13i64, spec_registry::pool::v13_migration_checksum()),
+        (14i64, spec_registry::pool::v14_migration_checksum()),
+    ] {
+        let sha: String = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = ?1",
+                [ver],
+                |r| r.get(0),
+            )
+            .expect("schema_migrations epic08 row");
+        assert_eq!(sha, expected_sha);
+    }
 
     for (table, expected_cols) in [
         (

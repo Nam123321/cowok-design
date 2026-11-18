@@ -74,6 +74,19 @@ jobs:
       - name: TypeScript Contract & App Typecheck
         run: pnpm run typecheck
 
+      - name: Install Rust Toolchain (Plugin Host Bridge)
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2.7.7
+        with:
+          shared-key: "cowok-design-rust"
+
+      - name: Build Plugin Host Repackager Bridge
+        run: cargo build -p plugin-host --bin plugin_host_repackager
+
       - name: Vitest Unit Tests
         run: pnpm run test
 

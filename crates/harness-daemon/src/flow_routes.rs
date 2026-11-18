@@ -21,9 +21,9 @@ use crate::flow_transition_handlers::{
     handle_list_transitions, handle_update_transition,
 };
 use crate::routes::doctor_vault::{
-    handle_delete_vault_key, handle_get_doctor_cli_matrix, handle_list_plugins,
-    handle_list_vault_keys, handle_probe_cli_tool, handle_update_vault_settings,
-    handle_upsert_vault_key, handle_verify_provider_key,
+    handle_delete_vault_key, handle_get_doctor_cli_matrix, handle_list_vault_keys,
+    handle_probe_cli_tool, handle_update_vault_settings, handle_upsert_vault_key,
+    handle_verify_provider_key,
 };
 use crate::routes::execution_coordinator::{
     handle_cancel_node_job, handle_enqueue_node_job, handle_list_node_chat_sessions,
@@ -36,6 +36,15 @@ use crate::routes::legacy_workbench_v6::{
     handle_list_agent_settings, handle_list_comments, handle_list_fixtures,
     handle_list_mcp_servers, handle_update_comment, handle_update_fixture, handle_update_viewport,
     handle_upsert_agent_setting, handle_upsert_mcp_server,
+};
+use crate::routes::plugins::{
+    handle_approve_learn_card, handle_compile_skill_prompt_bundle, handle_discard_staging,
+    handle_discover_plugin, handle_get_plugin_registry, handle_get_plugin_schedule,
+    handle_install_plugin, handle_list_learn_cards, handle_list_plugins, handle_promote_staging,
+    handle_propose_learn_card, handle_quarantine_plugin, handle_reject_learn_card,
+    handle_repackage_bundle, handle_repackage_discovery_stub, handle_repackage_video_intake,
+    handle_stream_plugin_events, handle_transition_plugin, handle_triangle_lint,
+    handle_trigger_plugin_sync, handle_upsert_plugin_schedule,
 };
 
 use crate::routes::doctor_usage::handle_get_doctor_usage;
@@ -181,7 +190,66 @@ fn flow_workbench_routes() -> Router<DaemonAppState> {
         )
         .route("/api/v1/settings/vault", put(handle_update_vault_settings))
         .route("/api/v1/plugins", get(handle_list_plugins))
-        .route("/api/v1/plugins/registry", get(handle_list_plugins))
+        .route("/api/v1/plugins/registry", get(handle_get_plugin_registry))
+        .route("/api/v1/plugins/discovery", post(handle_discover_plugin))
+        .route("/api/v1/plugins/installs", post(handle_install_plugin))
+        .route(
+            "/api/v1/plugins/:id/transitions",
+            post(handle_transition_plugin),
+        )
+        .route(
+            "/api/v1/plugins/:id/quarantine",
+            post(handle_quarantine_plugin),
+        )
+        .route(
+            "/api/v1/plugins/:id/staging/promotions",
+            post(handle_promote_staging),
+        )
+        .route(
+            "/api/v1/plugins/:id/staging/discards",
+            post(handle_discard_staging),
+        )
+        .route(
+            "/api/v1/plugins/repackager/bundles",
+            post(handle_repackage_bundle),
+        )
+        .route(
+            "/api/v1/plugins/repackager/discovery-stubs",
+            post(handle_repackage_discovery_stub),
+        )
+        .route(
+            "/api/v1/plugins/repackager/video-intakes",
+            post(handle_repackage_video_intake),
+        )
+        .route("/api/v1/plugins/linter/checks", post(handle_triangle_lint))
+        .route(
+            "/api/v1/projects/:id/skills/prompt-bundles",
+            post(handle_compile_skill_prompt_bundle),
+        )
+        .route(
+            "/api/v1/projects/:id/learn/cards",
+            get(handle_list_learn_cards).post(handle_propose_learn_card),
+        )
+        .route(
+            "/api/v1/projects/:id/learn/cards/:card_id/approvals",
+            post(handle_approve_learn_card),
+        )
+        .route(
+            "/api/v1/projects/:id/learn/cards/:card_id/rejections",
+            post(handle_reject_learn_card),
+        )
+        .route(
+            "/api/v1/plugins/:id/schedule",
+            get(handle_get_plugin_schedule).put(handle_upsert_plugin_schedule),
+        )
+        .route(
+            "/api/v1/projects/:id/plugins/stream",
+            get(handle_stream_plugin_events),
+        )
+        .route(
+            "/api/v1/plugins/:id/sync-jobs",
+            post(handle_trigger_plugin_sync),
+        )
 }
 
 pub fn build_flow_subrouter(state: DaemonAppState) -> Router<DaemonAppState> {

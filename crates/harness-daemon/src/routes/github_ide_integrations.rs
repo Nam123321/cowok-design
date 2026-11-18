@@ -15,7 +15,9 @@ use uuid::Uuid;
 
 use crate::daemon_auth::VerifiedLegacyIngress;
 use crate::routes::doctor_vault::{resolve_and_pin_ssrf_addr, resolve_cli_binary_path_pub};
-use crate::routes::legacy_proposals::{json_err_resp, run_bounded_cmd_with_pgid};
+use crate::routes::legacy_proposals::{
+    json_err_resp, resolve_tenant_id, run_bounded_cmd_with_pgid,
+};
 use crate::routes::legacy_sessions::map_error_to_response;
 use crate::routes::legacy_specs::verify_anti_idor_with_caller;
 use crate::routes::DaemonAppState;
@@ -193,9 +195,24 @@ fn detect_ides() -> Vec<IdeReadinessItem> {
         .collect()
 }
 
-fn read_vault_accounts(vault: &VaultStore) -> Vec<GitHubAccountEntry> {
+fn read_vault_secret<'a>(
+    secrets: &'a std::collections::BTreeMap<String, String>,
+    tenant_id: &str,
+    provider_id: &str,
+) -> Option<&'a String> {
+    let scoped = VaultStore::scoped_key(tenant_id, provider_id);
+    secrets.get(&scoped).or_else(|| {
+        if tenant_id.trim() == "local-default" {
+            secrets.get(provider_id)
+        } else {
+            None
+        }
+    })
+}
+
+fn read_vault_accounts(vault: &VaultStore, tenant_id: &str) -> Vec<GitHubAccountEntry> {
     let secrets = vault.unseal_secrets(None).unwrap_or_default();
-    let Some(raw) = secrets.get(GITHUB_ACCOUNTS_VAULT_KEY) else {
+    let Some(raw) = read_vault_secret(&secrets, tenant_id, GITHUB_ACCOUNTS_VAULT_KEY) else {
         return Vec::new();
     };
     serde_json::from_str::<Vec<GitHubAccountEntry>>(raw).unwrap_or_default()
@@ -203,6 +220,7 @@ fn read_vault_accounts(vault: &VaultStore) -> Vec<GitHubAccountEntry> {
 
 fn write_vault_accounts(
     vault: &VaultStore,
+    tenant_id: &str,
     accounts: &[GitHubAccountEntry],
 ) -> Result<(), Response> {
     let serialized = serde_json::to_string(accounts).map_err(|e| {
@@ -213,7 +231,7 @@ fn write_vault_accounts(
         )
     })?;
     vault
-        .upsert_secret(GITHUB_ACCOUNTS_VAULT_KEY, &serialized, None)
+        .upsert_secret_scoped(tenant_id, GITHUB_ACCOUNTS_VAULT_KEY, &serialized, None)
         .map_err(|e| json_err_resp(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_ERR", &e))?;
     Ok(())
 }
@@ -221,14 +239,14 @@ fn write_vault_accounts(
 fn inspect_project_status(
     daemon_ws_root: &Path,
     project_root: &Path,
+    tenant_id: &str,
 ) -> ProjectIntegrationsStatusDto {
     let vault = VaultStore::from_workspace_root(daemon_ws_root);
     let secrets = vault.unseal_secrets(None).unwrap_or_default();
-    let active_tok = secrets
-        .get(ACTIVE_GITHUB_VAULT_KEY)
+    let active_tok = read_vault_secret(&secrets, tenant_id, ACTIVE_GITHUB_VAULT_KEY)
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
-    let mut accounts = read_vault_accounts(&vault);
+    let mut accounts = read_vault_accounts(&vault, tenant_id);
     if accounts.is_empty() {
         if let Some(ref tok) = active_tok {
             accounts.push(GitHubAccountEntry {
@@ -366,16 +384,19 @@ pub(crate) async fn handle_get_integrations_status(
     let (_, canon_root, _) =
         verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
+    let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
     let ws_root = state.registry.pool().workspace_root().to_path_buf();
-    let dto = tokio::task::spawn_blocking(move || inspect_project_status(&ws_root, &canon_root))
-        .await
-        .map_err(|e| {
-            json_err_resp(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "TASK_ERR",
-                &e.to_string(),
-            )
-        })?;
+    let dto = tokio::task::spawn_blocking(move || {
+        inspect_project_status(&ws_root, &canon_root, &tenant_id)
+    })
+    .await
+    .map_err(|e| {
+        json_err_resp(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "TASK_ERR",
+            &e.to_string(),
+        )
+    })?;
     Ok(Json(dto))
 }
 
@@ -390,6 +411,7 @@ pub(crate) async fn handle_connect_github_account(
     let (_, canon_root, _) =
         verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
+    let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
     let ws_root = state.registry.pool().workspace_root().to_path_buf();
     let token = if req.use_gh_cli {
         let out = tokio::task::spawn_blocking({
@@ -434,12 +456,12 @@ pub(crate) async fn handle_connect_github_account(
             let vault = VaultStore::from_workspace_root(&ws_root);
             let acct_key = format!("github:{}", user.login);
             vault
-                .upsert_secret(&acct_key, &token, None)
+                .upsert_secret_scoped(&tenant_id, &acct_key, &token, None)
                 .map_err(|e| json_err_resp(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_ERR", &e))?;
             vault
-                .upsert_secret(ACTIVE_GITHUB_VAULT_KEY, &token, None)
+                .upsert_secret_scoped(&tenant_id, ACTIVE_GITHUB_VAULT_KEY, &token, None)
                 .map_err(|e| json_err_resp(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_ERR", &e))?;
-            let mut accounts = read_vault_accounts(&vault);
+            let mut accounts = read_vault_accounts(&vault, &tenant_id);
             for a in &mut accounts {
                 a.active = false;
             }
@@ -455,8 +477,8 @@ pub(crate) async fn handle_connect_github_account(
                     active: true,
                 },
             );
-            write_vault_accounts(&vault, &accounts)?;
-            Ok(inspect_project_status(&ws_root, &canon_root))
+            write_vault_accounts(&vault, &tenant_id, &accounts)?;
+            Ok(inspect_project_status(&ws_root, &canon_root, &tenant_id))
         })
         .await
         .map_err(|e| {
@@ -480,6 +502,7 @@ pub(crate) async fn handle_select_github_account(
     let (_, canon_root, _) =
         verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
+    let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
     let ws_root = state.registry.pool().workspace_root().to_path_buf();
     let target_login = req.login.trim().to_string();
     let dto =
@@ -487,7 +510,7 @@ pub(crate) async fn handle_select_github_account(
             let vault = VaultStore::from_workspace_root(&ws_root);
             let secrets = vault.unseal_secrets(None).unwrap_or_default();
             let key = format!("github:{target_login}");
-            let tok = secrets.get(&key).ok_or_else(|| {
+            let tok = read_vault_secret(&secrets, &tenant_id, &key).ok_or_else(|| {
                 json_err_resp(
                     StatusCode::NOT_FOUND,
                     "ACCOUNT_NOT_FOUND",
@@ -495,14 +518,14 @@ pub(crate) async fn handle_select_github_account(
                 )
             })?;
             vault
-                .upsert_secret(ACTIVE_GITHUB_VAULT_KEY, tok, None)
+                .upsert_secret_scoped(&tenant_id, ACTIVE_GITHUB_VAULT_KEY, tok, None)
                 .map_err(|e| json_err_resp(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_ERR", &e))?;
-            let mut accounts = read_vault_accounts(&vault);
+            let mut accounts = read_vault_accounts(&vault, &tenant_id);
             for a in &mut accounts {
                 a.active = a.login == target_login;
             }
-            write_vault_accounts(&vault, &accounts)?;
-            Ok(inspect_project_status(&ws_root, &canon_root))
+            write_vault_accounts(&vault, &tenant_id, &accounts)?;
+            Ok(inspect_project_status(&ws_root, &canon_root, &tenant_id))
         })
         .await
         .map_err(|e| {
@@ -526,6 +549,7 @@ pub(crate) async fn handle_bind_git_remote(
     let (_, canon_root, _) =
         verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
+    let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
     let remote = validate_remote_url_safe(&req.remote_url)?;
     let ws_root = state.registry.pool().workspace_root().to_path_buf();
     let dto =
@@ -584,7 +608,7 @@ pub(crate) async fn handle_bind_git_remote(
                     &set_out.stderr,
                 ));
             }
-            Ok(inspect_project_status(&ws_root, &canon_root))
+            Ok(inspect_project_status(&ws_root, &canon_root, &tenant_id))
         })
         .await
         .map_err(|e| {
@@ -608,6 +632,7 @@ pub(crate) async fn handle_set_default_ide(
     let (_, canon_root, _) =
         verify_anti_idor_with_caller(&state.registry, project_id, &headers, caller.as_deref())
             .map_err(map_error_to_response)?;
+    let tenant_id = resolve_tenant_id(&state.registry, project_id, caller.as_deref());
     let ide = req.ide.trim().to_ascii_lowercase();
     if !matches!(
         ide.as_str(),
@@ -623,7 +648,7 @@ pub(crate) async fn handle_set_default_ide(
     let dto =
         tokio::task::spawn_blocking(move || -> Result<ProjectIntegrationsStatusDto, Response> {
             write_ide_pref(&ws_root, &ide)?;
-            Ok(inspect_project_status(&ws_root, &canon_root))
+            Ok(inspect_project_status(&ws_root, &canon_root, &tenant_id))
         })
         .await
         .map_err(|e| {

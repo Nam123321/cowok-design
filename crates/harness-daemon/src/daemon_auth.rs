@@ -46,6 +46,38 @@ pub struct FlowPrincipal {
 
 pub type AuthPrincipal = FlowPrincipal;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts",
+    ts(export, export_to = "../../../packages/shared-types/src/generated/")
+)]
+pub enum HttpActorKind {
+    HumanWorkbenchSession,
+    AgentHmac,
+    McpClient,
+    SuperadminCli,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VerifiedActorContext {
+    pub kind: HttpActorKind,
+}
+
+/// Enforces that `HUMAN_ONLY` routes are executed exclusively by an interactive human session
+/// (never an Agent HMAC, MCP client, or `daemon.lock`-derived bearer/nonce session).
+pub fn require_human_workbench_actor(actor: &VerifiedActorContext) -> Result<(), Response> {
+    if actor.kind != HttpActorKind::HumanWorkbenchSession {
+        return Err(auth_err_resp(
+            StatusCode::FORBIDDEN,
+            "HUMAN_APPROVAL_REQUIRED",
+            "This operation requires an interactive HumanWorkbenchSession (HUMAN_ONLY); Agent/MCP/CLI tokens are denied",
+        ));
+    }
+    Ok(())
+}
+
 /// Resolves the effective role for a principal given HTTP headers and an optional token string.
 /// If `x-cowok-role` header is supplied: only `"editor"` is accepted; any other value (`"viewer"`,
 /// `"admin"`, or unknown) fails closed to `"viewer"`.
@@ -92,28 +124,118 @@ pub fn authenticate_request(
     headers: &HeaderMap,
     raw_body: &[u8],
 ) -> Result<AuthPrincipal, Response> {
+    authenticate_request_with_actor(auth, method, uri, headers, raw_body).map(|(p, _)| p)
+}
+
+/// Server-derived `(AuthPrincipal, VerifiedActorContext)` authenticator (EC-LEARN-001).
+/// `HttpActorKind` is NEVER read from `principal_b64` or granted from `daemon.lock` (`daemon_nonce`).
+pub fn authenticate_request_with_actor(
+    auth: &DaemonAuthState,
+    method: &Method,
+    uri: &axum::http::Uri,
+    headers: &HeaderMap,
+    raw_body: &[u8],
+) -> Result<(AuthPrincipal, VerifiedActorContext), Response> {
+    let client_hint = headers
+        .get("x-cowok-client-kind")
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim);
+    let mcp_or_agent = |principal: &FlowPrincipal| -> HttpActorKind {
+        if client_hint == Some("mcp") || principal.user_id.to_ascii_lowercase().starts_with("mcp-")
+        {
+            HttpActorKind::McpClient
+        } else {
+            HttpActorKind::AgentHmac
+        }
+    };
+
     if headers.contains_key("x-cowok-hmac-sig") {
-        match verify_hmac_v2(auth, method, uri, headers, raw_body) {
-            Ok(mut principal) => {
-                let role = resolve_role(headers, None);
+        let mut principal = verify_hmac_v2(auth, method, uri, headers, raw_body)
+            .map_err(|(st, code, msg)| auth_err_resp(st, code, msg))?;
+        let role = resolve_role(headers, None);
+        if role == "viewer" {
+            principal.role = "viewer".to_string();
+        }
+        if let Some(human_tok) = headers
+            .get("x-cowok-human-session")
+            .and_then(|v| v.to_str().ok())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            let Some(human_principal) = auth.get_valid_human_session(human_tok) else {
+                return Err(auth_err_resp(
+                    StatusCode::UNAUTHORIZED,
+                    "UNAUTHENTICATED",
+                    "Invalid human workbench session token",
+                ));
+            };
+            if human_principal.tenant_id != principal.tenant_id
+                || human_principal.user_id != principal.user_id
+            {
+                return Err(auth_err_resp(
+                    StatusCode::FORBIDDEN,
+                    "HUMAN_APPROVAL_REQUIRED",
+                    "Human session principal mismatch",
+                ));
+            }
+            return Ok((
+                principal,
+                VerifiedActorContext {
+                    kind: HttpActorKind::HumanWorkbenchSession,
+                },
+            ));
+        }
+        let kind = mcp_or_agent(&principal);
+        Ok((principal, VerifiedActorContext { kind }))
+    } else if let Some(human_tok) = headers
+        .get("x-cowok-human-session")
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        match auth.get_valid_human_session(human_tok) {
+            Some(mut principal) => {
+                let role = resolve_role(headers, Some(human_tok));
                 if role == "viewer" {
                     principal.role = "viewer".to_string();
                 }
-                Ok(principal)
+                Ok((
+                    principal,
+                    VerifiedActorContext {
+                        kind: HttpActorKind::HumanWorkbenchSession,
+                    },
+                ))
             }
-            Err((st, code, msg)) => Err(auth_err_resp(st, code, msg)),
+            None => Err(auth_err_resp(
+                StatusCode::UNAUTHORIZED,
+                "UNAUTHENTICATED",
+                "Invalid human workbench session token",
+            )),
         }
     } else if let Some(tok) = headers
         .get("x-cowok-session-token")
         .and_then(|v| v.to_str().ok())
     {
+        if let Some(mut human_principal) = auth.get_valid_human_session(tok) {
+            let role = resolve_role(headers, Some(tok));
+            if role == "viewer" {
+                human_principal.role = "viewer".to_string();
+            }
+            return Ok((
+                human_principal,
+                VerifiedActorContext {
+                    kind: HttpActorKind::HumanWorkbenchSession,
+                },
+            ));
+        }
         match auth.get_valid_session(tok) {
             Some(mut principal) => {
                 let role = resolve_role(headers, Some(tok));
                 if role == "viewer" {
                     principal.role = "viewer".to_string();
                 }
-                Ok(principal)
+                let kind = mcp_or_agent(&principal);
+                Ok((principal, VerifiedActorContext { kind }))
             }
             None => Err(auth_err_resp(
                 StatusCode::UNAUTHORIZED,
@@ -128,11 +250,16 @@ pub fn authenticate_request(
             .filter(|t| !t.is_empty())
         {
             if is_valid_superadmin_bearer(headers) {
-                Ok(FlowPrincipal {
-                    tenant_id: default_tenant_id(),
-                    user_id: default_user_id(),
-                    role: "admin".to_string(),
-                })
+                Ok((
+                    FlowPrincipal {
+                        tenant_id: default_tenant_id(),
+                        user_id: default_user_id(),
+                        role: "admin".to_string(),
+                    },
+                    VerifiedActorContext {
+                        kind: HttpActorKind::SuperadminCli,
+                    },
+                ))
             } else {
                 Err(auth_err_resp(
                     StatusCode::UNAUTHORIZED,
@@ -210,6 +337,7 @@ pub struct DaemonAuthState {
     nonce_order: Mutex<VecDeque<String>>,
     nonce_set: Mutex<HashSet<String>>,
     sessions: Mutex<HashMap<String, SessionEntry>>,
+    human_sessions: Mutex<HashMap<String, SessionEntry>>,
     pool: Option<SqlitePool>,
 }
 
@@ -276,6 +404,7 @@ impl DaemonAuthState {
             nonce_order: Mutex::new(VecDeque::new()),
             nonce_set: Mutex::new(HashSet::new()),
             sessions: Mutex::new(HashMap::new()),
+            human_sessions: Mutex::new(HashMap::new()),
             pool,
         })
     }
@@ -375,8 +504,8 @@ impl DaemonAuthState {
                 );
                 let token_hash = sha256_hex_token(token.trim());
                 let _ = conn.execute(
-                    "INSERT OR REPLACE INTO daemon_sessions (token_sha256, tenant_id, user_id, role, expires_at, created_at, revoked_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL)",
+                    "INSERT OR REPLACE INTO daemon_sessions (token_sha256, tenant_id, user_id, role, expires_at, created_at, revoked_at, actor_kind)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, 'AGENT_HMAC')",
                     params![
                         token_hash,
                         principal.tenant_id,
@@ -446,6 +575,108 @@ impl DaemonAuthState {
                         role,
                     };
                     let mut sessions = self.sessions.lock().expect("sessions");
+                    sessions.insert(
+                        trimmed.to_string(),
+                        SessionEntry {
+                            principal: principal.clone(),
+                            expires_at: exp,
+                        },
+                    );
+                    return Some(principal);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn issue_human_workbench_session(
+        &self,
+        principal: FlowPrincipal,
+        expires_at: i64,
+    ) -> String {
+        let token = format!("cwk_human_{}", generate_csprng_hex_32());
+        let now = Utc::now().timestamp();
+        if let Some(ref pool) = self.pool {
+            if let Ok(conn) = pool.connection() {
+                let _ = conn.execute(
+                    "DELETE FROM daemon_sessions WHERE expires_at < ?1",
+                    params![now],
+                );
+                let token_hash = sha256_hex_token(token.trim());
+                let _ = conn.execute(
+                    "INSERT OR REPLACE INTO daemon_sessions (token_sha256, tenant_id, user_id, role, expires_at, created_at, revoked_at, actor_kind)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, 'HUMAN_WORKBENCH_SESSION')",
+                    params![
+                        token_hash,
+                        principal.tenant_id,
+                        principal.user_id,
+                        principal.role,
+                        expires_at,
+                        now
+                    ],
+                );
+            }
+        }
+        let mut sessions = self.human_sessions.lock().expect("human_sessions");
+        sessions.retain(|_, entry| entry.expires_at >= now);
+        while sessions.len() >= MAX_SESSIONS_CAPACITY {
+            let Some(oldest) = sessions
+                .iter()
+                .min_by_key(|(_, entry)| entry.expires_at)
+                .map(|(k, _)| k.clone())
+            else {
+                break;
+            };
+            sessions.remove(&oldest);
+        }
+        sessions.insert(
+            token.clone(),
+            SessionEntry {
+                principal,
+                expires_at,
+            },
+        );
+        token
+    }
+
+    pub fn get_valid_human_session(&self, token: &str) -> Option<FlowPrincipal> {
+        let trimmed = token.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let now = Utc::now().timestamp();
+        {
+            let mut sessions = self.human_sessions.lock().expect("human_sessions");
+            match sessions.get(trimmed).cloned() {
+                Some(entry) if entry.expires_at >= now => return Some(entry.principal),
+                Some(_) => {
+                    sessions.remove(trimmed);
+                }
+                None => {}
+            }
+        }
+        if let Some(ref pool) = self.pool {
+            if let Ok(conn) = pool.connection() {
+                let token_hash = sha256_hex_token(trimmed);
+                let db_hit: Option<(String, String, String, i64)> = conn
+                    .query_row(
+                        "SELECT tenant_id, user_id, role, expires_at
+                         FROM daemon_sessions
+                         WHERE token_sha256 = ?1 AND actor_kind = 'HUMAN_WORKBENCH_SESSION'
+                           AND revoked_at IS NULL AND expires_at >= ?2",
+                        params![token_hash, now],
+                        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                    )
+                    .optional()
+                    .ok()
+                    .flatten();
+                if let Some((tenant_id, user_id, role, exp)) = db_hit {
+                    let principal = FlowPrincipal {
+                        tenant_id,
+                        user_id,
+                        role,
+                    };
+                    let mut sessions = self.human_sessions.lock().expect("human_sessions");
                     sessions.insert(
                         trimmed.to_string(),
                         SessionEntry {
@@ -592,6 +823,18 @@ pub async fn handle_issue_local_session(
         });
     let is_superadmin = is_valid_superadmin_bearer(&headers);
 
+    let is_same_origin = headers
+        .get("sec-fetch-site")
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .is_some_and(|s| s == "same-origin");
+    if !is_superadmin && !has_daemon_nonce && !is_same_origin {
+        return Err(auth_err_resp(
+            StatusCode::FORBIDDEN,
+            "INSUFFICIENT_ROLE",
+            "Local session issuance requires daemon nonce proof, superadmin authorization, or same-origin browser context",
+        ));
+    }
     if role == "admin" && !is_superadmin {
         return Err(auth_err_resp(
             StatusCode::FORBIDDEN,
@@ -629,6 +872,92 @@ pub async fn handle_issue_local_session(
     }))
 }
 
+/// Interactive `HUMAN_ONLY` workbench session issuer (`POST /api/v1/auth/workbench-session`).
+/// Strictly refuses `daemon.lock` (`daemon_nonce`) alone; requires `COWOK_SUPERADMIN_SECRET` or
+/// interactive `COWOK_WORKBENCH_HUMAN_SECRET` held outside `daemon.lock`.
+pub async fn handle_issue_human_workbench_session(
+    State(state): State<DaemonAppState>,
+    headers: HeaderMap,
+    body_opt: Option<Json<LocalSessionRequest>>,
+) -> Result<Json<LocalSessionResponse>, Response> {
+    let expected_port = (state.port > 0).then_some(state.port);
+    if let Err((st, code, msg)) = verify_loopback_headers(&headers, expected_port) {
+        return Err(auth_err_resp(st, code, msg));
+    }
+    let has_superadmin = is_valid_superadmin_bearer(&headers);
+    let supplied_secret = headers
+        .get("x-cowok-workbench-secret")
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let env_secret = std::env::var("COWOK_WORKBENCH_HUMAN_SECRET")
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    let file_secret = if env_secret.is_none() {
+        crate::vault::VaultStore::from_workspace_root(state.registry.pool().workspace_root())
+            .read_existing_workbench_human_secret()
+            .ok()
+            .flatten()
+            .map(|z| z.as_str().to_string())
+    } else {
+        None
+    };
+    let has_human_secret = supplied_secret.is_some_and(|actual| {
+        if let Some(exp) = env_secret.as_deref() {
+            constant_time_eq(exp.as_bytes(), actual.as_bytes())
+        } else {
+            file_secret
+                .as_deref()
+                .is_some_and(|exp| constant_time_eq(exp.as_bytes(), actual.as_bytes()))
+        }
+    });
+    if !has_superadmin && !has_human_secret {
+        return Err(auth_err_resp(
+            StatusCode::FORBIDDEN,
+            "HUMAN_APPROVAL_REQUIRED",
+            "HumanWorkbenchSession requires interactive workbench secret or superadmin bearer; daemon.lock credentials cannot mint HUMAN_ONLY sessions",
+        ));
+    }
+    let req = body_opt.map(|Json(v)| v).unwrap_or_default();
+    let role = req.role.unwrap_or_else(default_role);
+    if !matches!(role.as_str(), "editor" | "admin") {
+        return Err(auth_err_resp(
+            StatusCode::BAD_REQUEST,
+            "VALIDATION_ERROR",
+            "Human workbench session role must be editor or admin",
+        ));
+    }
+    if role == "admin" && !has_superadmin {
+        return Err(auth_err_resp(
+            StatusCode::FORBIDDEN,
+            "INSUFFICIENT_ROLE",
+            "Admin human workbench session requires COWOK_SUPERADMIN_SECRET Bearer",
+        ));
+    }
+    let principal = FlowPrincipal {
+        tenant_id: req
+            .tenant_id
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(default_tenant_id),
+        user_id: req
+            .user_id
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(default_user_id),
+        role: role.clone(),
+    };
+    let auth = state_auth(&state);
+    let expires_at = Utc::now().timestamp() + SESSION_TTL_SECS;
+    let token = auth.issue_human_workbench_session(principal.clone(), expires_at);
+    Ok(Json(LocalSessionResponse {
+        session_token: token,
+        tenant_id: principal.tenant_id,
+        user_id: principal.user_id,
+        role,
+        expires_at,
+    }))
+}
+
 pub async fn flow_dual_ingress_auth_middleware(
     State(state): State<DaemonAppState>,
     req: Request,
@@ -650,11 +979,16 @@ pub async fn flow_dual_ingress_auth_middleware(
         }
     };
     let auth = state_auth(&state);
-    let principal =
-        match authenticate_request(&auth, &parts.method, &parts.uri, &parts.headers, &raw_bytes) {
-            Ok(p) => p,
-            Err(resp) => return resp,
-        };
+    let (principal, actor_ctx) = match authenticate_request_with_actor(
+        &auth,
+        &parts.method,
+        &parts.uri,
+        &parts.headers,
+        &raw_bytes,
+    ) {
+        Ok(pair) => pair,
+        Err(resp) => return resp,
+    };
     if parts.method != Method::GET && parts.method != Method::HEAD {
         if let Err(resp) = require_editor_role(&principal) {
             return resp;
@@ -662,6 +996,7 @@ pub async fn flow_dual_ingress_auth_middleware(
     }
     let mut rebuilt = Request::from_parts(parts, Body::from(raw_bytes));
     rebuilt.extensions_mut().insert(principal);
+    rebuilt.extensions_mut().insert(actor_ctx);
     next.run(rebuilt).await
 }
 
@@ -739,7 +1074,7 @@ fn verify_hmac_v2(
             "Invalid principal base64",
         )
     })?;
-    let principal: FlowPrincipal = serde_json::from_slice(&decoded).map_err(|_| {
+    let mut principal: FlowPrincipal = serde_json::from_slice(&decoded).map_err(|_| {
         (
             StatusCode::UNAUTHORIZED,
             "UNAUTHENTICATED",
@@ -752,6 +1087,9 @@ fn verify_hmac_v2(
             "UNAUTHENTICATED",
             "Invalid principal role",
         ));
+    }
+    if principal.role == "admin" && !is_valid_superadmin_bearer(headers) {
+        principal.role = "editor".to_string();
     }
     Ok(principal)
 }
@@ -848,7 +1186,7 @@ fn attach_loopback_cors_headers(headers: &mut HeaderMap, origin: Option<&str>) {
                 headers.insert(
                     header::ACCESS_CONTROL_ALLOW_HEADERS,
                     HeaderValue::from_static(
-                        "Authorization, Content-Type, X-Cowok-Session-Token, X-Cowok-Workspace-Root, X-Cowok-Actor-Id, X-Cowok-Portal, X-Correlation-Id",
+                        "Authorization, Content-Type, X-Cowok-Session-Token, X-Cowok-Human-Session, X-Cowok-Client-Kind, X-Cowok-Workspace-Root, X-Cowok-Actor-Id, X-Cowok-Portal, X-Correlation-Id",
                     ),
                 );
             }
@@ -898,7 +1236,10 @@ pub async fn legacy_project_auth_middleware(
         .get("x-cowok-session-token")
         .and_then(|v| v.to_str().ok())
     {
-        match auth.get_valid_session(tok) {
+        match auth
+            .get_valid_human_session(tok)
+            .or_else(|| auth.get_valid_session(tok))
+        {
             Some(mut principal) => {
                 let role = resolve_role(&parts.headers, Some(tok));
                 if role == "viewer" {

@@ -11,6 +11,7 @@
 pub mod context_slicer;
 pub mod errors;
 pub mod lock;
+pub mod plugin_store;
 pub mod pool;
 pub mod recovery;
 pub mod registry;

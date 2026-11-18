@@ -128,8 +128,8 @@
     "intentStatusLabel": "Estado"
   },
   "canvas": {
-    "userflowLens": "Flujo de usuario",
-    "slideCmsLens": "Presentación",
+    "userflowLens": "Flujo de usuario (Userflow)",
+    "slideCmsLens": "Presentación de diapositivas / CMS",
     "presentButton": "Presentar",
     "exitPresent": "Salir de la presentación",
     "openNewTab": "Abrir archivo del proyecto o crear nuevo diseño",
@@ -374,7 +374,8 @@
     "customizeRuntimeBtn": "Personalizar",
     "vaultStorageShort": "Almacenamiento",
     "permissionShort": "Aprobación",
-    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · Local/Ollama"
+    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · Local/Ollama",
+    "mcpHostStory084Notice": "Administra Client MCPs, Registro de Plugins AgentSkills, Staging Aislado (HUMAN_ONLY) y Tarjetas LEARN en SQLite WAL V9."
   },
   "flow": {
     "dagCanvas": "Lienzo DAG 2D",
@@ -779,5 +780,61 @@
     "colValue": "Valor de Muestra",
     "footerSummary": "{{count}} atributos cargados • Plantilla: {{preset}}",
     "saveError": "No se pudo guardar el fixture de muestra: {{message}}"
+  },
+  "plugins": {
+    "validateBtn": "Validar",
+    "installBtn": "Instalar",
+    "activateBtn": "Activar (HUMAN_ONLY)",
+    "deprecateBtn": "Obsoleto",
+    "loadingState": "Cargando SkillPlugins desde el daemon SQLite WAL...",
+    "emptyState": "Aún no hay SkillPlugins registrados en este proyecto.",
+    "revLabel": "Revisión",
+    "registryTitle": "Registro AgentSkills y Staging",
+    "retryBtn": "Reintentar",
+    "stagingHeader": "Candidato de Staging Aislado",
+    "promoting": "Promoviendo...",
+    "promoteBtn": "Promover Staging -> ACTIVE",
+    "discarding": "Descartando...",
+    "discardBtn": "Descartar Candidato",
+    "rationalePlaceholder": "Ingresa justificación (>= 4 caracteres)...",
+    "quarantinedLabel": "EN CUARENTENA",
+    "archiveBtn": "Archivar",
+    "refreshBtn": "Actualizar",
+    "navLink": "Complementos",
+    "backToWorkbench": "Mesa de trabajo",
+    "stagingImpactSummary": "Actualizar v{{from}} -> v{{to}} introduce {{count}} cambio(s) incompatible(s); las ejecuciones activas siguen fijadas en v{{from}} hasta su promoción.",
+    "quarantineBtn": "Cuarentena",
+    "quarantinePlaceholder": "Motivo de cuarentena (>= 4 caracteres)...",
+    "quarantineReasonLabel": "Motivo de cuarentena"
+  },
+  "learn": {
+    "revLabel": "Revisión",
+    "approveBtn": "Aprobar y Sellar",
+    "rejectBtn": "Rechazar",
+    "loadingState": "Cargando tarjetas LEARN...",
+    "emptyState": "Aún no se han propuesto tarjetas LEARN para este proyecto.",
+    "queueTitle": "Cola de Revisión de Conocimiento LEARN",
+    "retryBtn": "Reintentar",
+    "rationalePlaceholder": "Justificación de aprobación/rechazo (>= 4 caracteres)...",
+    "budgetLabel": "Presupuesto Prompt",
+    "filterAll": "TODOS",
+    "filterProposed": "PROPUESTO",
+    "filterAccepted": "ACEPTADO",
+    "filterRejected": "RECHAZADO"
+  },
+  "cron": {
+    "failuresLabel": "Fallos",
+    "authRequiredNotice": "Error de origen 401/403",
+    "refreshAuthSync": "Actualizar Auth y Sincronizar",
+    "syncNowBtn": "Sincronizar Ahora",
+    "loadingState": "Comprobando programaciones cron de sincronización...",
+    "emptyState": "No hay programaciones cron de sincronización activas.",
+    "statusTitle": "Sincronización Cron de Plugins",
+    "refreshBtn": "Actualizar",
+    "retryBtn": "Reintentar",
+    "cronPlaceholder": "0 */5 * * * *",
+    "upstreamUrlPlaceholder": "https://github.com/organizacion/repositorio",
+    "saveScheduleBtn": "Guardar Horario",
+    "vaultTokenRequired": "Se requiere token GitHub de Vault"
   }
 }

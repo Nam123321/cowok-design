@@ -128,8 +128,8 @@
     "intentStatusLabel": "状态"
   },
   "canvas": {
-    "userflowLens": "用户流程",
-    "slideCmsLens": "幻灯片",
+    "userflowLens": "用户流程 (Userflow)",
+    "slideCmsLens": "幻灯片 / CMS",
     "presentButton": "演示",
     "exitPresent": "退出演示",
     "openNewTab": "打开项目文件或创建新设计",
@@ -374,7 +374,8 @@
     "customizeRuntimeBtn": "自定义",
     "vaultStorageShort": "密钥存储",
     "permissionShort": "审批权限",
-    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · 本地/Ollama"
+    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · 本地/Ollama",
+    "mcpHostStory084Notice": "在 SQLite WAL V9 上管理客户端 MCP、AgentSkills 插件注册表、隔离暂存区 (HUMAN_ONLY) 和 LEARN 知识卡片。"
   },
   "flow": {
     "dagCanvas": "DAG 2D 画布",
@@ -779,5 +780,61 @@
     "colValue": "示例值",
     "footerSummary": "已加载 {{count}} 个属性 • 预设: {{preset}}",
     "saveError": "无法保存示例数据：{{message}}"
+  },
+  "plugins": {
+    "validateBtn": "验证",
+    "installBtn": "安装",
+    "activateBtn": "激活 (HUMAN_ONLY)",
+    "deprecateBtn": "弃用",
+    "loadingState": "正在从 SQLite WAL 守护进程加载 SkillPlugins...",
+    "emptyState": "此项目尚未注册任何 SkillPlugins。",
+    "revLabel": "修订版",
+    "registryTitle": "AgentSkills 注册表与暂存区",
+    "retryBtn": "重试",
+    "stagingHeader": "隔离的暂存候选版本",
+    "promoting": "正在提升...",
+    "promoteBtn": "提升暂存 -> ACTIVE",
+    "discarding": "正在丢弃...",
+    "discardBtn": "丢弃候选版本",
+    "rationalePlaceholder": "输入理由（至少 4 个字符）...",
+    "quarantinedLabel": "已隔离",
+    "archiveBtn": "归档",
+    "refreshBtn": "刷新",
+    "navLink": "插件",
+    "backToWorkbench": "工作台",
+    "stagingImpactSummary": "从 v{{from}} 更新至 v{{to}} 包含 {{count}} 项破坏性变更；在提升前，活跃运行仍固定在 v{{from}}。",
+    "quarantineBtn": "隔离",
+    "quarantinePlaceholder": "隔离原因 (>= 4 个字符)...",
+    "quarantineReasonLabel": "隔离原因"
+  },
+  "learn": {
+    "revLabel": "修订版",
+    "approveBtn": "批准并封装",
+    "rejectBtn": "拒绝",
+    "loadingState": "正在加载 LEARN 知识卡片...",
+    "emptyState": "此项目尚未提出 LEARN 知识卡片。",
+    "queueTitle": "LEARN 知识审核队列",
+    "retryBtn": "重试",
+    "rationalePlaceholder": "输入批准或拒绝理由（至少 4 个字符）...",
+    "budgetLabel": "提示词预算",
+    "filterAll": "全部",
+    "filterProposed": "待审核",
+    "filterAccepted": "已批准",
+    "filterRejected": "已拒绝"
+  },
+  "cron": {
+    "failuresLabel": "失败次数",
+    "authRequiredNotice": "上游 401/403 认证失败",
+    "refreshAuthSync": "刷新认证并同步",
+    "syncNowBtn": "立即同步",
+    "loadingState": "正在检查 Cron 同步计划...",
+    "emptyState": "当前没有活动的上游 Cron 同步计划。",
+    "statusTitle": "插件上游 Cron 同步",
+    "refreshBtn": "刷新",
+    "retryBtn": "重试",
+    "cronPlaceholder": "0 */5 * * * *",
+    "upstreamUrlPlaceholder": "https://github.com/zuzhi/cangku",
+    "saveScheduleBtn": "保存计划",
+    "vaultTokenRequired": "需要 Vault GitHub 令牌"
   }
 }

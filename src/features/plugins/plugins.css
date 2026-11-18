@@ -1,0 +1,239 @@
+/* @story 08.4 */
+/* Zero-Tailwind canonical styles bound exclusively to src/styles/tokens.css */
+
+.plugin-eco-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface);
+  font-family: var(--font-sans);
+}
+
+.plugin-eco-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.plugin-eco-title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.plugin-eco-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.plugin-eco-subtitle {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.plugin-eco-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.plugin-eco-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-workspace);
+}
+
+.plugin-eco-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.plugin-eco-slug {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.plugin-eco-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.plugin-eco-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 9.5px;
+  font-weight: 600;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-subtle);
+  color: var(--text-secondary);
+}
+
+.plugin-eco-badge-active {
+  background-color: var(--state-success-soft);
+  color: var(--state-success);
+}
+
+.plugin-eco-badge-warning {
+  background-color: var(--state-warning-soft);
+  color: var(--state-warning);
+}
+
+.plugin-eco-badge-danger {
+  background-color: var(--state-danger-soft);
+  color: var(--state-danger);
+}
+
+.plugin-eco-badge-human {
+  background-color: var(--human-soft);
+  color: var(--human-accent);
+  border-color: var(--human-border);
+}
+
+.plugin-eco-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.plugin-eco-btn {
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-default);
+  background-color: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
+.plugin-eco-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.plugin-eco-btn-primary {
+  border-color: var(--action-primary);
+  background-color: var(--action-primary);
+  color: var(--action-primary-fg);
+}
+
+.plugin-eco-btn-danger {
+  border-color: var(--state-danger);
+  background-color: var(--state-danger-soft);
+  color: var(--state-danger);
+}
+
+.plugin-eco-state-box {
+  padding: var(--space-3);
+  border-radius: var(--radius-xs);
+  border: 1px dashed var(--border-subtle);
+  background-color: var(--bg-workspace);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.plugin-eco-error-box {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--state-danger);
+  background-color: var(--state-danger-soft);
+  color: var(--state-danger);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.plugin-eco-staging-diff {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--state-warning);
+  background-color: var(--state-warning-soft);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.plugin-eco-markdown-preview {
+  padding: var(--space-2);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-subtle);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.plugin-eco-input {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 11px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-default);
+  background-color: var(--bg-workspace);
+  color: var(--text-primary);
+}
+
+.plugin-eco-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.plugin-eco-tab {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-workspace);
+  color: var(--text-secondary);
+}
+
+.plugin-eco-tab-active {
+  border-color: var(--action-primary);
+  background-color: var(--action-primary);
+  color: var(--action-primary-fg);
+}
+
+.plugin-eco-rationale-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 11px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-default);
+  background-color: var(--bg-workspace);
+  color: var(--text-primary);
+}
+
+.plugin-eco-schedule-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}

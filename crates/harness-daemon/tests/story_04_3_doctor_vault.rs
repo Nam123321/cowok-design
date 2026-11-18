@@ -512,7 +512,7 @@ async fn test_plugins_list_tenant_isolation_and_enabled_filter() {
                 "11111111-1111-4111-8111-111111111111",
                 "cli-doctor-extension",
                 "1.0.0",
-                "ENABLED",
+                "ACTIVE",
                 "local://src/plugins/cli-doctor-extension",
                 "{\"id\":\"cli-doctor-extension\"}",
                 now
@@ -527,7 +527,7 @@ async fn test_plugins_list_tenant_isolation_and_enabled_filter() {
                 "11111111-1111-4111-8111-111111111111",
                 "disabled-extension",
                 "1.0.0",
-                "DISABLED",
+                "DEPRECATED",
                 "local://src/plugins/disabled-extension",
                 "{\"id\":\"disabled-extension\"}",
                 now
@@ -542,7 +542,7 @@ async fn test_plugins_list_tenant_isolation_and_enabled_filter() {
                 "22222222-2222-4222-8222-222222222222",
                 "tenant-b-secret-plugin",
                 "1.0.0",
-                "ENABLED",
+                "ACTIVE",
                 "local://src/plugins/tenant-b",
                 "{\"id\":\"tenant-b\"}",
                 now

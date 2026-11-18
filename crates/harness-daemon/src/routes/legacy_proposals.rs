@@ -470,7 +470,7 @@ pub struct OpenIdeHandoffResponseDto {
     pub manifest_sha256: String,
 }
 
-fn resolve_tenant_id(
+pub(crate) fn resolve_tenant_id(
     registry: &SpecRegistry,
     project_id: Uuid,
     caller: Option<&VerifiedLegacyIngress>,
@@ -6297,8 +6297,16 @@ fn preflight_pr_env_and_token(
     }
     let vault = VaultStore::from_workspace_root(daemon_workspace_root);
     let secrets = vault.unseal_secrets(None).unwrap_or_default();
+    let scoped_github_key = VaultStore::scoped_key(tenant_id, "github");
     let Some(gh_token) = secrets
-        .get("github")
+        .get(&scoped_github_key)
+        .or_else(|| {
+            if tenant_id.trim() == "local-default" {
+                secrets.get("github")
+            } else {
+                None
+            }
+        })
         .map(String::as_str)
         .map(str::trim)
         .filter(|s| !s.is_empty())

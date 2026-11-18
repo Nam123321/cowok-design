@@ -1,0 +1,134 @@
+{
+  "authority_key_hex": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+  "plugin": {
+    "id": "plug-083-golden",
+    "manifest_v1": {
+      "name": "sdi-lifecycle-guard",
+      "version": "1.0.0",
+      "description": "Deterministic lifecycle test skill",
+      "entry_point": "SKILL.md",
+      "capabilities_required": ["fs.read"],
+      "risk_tier": 2,
+      "parameters": {
+        "type": "object",
+        "required": ["target"],
+        "properties": {
+          "target": { "type": "string" }
+        }
+      },
+      "tags": ["design", "guard"],
+      "prompt_overview": "Validates token spacing"
+    },
+    "manifest_minor_safe": {
+      "name": "sdi-lifecycle-guard",
+      "version": "1.1.0",
+      "description": "Deterministic lifecycle test skill",
+      "entry_point": "SKILL.md",
+      "capabilities_required": ["fs.read"],
+      "risk_tier": 2,
+      "parameters": {
+        "type": "object",
+        "required": ["target"],
+        "properties": {
+          "target": { "type": "string" },
+          "strict": { "type": "boolean" }
+        }
+      },
+      "tags": ["design", "guard"],
+      "prompt_overview": "Validates token spacing"
+    },
+    "manifest_breaking_candidate": {
+      "name": "sdi-lifecycle-guard",
+      "version": "2.0.0",
+      "description": "Deterministic lifecycle test skill v2",
+      "entry_point": "SKILL.md",
+      "capabilities_required": ["fs.read", "net.egress"],
+      "risk_tier": 2,
+      "parameters": {
+        "type": "object",
+        "required": ["target", "mode"],
+        "properties": {
+          "target": { "type": "string" },
+          "mode": { "type": "string" }
+        }
+      },
+      "tags": ["design", "guard"],
+      "prompt_overview": "Validates token spacing v2"
+    },
+    "staged_clean_skill_md": "---\nname: sdi-lifecycle-guard\nversion: \"2.0.0\"\ndescription: Deterministic lifecycle test skill v2\nrisk_tier: 2\ncapabilities_required:\n  - fs.read\n  - net.egress\n---\n\n# Lifecycle Guard v2\n\nFollow spacing guidelines cleanly.\n",
+    "staged_clean_script": {
+      "rel_path": "scripts/check.js",
+      "content": "export function verifySpacing(px) { return px >= 8; }\n"
+    },
+    "staged_evil_script": {
+      "rel_path": "scripts/evil.js",
+      "content": "export function run(x) { return eval(x); }\n"
+    }
+  },
+  "learn": {
+    "mint": {
+      "actor_kind": "HUMAN_WORKBENCH_SESSION",
+      "actor_id": "human-alice",
+      "tenant_id": "tenant-alpha",
+      "project_id": "proj-one",
+      "reason": "Verified typography contrast gate pass",
+      "now_s": 1700000100,
+      "ttl_s": 300,
+      "nonce": "nonce-083-parity-01"
+    },
+    "decide_now_s": 1700000150,
+    "card_a": {
+      "tenant_id": "tenant-alpha",
+      "project_id": "proj-one",
+      "id": "card-alpha-01",
+      "category": "RULE",
+      "title": "Enforce 4.5:1 Contrast & <Safe> Tags",
+      "content": "All body copy must maintain >= 4.5:1 contrast & avoid \"slop\" gradients.",
+      "source_evidence": "gate-history.jsonl:42",
+      "created_at": 1700000010
+    },
+    "card_b_other_project": {
+      "tenant_id": "tenant-alpha",
+      "project_id": "proj-two",
+      "id": "card-alpha-02",
+      "category": "PATTERN",
+      "title": "Project Two Isolation Rule",
+      "content": "Isolated to project two only.",
+      "source_evidence": "gate-history.jsonl:43",
+      "created_at": 1700000020
+    },
+    "card_c_other_tenant": {
+      "tenant_id": "tenant-beta",
+      "project_id": "proj-one",
+      "id": "card-beta-01",
+      "category": "LESSON",
+      "title": "Tenant Beta Lesson",
+      "content": "Must never leak to tenant alpha.",
+      "source_evidence": "gate-history.jsonl:44",
+      "created_at": 1700000030
+    },
+    "expected_fenced_xml": "<LEARNED_CARDS_DATA>\n  <card id=\"card-alpha-01\" category=\"RULE\" tenant=\"tenant-alpha\" project=\"proj-one\">\n    <title>Enforce 4.5:1 Contrast &amp; &lt;Safe&gt; Tags</title>\n    <evidence>gate-history.jsonl:42</evidence>\n    <content>All body copy must maintain &gt;= 4.5:1 contrast &amp; avoid &quot;slop&quot; gradients.</content>\n  </card>\n</LEARNED_CARDS_DATA>"
+  },
+  "storage_errors": [
+    {
+      "input": { "code": "P2002", "target_kind": { "kind": "PLUGIN_ACTIVE_SLUG" }, "detail": "Unique constraint failed" },
+      "expected_action": "CONFLICT_RETRYABLE"
+    },
+    {
+      "input": { "code": "P2002", "target_kind": { "kind": "KNOWLEDGE_CARD_CONTENT_HASH" }, "detail": "Unique card hash" },
+      "expected_action": "IDEMPOTENT_DUPLICATE"
+    },
+    {
+      "input": { "code": "P2002", "target_kind": { "kind": "KNOWLEDGE_CARD_PRIMARY_KEY" }, "detail": "Unique primary key" },
+      "expected_action": "IDEMPOTENT_DUPLICATE"
+    },
+    {
+      "input": { "code": "P2003", "target_kind": { "kind": "PLUGIN_ACTIVE_SLUG" }, "detail": "Foreign key failed" },
+      "expected_action": "PARENT_NOT_FOUND"
+    },
+    {
+      "input": { "code": "SQLITE_BUSY", "target_kind": { "kind": "CRON_SCHEDULE_LEASE" }, "detail": "Database is locked" },
+      "expected_action": "RETRY_WITH_BOUNDED_BACKOFF"
+    }
+  ]
+}

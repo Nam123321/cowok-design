@@ -1,0 +1,15 @@
+// @story 08.4
+import { guardedRoute } from "@/lib/api-guard";
+import { forwardFromGuardedContext } from "@/lib/daemon-client";
+import { CompilePromptBundleRequestSchema } from "@/lib/validations/plugins-learn-cron";
+
+export const POST = guardedRoute(
+  (req, ctx, { body }) =>
+    forwardFromGuardedContext(
+      req,
+      ctx,
+      `/api/v1/projects/${encodeURIComponent(ctx.params?.id || "")}/skills/prompt-bundles`,
+      body
+    ),
+  { authMode: "strict-loopback", body: CompilePromptBundleRequestSchema }
+);

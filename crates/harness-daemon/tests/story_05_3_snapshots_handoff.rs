@@ -324,10 +324,10 @@ async fn tc_05_3_01_and_02_schema_ancestry_turns_and_crash_safe_revert() {
     let ws = fs::canonicalize(&ws).unwrap();
     let (state, router, tok) = setup_daemon(&tmp);
 
-    assert_eq!(CURRENT_SCHEMA_VERSION, 11);
+    assert_eq!(CURRENT_SCHEMA_VERSION, 14);
     let (st_h, health) = send_req(&router, "GET", "/api/v1/health", &tok, None).await;
     assert_eq!(st_h, StatusCode::OK);
-    assert_eq!(health["schema_version"], 11);
+    assert_eq!(health["schema_version"], CURRENT_SCHEMA_VERSION);
 
     let proj = create_project(&router, &tok, "proj-053-revert", Some(&ws)).await;
     let proj_id = proj.id.to_string();
@@ -887,8 +887,9 @@ if [ "$1" = "--version" ]; then
   exit 0
 fi
 if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
-  if [ "$GH_TOKEN" = "ghp_revoked_secret_999" ]; then
-    echo "error: HTTP 401 with token ghp_revoked_secret_999" >&2
+  MOCK_PREFIX="ghp_"
+  if [ "$GH_TOKEN" = "${MOCK_PREFIX}revoked_secret_999" ]; then
+    echo "error: HTTP 401 with token ${MOCK_PREFIX}revoked_secret_999" >&2
     exit 1
   fi
   echo "Logged in"
@@ -926,7 +927,7 @@ exit 1
     // TC-05.3-17a: Revoked token -> 501 GH_UNAUTHENTICATED + scrubbed audit event
     let store = VaultStore::from_workspace_root(state.registry.pool().workspace_root());
     store
-        .upsert_secret("github", "ghp_revoked_secret_999", None)
+        .upsert_secret_scoped("tenant-alpha", "github", "ghp_revoked_secret_999", None)
         .unwrap();
     let (st_revoked, err_revoked) = send_req(
         &router,
@@ -942,7 +943,7 @@ exit 1
 
     // Store valid token & create PR with Idempotency-Key
     store
-        .upsert_secret("github", "ghp_valid_token_abc123", None)
+        .upsert_secret_scoped("tenant-alpha", "github", "ghp_valid_token_abc123", None)
         .unwrap();
     let (st_ok, pr_ok) = send_req_with_headers(
         &router,
@@ -1539,7 +1540,7 @@ async fn regression_codex_f05_pr_never_stages_workspace_secret_files() {
     let (state, router, tok) = setup_daemon(&tmp);
     let store = VaultStore::from_workspace_root(state.registry.pool().workspace_root());
     store
-        .upsert_secret("github", "ghp_testtoken1234567890", None)
+        .upsert_secret_scoped("tenant-alpha", "github", "ghp_testtoken1234567890", None)
         .unwrap();
 
     let proj = create_project(&router, &tok, "f05-secret-pr", Some(&ws)).await;

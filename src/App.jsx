@@ -1,4 +1,5 @@
 import React from "react";
+import { PluginCenterPage } from "./pages/plugins/PluginCenterPage";
 import { WorkbenchShell } from "./pages/workbench/WorkbenchShell";
 import "./styles/tokens.css";
 
@@ -10,6 +11,8 @@ export default function App() {
         import.meta.env.VITE_QA_NONCE ||
         import.meta.env.WATCHMEN_NONCE)) ||
     "";
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const isPluginCenterRoute = pathname === "/plugins" || pathname === "/plugins/";
 
   return (
     <div id="cowok-app-container">
@@ -20,7 +23,7 @@ export default function App() {
       >
         {nonce}
       </div>
-      <WorkbenchShell />
+      {isPluginCenterRoute ? <PluginCenterPage /> : <WorkbenchShell />}
     </div>
   );
 }

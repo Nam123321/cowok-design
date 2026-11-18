@@ -128,8 +128,8 @@
     "intentStatusLabel": "Trạng thái"
   },
   "canvas": {
-    "userflowLens": "Luồng người dùng",
-    "slideCmsLens": "Trình chiếu Slide",
+    "userflowLens": "Luồng người dùng (Userflow)",
+    "slideCmsLens": "Trình chiếu Slide / CMS",
     "presentButton": "Trình chiếu (Present)",
     "exitPresent": "Thoát trình chiếu",
     "openNewTab": "Mở tệp dự án hoặc tạo thiết kế mới",
@@ -374,7 +374,8 @@
     "customizeRuntimeBtn": "Tùy chỉnh",
     "vaultStorageShort": "Cơ chế lưu trữ",
     "permissionShort": "Cơ chế phê duyệt",
-    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · Cục bộ/Ollama"
+    "apiProvidersList": "Gemini · Claude · OpenAI · OpenRouter · DeepSeek · Cục bộ/Ollama",
+    "mcpHostStory084Notice": "Quản lý Client MCPs, AgentSkills Plugin Registry, Isolated Staging (HUMAN_ONLY), và LEARN Knowledge Cards trên SQLite WAL V9."
   },
   "flow": {
     "dagCanvas": "Khung đồ thị DAG 2D",
@@ -779,5 +780,61 @@
     "colValue": "Giá Trị Mẫu",
     "footerSummary": "Đã nạp {{count}} thuộc tính • Bộ mẫu: {{preset}}",
     "saveError": "Không thể lưu dữ liệu mẫu: {{message}}"
+  },
+  "plugins": {
+    "validateBtn": "Kiểm tra",
+    "installBtn": "Cài đặt",
+    "activateBtn": "Kích hoạt (HUMAN_ONLY)",
+    "deprecateBtn": "Ngưng dùng",
+    "loadingState": "Đang tải SkillPlugins từ SQLite WAL daemon...",
+    "emptyState": "Chưa có SkillPlugin nào được đăng ký trong dự án này.",
+    "revLabel": "Phiên bản",
+    "registryTitle": "Kho AgentSkills & Hàng chờ Staging",
+    "retryBtn": "Thử lại",
+    "stagingHeader": "Bản cập nhật Staging cách ly",
+    "promoting": "Đang nâng cấp...",
+    "promoteBtn": "Duyệt Staging -> ACTIVE",
+    "discarding": "Đang hủy...",
+    "discardBtn": "Hủy bản cập nhật",
+    "rationalePlaceholder": "Nhập lý do (>= 4 ký tự)...",
+    "quarantinedLabel": "CÁCH LY",
+    "archiveBtn": "Lưu trữ",
+    "refreshBtn": "Làm mới",
+    "navLink": "Tiện ích",
+    "backToWorkbench": "Bàn làm việc",
+    "stagingImpactSummary": "Cập nhật v{{from}} -> v{{to}} có {{count}} thay đổi lớn; các luồng đang chạy vẫn cố định ở v{{from}} cho tới khi được duyệt.",
+    "quarantineBtn": "Cách ly",
+    "quarantinePlaceholder": "Lý do cách ly (>= 4 ký tự)...",
+    "quarantineReasonLabel": "Lý do cách ly"
+  },
+  "learn": {
+    "revLabel": "Phiên bản",
+    "approveBtn": "Phê duyệt & Niêm phong",
+    "rejectBtn": "Từ chối",
+    "loadingState": "Đang tải thẻ LEARN...",
+    "emptyState": "Chưa có thẻ LEARN nào được đề xuất cho dự án này.",
+    "queueTitle": "Hàng chờ Phê duyệt Tri thức LEARN",
+    "retryBtn": "Thử lại",
+    "rationalePlaceholder": "Nhập lý do duyệt / từ chối (>= 4 ký tự)...",
+    "budgetLabel": "Ngân sách Prompt",
+    "filterAll": "TẤT CẢ",
+    "filterProposed": "CHỜ DUYỆT",
+    "filterAccepted": "ĐÃ DUYỆT",
+    "filterRejected": "ĐÃ TỪ CHỐI"
+  },
+  "cron": {
+    "failuresLabel": "Số lần lỗi",
+    "authRequiredNotice": "Lỗi xác thực nguồn 401/403",
+    "refreshAuthSync": "Làm mới Xác thực & Đồng bộ",
+    "syncNowBtn": "Đồng bộ ngay",
+    "loadingState": "Đang kiểm tra lịch đồng bộ cron...",
+    "emptyState": "Chưa có lịch đồng bộ cron nào đang hoạt động.",
+    "statusTitle": "Đồng bộ Cron Nguồn Plugin",
+    "refreshBtn": "Làm mới",
+    "retryBtn": "Thử lại",
+    "cronPlaceholder": "0 */5 * * * *",
+    "upstreamUrlPlaceholder": "https://github.com/to-chuc/kho-ma",
+    "saveScheduleBtn": "Lưu Lịch Đồng Bộ",
+    "vaultTokenRequired": "Cần mã thông báo GitHub trong Vault"
   }
 }

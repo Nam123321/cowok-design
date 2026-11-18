@@ -130,11 +130,90 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  // Mirror pool.rs idempotent V12 column guards prior to V12 12-step rebuild of skill_plugins
+  db.exec(`
+    ALTER TABLE skill_plugins ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
+    ALTER TABLE skill_plugins ADD COLUMN source_type TEXT NOT NULL DEFAULT 'local';
+    ALTER TABLE skill_plugins ADD COLUMN upstream_repo_url TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN upstream_commit_sha TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN cron_schedule TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN skill_md_path TEXT NOT NULL DEFAULT 'SKILL.md';
+    ALTER TABLE skill_plugins ADD COLUMN plugin_json_path TEXT NOT NULL DEFAULT 'plugin.json';
+    ALTER TABLE skill_plugins ADD COLUMN last_synced_at BIGINT;
+    ALTER TABLE skill_plugins ADD COLUMN revision BIGINT NOT NULL DEFAULT 1;
+    ALTER TABLE skill_plugins ADD COLUMN staging_version TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN staging_manifest_json TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN staging_diff_reasons_json TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN staging_bundle_dir TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN staging_package_sha256 TEXT;
+    ALTER TABLE skill_plugins ADD COLUMN breaking_change_isolated INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE skill_plugins ADD COLUMN quarantined INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE skill_plugins ADD COLUMN quarantine_reason TEXT;
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V12__epic08_plugins_learn_cron.sql"),
+      "utf-8"
+    )
+  );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V13__epic08_audit_remediation.sql"),
+      "utf-8"
+    )
+  );
+  // Mirror pool.rs apply_v14_columns idempotent column guards prior to V14 index creation
+  db.exec(`
+    ALTER TABLE gate_reports ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
+    ALTER TABLE gate_reports ADD COLUMN correlation_id TEXT NOT NULL DEFAULT '';
+    ALTER TABLE gate_reports ADD COLUMN target_id TEXT NOT NULL DEFAULT '';
+    ALTER TABLE gate_reports ADD COLUMN action TEXT NOT NULL DEFAULT '';
+    ALTER TABLE gate_reports ADD COLUMN revision BIGINT NOT NULL DEFAULT 0;
+    ALTER TABLE gate_reports ADD COLUMN fencing_token BIGINT NOT NULL DEFAULT 0;
+    ALTER TABLE gate_reports ADD COLUMN reason_code TEXT NOT NULL DEFAULT '';
+    ALTER TABLE daemon_sessions ADD COLUMN actor_kind TEXT NOT NULL DEFAULT 'AGENT_HMAC';
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V14__epic08_party_remediation.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
 
-describe("P1 Persistence Contract & SQLite WAL V1-V9 Mirror Verification (ADR-091)", () => {
+const PRISMA_SCALAR_TYPES = new Set([
+  "String",
+  "Int",
+  "BigInt",
+  "Boolean",
+  "Float",
+  "Bytes",
+  "DateTime",
+  "Decimal",
+  "Json",
+]);
+
+function parsePrismaModelColumns(schemaText: string, modelName: string): string[] {
+  const modelRe = new RegExp(`model\\s+${modelName}\\s+\\{([\\s\\S]*?)\\n\\}`, "m");
+  const match = modelRe.exec(schemaText);
+  if (!match) throw new Error(`Missing Prisma model ${modelName}`);
+  const cols: string[] = [];
+  for (const rawLine of match[1].split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("//") || line.startsWith("@@")) continue;
+    const fieldMatch = /^([a-zA-Z_][a-zA-Z0-9_]*)\s+([A-Za-z0-9_]+)([\?\[]*)/.exec(line);
+    if (!fieldMatch) continue;
+    const [, fieldName, fieldType, suffix] = fieldMatch;
+    if (!PRISMA_SCALAR_TYPES.has(fieldType) || suffix.includes("[")) continue;
+    const mapMatch = /@map\("([^"]+)"\)/.exec(line);
+    cols.push(mapMatch ? mapMatch[1] : fieldName);
+  }
+  return cols.sort();
+}
+
+describe("P1 Persistence Contract & SQLite WAL V1-V14 Mirror Verification (ADR-091)", () => {
   const schemaPath = path.resolve(__dirname, "schema.prisma");
   const migrationsDir = path.resolve(__dirname, "../crates/spec-registry/migrations");
 
@@ -156,7 +235,10 @@ describe("P1 Persistence Contract & SQLite WAL V1-V9 Mirror Verification (ADR-09
     expect(mappedTables).toContain("proposal_target_nodes");
     expect(mappedTables).toContain("proposal_gate_receipts");
     expect(mappedTables).toContain("proposal_tradeoffs");
-    expect(mappedTables).toHaveLength(46);
+    expect(mappedTables).toContain("knowledge_cards");
+    expect(mappedTables).toContain("learn_consumed_nonces");
+    expect(mappedTables).toContain("plugin_cron_schedules");
+    expect(mappedTables).toHaveLength(49);
   });
 
   it("UT-DB-02: executes V1-V9 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
@@ -280,10 +362,61 @@ describe("P1 Persistence Contract & SQLite WAL V1-V9 Mirror Verification (ADR-09
     expect(remainingEdges.count).toBe(0);
   });
 
-  it("UT-DB-06: verifies Story 05.3 V11 columns, 6 indexes, and Prisma parity", () => {
+  it("UT-DB-06: verifies Story 05.3 V11 & Story 08.4 V12-V14 columns, indexes, and Prisma partialIndexes parity", () => {
     const db = openMigratedMemoryDb();
-    const schemaContent = fs.readFileSync(schemaPath, "utf-8");
+    const schemaText = fs.readFileSync(path.resolve(__dirname, "schema.prisma"), "utf8");
+    const sqliteIndexes = db
+      .prepare(
+        "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name IN ('skill_plugins', 'knowledge_cards', 'plugin_cron_schedules', 'gate_reports', 'chat_sessions', 'chat_artifact_snapshots', 'version_snapshots', 'github_pull_requests')"
+      )
+      .all() as Array<{ name: string; sql: string | null }>;
+    const byName = new Map(sqliteIndexes.map((idx) => [idx.name, idx.sql ?? ""]));
 
+    expect(byName.has("uq_skill_plugins_scope_slug_ver")).toBe(true);
+    expect(byName.has("uq_skill_plugins_active_slug")).toBe(true);
+    expect(byName.get("uq_skill_plugins_active_slug")).toContain("WHERE lifecycle_state = 'ACTIVE'");
+    expect(byName.has("uq_knowledge_cards_idempotency")).toBe(true);
+    expect(byName.get("uq_knowledge_cards_idempotency")).toContain("WHERE idempotency_key IS NOT NULL");
+    expect(byName.has("uq_knowledge_cards_active_hash")).toBe(true);
+    expect(byName.get("uq_knowledge_cards_active_hash")).toContain("WHERE status != 'REJECTED'");
+    expect(byName.has("uq_plugin_cron_schedules_scope_plugin")).toBe(true);
+    expect(byName.has("idx_gate_reports_project_gate_target")).toBe(true);
+    expect(byName.has("skill_plugins_project_slug_ver_key")).toBe(false);
+    for (const expectedIdx of [
+      "idx_chat_sessions_forked_from",
+      "idx_artifact_snapshots_proposal",
+      "idx_artifact_snapshots_parent",
+      "idx_version_snapshots_proposal",
+      "idx_version_snapshots_parent",
+      "idx_github_prs_snapshot",
+    ]) {
+      expect(byName.has(expectedIdx)).toBe(true);
+    }
+
+    expect(schemaText).toContain('previewFeatures = ["partialIndexes"]');
+    expect(schemaText).toContain('map: "uq_skill_plugins_active_slug"');
+    expect(schemaText).toContain('map: "uq_knowledge_cards_idempotency"');
+    expect(schemaText).toContain('map: "uq_knowledge_cards_active_hash"');
+    expect(schemaText).toContain('map: "uq_plugin_cron_schedules_scope_plugin"');
+    expect(schemaText).toContain('map: "idx_gate_reports_project_gate_target"');
+
+    // Column-level PRAGMA table_info parity across V12-V14 Epic 08 models
+    const tableModelPairs: Array<[string, string]> = [
+      ["skill_plugins", "SkillPlugin"],
+      ["knowledge_cards", "KnowledgeCard"],
+      ["learn_consumed_nonces", "LearnConsumedNonce"],
+      ["plugin_cron_schedules", "PluginCronSchedule"],
+      ["gate_reports", "GateReport"],
+      ["daemon_sessions", "DaemonSession"],
+    ];
+    for (const [tableName, modelName] of tableModelPairs) {
+      const pragmaRows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+      const sqliteCols = pragmaRows.map((r) => r.name).sort();
+      const prismaCols = parsePrismaModelColumns(schemaText, modelName);
+      expect(sqliteCols, `Column parity for ${tableName} <-> ${modelName}`).toEqual(prismaCols);
+    }
+
+    // Verify Story 05.3 V11 additive columns exist in both SQLite and schema.prisma
     for (const [table, cols] of [
       ["chat_sessions", ["forked_from_session_id", "forked_from_message_id"]],
       ["chat_artifact_snapshots", ["proposal_id", "parent_snapshot_id", "node_snapshot_json"]],
@@ -295,24 +428,27 @@ describe("P1 Persistence Contract & SQLite WAL V1-V9 Mirror Verification (ADR-09
       );
       for (const col of cols) {
         expect(tableCols).toContain(col);
-        expect(schemaContent).toContain(`@map("${col}")`);
+        expect(schemaText).toContain(`@map("${col}")`);
       }
     }
 
-    const idxNames = (
-      db
-        .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
-        .all() as { name: string }[]
-    ).map((r) => r.name);
-    for (const expectedIdx of [
-      "idx_chat_sessions_forked_from",
-      "idx_artifact_snapshots_proposal",
-      "idx_artifact_snapshots_parent",
-      "idx_version_snapshots_proposal",
-      "idx_version_snapshots_parent",
-      "idx_github_prs_snapshot",
-    ]) {
-      expect(idxNames).toContain(expectedIdx);
-    }
+    const now = Date.now();
+    db.prepare(
+      "INSERT INTO projects (id, tenant_id, name, slug, created_at, updated_at) VALUES ('p-084', 'tenant-a', 'Proj 084', 'p-084', ?, ?)"
+    ).run(now, now);
+    db.prepare(
+      "INSERT INTO skill_plugins (id, tenant_id, project_id, plugin_slug, version, lifecycle_state, source_type, source_repo_url, updated_at) VALUES ('sp-1', 'tenant-a', 'p-084', 'tokens-skill', '1.0.0', 'ACTIVE', 'local', 'https://github.com/org/repo', ?)"
+    ).run(now);
+    db.prepare(
+      "INSERT INTO skill_plugins (id, tenant_id, project_id, plugin_slug, version, lifecycle_state, source_type, source_repo_url, updated_at) VALUES ('sp-2', 'tenant-a', 'p-084', 'tokens-skill', '2.0.0', 'INSTALLED', 'local', 'https://github.com/org/repo', ?)"
+    ).run(now);
+    expect(() => {
+      db.prepare(
+        "INSERT INTO skill_plugins (id, tenant_id, project_id, plugin_slug, version, lifecycle_state, source_type, source_repo_url, updated_at) VALUES ('sp-3', 'tenant-a', 'p-084', 'tokens-skill', '3.0.0', 'ACTIVE', 'local', 'https://github.com/org/repo', ?)"
+      ).run(now);
+    }).toThrow();
+    db.prepare(
+      "INSERT INTO skill_plugins (id, tenant_id, project_id, plugin_slug, version, lifecycle_state, source_type, source_repo_url, updated_at) VALUES ('sp-4', 'tenant-b', 'p-084', 'tokens-skill', '1.0.0', 'ACTIVE', 'local', 'https://github.com/org/repo', ?)"
+    ).run(now);
   });
 });

@@ -1,13 +1,14 @@
 {
   "schema_version": "1.0.0",
   "project_slug": "cowok-design",
-  "verified_state_sha": "61772b92e2fde8145f6d98a6ccef298092c9996f4b6eda4274d910fa07c04d8c",
-  "generated_at": "2026-11-17T19:14:38.635592",
+  "verified_state_sha": "b303bc44ac2a188cb96a1934447cbeca8dd5696a39f190ac1719afbd4475458a",
+  "generated_at": "2026-11-18T11:55:14.403125",
   "maturity_baseline_epics": [
     "01",
     "03",
     "04",
-    "05"
+    "05",
+    "08"
   ],
   "waves": [
     {
@@ -16,7 +17,8 @@
       "status": "active",
       "epics": [
         "02",
-        "06"
+        "06",
+        "09"
       ],
       "sub_epic_slices": [],
       "vertical_value_slice": "Delivery of core capabilities for Wave 1",
@@ -34,8 +36,8 @@
       "wave_name": "Wave 2: Vertical Value Increment 2",
       "status": "pending",
       "epics": [
-        "08",
-        "07"
+        "07",
+        "10"
       ],
       "sub_epic_slices": [],
       "vertical_value_slice": "Delivery of core capabilities for Wave 2",
@@ -53,7 +55,7 @@
       "wave_name": "Wave 3: Vertical Value Increment 3",
       "status": "pending",
       "epics": [
-        "09"
+        "11"
       ],
       "sub_epic_slices": [],
       "vertical_value_slice": "Delivery of core capabilities for Wave 3",
@@ -71,29 +73,10 @@
       "wave_name": "Wave 4: Vertical Value Increment 4",
       "status": "pending",
       "epics": [
-        "10"
-      ],
-      "sub_epic_slices": [],
-      "vertical_value_slice": "Delivery of core capabilities for Wave 4",
-      "parallel_tracks": [
-        "Stream-1",
-        "Stream-2",
-        "Stream-3",
-        "Stream-4",
-        "Stream-5"
-      ],
-      "stream_execution_chains": []
-    },
-    {
-      "wave_id": 5,
-      "wave_name": "Wave 5: Vertical Value Increment 5",
-      "status": "pending",
-      "epics": [
-        "11",
         "12"
       ],
       "sub_epic_slices": [],
-      "vertical_value_slice": "Delivery of core capabilities for Wave 5",
+      "vertical_value_slice": "Delivery of core capabilities for Wave 4",
       "parallel_tracks": [
         "Stream-1",
         "Stream-2",
@@ -111,30 +94,25 @@
       "02.3",
       "06.1",
       "06.2",
-      "06.3"
-    ],
-    "wave_2": [
-      "08.1",
-      "08.2",
-      "08.3",
-      "07.1",
-      "07.2",
-      "07.3"
-    ],
-    "wave_3": [
+      "06.3",
       "09.1",
       "09.2",
       "09.3"
     ],
-    "wave_4": [
+    "wave_2": [
+      "07.1",
+      "07.2",
+      "07.3",
       "10.1",
       "10.2",
       "10.3"
     ],
-    "wave_5": [
+    "wave_3": [
       "11.1",
       "11.2",
-      "11.3",
+      "11.3"
+    ],
+    "wave_4": [
       "12.1",
       "12.2",
       "12.3"
@@ -163,6 +141,18 @@
         "06.3"
       ],
       "track": "Stream-2",
+      "rationale": "Zero blocker risk anchor for Wave 1 unblocking downstream business workflows."
+    },
+    {
+      "slice_id": "P0.3",
+      "epic_id": "09",
+      "name": "Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine (Immediate P0 Anchor)",
+      "story_ids": [
+        "09.1",
+        "09.2",
+        "09.3"
+      ],
+      "track": "Stream-4",
       "rationale": "Zero blocker risk anchor for Wave 1 unblocking downstream business workflows."
     }
   ],

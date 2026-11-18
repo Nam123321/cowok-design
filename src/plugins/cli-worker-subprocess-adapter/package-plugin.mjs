@@ -144,12 +144,12 @@ pid_row = conn.execute(
 plugin_id = f"plugin-{slug}-{project_id}"
 if pid_row is None:
     conn.execute(
-        "INSERT INTO skill_plugins (id, project_id, plugin_slug, version, lifecycle_state, source_repo_url, manifest_json, updated_at) VALUES (?, ?, ?, ?, 'ENABLED', ?, ?, ?)",
+        "INSERT INTO skill_plugins (id, project_id, plugin_slug, version, lifecycle_state, source_repo_url, manifest_json, updated_at) VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?)",
         (plugin_id, project_id, slug, version, "local://src/plugins/cli-worker-subprocess-adapter", mjson, now_ms),
     )
 else:
     conn.execute(
-        "UPDATE skill_plugins SET lifecycle_state = 'ENABLED', manifest_json = ?, updated_at = ? WHERE id = ?",
+        "UPDATE skill_plugins SET lifecycle_state = 'ACTIVE', manifest_json = ?, updated_at = ? WHERE id = ?",
         (mjson, now_ms, pid_row[0]),
     )
 conn.commit()

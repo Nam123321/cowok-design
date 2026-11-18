@@ -1,3 +1,5 @@
+// @story 08.1
+// @implements AC-01, AC-02, AC-05, AC-06
 import * as fs from "fs";
 import * as path from "path";
 import {
@@ -8,11 +10,14 @@ import {
   ScenarioDef,
   AtomDef,
 } from "./types";
-import { validateSkillFrontmatter } from "./validator";
+import { StagedSkillSource } from "./staging";
+import { readVerifiedRegularUtf8 } from "./repackager-bundle";
+import { loadSkillFolderWithHash, lstatSafe } from "./registry-loader";
 
 export class BuiltinSkillsRegistry {
   private baseDir: string;
   private skills: Map<string, SkillManifest> = new Map();
+  private skillMdHashes: Map<string, string> = new Map();
   private craftRules: Map<string, CraftRule> = new Map();
   private designTemplates: Map<string, DesignTemplate> = new Map();
   private designSystems: Map<string, DesignSystemV1> = new Map();
@@ -24,221 +29,128 @@ export class BuiltinSkillsRegistry {
     this.baseDir = baseDir;
   }
 
-  /**
-   * Discovers and indexes all multi-axis capabilities from the directory structure
-   */
   public discover(): void {
     if (!fs.existsSync(this.baseDir)) return;
+    this.discoverSkillsAxis();
+    this.discoverCraftRules();
+    this.discoverJsonAxis<DesignTemplate>("design-templates", this.designTemplates);
+    this.discoverDesignSystems();
+    this.discoverJsonAxis<ScenarioDef>("scenarios", this.scenarios);
+    this.discoverJsonAxis<AtomDef>("atoms", this.atoms);
+    this.discoverPromptTemplates();
+  }
 
-    // 1. Discover Skills
+  private discoverSkillsAxis(): void {
     const skillsDir = path.join(this.baseDir, "skills");
-    if (fs.existsSync(skillsDir)) {
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory()) {
-          const folder = path.join(skillsDir, entry.name);
-          const manifest = this.loadSkillFolder(folder);
-          if (manifest) {
-            this.skills.set(manifest.name, manifest);
-          }
-        }
-      }
+    const dirStat = lstatSafe(skillsDir);
+    if (!dirStat || dirStat.isSymbolicLink() || !dirStat.isDirectory()) return;
+    const entries = fs.readdirSync(skillsDir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+      const folder = path.join(skillsDir, entry.name);
+      const loaded = loadSkillFolderWithHash(folder);
+      if (!loaded) continue;
+      this.skills.set(loaded.manifest.name, loaded.manifest);
+      if (loaded.skillMdSha256) this.skillMdHashes.set(loaded.manifest.name, loaded.skillMdSha256);
     }
+  }
 
-    // 2. Discover Craft Rules
+  private discoverCraftRules(): void {
     const craftDir = path.join(this.baseDir, "craft");
-    if (fs.existsSync(craftDir)) {
-      const files = fs.readdirSync(craftDir);
-      for (const file of files) {
-        if (file.endsWith(".md")) {
-          const id = path.basename(file, ".md");
-          const content = fs.readFileSync(path.join(craftDir, file), "utf8");
-          const rule: CraftRule = {
-            id,
-            title: id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-            category: (id.includes("typo")
-              ? "typography"
-              : id.includes("spac")
-              ? "spacing"
-              : id.includes("color")
-              ? "color"
-              : id.includes("hier")
-              ? "hierarchy"
-              : "interactions") as CraftRule["category"],
-            summary: content.split("\n\n")[0]?.slice(0, 150) || "",
-            content,
-          };
-          this.craftRules.set(id, rule);
-        }
-      }
-    }
-
-    // 3. Discover Design Templates
-    const templatesDir = path.join(this.baseDir, "design-templates");
-    if (fs.existsSync(templatesDir)) {
-      const files = fs.readdirSync(templatesDir);
-      for (const file of files) {
-        if (file.endsWith(".json")) {
-          try {
-            const raw = fs.readFileSync(path.join(templatesDir, file), "utf8");
-            const parsed = JSON.parse(raw) as DesignTemplate;
-            this.designTemplates.set(parsed.id, parsed);
-          } catch {
-            // Ignore parse errors on templates
-          }
-        }
-      }
-    }
-
-    // 4. Discover Design Systems
-    const dsDir = path.join(this.baseDir, "design-systems");
-    if (fs.existsSync(dsDir)) {
-      const versions = fs.readdirSync(dsDir, { withFileTypes: true });
-      for (const ver of versions) {
-        if (ver.isDirectory()) {
-          const verPath = path.join(dsDir, ver.name);
-          const tokensFile = path.join(verPath, "dtcg-tokens.json");
-          const mapFile = path.join(verPath, "mapping.json");
-          if (fs.existsSync(tokensFile)) {
-            try {
-              const tokens = JSON.parse(fs.readFileSync(tokensFile, "utf8"));
-              const mapping = fs.existsSync(mapFile) ? JSON.parse(fs.readFileSync(mapFile, "utf8")) : {};
-              this.designSystems.set(ver.name, {
-                version: "v1",
-                name: `Cowok Design System ${ver.name}`,
-                tokens,
-                mapping,
-              });
-            } catch {
-              // Ignore
-            }
-          }
-        }
-      }
-    }
-
-    // 5. Discover Scenarios
-    const scenariosDir = path.join(this.baseDir, "scenarios");
-    if (fs.existsSync(scenariosDir)) {
-      const files = fs.readdirSync(scenariosDir);
-      for (const file of files) {
-        if (file.endsWith(".json")) {
-          try {
-            const raw = fs.readFileSync(path.join(scenariosDir, file), "utf8");
-            const parsed = JSON.parse(raw) as ScenarioDef;
-            this.scenarios.set(parsed.id, parsed);
-          } catch {
-            // Ignore
-          }
-        }
-      }
-    }
-
-    // 6. Discover Atoms
-    const atomsDir = path.join(this.baseDir, "atoms");
-    if (fs.existsSync(atomsDir)) {
-      const files = fs.readdirSync(atomsDir);
-      for (const file of files) {
-        if (file.endsWith(".json")) {
-          try {
-            const raw = fs.readFileSync(path.join(atomsDir, file), "utf8");
-            const parsed = JSON.parse(raw) as AtomDef;
-            this.atoms.set(parsed.id, parsed);
-          } catch {
-            // Ignore
-          }
-        }
-      }
-    }
-
-    // 7. Discover Prompt Templates
-    const promptsDir = path.join(this.baseDir, "prompt-templates");
-    if (fs.existsSync(promptsDir)) {
-      const files = fs.readdirSync(promptsDir);
-      for (const file of files) {
-        if (file.endsWith(".md")) {
-          const id = path.basename(file, ".md");
-          const content = fs.readFileSync(path.join(promptsDir, file), "utf8");
-          this.promptTemplates.set(id, content);
-        }
-      }
-    }
-  }
-
-  private loadSkillFolder(folder: string): SkillManifest | null {
-    try {
-      if (fs.lstatSync(folder).isSymbolicLink()) {
-        return null;
-      }
-    } catch {
-      return null;
-    }
-
-    const pluginJsonPath = path.join(folder, "plugin.json");
-    const skillMdPath = path.join(folder, "SKILL.md");
-
-    let manifest: Partial<SkillManifest> = {};
-
-    if (fs.existsSync(skillMdPath)) {
-      if (fs.lstatSync(skillMdPath).isSymbolicLink()) {
-        return null;
-      }
-      const raw = fs.readFileSync(skillMdPath, "utf8");
-      const validation = validateSkillFrontmatter(raw);
-      if (!validation.valid) {
-        return null;
-      }
-      manifest = {
-        name: validation.fields?.name,
-        version: validation.fields?.version || "1.0.0",
-        description: validation.fields?.description,
-        risk_tier: validation.fields?.risk_tier || 1,
-      };
-    }
-
-    if (fs.existsSync(pluginJsonPath)) {
-      if (fs.lstatSync(pluginJsonPath).isSymbolicLink()) {
-        return null;
-      }
+    const dirStat = lstatSafe(craftDir);
+    if (!dirStat || dirStat.isSymbolicLink() || !dirStat.isDirectory()) return;
+    for (const file of fs.readdirSync(craftDir).sort()) {
+      if (!file.endsWith(".md")) continue;
       try {
-        const rawJson = fs.readFileSync(pluginJsonPath, "utf8");
-        const jsonManifest = JSON.parse(rawJson);
-        manifest = { ...manifest, ...jsonManifest };
-      } catch {
-        // Fallback to SKILL.md fields
+        const id = path.basename(file, ".md");
+        const content = readVerifiedRegularUtf8(path.join(craftDir, file));
+        this.craftRules.set(id, {
+          id,
+          title: id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+          category: (id.includes("typo")
+            ? "typography"
+            : id.includes("spac")
+            ? "spacing"
+            : id.includes("color")
+            ? "color"
+            : id.includes("hier")
+            ? "hierarchy"
+            : "interactions") as CraftRule["category"],
+          summary: content.split("\n\n")[0]?.slice(0, 150) || "",
+          content,
+        });
+      } catch (err) {
+        console.warn(`[BuiltinSkillsRegistry] skipping unsafe/unreadable craft/${file}:`, err instanceof Error ? err.message : String(err));
       }
     }
-
-    if (
-      manifest.name &&
-      manifest.description &&
-      /^[a-zA-Z0-9._-]+$/.test(manifest.name) &&
-      manifest.name !== "." &&
-      manifest.name !== ".."
-    ) {
-      return {
-        name: manifest.name,
-        version: manifest.version || "1.0.0",
-        description: manifest.description,
-        entry_point: manifest.entry_point || "SKILL.md",
-        capabilities_required: manifest.capabilities_required || [],
-        risk_tier: (manifest.risk_tier || 1) as 1 | 2 | 3,
-        parameters: manifest.parameters,
-        tags: manifest.tags || [],
-        prompt_overview: manifest.prompt_overview,
-      };
-    }
-
-    return null;
   }
 
-  // Getters
+  private discoverPromptTemplates(): void {
+    const promptsDir = path.join(this.baseDir, "prompt-templates");
+    const dirStat = lstatSafe(promptsDir);
+    if (!dirStat || dirStat.isSymbolicLink() || !dirStat.isDirectory()) return;
+    for (const file of fs.readdirSync(promptsDir).sort()) {
+      if (!file.endsWith(".md")) continue;
+      try {
+        this.promptTemplates.set(path.basename(file, ".md"), readVerifiedRegularUtf8(path.join(promptsDir, file)));
+      } catch (err) {
+        console.warn(`[BuiltinSkillsRegistry] skipping unsafe/unreadable prompt-templates/${file}:`, err instanceof Error ? err.message : String(err));
+      }
+    }
+  }
+
+  private discoverJsonAxis<T extends { id: string }>(dirName: string, target: Map<string, T>): void {
+    const dir = path.join(this.baseDir, dirName);
+    const dirStat = lstatSafe(dir);
+    if (!dirStat || dirStat.isSymbolicLink() || !dirStat.isDirectory()) return;
+    for (const file of fs.readdirSync(dir).sort()) {
+      if (!file.endsWith(".json")) continue;
+      try {
+        const parsed = JSON.parse(readVerifiedRegularUtf8(path.join(dir, file))) as T;
+        target.set(parsed.id, parsed);
+      } catch (err) {
+        console.warn(`[BuiltinSkillsRegistry] skipping malformed ${dirName}/${file}:`, err instanceof Error ? err.message : String(err));
+      }
+    }
+  }
+
+  private discoverDesignSystems(): void {
+    const dsDir = path.join(this.baseDir, "design-systems");
+    const dsStat = lstatSafe(dsDir);
+    if (!dsStat || dsStat.isSymbolicLink() || !dsStat.isDirectory()) return;
+    for (const ver of fs.readdirSync(dsDir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (!ver.isDirectory() || ver.isSymbolicLink()) continue;
+      const verPath = path.join(dsDir, ver.name);
+      const tokensFile = path.join(verPath, "dtcg-tokens.json");
+      const mapFile = path.join(verPath, "mapping.json");
+      if (!lstatSafe(tokensFile)) continue;
+      try {
+        const tokens = JSON.parse(readVerifiedRegularUtf8(tokensFile));
+        const mapping = lstatSafe(mapFile) ? JSON.parse(readVerifiedRegularUtf8(mapFile)) : {};
+        this.designSystems.set(ver.name, { version: "v1", name: `Cowok Design System ${ver.name}`, tokens, mapping });
+      } catch (err) {
+        console.warn(`[BuiltinSkillsRegistry] skipping malformed design system ${ver.name}:`, err instanceof Error ? err.message : String(err));
+      }
+    }
+  }
+
+  public getSkillMdSha256(name: string): string | undefined {
+    return this.skillMdHashes.get(name);
+  }
+
+  public getStagedSources(): StagedSkillSource[] {
+    return this.listSkills().map((manifest) => ({
+      manifest,
+      skillMdSha256: this.skillMdHashes.get(manifest.name) ?? null,
+    }));
+  }
+
   public getSkill(name: string): SkillManifest | undefined {
     return this.skills.get(name);
   }
 
   public listSkills(): SkillManifest[] {
-    return Array.from(this.skills.values());
+    return Array.from(this.skills.values()).sort((a, b) => a.name.localeCompare(b.name));
   }
 
   public getCraftRule(id: string): CraftRule | undefined {
@@ -246,7 +158,7 @@ export class BuiltinSkillsRegistry {
   }
 
   public listCraftRules(): CraftRule[] {
-    return Array.from(this.craftRules.values());
+    return Array.from(this.craftRules.values()).sort((a, b) => a.id.localeCompare(b.id));
   }
 
   public getDesignTemplate(id: string): DesignTemplate | undefined {
@@ -254,7 +166,7 @@ export class BuiltinSkillsRegistry {
   }
 
   public listDesignTemplates(): DesignTemplate[] {
-    return Array.from(this.designTemplates.values());
+    return Array.from(this.designTemplates.values()).sort((a, b) => a.id.localeCompare(b.id));
   }
 
   public getDesignSystem(version: string): DesignSystemV1 | undefined {
@@ -266,7 +178,7 @@ export class BuiltinSkillsRegistry {
   }
 
   public listScenarios(): ScenarioDef[] {
-    return Array.from(this.scenarios.values());
+    return Array.from(this.scenarios.values()).sort((a, b) => a.id.localeCompare(b.id));
   }
 
   public getAtom(id: string): AtomDef | undefined {
@@ -274,7 +186,7 @@ export class BuiltinSkillsRegistry {
   }
 
   public listAtoms(): AtomDef[] {
-    return Array.from(this.atoms.values());
+    return Array.from(this.atoms.values()).sort((a, b) => a.id.localeCompare(b.id));
   }
 
   public getPromptTemplate(id: string): string | undefined {
