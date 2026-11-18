@@ -570,7 +570,15 @@
     "discarding": "Discarding...",
     "discardBtn": "Discard Candidate",
     "rationalePlaceholder": "Enter rationale (>= 4 chars)...",
-    "quarantinedLabel": "QUARANTINED"
+    "quarantinedLabel": "QUARANTINED",
+    "archiveBtn": "Archive",
+    "refreshBtn": "Refresh",
+    "navLink": "Plugins",
+    "backToWorkbench": "Workbench",
+    "stagingImpactSummary": "Updating v{{from}} -> v{{to}} introduces {{count}} breaking change(s); active runs stay pinned to v{{from}} until promoted.",
+    "quarantineBtn": "Quarantine",
+    "quarantinePlaceholder": "Quarantine reason (>= 4 chars)...",
+    "quarantineReasonLabel": "Quarantine reason"
   },
   "learn": {
     "revLabel": "Revision",
@@ -599,6 +607,7 @@
     "retryBtn": "Retry",
     "cronPlaceholder": "0 */5 * * * *",
     "upstreamUrlPlaceholder": "https://github.com/org/repo",
-    "saveScheduleBtn": "Save Schedule"
+    "saveScheduleBtn": "Save Schedule",
+    "vaultTokenRequired": "Vault github token required"
   }
 }

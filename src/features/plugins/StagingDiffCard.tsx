@@ -7,6 +7,7 @@ import type { PluginSummaryDto } from "../../lib/validations/plugins";
 
 const STAGING_ICON_SIZE = 13;
 const MIN_RATIONALE_CHARS = 4;
+const MAX_RATIONALE_CHARS = 500;
 
 export interface StagingDiffCardProps {
   plugin: PluginSummaryDto;
@@ -19,8 +20,8 @@ const StagingReasonsList: React.FC<{ reasons: string[] }> = ({ reasons }) => {
   if (reasons.length === 0) return null;
   return (
     <ul className="plugin-eco-meta" style={{ margin: 0, paddingLeft: "16px" }}>
-      {reasons.map((reason) => (
-        <li key={reason}>{reason}</li>
+      {reasons.map((reason, idx) => (
+        <li key={`${idx}:${reason}`}>{reason}</li>
       ))}
     </ul>
   );
@@ -36,7 +37,7 @@ const StagingActionBar: React.FC<{
   const [reason, setReason] = useState("");
   const isPromoting = pendingActionId === `promote:${plugin.id}`;
   const isDiscarding = pendingActionId === `discard:${plugin.id}`;
-  const busy = pendingActionId !== null;
+  const busy = isPromoting || isDiscarding;
   const reasonValid = reason.trim().length >= MIN_RATIONALE_CHARS;
   return (
     <>
@@ -45,6 +46,7 @@ const StagingActionBar: React.FC<{
         className="plugin-eco-rationale-input"
         data-testid={`input-staging-reason-${plugin.pluginSlug}`}
         minLength={MIN_RATIONALE_CHARS}
+        maxLength={MAX_RATIONALE_CHARS}
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder={t("plugins.rationalePlaceholder", "Enter rationale (>= 4 chars)...")}
@@ -82,6 +84,15 @@ export const StagingDiffCard: React.FC<StagingDiffCardProps> = ({
   const { t } = useTranslation();
   if (!plugin.breakingChangeIsolated || !plugin.stagingVersion) return null;
 
+  const reasonCount = plugin.stagingDiffReasons.length;
+  const impactSummary = t(
+    "plugins.stagingImpactSummary",
+    `Updating v${plugin.version} -> v${plugin.stagingVersion} introduces ${reasonCount} breaking change(s); active runs stay pinned to v${plugin.version} until promoted.`
+  )
+    .replace("{{from}}", plugin.version)
+    .replace("{{to}}", plugin.stagingVersion)
+    .replace("{{count}}", String(reasonCount));
+
   return (
     <div
       className="plugin-eco-staging-diff"
@@ -97,6 +108,9 @@ export const StagingDiffCard: React.FC<StagingDiffCardProps> = ({
         </div>
         <span className="plugin-eco-badge plugin-eco-badge-human">HUMAN_ONLY</span>
       </div>
+      <p className="plugin-eco-meta" data-testid={`staging-impact-summary-${plugin.pluginSlug}`} style={{ margin: 0 }}>
+        {impactSummary}
+      </p>
       <StagingReasonsList reasons={plugin.stagingDiffReasons} />
       <StagingActionBar
         plugin={plugin}

@@ -1,7 +1,10 @@
 // @story 08.3
 // @implements AC-03, AC-05
+import { diffParameterSchemas, stableJsonEqual } from "./breaking-schema-diff";
 import { PluginLifecycleError } from "./lifecycle-errors";
 import type { BreakingDiffReport } from "./lifecycle-types";
+
+export { stableJsonEqual };
 
 export interface DiffableManifest {
   version: string;
@@ -37,68 +40,6 @@ export function compareSemVer(a: SemVer, b: SemVer): number {
   if (a.minor !== b.minor) return a.minor < b.minor ? -1 : 1;
   if (a.patch !== b.patch) return a.patch < b.patch ? -1 : 1;
   return 0;
-}
-
-/** Deterministic key-order-independent JSON equality check matching Rust Option omitted-key semantics. */
-export function stableJsonEqual(a: unknown, b: unknown): boolean {
-  const norm = (v: unknown): unknown => {
-    if (Array.isArray(v)) return v.map((item) => (item === undefined ? null : norm(item)));
-    if (v && typeof v === "object") {
-      const obj = v as Record<string, unknown>;
-      return Object.fromEntries(
-        Object.keys(obj).sort().filter((k) => obj[k] !== undefined).map((k) => [k, norm(obj[k])])
-      );
-    }
-    return v ?? null;
-  };
-  return JSON.stringify(norm(a)) === JSON.stringify(norm(b));
-}
-
-const asRecord = (val: unknown): Record<string, unknown> | null =>
-  val !== null && typeof val === "object" && !Array.isArray(val) ? (val as Record<string, unknown>) : null;
-
-function canonicalTypeKey(schemaVal: unknown): string {
-  const rawType = asRecord(schemaVal)?.type;
-  if (rawType === undefined) return "__NONE__";
-  if (typeof rawType === "string") return `SET:${JSON.stringify([rawType])}`;
-  if (Array.isArray(rawType) && rawType.every((x) => typeof x === "string")) {
-    return `SET:${JSON.stringify([...new Set(rawType)].sort())}`;
-  }
-  return `RAW:${JSON.stringify(rawType)}`;
-}
-
-function diffParameterSchemas(current: unknown, candidate: unknown, reasons: string[]): void {
-  const curNull = current === null || current === undefined;
-  const candNull = candidate === null || candidate === undefined;
-  if (curNull || candNull) {
-    if (!curNull && candNull) reasons.push("Parameter schema removed completely");
-    else if (curNull && !candNull) {
-      const candObj = asRecord(candidate);
-      if (candObj && Array.isArray(candObj.required) && candObj.required.length > 0) reasons.push("Added new required parameters without existing schema");
-      else if (!candObj) reasons.push("Parameter schema structural type changed (expected JSON object)");
-    }
-    return;
-  }
-  const curObj = asRecord(current);
-  const candObj = asRecord(candidate);
-  if (!curObj || !candObj) {
-    if (!stableJsonEqual(current, candidate)) reasons.push("Parameter schema structural type changed");
-    return;
-  }
-  const curReq = new Set(Array.isArray(curObj.required) ? curObj.required.filter((v): v is string => typeof v === "string") : []);
-  const candReq = new Set(Array.isArray(candObj.required) ? candObj.required.filter((v): v is string => typeof v === "string") : []);
-  for (const added of candReq) if (!curReq.has(added)) reasons.push(`Added new required parameter '${added}'`);
-  for (const removed of curReq) if (!candReq.has(removed)) reasons.push(`Removed previously required parameter '${removed}'`);
-
-  const curProps = asRecord(curObj.properties);
-  const candProps = asRecord(candObj.properties);
-  if (curProps && candProps) {
-    for (const [propName, oldVal] of Object.entries(curProps)) {
-      const nextVal = candProps[propName];
-      if (nextVal === undefined) reasons.push(`Removed parameter property '${propName}'`);
-      else if (canonicalTypeKey(oldVal) !== canonicalTypeKey(nextVal)) reasons.push(`Parameter '${propName}' type changed`);
-    }
-  } else if (curProps && !candProps) reasons.push("Removed parameter 'properties' definition");
 }
 
 /** Authoritative structural manifest & SemVer breaking-change detector matching Rust plugin-host (EC-E08-03). */

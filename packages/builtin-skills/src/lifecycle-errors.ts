@@ -51,7 +51,8 @@ export type LearnErrorCode =
   | "ReplayedApprovalNonce"
   | "InvalidCardTransition"
   | "RevisionConflict"
-  | "CapacityExceeded";
+  | "CapacityExceeded"
+  | "EntropyUnavailable";
 
 /** Typed LEARN pipeline error carrying a machine-readable discriminant code for callers. */
 export class LearnError extends Error {

@@ -42,17 +42,54 @@ function hasTagEventHandlerAttr(lower: string): boolean {
   return false;
 }
 
+function decodeHtmlEntitiesLower(input: string): string {
+  const named: Record<string, string> = {
+    lt: "<",
+    gt: ">",
+    colon: ":",
+    amp: "&",
+    quot: "\"",
+    apos: "'",
+  };
+  return input
+    .replace(/&#x([0-9a-f]+);?/gi, (_m, hex: string) => {
+      const code = Number.parseInt(hex, 16);
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "";
+    })
+    .replace(/&#([0-9]+);?/g, (_m, dec: string) => {
+      const code = Number.parseInt(dec, 10);
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "";
+    })
+    .replace(/&([a-z]+);?/gi, (m, name: string) => named[name.toLowerCase()] ?? m)
+    .toLowerCase();
+}
+
 export function scanSkillMarkdownSafety(label: string, content: string): void {
-  if (/[\u200B-\u200F\u2028-\u202E\u2066-\u2069\uFEFF\u{E0001}-\u{E007F}]/u.test(content)) {
+  if (/[\u00AD\u034F\u061C\u180E\u200B-\u200F\u2028-\u202E\u2060-\u2069\uFE00-\uFE0F\uFEFF]|\uDB40[\uDC01-\uDC7F]/u.test(content)) {
     throw new Error(`Disallowed zero-width or bidirectional control Unicode character in ${label}`);
   }
   const scanSlice = (text: string): void => {
-    const norm = text.replace(/&#0*58;/gi, ":").replace(/&#x0*3a;/gi, ":").toLowerCase();
+    const norm = decodeHtmlEntitiesLower(text);
     const compact = norm.replace(/\s+/g, "");
-    for (const tag of ["<important", "</important", "<system", "</system", "<!--", "-->", "<img", "<script", "<iframe", "<object", "<embed", "<image", "@import", "dangerously" + "setinnerhtml"]) {
-      if (norm.includes(tag)) throw new Error(`Indirect prompt injection or active tag '${tag}' disallowed in ${label}`);
+    for (const tag of [
+      "<important", "</important", "<system", "</system",
+      "<learned_cards_data", "</learned_cards_data", "<skill_catalog_data", "</skill_catalog_data",
+      "<learn_context", "</learn_context", "<assistant", "</assistant", "<tool_call", "</tool_call",
+      "<!--", "-->", "<img", "<script", "<iframe", "<object", "<embed", "<image",
+      "<style", "<link", "<meta", "<animate", "<set", "<use",
+      "@import", "dangerously" + "setinnerhtml",
+    ]) {
+      if (norm.includes(tag) || compact.includes(tag)) {
+        throw new Error(`Indirect prompt injection or active tag '${tag}' disallowed in ${label}`);
+      }
     }
-    if (compact.includes("javascript:") || compact.includes("data:text/html") || hasTagEventHandlerAttr(norm)) {
+    if (
+      compact.includes("javascript:") ||
+      compact.includes("vbscript:") ||
+      compact.includes("data:text/html") ||
+      compact.includes("data:image/svg+xml") ||
+      hasTagEventHandlerAttr(norm)
+    ) {
       throw new Error(`Disallowed active script URI or event handler in ${label}`);
     }
     if (/!\[[^\]]*\]\([^)]*\)/.test(norm) || /!\[[^\]]*\][\s]*\[[^\]]*\]/.test(norm)) {

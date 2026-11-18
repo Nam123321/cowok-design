@@ -120,6 +120,44 @@ describe("Story 08.3 Hardened: Lifecycle, Split-Brain Parity, Confused Deputy & 
     const matchingSkillMd = GOLDEN.plugin.staged_clean_skill_md.replace("risk_tier: 2\n", "risk_tier: 2\nentry_point: scripts/check.js\n");
     entryPlugin.promoteStaging({ manifest: scriptCand, skill_md: matchingSkillMd, scripts: [GOLDEN.plugin.staged_clean_script] }, entryPlugin.snapshot.revision);
 
+    // Malicious references/assets must NOT be stripped by StagedPluginBundleSchema inside promoteStaging
+    expect(() =>
+      sm.promoteStaging(
+        {
+          manifest: breaking,
+          skill_md: GOLDEN.plugin.staged_clean_skill_md,
+          scripts: [GOLDEN.plugin.staged_clean_script],
+          references: [{ rel_path: "references/guide.md", content: "<script>alert(1)</script>" }],
+        },
+        stagedRev
+      )
+    ).toThrow("StagingPromotionRejected");
+    expect(() =>
+      sm.promoteStaging(
+        {
+          manifest: breaking,
+          skill_md: GOLDEN.plugin.staged_clean_skill_md,
+          scripts: [GOLDEN.plugin.staged_clean_script],
+          assets: [{ rel_path: "assets/badge.svg", bytes: Array.from(Buffer.from("<svg onload=alert(1)/>", "utf8")) }],
+        },
+        stagedRev
+      )
+    ).toThrow("StagingPromotionRejected");
+
+    // assertManifestContract rejects traversal/absolute entry_point in persisted manifests
+    expect(() =>
+      PluginStateMachine.withScope("t1", "p1", "plug-bad-ep", "bad-ep", {
+        ...v1,
+        entry_point: "../escape.js",
+      })
+    ).toThrow("InvalidManifestField");
+    expect(() =>
+      PluginStateMachine.withScope("t1", "p1", "plug-abs-ep", "abs-ep", {
+        ...v1,
+        entry_point: "/etc/passwd",
+      })
+    ).toThrow("InvalidManifestField");
+
     sm.promoteStaging({ manifest: breaking, skill_md: GOLDEN.plugin.staged_clean_skill_md, scripts: [GOLDEN.plugin.staged_clean_script] }, stagedRev);
     expect(sm.snapshot.version).toBe("2.0.0");
     expect(sm.snapshot.breaking_change_isolated).toBe(false);
@@ -265,5 +303,42 @@ describe("Story 08.3 Hardened: Lifecycle, Split-Brain Parity, Confused Deputy & 
       action: "UNMAPPED_FATAL",
       error: "boom",
     });
+
+    // Rejects tampered persisted provenance & normalizes ms GateReport timestamps + NaN maxTokens
+    const auth = HumanSessionAuthority.fromKeyBytes(crypto.randomBytes(32));
+    const pipe = new LearnPipeline(auth);
+    const msCard = pipe.proposeCardFromGateReport("t1", "p1", "card-ms", {
+      gate_report: { gate_name: "audit", passed: false, checker_id: "c", timestamp: 1700000000123, evidence_hash: "b".repeat(64) },
+    });
+    expect(msCard.created_at).toBe(1700000000);
+    expect(() =>
+      LearnPipeline.fromPersistedState(auth, [{ ...msCard, accepted_at: 1700000001 }], [], 1700000010)
+    ).toThrow("InvalidCardInput");
+    expect(pipe.renderPromptFencedCards("t1", "p1", Number.NaN).card_ids).toEqual([]);
+    const baseManifest = { version: "1.0.0", entry_point: "SKILL.md", parameters: { type: "object", properties: { mode: { type: "string" } } } };
+    expect(
+      detectBreakingChange(baseManifest, {
+        version: "1.0.1",
+        entry_point: "SKILL.md",
+        parameters: { type: "object", properties: { mode: { type: "string", const: "strict" } } },
+      }).is_breaking
+    ).toBe(true);
+    expect(
+      detectBreakingChange(baseManifest, {
+        version: "1.0.1",
+        entry_point: "SKILL.md",
+        parameters: { type: "object", oneOf: [{ required: ["mode"] }] },
+      }).is_breaking
+    ).toBe(true);
+    expect(
+      detectBreakingChange(
+        {
+          version: "1.0.0",
+          entry_point: "SKILL.md",
+          parameters: { type: "object", properties: { mode: { type: "string", const: null } } },
+        },
+        baseManifest
+      ).is_breaking
+    ).toBe(true);
   });
 });

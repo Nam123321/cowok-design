@@ -1,6 +1,6 @@
 // @story 08.2
 // @implements AC-03, AC-05, AC-07
-use crate::staging::{shadow_nfkc_fold, validate_staged_prompt_content};
+use crate::staging::{shadow_nfkc_fold, validate_staged_prompt_base};
 use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,7 +75,16 @@ fn extension_lowercase(filename: &str) -> Option<String> {
 fn is_hidden_or_bidi(c: char) -> bool {
     matches!(
         c as u32,
-        0x200B..=0x200F | 0x2028..=0x202E | 0x2066..=0x2069 | 0xFEFF | 0xE0001..=0xE007F
+        0x00AD
+            | 0x034F
+            | 0x061C
+            | 0x180E
+            | 0x200B..=0x200F
+            | 0x2028..=0x202E
+            | 0x2060..=0x2069
+            | 0xFE00..=0xFE0F
+            | 0xFEFF
+            | 0xE0001..=0xE007F
     )
 }
 
@@ -248,6 +257,9 @@ fn contains_call_or_indirect(haystack: &str, ident: &str) -> bool {
                 || trimmed.starts_with("?.(")
                 || trimmed.starts_with(')')
                 || trimmed.starts_with(',')
+                || trimmed.starts_with(':')
+                || trimmed.starts_with('}')
+                || trimmed.starts_with(']')
             {
                 return true;
             }
@@ -257,7 +269,13 @@ fn contains_call_or_indirect(haystack: &str, ident: &str) -> bool {
                 && !before.ends_with("!=")
                 && !before.ends_with("<=")
                 && !before.ends_with(">=");
-            if before.ends_with(',') || is_assign || trimmed.starts_with(';') {
+            if before.ends_with(',')
+                || before.ends_with(':')
+                || before.ends_with('{')
+                || before.ends_with('[')
+                || is_assign
+                || trimmed.starts_with(';')
+            {
                 return true;
             }
         }
@@ -380,6 +398,33 @@ fn detect_eval_tell(filename: &str, cased: &str, lower: &str) -> bool {
         "[\"eval\"]",
         "['eval']",
         "[`eval`]",
+        "[\"fromcharcode\"]",
+        "['fromcharcode']",
+        "[`fromcharcode`]",
+        "[\"fromcodepoint\"]",
+        "['fromcodepoint']",
+        "require(\"child_process\")",
+        "require('child_process')",
+        "require(\"fs\")",
+        "require('fs')",
+        "require(\"node:fs\")",
+        "require('node:fs')",
+        "require(\"http\")",
+        "require('http')",
+        "require(\"https\")",
+        "require('https')",
+        "require(\"net\")",
+        "require('net')",
+        "import(\"child_process\"",
+        "import('child_process'",
+        "import(\"node:",
+        "import('node:",
+        "deno.run",
+        "deno.command",
+        "node:child_process",
+        "node:vm",
+        "vm.runinnewcontext",
+        "vm.runinthiscontext",
         "base64 -d",
         "base64 --decode",
         "buffer.from(",
@@ -399,7 +444,11 @@ fn detect_eval_tell(filename: &str, cased: &str, lower: &str) -> bool {
         return true;
     }
     let ext = extension_lowercase(filename).unwrap_or_default();
-    if matches!(ext.as_str(), "sh" | "bash" | "zsh") && contains_bare_word(lower, "eval") {
+    if matches!(ext.as_str(), "sh" | "bash" | "zsh")
+        && (contains_bare_word(lower, "eval")
+            || lower.contains("bash -c")
+            || lower.contains("sh -c"))
+    {
         return true;
     }
     let exec_exts = ["py", "js", "mjs", "cjs", "ts", "tsx", "jsx"];
@@ -429,6 +478,9 @@ fn detect_network_or_traversal(
         "curl|",
         "wget ",
         "wget|",
+        "websocket(",
+        "navigator.sendbeacon",
+        "xmlhttprequest",
     ];
     for tell in net_tells {
         if lower.contains(tell) {
@@ -469,21 +521,27 @@ pub fn scan_external_script_security(
     filename: &str,
     content: &str,
 ) -> Result<(), RepackageSecurityError> {
-    for (idx, (cased, lower)) in normalize_script_for_scan_dual(content)
-        .into_iter()
-        .enumerate()
-    {
-        let line_num = idx + 1;
-        if let Some(tell) = detect_command_tell(filename, &lower) {
-            return Err(RepackageSecurityError::CommandInjectionTell {
-                pattern: tell.to_string(),
-                line: line_num,
-            });
+    let folded_nfkc = shadow_nfkc_fold(content);
+    for slice in [content, folded_nfkc.as_str()] {
+        for (idx, (cased, lower)) in normalize_script_for_scan_dual(slice)
+            .into_iter()
+            .enumerate()
+        {
+            let line_num = idx + 1;
+            if let Some(tell) = detect_command_tell(filename, &lower) {
+                return Err(RepackageSecurityError::CommandInjectionTell {
+                    pattern: tell.to_string(),
+                    line: line_num,
+                });
+            }
+            if detect_eval_tell(filename, &cased, &lower) {
+                return Err(RepackageSecurityError::ArbitraryCodeEvaluation { line: line_num });
+            }
+            detect_network_or_traversal(&lower, &lower, line_num)?;
         }
-        if detect_eval_tell(filename, &cased, &lower) {
-            return Err(RepackageSecurityError::ArbitraryCodeEvaluation { line: line_num });
+        if folded_nfkc == content {
+            break;
         }
-        detect_network_or_traversal(&lower, &lower, line_num)?;
     }
     Ok(())
 }
@@ -556,43 +614,83 @@ fn contains_event_handler_attr(lower: &str) -> bool {
     false
 }
 
-fn decode_colon_entities(lower: &str) -> String {
+fn decode_html_entities_lower(lower: &str) -> String {
     let mut out = String::with_capacity(lower.len());
     let bytes = lower.as_bytes();
     let mut i = 0usize;
     while i < bytes.len() {
-        if bytes[i] == b'&' && bytes.get(i + 1) == Some(&b'#') {
-            let mut j = i + 2;
-            let is_hex = bytes.get(j) == Some(&b'x');
-            if is_hex {
-                j += 1;
-            }
-            while j < bytes.len() && bytes[j] == b'0' {
-                j += 1;
-            }
-            let matched = if is_hex {
-                bytes.get(j..j + 3) == Some(b"3a;")
-            } else {
-                bytes.get(j..j + 3) == Some(b"58;")
-            };
-            if matched {
-                out.push(':');
-                i = j + 3;
+        if bytes[i] == b'&' {
+            if let Some((entity_char, len)) = try_decode_named_entity(&bytes[i..]) {
+                out.push(entity_char.to_ascii_lowercase());
+                i += len;
                 continue;
             }
+            if bytes.get(i + 1) == Some(&b'#') {
+                let mut j = i + 2;
+                let is_hex = bytes.get(j) == Some(&b'x');
+                if is_hex {
+                    j += 1;
+                }
+                let start_digits = j;
+                while j < bytes.len()
+                    && j - start_digits < 8
+                    && ((is_hex && bytes[j].is_ascii_hexdigit())
+                        || (!is_hex && bytes[j].is_ascii_digit()))
+                {
+                    j += 1;
+                }
+                if j > start_digits {
+                    let digits = std::str::from_utf8(&bytes[start_digits..j]).unwrap_or("");
+                    let code = u32::from_str_radix(digits, if is_hex { 16 } else { 10 }).ok();
+                    if let Some(ch) = code.and_then(|cp| (cp <= 0x7F).then_some(cp as u8 as char)) {
+                        if !ch.is_control() || ch == '\t' || ch == '\n' || ch == '\r' {
+                            out.push(ch.to_ascii_lowercase());
+                            i = if bytes.get(j) == Some(&b';') {
+                                j + 1
+                            } else {
+                                j
+                            };
+                            continue;
+                        }
+                    }
+                }
+            }
         }
-        out.push(lower[i..].chars().next().unwrap_or_default());
-        i += lower[i..].chars().next().map_or(1, char::len_utf8);
+        let ch = lower[i..].chars().next().unwrap_or_default();
+        out.push(ch);
+        i += ch.len_utf8();
     }
     out
 }
 
+fn try_decode_named_entity(slice: &[u8]) -> Option<(char, usize)> {
+    const NAMED: &[(&[u8], char)] = &[
+        (b"&lt;", '<'),
+        (b"&gt;", '>'),
+        (b"&colon;", ':'),
+        (b"&amp;", '&'),
+        (b"&quot;", '"'),
+        (b"&apos;", '\''),
+    ];
+    for &(pat, ch) in NAMED {
+        if slice.starts_with(pat) {
+            return Some((ch, pat.len()));
+        }
+    }
+    None
+}
+
 fn scan_normalized_markdown_slice(label: &str, text: &str) -> Result<(), RepackageSecurityError> {
-    let entity_norm = decode_colon_entities(&text.to_ascii_lowercase());
-    let compact_scheme: String = entity_norm.chars().filter(|c| !c.is_whitespace()).collect();
+    let entity_norm = decode_html_entities_lower(&text.to_ascii_lowercase());
+    let compact_scheme: String = entity_norm
+        .chars()
+        .filter(|c| !c.is_whitespace() && !c.is_control())
+        .collect();
     if contains_ref_markdown_image(&entity_norm)
         || compact_scheme.contains("javascript:")
+        || compact_scheme.contains("vbscript:")
         || compact_scheme.contains("data:text/html")
+        || compact_scheme.contains("data:image/svg+xml")
     {
         return Err(RepackageSecurityError::PromptInjectionOrBeacon {
             label: label.to_string(),
@@ -604,11 +702,27 @@ fn scan_normalized_markdown_slice(label: &str, text: &str) -> Result<(), Repacka
         "</important",
         "<system",
         "</system",
+        "<learned_cards_data",
+        "</learned_cards_data",
+        "<skill_catalog_data",
+        "</skill_catalog_data",
+        "<learn_context",
+        "</learn_context",
+        "<assistant",
+        "</assistant",
+        "<tool_call",
+        "</tool_call",
         "<script",
         "<iframe",
         "<object",
         "<embed",
         "<image",
+        "<style",
+        "<link",
+        "<meta",
+        "<animate",
+        "<set",
+        "<use",
         "@import",
         concat!("dangerously", "setinnerhtml"),
     ] {
@@ -633,7 +747,7 @@ pub fn scan_skill_markdown_safety(
     label: &str,
     content: &str,
 ) -> Result<(), RepackageSecurityError> {
-    validate_staged_prompt_content(content).map_err(|err| {
+    validate_staged_prompt_base(content).map_err(|err| {
         RepackageSecurityError::PromptInjectionOrBeacon {
             label: label.to_string(),
             detail: err.to_string(),
@@ -808,5 +922,24 @@ export function calculatePadding(w: number): number {
             err,
             RepackageSecurityError::ArbitraryCodeEvaluation { line: 1 }
         );
+    }
+
+    #[test]
+    fn test_rejects_party_r2_evasion_vectors() {
+        assert!(scan_external_script_security("destr.js", "const { f: eval } = { f: console.log }; const { execSync: run } = require('child_process');").is_err());
+        assert!(scan_external_script_security(
+            "fw.py",
+            "\u{FF45}\u{FF56}\u{FF41}\u{FF4C}(user_input)"
+        )
+        .is_err());
+        assert!(
+            scan_skill_markdown_safety("a.html", "<a href=\"&#106;avascript:alert(1)\">x</a>")
+                .is_err()
+        );
+        assert!(scan_skill_markdown_safety(
+            "b.md",
+            "<learned_cards_data>override</learned_cards_data>"
+        )
+        .is_err());
     }
 }

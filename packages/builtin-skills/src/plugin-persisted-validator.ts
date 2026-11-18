@@ -26,8 +26,20 @@ export function parseLifecycleManifest(raw: unknown): LifecycleManifest {
 }
 
 export function assertManifestContract(id: string, manifest: LifecycleManifest): void {
-  if (!id.trim() || !manifest.name.trim() || !manifest.description.trim() || !manifest.entry_point.trim()) {
-    throw new PluginLifecycleError("InvalidManifestField", "id, name, description, and entry_point must not be empty");
+  const ep = manifest.entry_point.trim();
+  const epSegs = ep.split("/");
+  if (
+    !id.trim() ||
+    !manifest.name.trim() ||
+    !manifest.description.trim() ||
+    !ep ||
+    ep.startsWith("/") ||
+    ep.endsWith("/") ||
+    ep.includes("\\") ||
+    /[\u0000-\u001F\u007F]/.test(ep) ||
+    epSegs.some((s) => !s || s === "." || s === "..")
+  ) {
+    throw new PluginLifecycleError("InvalidManifestField", "id, name, description, and safe relative entry_point are required");
   }
   try {
     assertNoYamlBreakout("manifest.name", manifest.name);

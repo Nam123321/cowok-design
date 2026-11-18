@@ -5,7 +5,7 @@ use std::ffi::CString;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
@@ -25,6 +25,16 @@ use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::PermissionsExt;
 #[cfg(unix)]
 use std::os::unix::io::{FromRawFd, OwnedFd};
+
+fn learn_ring_mutex() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn machine_secret_mutex() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -392,7 +402,37 @@ impl VaultStore {
         Ok(())
     }
 
+    fn scoped_key(tenant_id: &str, provider_id: &str) -> String {
+        let tid = tenant_id.trim();
+        let pid = provider_id.trim().to_ascii_lowercase();
+        format!("tenant::{tid}::{pid}")
+    }
+
+    fn workbench_secret_path(&self) -> PathBuf {
+        let state_root = std::env::var_os("COWOK_WORKBENCH_SECRET_DIR")
+            .or_else(|| std::env::var_os("XDG_STATE_HOME"))
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOME")
+                    .filter(|v| !v.is_empty())
+                    .map(|h| PathBuf::from(h).join(".local").join("state"))
+            })
+            .unwrap_or_else(|| self.cowok_dir.join("state-fallback"));
+        let mut hasher = Sha256::new();
+        hasher.update(self.cowok_dir.to_string_lossy().as_bytes());
+        let ws_hash = format!("{:x}", hasher.finalize());
+        state_root
+            .join("cowok-design")
+            .join("workbench-secrets")
+            .join(format!("{ws_hash}.secret"))
+    }
+
     fn load_or_init_machine_secret(&self) -> Result<Zeroizing<Vec<u8>>, String> {
+        let _guard = machine_secret_mutex()
+            .lock()
+            .map_err(|_| "Vault machine secret mutex poisoned".to_string())?;
+        #[cfg(test)]
         if let Ok(test_key) = std::env::var("COWOK_VAULT_TEST_KEY") {
             let trimmed = test_key.trim();
             if !trimmed.is_empty() {
@@ -408,6 +448,15 @@ impl VaultStore {
                     "Security violation: vault master key path is a symlink or non-file"
                         .to_string(),
                 );
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                if meta.nlink() != 1 {
+                    return Err(
+                        "Security violation: vault master key path is a hardlink".to_string()
+                    );
+                }
             }
             let raw = Zeroizing::new(
                 fs::read_to_string(&self.master_key_path)
@@ -549,20 +598,37 @@ impl VaultStore {
         secret: &str,
         master_passphrase: Option<&str>,
     ) -> Result<String, String> {
+        self.upsert_secret_scoped("local-default", provider_id, secret, master_passphrase)
+    }
+
+    pub fn upsert_secret_scoped(
+        &self,
+        tenant_id: &str,
+        provider_id: &str,
+        secret: &str,
+        master_passphrase: Option<&str>,
+    ) -> Result<String, String> {
+        let _guard = learn_ring_mutex()
+            .lock()
+            .map_err(|_| "Vault upsert mutex poisoned".to_string())?;
         let mut secrets = if self.vault_path.exists() {
             self.unseal_secrets(master_passphrase)?
         } else {
             BTreeMap::new()
         };
         let pid = provider_id.trim().to_ascii_lowercase();
-        secrets.insert(pid.clone(), secret.trim().to_string());
+        let scoped = Self::scoped_key(tenant_id, &pid);
+        secrets.insert(scoped.clone(), secret.trim().to_string());
         self.seal_secrets(&secrets, master_passphrase)?;
 
-        // Best-effort non-interactive OS Keychain sync when COWOK_OS_KEYCHAIN=1
         if std::env::var("COWOK_OS_KEYCHAIN").as_deref() == Ok("1") {
-            let _ = self.try_store_os_keychain(&pid, secret.trim());
+            let _ = self.try_store_os_keychain(&scoped, secret.trim());
         }
-        Ok(format!("vault://vault_0600/{pid}"))
+        if tenant_id.trim() == "local-default" {
+            Ok(format!("vault://vault_0600/{pid}"))
+        } else {
+            Ok(format!("vault://vault_0600/{tenant_id}/{pid}"))
+        }
     }
 
     pub fn delete_secret(
@@ -570,15 +636,35 @@ impl VaultStore {
         provider_id: &str,
         master_passphrase: Option<&str>,
     ) -> Result<(), String> {
+        self.delete_secret_scoped("local-default", provider_id, master_passphrase)
+    }
+
+    pub fn delete_secret_scoped(
+        &self,
+        tenant_id: &str,
+        provider_id: &str,
+        master_passphrase: Option<&str>,
+    ) -> Result<(), String> {
+        let _guard = learn_ring_mutex()
+            .lock()
+            .map_err(|_| "Vault delete mutex poisoned".to_string())?;
         let pid = provider_id.trim().to_ascii_lowercase();
+        let scoped = Self::scoped_key(tenant_id, &pid);
         if self.vault_path.exists() {
             let mut secrets = self.unseal_secrets(master_passphrase)?;
-            if secrets.remove(&pid).is_some() {
+            let mut removed = secrets.remove(&scoped).is_some();
+            if tenant_id == "local-default" {
+                removed |= secrets.remove(&pid).is_some();
+            }
+            if removed {
                 self.seal_secrets(&secrets, master_passphrase)?;
             }
         }
         if std::env::var("COWOK_OS_KEYCHAIN").as_deref() == Ok("1") {
-            let _ = self.try_delete_os_keychain(&pid);
+            let _ = self.try_delete_os_keychain(&scoped);
+            if tenant_id == "local-default" {
+                let _ = self.try_delete_os_keychain(&pid);
+            }
         }
         Ok(())
     }
@@ -587,6 +673,9 @@ impl VaultStore {
     /// so `HumanSessionAuthority::from_key_with_kid` & `LearnPipeline::register_authority` survive restarts and rotations.
     pub fn ensure_or_load_learn_signing_ring(&self) -> Result<LearnSigningKeyRing, String> {
         const RING_KEY: &str = "cowok_learn_hmac_ring_v1";
+        let _guard = learn_ring_mutex()
+            .lock()
+            .map_err(|_| "LEARN signing ring mutex poisoned".to_string())?;
         let secrets = if self.vault_path.exists() {
             self.unseal_secrets(None)?
         } else {
@@ -618,10 +707,91 @@ impl VaultStore {
         })
     }
 
+    /// Reads an already-provisioned interactive workbench secret from outside `.cowok-design/` (`0o600`, non-symlink).
+    pub fn read_existing_workbench_human_secret(
+        &self,
+    ) -> Result<Option<Zeroizing<String>>, String> {
+        let _guard = learn_ring_mutex()
+            .lock()
+            .map_err(|_| "Workbench secret mutex poisoned".to_string())?;
+        let secret_path = self.workbench_secret_path();
+        if !secret_path.exists() {
+            return Ok(None);
+        }
+        let meta = fs::symlink_metadata(&secret_path)
+            .map_err(|e| format!("Failed checking workbench secret metadata: {e}"))?;
+        if meta.file_type().is_symlink() || !meta.is_file() {
+            return Err(
+                "Security violation: workbench secret is a symlink or non-file".to_string(),
+            );
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            if meta.nlink() != 1 {
+                return Err("Security violation: workbench secret is a hardlink".to_string());
+            }
+        }
+        let raw = Zeroizing::new(
+            fs::read_to_string(&secret_path)
+                .map_err(|e| format!("Failed reading workbench secret: {e}"))?,
+        );
+        let trimmed = raw.trim();
+        if trimmed.len() >= 32 {
+            return Ok(Some(Zeroizing::new(trimmed.to_string())));
+        }
+        Ok(None)
+    }
+
+    /// Loads or initializes the out-of-workspace `0o600` interactive workbench secret
+    /// under XDG/HOME user-private state (outside `.cowok-design/` next to `daemon.lock`).
+    pub fn load_or_init_workbench_human_secret(&self) -> Result<Zeroizing<String>, String> {
+        if let Some(existing) = self.read_existing_workbench_human_secret()? {
+            return Ok(existing);
+        }
+        let _guard = learn_ring_mutex()
+            .lock()
+            .map_err(|_| "Workbench secret mutex poisoned".to_string())?;
+        let secret_path = self.workbench_secret_path();
+        if let Some(parent) = secret_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed creating workbench secret dir: {e}"))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
+                    .map_err(|e| format!("Failed enforcing 0o700 on workbench secret dir: {e}"))?;
+            }
+        }
+        let mut bytes = Zeroizing::new([0u8; 32]);
+        OsRng.fill_bytes(&mut *bytes);
+        let hex_secret: Zeroizing<String> =
+            Zeroizing::new(bytes.iter().map(|b| format!("{b:02x}")).collect::<String>());
+        Self::write_atomic_0600(&secret_path, hex_secret.as_bytes())?;
+        Ok(hex_secret)
+    }
+
     /// Rotates the active LEARN HMAC signing key while preserving retired keys so prior card signatures remain valid.
     pub fn rotate_learn_signing_key(&self) -> Result<LearnSigningKeyRing, String> {
         const RING_KEY: &str = "cowok_learn_hmac_ring_v1";
-        let current = self.ensure_or_load_learn_signing_ring()?;
+        let _guard = learn_ring_mutex()
+            .lock()
+            .map_err(|_| "LEARN signing ring mutex poisoned".to_string())?;
+        let current = {
+            let secrets = if self.vault_path.exists() {
+                self.unseal_secrets(None)?
+            } else {
+                BTreeMap::new()
+            };
+            if let Some(raw_json) = secrets.get(RING_KEY) {
+                serde_json::from_str::<PersistedLearnKeyRing>(raw_json)
+                    .map_err(|e| e.to_string())?
+                    .into_runtime()?
+            } else {
+                drop(_guard);
+                return self.ensure_or_load_learn_signing_ring();
+            }
+        };
         let mut retired_persisted: Vec<PersistedLearnKeyEntry> = current
             .retired
             .iter()
@@ -659,17 +829,33 @@ impl VaultStore {
         persisted.into_runtime()
     }
 
-    /// Loads optional GitHub PAT stored under `"github"` or `"github_plugins"` inside Vault `0o600`.
+    /// Loads optional GitHub PAT scoped to `tenant_id` (`"github_plugins"` or `"github"`) inside Vault `0o600`.
     pub fn get_github_sync_token(&self) -> Result<Option<Zeroizing<String>>, String> {
+        self.get_github_sync_token_scoped("local-default")
+    }
+
+    pub fn get_github_sync_token_scoped(
+        &self,
+        tenant_id: &str,
+    ) -> Result<Option<Zeroizing<String>>, String> {
         if !self.vault_path.exists() {
             return Ok(None);
         }
         let secrets = self.unseal_secrets(None)?;
-        for key in ["github_plugins", "github"] {
-            if let Some(val) = secrets.get(key) {
+        for provider in ["github_plugins", "github"] {
+            let scoped = Self::scoped_key(tenant_id, provider);
+            if let Some(val) = secrets.get(&scoped) {
                 let trimmed = val.trim();
                 if !trimmed.is_empty() {
                     return Ok(Some(Zeroizing::new(trimmed.to_string())));
+                }
+            }
+            if tenant_id == "local-default" {
+                if let Some(val) = secrets.get(provider) {
+                    let trimmed = val.trim();
+                    if !trimmed.is_empty() {
+                        return Ok(Some(Zeroizing::new(trimmed.to_string())));
+                    }
                 }
             }
         }
@@ -773,14 +959,34 @@ mod tests {
 
         let unsealed = store.unseal_secrets(None).expect("unseal should succeed");
         assert_eq!(
-            unsealed.get("anthropic").map(String::as_str),
+            unsealed
+                .get("tenant::local-default::anthropic")
+                .map(String::as_str),
             Some(secret_val)
         );
+        // Cross-tenant isolation: tenant-b upsert must not overwrite local-default
+        store
+            .upsert_secret_scoped("tenant-b", "anthropic", "sk-tenant-b-only", None)
+            .expect("tenant-b upsert");
+        let after_b = store.unseal_secrets(None).unwrap();
+        assert_eq!(
+            after_b
+                .get("tenant::local-default::anthropic")
+                .map(String::as_str),
+            Some(secret_val)
+        );
+        assert_eq!(
+            after_b
+                .get("tenant::tenant-b::anthropic")
+                .map(String::as_str),
+            Some("sk-tenant-b-only")
+        );
 
-        // Delete secret removes it cleanly
+        // Delete secret removes only the targeted tenant scope
         store.delete_secret("anthropic", None).unwrap();
         let after_del = store.unseal_secrets(None).unwrap();
-        assert!(!after_del.contains_key("anthropic"));
+        assert!(!after_del.contains_key("tenant::local-default::anthropic"));
+        assert!(after_del.contains_key("tenant::tenant-b::anthropic"));
     }
 
     #[test]

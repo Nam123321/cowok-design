@@ -11,7 +11,7 @@ pub use repackager_engine::{
 };
 pub use security_scanner::{
     classify_and_validate_source_asset, scan_external_script_security, scan_skill_markdown_safety,
-    RepackageAssetBucket, RepackageSecurityError,
+    validate_skill_metadata_text, RepackageAssetBucket, RepackageSecurityError,
 };
 pub use video_intake::{
     VideoFrameCheckpoint, VideoIntakeError, VideoIntakeProcessor, VideoStoryboardReceipt,

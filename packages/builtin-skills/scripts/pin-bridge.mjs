@@ -4,6 +4,7 @@
 import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "node:url";
 
 const pkgDir = path.resolve(__dirname_compat(), "..");
 const repoRoot = path.resolve(pkgDir, "../..");
@@ -11,10 +12,35 @@ const defaultBin = path.join(repoRoot, "target", "release", "plugin_host_repacka
 const defaultPinTs = path.join(pkgDir, "src", "bridge-pin.ts");
 
 function __dirname_compat() {
-  return path.dirname(new URL(import.meta.url).pathname);
+  return path.dirname(fileURLToPath(import.meta.url));
+}
+
+function isSafeDirNode(st) {
+  const uid = typeof process.getuid === "function" ? process.getuid() : null;
+  return st.isDirectory() && !st.isSymbolicLink() && (st.mode & 0o022) === 0 && (uid === null || st.uid === uid || st.uid === 0);
+}
+
+function assertAncestorsTrusted(targetPath) {
+  const macSyms = new Set(["tmp", "var", "etc"]);
+  const parts = path.resolve(path.dirname(targetPath)).split(path.sep).filter(Boolean);
+  let cur = path.sep;
+  for (let i = 0; i < parts.length; i++) {
+    if (process.platform === "darwin" && i === 0 && macSyms.has(parts[0])) {
+      const priv = fs.lstatSync("/private");
+      if (!isSafeDirNode(priv)) throw new Error("Untrusted /private ancestor directory");
+      cur = path.join("/private", parts[0]);
+    } else {
+      cur = path.join(cur, parts[i]);
+    }
+    const st = fs.lstatSync(cur);
+    if (!isSafeDirNode(st)) {
+      throw new Error(`Untrusted ancestor directory or symlink at ${cur}`);
+    }
+  }
 }
 
 export function hashVerifiedExecutable(binPath) {
+  assertAncestorsTrusted(binPath);
   const flags = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0);
   const fd = fs.openSync(binPath, flags);
   try {
@@ -37,7 +63,29 @@ export function writeBridgePinFile(binPath = defaultBin, outTsPath = defaultPinT
     `export const COMPILED_RELEASE_BRIDGE_SHA256: string | null = "${sha}";`,
     "",
   ].join("\n");
-  fs.writeFileSync(outTsPath, content, "utf8");
+  const absOut = path.resolve(outTsPath);
+  const outDir = path.dirname(absOut);
+  const dirStat = fs.lstatSync(outDir);
+  if (dirStat.isSymbolicLink() || !dirStat.isDirectory()) {
+    throw new Error(`Unsafe pin output directory: ${outDir}`);
+  }
+  const tmpPath = path.join(outDir, `.${path.basename(absOut)}.tmp-${process.pid}-${crypto.randomBytes(4).toString("hex")}`);
+  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0);
+  let fd;
+  try {
+    fd = fs.openSync(tmpPath, flags, 0o644);
+    fs.writeFileSync(fd, content, "utf8");
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = undefined;
+    fs.renameSync(tmpPath, absOut);
+  } catch (err) {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch {}
+    }
+    try { fs.rmSync(tmpPath, { force: true }); } catch {}
+    throw err;
+  }
   return sha;
 }
 
@@ -54,7 +102,16 @@ export function verifyBridgePinFile(binPath = defaultBin, pinTsPath = defaultPin
   return actual;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (
+  process.argv[1] &&
+  (() => {
+    try {
+      return fs.realpathSync(fileURLToPath(import.meta.url)) === fs.realpathSync(path.resolve(process.argv[1]));
+    } catch {
+      return false;
+    }
+  })()
+) {
   const args = process.argv.slice(2);
   const verifyOnly = args.includes("--verify");
   const binIdx = args.indexOf("--bin");

@@ -86,10 +86,10 @@ links_to:
 
 | Story ID | Trạng thái Thực tế | Provides (Cung cấp) | Consumes (Tiêu thụ) | Zod Schema Status | Ghi chú & Rào chắn |
 |---|---|---|---|:---:|---|
-| **Story-08.1** | `completed` | **AC-02 (D2 Single Core Port & Domain Contracts):** Khóa `crates/plugin-host` là runtime thẩm quyền  | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
-| **Story-08.2** | `completed` | Cung cấp năng lực đóng gói, băm khóa SHA-256 và kiểm duyệt an toàn plugin cho `Story 08.3` và tầng t | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
-| **Story-08.3** | `completed` | Chặn bước nhảy trạng thái trái phép và cung cấp bộ mapping tương thích ngược `'ENABLED' -> 'ACTIVE'` | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
-| **Story-08.4** | `completed` | Chức năng Story 08.4: SQLite Additive Convergence, | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
+| **Story-08.1** | `completed` | **AC-02 (D2 Single Core Port & Domain Contracts):** Khóa `crates/plugin-host` là runtime thẩm quyền  | consumes_apis: [] | ✅ Đã đồng bộ (`ts-rs` + Zod) | Tuân thủ Zero-Trust Category A |
+| **Story-08.2** | `completed` | Cung cấp năng lực đóng gói, băm khóa SHA-256 và kiểm duyệt an toàn plugin cho `Story 08.3` và tầng t | consumes_apis: [] | ✅ Đã đồng bộ (`ts-rs` + Zod) | Tuân thủ Zero-Trust Category A |
+| **Story-08.3** | `completed` | Chặn bước nhảy trạng thái trái phép và cung cấp bộ mapping tương thích ngược `'ENABLED' -> 'ACTIVE'` | consumes_apis: [] | ✅ Đã đồng bộ (`ts-rs` + Zod) | Tuân thủ Zero-Trust Category A |
+| **Story-08.4** | `completed` | Chức năng Story 08.4: SQLite Additive Convergence, Daemon `HUMAN_ONLY` Auth, Cron Sync & Workbench UI | consumes_apis: ['08.1', '08.2', '08.3'] | ✅ Đã đồng bộ (`ts-rs` + Zod) | Tuân thủ Zero-Trust Category A |
 
 ---
 
@@ -165,24 +165,6 @@ flowchart TD
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
 
 <!-- END AUTO-ROADMAP -->
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-08.1](./Story-08.1/story.md) | Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host) | 01.1, 01.2 | completed |
-| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills) | 08.1 | completed |
-| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core) | 08.2 | completed |
-| [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | completed |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-08.1](./Story-08.1/story.md) | Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host) | 01.1, 01.2 | completed |
-| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills) | 08.1 | completed |
-| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core) | 08.2 | completed |
-| [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | completed |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-08.1](./Story-08.1/story.md) | Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host) | 01.1, 01.2 | completed |
-| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills) | 08.1 | completed |
-| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core) | 08.2 | completed |
-| [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | completed |
 | Story ID | Title | Dependencies | Status |
 |---|---|---|---|
 | [Story-08.1](./Story-08.1/story.md) | Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host) | 01.1, 01.2 | completed |

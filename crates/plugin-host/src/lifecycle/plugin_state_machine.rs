@@ -4,9 +4,12 @@ use crate::lifecycle::breaking_diff::{
     detect_breaking_change, parse_semver_strict, BreakingDiffReport, SemVerParseError,
 };
 use crate::models::SkillManifest;
-use crate::repackager::repackager_engine::load_verified_staged_bundle_from_dir;
+use crate::repackager::repackager_engine::{
+    load_verified_staged_bundle_from_dir, validate_safe_segment,
+};
 use crate::repackager::security_scanner::{
-    scan_external_script_security, scan_skill_markdown_safety, validate_skill_metadata_text,
+    classify_and_validate_source_asset, scan_external_script_security, scan_skill_markdown_safety,
+    validate_skill_metadata_text, RepackageAssetBucket,
 };
 use crate::validator::parse_and_validate_skill_frontmatter;
 use domain::models::SkillPlugin;
@@ -100,10 +103,25 @@ pub struct StagedScriptFile {
     feature = "ts",
     ts(export, export_to = "../../../packages/shared-types/src/generated/")
 )]
+pub struct StagedAssetFile {
+    pub rel_path: String,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts",
+    ts(export, export_to = "../../../packages/shared-types/src/generated/")
+)]
 pub struct StagedPluginBundle {
     pub manifest: SkillManifest,
     pub skill_md: String,
     pub scripts: Vec<StagedScriptFile>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub references: Vec<StagedScriptFile>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assets: Vec<StagedAssetFile>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -183,11 +201,17 @@ fn derive_plugin_slug(name: &str) -> String {
             prev_dash = true;
         }
     }
-    let trimmed = slug.trim_matches('-').to_string();
+    let trimmed = slug.trim_matches('-');
     if trimmed.is_empty() {
         "unnamed-plugin".to_string()
     } else {
-        trimmed
+        let capped: String = trimmed.chars().take(64).collect();
+        let clean = capped.trim_matches('-');
+        if clean.is_empty() {
+            "unnamed-plugin".to_string()
+        } else {
+            clean.to_string()
+        }
     }
 }
 
@@ -261,7 +285,10 @@ fn is_disallowed_path_char(c: char) -> bool {
         )
 }
 
-fn validate_safe_rel_script_path(rel_path: &str) -> Result<(), PluginLifecycleError> {
+fn validate_safe_rel_bundle_path(
+    rel_path: &str,
+    kind: &str,
+) -> Result<String, PluginLifecycleError> {
     if rel_path.is_empty()
         || rel_path.starts_with('/')
         || rel_path.contains('\\')
@@ -271,16 +298,21 @@ fn validate_safe_rel_script_path(rel_path: &str) -> Result<(), PluginLifecycleEr
             .any(|seg| seg.is_empty() || seg == "." || seg == "..")
     {
         return Err(PluginLifecycleError::StagingPromotionRejected(format!(
-            "Unsafe staged script path: '{rel_path}'"
+            "Unsafe staged {kind} path: '{rel_path}'"
         )));
     }
     let lower = rel_path.to_ascii_lowercase();
     let base = lower.rsplit('/').next().unwrap_or(&lower);
     if RESERVED_ROOT_NAMES.contains(&base) {
         return Err(PluginLifecycleError::StagingPromotionRejected(format!(
-            "Reserved bundle filename disallowed in scripts: '{rel_path}'"
+            "Reserved bundle filename disallowed in {kind}: '{rel_path}'"
         )));
     }
+    Ok(base.to_string())
+}
+
+fn validate_safe_rel_script_path(rel_path: &str) -> Result<(), PluginLifecycleError> {
+    let base = validate_safe_rel_bundle_path(rel_path, "script")?;
     let ext = base.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
     if !SCRIPT_EXTENSIONS.contains(&ext) {
         return Err(PluginLifecycleError::StagingPromotionRejected(format!(
@@ -389,6 +421,76 @@ fn validate_staged_bundle_contents(
             bundle.manifest.entry_point
         )));
     }
+    let mut seen_refs = BTreeSet::new();
+    for reference in &bundle.references {
+        validate_safe_rel_bundle_path(&reference.rel_path, "reference")?;
+        if !seen_refs.insert(reference.rel_path.clone()) {
+            return Err(PluginLifecycleError::StagingPromotionRejected(format!(
+                "Duplicate staged reference path: '{}'",
+                reference.rel_path
+            )));
+        }
+        let bucket =
+            classify_and_validate_source_asset(&reference.rel_path, reference.content.as_bytes())
+                .map_err(|e| {
+                PluginLifecycleError::StagingPromotionRejected(format!(
+                    "Reference '{}' rejected: {e}",
+                    reference.rel_path
+                ))
+            })?;
+        if bucket != RepackageAssetBucket::References {
+            return Err(PluginLifecycleError::StagingPromotionRejected(format!(
+                "Staged reference '{}' is not a valid reference document",
+                reference.rel_path
+            )));
+        }
+        scan_skill_markdown_safety(&reference.rel_path, &reference.content).map_err(|e| {
+            PluginLifecycleError::StagingPromotionRejected(format!(
+                "Reference '{}' rejected: {e}",
+                reference.rel_path
+            ))
+        })?;
+    }
+    let mut seen_assets = BTreeSet::new();
+    for asset in &bundle.assets {
+        validate_safe_rel_bundle_path(&asset.rel_path, "asset")?;
+        if !seen_assets.insert(asset.rel_path.clone()) {
+            return Err(PluginLifecycleError::StagingPromotionRejected(format!(
+                "Duplicate staged asset path: '{}'",
+                asset.rel_path
+            )));
+        }
+        let bucket =
+            classify_and_validate_source_asset(&asset.rel_path, &asset.bytes).map_err(|e| {
+                PluginLifecycleError::StagingPromotionRejected(format!(
+                    "Asset '{}' rejected: {e}",
+                    asset.rel_path
+                ))
+            })?;
+        match bucket {
+            RepackageAssetBucket::AssetsText => {
+                let text = std::str::from_utf8(&asset.bytes).map_err(|_| {
+                    PluginLifecycleError::StagingPromotionRejected(format!(
+                        "Text asset '{}' must be valid UTF-8",
+                        asset.rel_path
+                    ))
+                })?;
+                scan_skill_markdown_safety(&asset.rel_path, text).map_err(|e| {
+                    PluginLifecycleError::StagingPromotionRejected(format!(
+                        "Text asset '{}' rejected: {e}",
+                        asset.rel_path
+                    ))
+                })?;
+            }
+            RepackageAssetBucket::AssetsBinaryImage => {}
+            _ => {
+                return Err(PluginLifecycleError::StagingPromotionRejected(format!(
+                    "Staged asset '{}' is not a valid asset file",
+                    asset.rel_path
+                )));
+            }
+        }
+    }
     Ok(())
 }
 
@@ -433,6 +535,8 @@ impl ManagedPlugin {
                 "tenant_id, project_id, id, and plugin_slug must not be empty".to_string(),
             ));
         }
+        validate_safe_segment("plugin_slug", slug)
+            .map_err(PluginLifecycleError::InvalidManifestField)?;
         validate_manifest_contract(&clean)?;
         Ok(Self {
             id: cid.to_string(),
@@ -776,6 +880,8 @@ impl ManagedPlugin {
             manifest: normalize_manifest(bundle.manifest.clone()),
             skill_md: bundle.skill_md.clone(),
             scripts: bundle.scripts.clone(),
+            references: bundle.references.clone(),
+            assets: bundle.assets.clone(),
         };
         if expected_manifest != &norm_bundle.manifest {
             return Err(PluginLifecycleError::StagingPromotionRejected(

@@ -968,6 +968,8 @@ async fn test_02_vault_kid_rotation_ssrf_redirect_git_hardening_and_cron_fencing
         skill_md: "---\nname: staged-promote-skill\nversion: \"2.0.0\"\nrisk_tier: 3\ncapabilities_required:\n  - \"net:outbound\"\ndescription: \"Breaking v2 plugin\"\n---\n# Body\n"
             .into(),
         scripts: vec![],
+        references: vec![],
+        assets: vec![],
     };
     let staged_row = harness_daemon::routes::plugins_cron::apply_synced_bundle_to_plugin(
         &pool,
@@ -995,4 +997,1051 @@ async fn test_02_vault_kid_rotation_ssrf_redirect_git_hardening_and_cron_fencing
         .expect("promote_verified_staged_bundle_from_dir must verify & promote v2.0.0 cleanly");
     assert_eq!(managed_promote.version(), "2.0.0");
     assert!(!managed_promote.breaking_change_isolated());
+}
+
+#[tokio::test]
+async fn e2e_epic08_audit_remediation_verifies_real_git_bundle_fence_auth_and_flow_cards() {
+    use domain::{GateReport, SafeJsInteger};
+    use harness_daemon::routes::legacy_workbench_v6::validate_ssrf_safe_url;
+    use harness_daemon::routes::plugins_cron::{
+        cron_is_due, prepare_verified_bundle_from_clone, snapshot_from_plugin_row,
+    };
+    use plugin_host::{
+        ActorKind, CardDecisionAction, HumanSessionAuthority, LearnPipeline, MintTokenInput,
+        SkillManifest,
+    };
+    use spec_registry::plugin_store::{
+        claim_cron_lease, commit_cron_and_plugin_fenced, get_plugin_scoped, upsert_cron_schedule,
+        upsert_plugin_record, FencedCronCommit, PluginCasUpdateSpec,
+    };
+
+    let (_tmp, canon_root, pool, _reg, server, proj_a, _proj_b) = setup_test_daemon();
+    let lock = server.lock_info().clone();
+    let router = server.router();
+
+    // 1. Real git repository clone (WITH .git/ present!) must extract cleanly + reject hardlinks
+    let upstream_git = TempDir::new().expect("upstream git");
+    assert!(Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(upstream_git.path())
+        .status()
+        .expect("git init")
+        .success());
+    assert!(Command::new("git")
+        .args(["config", "user.email", "test@cowok.local"])
+        .current_dir(upstream_git.path())
+        .status()
+        .unwrap()
+        .success());
+    assert!(Command::new("git")
+        .args(["config", "user.name", "Test"])
+        .current_dir(upstream_git.path())
+        .status()
+        .unwrap()
+        .success());
+    std::fs::write(
+        upstream_git.path().join("SKILL.md"),
+        "---\nname: git-sync-skill\nversion: \"1.0.0\"\nrisk_tier: 1\ndescription: \"Git synced skill\"\n---\n# Body\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(upstream_git.path().join("scripts")).unwrap();
+    std::fs::write(
+        upstream_git.path().join("scripts/helper.ts"),
+        "export const ok = true;\n",
+    )
+    .unwrap();
+    assert!(Command::new("git")
+        .args(["add", "-A"])
+        .current_dir(upstream_git.path())
+        .status()
+        .unwrap()
+        .success());
+    assert!(Command::new("git")
+        .args(["commit", "-m", "init", "-q"])
+        .current_dir(upstream_git.path())
+        .status()
+        .unwrap()
+        .success());
+
+    let cloned_dest = TempDir::new().expect("clone dest");
+    assert!(Command::new("git")
+        .args([
+            "clone",
+            "-q",
+            upstream_git.path().to_str().unwrap(),
+            cloned_dest.path().to_str().unwrap(),
+        ])
+        .status()
+        .unwrap()
+        .success());
+    assert!(cloned_dest.path().join(".git").is_dir());
+
+    let plugin_id = Uuid::new_v4().to_string();
+    let seed_row = SkillPluginRow {
+        id: plugin_id.clone(),
+        tenant_id: "tenant-alpha".into(),
+        project_id: proj_a.clone(),
+        plugin_slug: "git-sync-skill".into(),
+        version: "1.0.0".into(),
+        lifecycle_state: "ACTIVE".into(),
+        source_type: "github".into(),
+        source_repo_url: "https://github.com/cowok-ai/git-sync-skill".into(),
+        upstream_repo_url: Some("https://github.com/cowok-ai/git-sync-skill".into()),
+        upstream_commit_sha: None,
+        cron_schedule: None,
+        skill_md_path: "SKILL.md".into(),
+        plugin_json_path: "plugin.json".into(),
+        manifest_json: serde_json::to_string(&SkillManifest {
+            name: "git-sync-skill".into(),
+            version: "1.0.0".into(),
+            description: "Git synced skill".into(),
+            entry_point: "SKILL.md".into(),
+            capabilities_required: vec![],
+            risk_tier: 1,
+            parameters: None,
+            tags: vec![],
+            prompt_overview: None,
+        })
+        .unwrap(),
+        last_synced_at: None,
+        revision: 1,
+        staging_version: None,
+        staging_manifest_json: None,
+        staging_diff_reasons_json: None,
+        staging_bundle_dir: None,
+        staging_package_sha256: None,
+        breaking_change_isolated: false,
+        quarantined: false,
+        quarantine_reason: None,
+        updated_at: 1_760_000_000_000,
+    };
+    upsert_plugin_record(&pool, &seed_row, None).unwrap();
+
+    let verified_bundle =
+        prepare_verified_bundle_from_clone(cloned_dest.path(), &seed_row).expect("real git bundle");
+    assert_eq!(verified_bundle.manifest.name, "git-sync-skill");
+
+    // Hardlink inside cloned checkout MUST fail closed
+    std::fs::hard_link(
+        cloned_dest.path().join("scripts/helper.ts"),
+        cloned_dest.path().join("scripts/hardlinked.ts"),
+    )
+    .unwrap();
+    let hl_err = prepare_verified_bundle_from_clone(cloned_dest.path(), &seed_row)
+        .expect_err("hardlink in cloned repo must fail closed");
+    assert!(hl_err.contains("hardlink rejected"));
+
+    // 2. Real cron_is_due & atomic fence-first commit (`commit_cron_and_plugin_fenced`)
+    assert!(!cron_is_due(
+        "0 0 * * *",
+        1_760_000_001_000,
+        1_760_000_016_000
+    ));
+    assert!(cron_is_due(
+        "*/15 * * * * *",
+        1_760_000_000_000,
+        1_760_000_020_000
+    ));
+
+    upsert_cron_schedule(
+        &pool,
+        "tenant-alpha",
+        &proj_a,
+        &plugin_id,
+        "*/5 * * * *",
+        "https://github.com/cowok-ai/git-sync-skill",
+        None,
+    )
+    .unwrap();
+    let stale_claim = claim_cron_lease(
+        &pool,
+        "tenant-alpha",
+        &proj_a,
+        &plugin_id,
+        "w1",
+        true,
+        1_760_000_000_000,
+        5_000,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        spec_registry::plugin_store::reap_stale_cron_leases(&pool, 1_760_000_010_000).unwrap(),
+        1
+    );
+    let newer_claim = claim_cron_lease(
+        &pool,
+        "tenant-alpha",
+        &proj_a,
+        &plugin_id,
+        "w2",
+        true,
+        1_760_000_010_000,
+        5_000,
+    )
+    .unwrap()
+    .unwrap();
+    assert!(newer_claim.fencing_token > stale_claim.fencing_token);
+
+    let mut candidate_plugin = seed_row.clone();
+    candidate_plugin.version = "1.0.1".into();
+    candidate_plugin.revision = 2;
+    let stale_commit_ok = commit_cron_and_plugin_fenced(
+        &pool,
+        &FencedCronCommit {
+            tenant_id: "tenant-alpha",
+            project_id: &proj_a,
+            plugin_id: &plugin_id,
+            fencing_token: stale_claim.fencing_token,
+            sync_status: "SUCCEEDED",
+            last_etag: None,
+            last_commit_sha: Some("deadbeef"),
+            consecutive_failures: 0,
+            next_retry_at: None,
+            last_error_code: None,
+            last_error_message: None,
+            updated_at: 1_760_000_020_000,
+        },
+        Some(PluginCasUpdateSpec {
+            expected_revision: 1,
+            next: &candidate_plugin,
+            audit: None,
+        }),
+    )
+    .unwrap();
+    assert!(
+        !stale_commit_ok,
+        "zombie worker MUST NOT mutate plugin or cron schedule when fenced"
+    );
+    let conn = pool.connection().unwrap();
+    let untouched = get_plugin_scoped(&conn, "tenant-alpha", &proj_a, &plugin_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(untouched.revision, 1);
+    assert_eq!(untouched.version, "1.0.0");
+    drop(conn);
+
+    // 3. Timestamp ms -> s normalization in propose_card_from_gate_report + V10 FLOW card + Actor matrix + 0o600 secret
+    let mut lp = LearnPipeline::default();
+    let auth = HumanSessionAuthority::random_ephemeral();
+    lp.register_authority(&auth);
+    let report = GateReport {
+        gate_name: "clean_code".into(),
+        passed: false,
+        checker_id: "audit".into(),
+        evidence_hash: "0123456789abcdef".repeat(4),
+        timestamp: SafeJsInteger::try_from(1_760_000_000_500i64).unwrap(),
+    };
+    let card = lp
+        .propose_card_from_gate_report("tenant-alpha", &proj_a, "card-ms-norm", None, &report, &[])
+        .expect("propose_card_from_gate_report");
+    let created_s = card.created_at;
+    let tok = auth
+        .mint_token(&MintTokenInput {
+            actor_kind: ActorKind::HumanWorkbenchSession,
+            actor_id: "op-1",
+            tenant_id: "tenant-alpha",
+            project_id: &proj_a,
+            card_id: "card-ms-norm",
+            content_sha256: &card.content_sha256,
+            action: CardDecisionAction::Accept,
+            expected_revision: 1,
+            reason: "Approved normalized ts",
+            nonce: "n-ms-norm-1",
+            ttl_s: 300,
+            now_s: created_s + 5,
+        })
+        .unwrap();
+    assert!(lp
+        .accept_card_verified(
+            "tenant-alpha",
+            &proj_a,
+            "card-ms-norm",
+            &tok,
+            1,
+            created_s + 10,
+        )
+        .is_ok());
+
+    let _guard = ENV_MUTEX.lock().await;
+    let disk_secret = VaultStore::from_workspace_root(&canon_root)
+        .load_or_init_workbench_human_secret()
+        .expect("0o600 workbench secret");
+    let prev_env = std::env::var("COWOK_WORKBENCH_HUMAN_SECRET").ok();
+    std::env::remove_var("COWOK_WORKBENCH_HUMAN_SECRET");
+    let (wb_st, wb_json) = send_raw(
+        &router,
+        "POST",
+        "/api/v1/auth/workbench-session",
+        &[
+            ("host".into(), format!("127.0.0.1:{}", lock.port)),
+            ("x-cowok-workbench-secret".into(), disk_secret.as_str().into()),
+            ("content-type".into(), "application/json".into()),
+        ],
+        serde_json::to_vec(&serde_json::json!({ "tenantId": "tenant-alpha", "userId": "human-attach", "role": "editor" })).unwrap(),
+    )
+    .await;
+    assert_eq!(
+        wb_st,
+        StatusCode::OK,
+        "disk 0o600 secret must attach seamlessly"
+    );
+    let attach_human_tok = wb_json["sessionToken"].as_str().unwrap().to_string();
+
+    let (adm_st, _) = send_raw(
+        &router,
+        "POST",
+        "/api/v1/auth/workbench-session",
+        &[
+            ("host".into(), format!("127.0.0.1:{}", lock.port)),
+            ("x-cowok-workbench-secret".into(), disk_secret.as_str().into()),
+            ("content-type".into(), "application/json".into()),
+        ],
+        serde_json::to_vec(&serde_json::json!({ "tenantId": "tenant-alpha", "userId": "human-attach", "role": "admin" })).unwrap(),
+    )
+    .await;
+    assert_eq!(
+        adm_st,
+        StatusCode::FORBIDDEN,
+        "workbench secret must NOT mint admin role"
+    );
+    if let Some(v) = prev_env {
+        std::env::set_var("COWOK_WORKBENCH_HUMAN_SECRET", v);
+    }
+
+    let agent_ctx = CallScope {
+        router: &router,
+        lock: &lock,
+        tenant_id: "tenant-alpha",
+        user_id: "agent-worker-1",
+        role: "editor",
+    };
+    let (dep_st, _) = signed_call(
+        &agent_ctx,
+        "POST",
+        &format!("/api/v1/plugins/{plugin_id}/transitions"),
+        &[],
+        Some(serde_json::json!({
+            "projectId": proj_a,
+            "targetState": "DEPRECATED",
+            "expectedRevision": 1
+        })),
+    )
+    .await;
+    assert_eq!(
+        dep_st,
+        StatusCode::FORBIDDEN,
+        "AgentHmac must NOT deprecate ACTIVE plugin"
+    );
+
+    let (flow_st, flow_json) = signed_call(
+        &agent_ctx,
+        "POST",
+        &format!("/api/v1/projects/{proj_a}/learn/cards"),
+        &[],
+        Some(serde_json::json!({
+            "category": "FLOW",
+            "title": "Flow orchestration invariant",
+            "content": "Always verify fence token before promoting staging.",
+            "sourceEvidence": "story-08.4-audit"
+        })),
+    )
+    .await;
+    assert_eq!(
+        flow_st,
+        StatusCode::OK,
+        "V10 FLOW card category must persist cleanly: {flow_json}"
+    );
+    let _ = attach_human_tok;
+    let _ = snapshot_from_plugin_row(&seed_row).unwrap();
+
+    // 4. IPv6 transition/multicast/NAT64-local SSRF rejections
+    for blocked in [
+        "https://[2001:0::1]/x",
+        "https://[2002:0a00:0001::1]/x",
+        "https://[ff02::1]/x",
+        "https://[64:ff9b:1::1]/x",
+    ] {
+        assert!(
+            validate_ssrf_safe_url(blocked, false).is_err(),
+            "{blocked} must fail closed"
+        );
+    }
+}
+
+#[tokio::test]
+async fn e2e_round2_audit_remediations_registry_quarantine_promote_and_cron() {
+    let (_tmp, canon_root, pool, _reg, server, proj_a, _proj_b) = setup_test_daemon();
+    let proj_a2 = Uuid::new_v4().to_string();
+    {
+        let conn = pool.connection().unwrap();
+        conn.execute(
+            "INSERT INTO projects (id, tenant_id, slug, name, product_brief, workspace_root, created_at, updated_at)
+             VALUES (?1, 'tenant-alpha', 'alpha-proj-2', 'Alpha Proj 2', 'Alpha Brief 2', '.', 1700000000000, 1700000000000)",
+            rusqlite::params![proj_a2],
+        )
+        .unwrap();
+    }
+    let lock = read_daemon_lock(&canon_root).expect("lock");
+    let router = server.router();
+    let human_tok = {
+        let _guard = ENV_MUTEX.lock().await;
+        std::env::set_var("COWOK_WORKBENCH_HUMAN_SECRET", "human-secret-084");
+        let tok =
+            issue_human_token_for_test(lock.port, &router, "tenant-alpha", "human-reviewer-r2")
+                .await;
+        std::env::remove_var("COWOK_WORKBENCH_HUMAN_SECRET");
+        tok
+    };
+    let human_ctx = CallScope {
+        router: &router,
+        lock: &lock,
+        tenant_id: "tenant-alpha",
+        user_id: "human-reviewer-r2",
+        role: "editor",
+    };
+
+    // Seed two builtin skills on disk under canon_root/packages/builtin-skills/skills
+    let builtins_root = canon_root
+        .join("packages")
+        .join("builtin-skills")
+        .join("skills");
+    for (slug, desc) in [
+        ("design-taste-and-ux-guard", "Builtin UX guard skill"),
+        ("flow-state-completer", "Builtin flow completer skill"),
+    ] {
+        let dir = builtins_root.join(slug);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("SKILL.md"),
+            format!(
+                "---\nname: {slug}\nversion: \"1.0.0\"\ndescription: \"{desc}\"\ncapabilities_required: [\"lint\"]\nrisk_tier: 1\n---\n# {slug}\n"
+            ),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("plugin.json"),
+            serde_json::to_string_pretty(&serde_json::json!({
+                "name": slug,
+                "version": "1.0.0",
+                "description": desc,
+                "entry_point": "SKILL.md",
+                "capabilities_required": ["lint"],
+                "risk_tier": 1
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+    }
+
+    let agent_ctx = CallScope {
+        router: &router,
+        lock: &lock,
+        tenant_id: "tenant-alpha",
+        user_id: "agent-worker-r2",
+        role: "editor",
+    };
+    let viewer_ctx = CallScope {
+        router: &router,
+        lock: &lock,
+        tenant_id: "tenant-alpha",
+        user_id: "viewer-r2",
+        role: "viewer",
+    };
+
+    // 1. GET /api/v1/plugins stays DB-only ([]), while GET /api/v1/plugins/registry returns merged builtins read-only
+    let (list_st, list_json) = signed_call(
+        &agent_ctx,
+        "GET",
+        &format!("/api/v1/plugins?projectId={proj_a}"),
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(list_st, StatusCode::OK);
+    assert_eq!(list_json.as_array().unwrap().len(), 0);
+
+    let (global_reg_st, global_reg_json) =
+        signed_call(&agent_ctx, "GET", "/api/v1/plugins/registry", &[], None).await;
+    assert_eq!(global_reg_st, StatusCode::OK);
+    let global_arr = global_reg_json.as_array().unwrap();
+    assert_eq!(global_arr[0]["projectId"], "global");
+    assert!(global_arr[0]["id"]
+        .as_str()
+        .unwrap()
+        .starts_with("builtin-"));
+    assert!(!global_arr[0]["id"].as_str().unwrap().contains(':'));
+
+    let (reg_st, reg_json) = signed_call(
+        &agent_ctx,
+        "GET",
+        &format!("/api/v1/plugins/registry?projectId={proj_a}"),
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(reg_st, StatusCode::OK, "registry failed: {reg_json}");
+    let reg_arr = reg_json.as_array().unwrap();
+    assert_eq!(reg_arr.len(), 2);
+    let scoped_design_id_a = reg_arr[0]["id"].as_str().unwrap().to_string();
+    let scoped_flow_id_a = reg_arr[1]["id"].as_str().unwrap().to_string();
+    assert!(scoped_design_id_a.starts_with("builtin-"));
+    assert!(scoped_design_id_a.ends_with("-design-taste-and-ux-guard"));
+    assert!(scoped_design_id_a.len() <= 64);
+    assert!(!scoped_design_id_a.contains(':'));
+    assert_eq!(
+        reg_arr[0]["sourceRepoUrl"],
+        "builtin://packages/builtin-skills/skills/design-taste-and-ux-guard"
+    );
+    assert_eq!(reg_arr[0]["projectId"], proj_a);
+    assert_eq!(reg_arr[0]["sourceType"], "builtin");
+    assert_eq!(reg_arr[0]["lifecycleState"], "ACTIVE");
+    assert_eq!(reg_arr[0]["enabled"], true);
+
+    // Project A2 (same tenant, distinct project) gets distinct scoped IDs isolated from Project A and global scope
+    let (reg_b_st, reg_b_json) = signed_call(
+        &agent_ctx,
+        "GET",
+        &format!("/api/v1/plugins/registry?projectId={proj_a2}"),
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(reg_b_st, StatusCode::OK);
+    let reg_b_arr = reg_b_json.as_array().unwrap();
+    let scoped_design_id_b = reg_b_arr[0]["id"].as_str().unwrap().to_string();
+    assert_ne!(scoped_design_id_a, scoped_design_id_b);
+    assert_ne!(scoped_design_id_a, global_arr[0]["id"].as_str().unwrap());
+
+    // Registry call MUST NOT materialize into SQLite
+    let (list_after_reg_st, list_after_reg_json) = signed_call(
+        &agent_ctx,
+        "GET",
+        &format!("/api/v1/plugins?projectId={proj_a}"),
+        &[],
+        None,
+    )
+    .await;
+    assert_eq!(list_after_reg_st, StatusCode::OK);
+    assert_eq!(list_after_reg_json.as_array().unwrap().len(), 0);
+
+    // 2. Transition scoped builtin id lazily materializes & deprecates it in Project A without touching Project B
+    let (tr_st, tr_json) = signed_call(
+        &human_ctx,
+        "POST",
+        &format!("/api/v1/plugins/{scoped_design_id_a}/transitions"),
+        &[("x-cowok-human-session", human_tok.as_str())],
+        Some(serde_json::json!({
+            "projectId": proj_a,
+            "targetState": "DEPRECATED",
+            "expectedRevision": 1,
+            "reason": "Deprecate first builtin for test"
+        })),
+    )
+    .await;
+    assert_eq!(
+        tr_st,
+        StatusCode::OK,
+        "builtin transition failed: {tr_json}"
+    );
+    assert_eq!(tr_json["id"], scoped_design_id_a);
+    assert_eq!(tr_json["lifecycleState"], "DEPRECATED");
+
+    // Project A2 can still independently quarantine its own design-taste-and-ux-guard without colliding with Project A
+    let (q_b_st, q_b_json) = signed_call(
+        &human_ctx,
+        "POST",
+        &format!("/api/v1/plugins/{scoped_design_id_b}/quarantine"),
+        &[("x-cowok-human-session", human_tok.as_str())],
+        Some(serde_json::json!({
+            "projectId": proj_a2,
+            "expectedRevision": 1,
+            "reason": "Project A2 isolated quarantine"
+        })),
+    )
+    .await;
+    assert_eq!(
+        q_b_st,
+        StatusCode::OK,
+        "proj_a2 quarantine failed: {q_b_json}"
+    );
+    assert_eq!(q_b_json["id"], scoped_design_id_b);
+    assert_eq!(q_b_json["projectId"], proj_a2);
+
+    // Cross-project PK upsert attempt with Project A's id into Project A2 must be blocked
+    let conn_check = pool.connection().unwrap();
+    let proj_a_row = spec_registry::plugin_store::get_plugin_scoped(
+        &conn_check,
+        "tenant-alpha",
+        &proj_a,
+        &scoped_design_id_a,
+    )
+    .unwrap()
+    .unwrap();
+    let mut forged_cross_proj = proj_a_row.clone();
+    forged_cross_proj.project_id = proj_a2.clone();
+    assert!(
+        spec_registry::plugin_store::upsert_plugin_record(&pool, &forged_cross_proj, None).is_err(),
+        "cross-project PK upsert must be rejected"
+    );
+    // Idempotent insert_plugin_if_absent MUST NOT overwrite DEPRECATED rev=2 back to ACTIVE rev=1
+    let mut stale_active = proj_a_row.clone();
+    stale_active.lifecycle_state = "ACTIVE".to_string();
+    stale_active.revision = 1;
+    let preserved =
+        spec_registry::plugin_store::insert_plugin_if_absent(&pool, &stale_active, None)
+            .expect("insert_plugin_if_absent must return existing row");
+    assert_eq!(preserved.lifecycle_state, "DEPRECATED");
+    assert_eq!(preserved.revision, 2);
+    // Project A's row must remain untouched (not quarantined)
+    let still_proj_a = spec_registry::plugin_store::get_plugin_scoped(
+        &conn_check,
+        "tenant-alpha",
+        &proj_a,
+        &scoped_design_id_a,
+    )
+    .unwrap()
+    .unwrap();
+    assert!(!still_proj_a.quarantined);
+    assert_eq!(still_proj_a.lifecycle_state, "DEPRECATED");
+    drop(conn_check);
+
+    let (comp_st, comp_json) = signed_call(
+        &agent_ctx,
+        "POST",
+        &format!("/api/v1/projects/{proj_a}/skills/prompt-bundles"),
+        &[],
+        Some(serde_json::json!({ "runId": "run-builtin-r2" })),
+    )
+    .await;
+    assert_eq!(comp_st, StatusCode::OK, "compile failed: {comp_json}");
+    let xml = comp_json["fencedPromptXml"].as_str().unwrap();
+    assert!(xml.contains("flow-state-completer"));
+    assert!(!xml.contains("design-taste-and-ux-guard"));
+
+    // 3. Quarantine HUMAN_ONLY route + cron skip (both scoped ID and legacy builtin: alias supported)
+    let (q_agent_st, _) = signed_call(
+        &agent_ctx,
+        "POST",
+        &format!("/api/v1/plugins/{scoped_flow_id_a}/quarantine"),
+        &[],
+        Some(serde_json::json!({
+            "projectId": proj_a,
+            "expectedRevision": 1,
+            "reason": "Agent attempt must fail"
+        })),
+    )
+    .await;
+    assert_eq!(q_agent_st, StatusCode::FORBIDDEN);
+
+    let (q_hum_st, q_hum_json) = signed_call(
+        &human_ctx,
+        "POST",
+        "/api/v1/plugins/builtin:flow-state-completer/quarantine",
+        &[("x-cowok-human-session", human_tok.as_str())],
+        Some(serde_json::json!({
+            "projectId": proj_a,
+            "expectedRevision": 1,
+            "reason": "Malicious upstream behavior"
+        })),
+    )
+    .await;
+    assert_eq!(q_hum_st, StatusCode::OK, "quarantine failed: {q_hum_json}");
+    assert_eq!(q_hum_json["id"], scoped_flow_id_a);
+    assert_eq!(q_hum_json["quarantined"], true);
+    assert_eq!(q_hum_json["lifecycleState"], "DEPRECATED");
+
+    let (reactivate_st, _) = signed_call(
+        &human_ctx,
+        "POST",
+        &format!("/api/v1/plugins/{scoped_flow_id_a}/transitions"),
+        &[("x-cowok-human-session", human_tok.as_str())],
+        Some(serde_json::json!({
+            "projectId": proj_a,
+            "targetState": "ACTIVE",
+            "expectedRevision": q_hum_json["revision"].as_u64().unwrap(),
+            "reason": "Attempt reactivate quarantined"
+        })),
+    )
+    .await;
+    assert_eq!(reactivate_st, StatusCode::FORBIDDEN);
+
+    // 4. Promote script-entry staged bundle retains permanent runtime files & clears PendingStagingMustBeResolved cron hold
+    let script_plugin_id = Uuid::new_v4().to_string();
+    let v1_manifest = plugin_host::SkillManifest {
+        name: "script-promote-skill".into(),
+        version: "1.0.0".into(),
+        description: "Baseline v1".into(),
+        entry_point: "SKILL.md".into(),
+        capabilities_required: vec![],
+        risk_tier: 1,
+        parameters: None,
+        tags: vec![],
+        prompt_overview: None,
+    };
+    let v1_row = spec_registry::plugin_store::SkillPluginRow {
+        id: script_plugin_id.clone(),
+        tenant_id: "tenant-alpha".into(),
+        project_id: proj_a.clone(),
+        plugin_slug: "script-promote-skill".into(),
+        version: "1.0.0".into(),
+        lifecycle_state: "ACTIVE".into(),
+        source_type: "github".into(),
+        source_repo_url: "https://github.com/cowok-ai/script-promote-skill".into(),
+        upstream_repo_url: Some("https://github.com/cowok-ai/script-promote-skill".into()),
+        upstream_commit_sha: None,
+        cron_schedule: Some("0 */15 * * * *".into()),
+        skill_md_path: "SKILL.md".into(),
+        plugin_json_path: "plugin.json".into(),
+        manifest_json: serde_json::to_string(&v1_manifest).unwrap(),
+        last_synced_at: None,
+        revision: 1,
+        staging_version: None,
+        staging_manifest_json: None,
+        staging_diff_reasons_json: None,
+        staging_bundle_dir: None,
+        staging_package_sha256: None,
+        breaking_change_isolated: false,
+        quarantined: false,
+        quarantine_reason: None,
+        updated_at: 1_700_000_000_000,
+    };
+    let saved_v1 = spec_registry::plugin_store::upsert_plugin_record(&pool, &v1_row, None).unwrap();
+    spec_registry::plugin_store::upsert_cron_schedule(
+        &pool,
+        "tenant-alpha",
+        &proj_a,
+        &script_plugin_id,
+        "0 */15 * * * *",
+        "https://github.com/cowok-ai/script-promote-skill",
+        None,
+    )
+    .unwrap();
+    let v2_bundle = plugin_host::StagedPluginBundle {
+        manifest: plugin_host::SkillManifest {
+            name: "script-promote-skill".into(),
+            version: "2.0.0".into(),
+            description: "Script v2".into(),
+            entry_point: "scripts/run.js".into(),
+            capabilities_required: vec!["net:outbound".into()],
+            risk_tier: 3,
+            parameters: Some(serde_json::json!({ "type": "object" })),
+            tags: vec!["repackaged".into()],
+            prompt_overview: Some("Script v2 overview".into()),
+        },
+        skill_md: "---\nname: script-promote-skill\nversion: \"2.0.0\"\nentry_point: \"scripts/run.js\"\nrisk_tier: 3\ncapabilities_required:\n  - \"net:outbound\"\ndescription: \"Script v2\"\n---\n# V2\n".into(),
+        scripts: vec![plugin_host::StagedScriptFile {
+            rel_path: "scripts/run.js".into(),
+            content: "export function run() { return 'ok'; }\n".into(),
+        }],
+        references: vec![plugin_host::StagedScriptFile {
+            rel_path: "references/guide.md".into(),
+            content: "# Guide\n".into(),
+        }],
+        assets: vec![plugin_host::StagedAssetFile {
+            rel_path: "assets/icon.png".into(),
+            bytes: b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR".to_vec(),
+        }],
+    };
+    let staged_script_row = harness_daemon::routes::plugins_cron::apply_synced_bundle_to_plugin(
+        &pool,
+        &canon_root,
+        &saved_v1,
+        v2_bundle,
+        Some("deadbeef"),
+    )
+    .expect("stage breaking script entry bundle");
+
+    // Auto cron tick (force_manual=false) skips claiming while breaking_change_isolated == true;
+    // manual sync (force_manual=true) skips clone and records PendingStagingMustBeResolved until promote resets it to IDLE.
+    let auto_sync_err = harness_daemon::routes::plugins_cron::run_plugin_sync_cycle(
+        &pool,
+        &canon_root,
+        "tenant-alpha",
+        &proj_a,
+        &script_plugin_id,
+        false,
+    )
+    .await
+    .unwrap_err();
+    assert!(auto_sync_err.contains("CRON_LEASE_BUSY_OR_BLOCKED"));
+
+    let manual_sync_err = harness_daemon::routes::plugins_cron::run_plugin_sync_cycle(
+        &pool,
+        &canon_root,
+        "tenant-alpha",
+        &proj_a,
+        &script_plugin_id,
+        true,
+    )
+    .await
+    .unwrap_err();
+    assert!(manual_sync_err.contains("PendingStagingMustBeResolved"));
+
+    // Cron staged bundle dir MUST reside under tenant/project scope and be discoverable via discovery-stubs
+    let staged_bundle_rel = Path::new(staged_script_row.staging_bundle_dir.as_deref().unwrap())
+        .strip_prefix(&canon_root)
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+    let (cron_stub_ok_st, cron_stub_ok_json) = signed_call(
+        &agent_ctx,
+        "POST",
+        "/api/v1/plugins/repackager/discovery-stubs",
+        &[],
+        Some(serde_json::json!({
+            "projectId": proj_a,
+            "bundleDir": staged_bundle_rel
+        })),
+    )
+    .await;
+    assert_eq!(
+        cron_stub_ok_st,
+        StatusCode::OK,
+        "cron staged discovery stub failed: {cron_stub_ok_json}"
+    );
+    assert_eq!(cron_stub_ok_json["discoveryStub"]["version"], "2.0.0");
+    assert_eq!(cron_stub_ok_json["skillPlugin"]["version"], "2.0.0");
+
+    let (cron_stub_cross_st, _) = signed_call(
+        &agent_ctx,
+        "POST",
+        "/api/v1/plugins/repackager/discovery-stubs",
+        &[],
+        Some(serde_json::json!({
+            "projectId": proj_a2,
+            "bundleDir": staged_bundle_rel
+        })),
+    )
+    .await;
+    assert_eq!(cron_stub_cross_st, StatusCode::FORBIDDEN);
+
+    // Seed v1 runtime bundle and verify CAS 409 rollback restores baseline v1 SKILL.md cleanly
+    let runtime_promoted_dir = canon_root
+        .join(".cowok-design")
+        .join("repackaged-skills")
+        .join("tenant-alpha")
+        .join(&proj_a)
+        .join("script-promote-skill");
+    std::fs::create_dir_all(&runtime_promoted_dir).unwrap();
+    std::fs::write(
+        runtime_promoted_dir.join("SKILL.md"),
+        "# Baseline v1 runtime\n",
+    )
+    .unwrap();
+
+    let (prom_cas_st, _) = signed_call(
+        &human_ctx,
+        "POST",
+        &format!("/api/v1/plugins/{script_plugin_id}/staging/promotions"),
+        &[("x-cowok-human-session", human_tok.as_str())],
+        Some(serde_json::json!({
+            "projectId": proj_a,
+            "expectedRevision": 1,
+            "reason": "Stale revision must roll back runtime"
+        })),
+    )
+    .await;
+    assert_eq!(prom_cas_st, StatusCode::CONFLICT);
+    assert_eq!(
+        std::fs::read_to_string(runtime_promoted_dir.join("SKILL.md")).unwrap(),
+        "# Baseline v1 runtime\n",
+        "CAS conflict during promote must roll back runtime directory"
+    );
+
+    let (prom_st, prom_json) = signed_call(
+        &human_ctx,
+        "POST",
+        &format!("/api/v1/plugins/{script_plugin_id}/staging/promotions"),
+        &[("x-cowok-human-session", human_tok.as_str())],
+        Some(serde_json::json!({
+            "projectId": proj_a,
+            "expectedRevision": staged_script_row.revision,
+            "reason": "Verified script v2 promotion"
+        })),
+    )
+    .await;
+    assert_eq!(prom_st, StatusCode::OK, "promote failed: {prom_json}");
+    assert_eq!(prom_json["version"], "2.0.0");
+
+    // Promoted runtime directory MUST exist and verify cleanly with scripts/references/assets
+    plugin_host::SkillRepackager::verify_repackaged_bundle(&runtime_promoted_dir)
+        .expect("promoted runtime bundle must remain intact & verified");
+    assert!(runtime_promoted_dir.join("scripts/run.js").is_file());
+    assert!(runtime_promoted_dir.join("references/guide.md").is_file());
+    assert!(runtime_promoted_dir.join("assets/icon.png").is_file());
+
+    // Cron schedule must be reset back to IDLE after promote
+    let conn = pool.connection().unwrap();
+    let sched_after = spec_registry::plugin_store::get_cron_schedule_scoped(
+        &conn,
+        "tenant-alpha",
+        &proj_a,
+        &script_plugin_id,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(sched_after.sync_status, "IDLE");
+    assert!(sched_after.last_error_code.is_none());
+
+    // 5. prepare_verified_bundle_from_clone adopts upstream plugin.json parameters/capabilities/tags unconditionally
+    let clone_src = tempfile::tempdir().unwrap();
+    std::fs::write(
+        clone_src.path().join("SKILL.md"),
+        "---\nname: script-promote-skill\nversion: \"3.0.0\"\ndescription: \"Upstream v3\"\nrisk_tier: 2\n---\n# V3\n",
+    )
+    .unwrap();
+    std::fs::write(
+        clone_src.path().join("plugin.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "name": "script-promote-skill",
+            "version": "3.0.0",
+            "description": "Upstream v3",
+            "entry_point": "SKILL.md",
+            "capabilities_required": ["fs:read"],
+            "risk_tier": 2,
+            "parameters": { "type": "object", "properties": { "mode": { "type": "string" } } },
+            "tags": ["upstream-v3"]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let v3_bundle = harness_daemon::routes::plugins_cron::prepare_verified_bundle_from_clone(
+        clone_src.path(),
+        &saved_v1,
+    )
+    .expect("prepare_verified_bundle_from_clone must adopt upstream plugin.json");
+    assert_eq!(
+        v3_bundle.manifest.capabilities_required,
+        vec!["fs:read".to_string()]
+    );
+    assert_eq!(v3_bundle.manifest.tags, vec!["upstream-v3".to_string()]);
+    assert!(v3_bundle.manifest.parameters.is_some());
+
+    // Quarantined plugins excluded from list_active_cron_schedules
+    assert!(
+        spec_registry::plugin_store::list_active_cron_schedules(&conn)
+            .unwrap()
+            .iter()
+            .all(|s| s.plugin_id != scoped_flow_id_a)
+    );
+
+    // 6. Auth/validation hardenings on discovery, discovery-stubs, video-intakes, linter/checks
+    let (disc_http_st, _) = signed_call(
+        &agent_ctx,
+        "POST",
+        "/api/v1/plugins/discovery",
+        &[],
+        Some(serde_json::json!({
+            "projectId": proj_a,
+            "pluginSlug": "bad-http-skill",
+            "sourceType": "github",
+            "sourceRepoUrl": "http://github.com/cowok-ai/insecure",
+            "manifest": {
+                "name": "bad-http-skill",
+                "version": "1.0.0",
+                "description": "Insecure URL",
+                "entry_point": "SKILL.md",
+                "capabilities_required": [],
+                "risk_tier": 1
+            }
+        })),
+    )
+    .await;
+    assert_eq!(disc_http_st, StatusCode::BAD_REQUEST);
+
+    let (disc_slug_st, _) = signed_call(
+        &agent_ctx,
+        "POST",
+        "/api/v1/plugins/discovery",
+        &[],
+        Some(serde_json::json!({
+            "projectId": proj_a,
+            "pluginSlug": "../escape",
+            "sourceType": "local",
+            "sourceRepoUrl": "local://escape",
+            "manifest": {
+                "name": "escape-skill",
+                "version": "1.0.0",
+                "description": "Unsafe slug",
+                "entry_point": "SKILL.md",
+                "capabilities_required": [],
+                "risk_tier": 1
+            }
+        })),
+    )
+    .await;
+    assert_eq!(disc_slug_st, StatusCode::BAD_REQUEST);
+
+    let (stub_viewer_st, _) = signed_call(
+        &viewer_ctx,
+        "POST",
+        "/api/v1/plugins/repackager/discovery-stubs",
+        &[],
+        Some(serde_json::json!({
+            "projectId": proj_a,
+            "bundleDir": ".cowok-design/repackaged-skills"
+        })),
+    )
+    .await;
+    assert_eq!(stub_viewer_st, StatusCode::FORBIDDEN);
+    let (vid_viewer_st, _) = signed_call(
+        &viewer_ctx,
+        "POST",
+        "/api/v1/plugins/repackager/video-intakes",
+        &[],
+        Some(serde_json::json!({
+            "skillName": "demo",
+            "storyboardMarkdown": "00:01 | click | Open panel"
+        })),
+    )
+    .await;
+    assert_eq!(vid_viewer_st, StatusCode::FORBIDDEN);
+
+    let (vid_bad_dur_st, _) = signed_call(
+        &agent_ctx,
+        "POST",
+        "/api/v1/plugins/repackager/video-intakes",
+        &[],
+        Some(serde_json::json!({
+            "skillName": "demo",
+            "storyboardMarkdown": "00:01 | click | Open panel",
+            "expectedDurationSecs": -1.0
+        })),
+    )
+    .await;
+    assert_eq!(vid_bad_dur_st, StatusCode::BAD_REQUEST);
+
+    let (lint_st, lint_json) = signed_call(
+        &agent_ctx,
+        "POST",
+        "/api/v1/plugins/linter/checks",
+        &[],
+        Some(serde_json::json!({
+            "content": "<div style=\"color:#6366f1\">“Hi”</div>",
+            "autoFix": true
+        })),
+    )
+    .await;
+    assert_eq!(lint_st, StatusCode::OK);
+    assert!(lint_json["fixed_issues"].as_u64().unwrap() >= 1);
+    assert!(lint_json["fixed_content"]
+        .as_str()
+        .unwrap()
+        .contains("var(--action-primary"));
+    assert_eq!(lint_json["new_in_this_call"], 0);
+
+    let (lint_nofix_st, lint_nofix_json) = signed_call(
+        &agent_ctx,
+        "POST",
+        "/api/v1/plugins/linter/checks",
+        &[],
+        Some(serde_json::json!({
+            "content": "<div style=\"color:#6366f1\">“Hi”</div>",
+            "autoFix": false
+        })),
+    )
+    .await;
+    assert_eq!(lint_nofix_st, StatusCode::OK);
+    assert!(lint_nofix_json.get("fixed_content").is_none());
 }

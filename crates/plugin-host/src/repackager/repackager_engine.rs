@@ -33,27 +33,45 @@ pub const MAX_TOTAL_PACKAGE_BYTES: usize = 8_388_608; // 8 MiB
 static STAGING_SEQ: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts",
+    ts(export, export_to = "../../../packages/shared-types/src/generated/")
+)]
 pub struct DiscoveryStub {
     pub name: String,
     pub version: String,
     pub description: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
     pub upstream_url: Option<String>,
     pub capabilities: Vec<String>,
     pub risk_tier: u8,
     pub package_sha256: String,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub stub_size_bytes: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts",
+    ts(export, export_to = "../../../packages/shared-types/src/generated/")
+)]
 pub struct LockedSkillEntry {
     pub path: String,
     pub packaged_path: String,
     pub sha256: String,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub bytes: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts",
+    ts(export, export_to = "../../../packages/shared-types/src/generated/")
+)]
 pub struct SkillsLockFile {
     pub schema_version: u32,
     pub skill_name: String,
@@ -81,13 +99,20 @@ struct StagingCapabilityRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts",
+    ts(export, export_to = "../../../packages/shared-types/src/generated/")
+)]
 pub struct RepackageReceipt {
     pub skill_name: String,
     pub version: String,
     pub target_dir: String,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub files_repackaged: usize,
     pub discovery_stub: DiscoveryStub,
     pub skill_plugin: SkillPlugin,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub created_at: i64,
 }
 
@@ -107,8 +132,12 @@ struct RepackagedFrontmatter<'a> {
     name: &'a str,
     version: &'a str,
     description: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    entry_point: Option<&'a str>,
     capabilities_required: &'a [String],
     risk_tier: u8,
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    tags: &'a [String],
 }
 
 struct DiscoveredSource {
@@ -168,13 +197,8 @@ fn validate_upstream_url(raw: &str) -> Result<(), String> {
         .is_some_and(|p| p.eq_ignore_ascii_case("https://"))
     {
         &raw[8..]
-    } else if raw
-        .get(..7)
-        .is_some_and(|p| p.eq_ignore_ascii_case("http://"))
-    {
-        &raw[7..]
     } else {
-        return Err("Invalid upstream_url: must start with https:// or http://".to_string());
+        return Err("Invalid upstream_url: must start with https://".to_string());
     };
     let authority = after_scheme.split('/').next().unwrap_or("");
     if authority.is_empty()
@@ -190,6 +214,7 @@ fn validate_upstream_url(raw: &str) -> Result<(), String> {
 
 fn validate_stub_field_budgets(
     skill_name: &str,
+    version: &str,
     description: &str,
     capabilities: &[String],
     upstream_url: Option<&str>,
@@ -218,7 +243,7 @@ fn validate_stub_field_budgets(
     if let Some(url) = upstream_url {
         validate_upstream_url(url)?;
     }
-    if "1.0.0".len() > MAX_VERSION_BYTES || skill_name.len() > MAX_SKILL_NAME_BYTES {
+    if version.len() > MAX_VERSION_BYTES || skill_name.len() > MAX_SKILL_NAME_BYTES {
         return Err("DiscoveryStub overflow: version/name exceeds ceiling".to_string());
     }
     Ok(())
@@ -307,15 +332,20 @@ fn build_validated_skill_md_with_meta(
     skill_name: &str,
     version: &str,
     risk_tier: u8,
+    entry_point: &str,
     description: &str,
     capabilities: &[String],
+    tags: &[String],
 ) -> Result<String, String> {
+    let ep_opt = (entry_point != "SKILL.md").then_some(entry_point);
     let fm = RepackagedFrontmatter {
         name: skill_name,
         version,
         description,
+        entry_point: ep_opt,
         capabilities_required: capabilities,
         risk_tier,
+        tags,
     };
     let mut yaml_block = serde_yaml::to_string(&fm).map_err(|e| e.to_string())?;
     if let Some(stripped) = yaml_block.strip_prefix("---\n") {
@@ -823,8 +853,13 @@ fn recover_verified_inflight_orphan_fd(
         .iter()
         .any(|(n, is_dir, is_sym)| n == INFLIGHT_COMMIT_MARKER && !*is_dir && !*is_sym);
     if !has_lock && has_marker {
-        // Verify marker itself is a regular nlink==1 file owned by current UID before cleanup.
-        let _ = read_bounded_file(&dst_fd, INFLIGHT_COMMIT_MARKER)?;
+        // Verify marker itself is a regular nlink==1 file owned by current UID with exact magic bytes before cleanup.
+        let marker_bytes = read_bounded_file(&dst_fd, INFLIGHT_COMMIT_MARKER)?;
+        if marker_bytes != b"cowok-inflight\n" {
+            return Err(
+                "CorruptInflightMarker: unexpected .cowok-inflight marker contents".to_string(),
+            );
+        }
         cleanup_dir_fd_recursive(dest_fd, skill_name)?;
         return Ok(true);
     }
@@ -839,7 +874,7 @@ fn commit_repackaged_dir_fd(
     skill_name: &str,
     owned_dst: &mut bool,
 ) -> Result<(), String> {
-    dest_fd.mkdirat(skill_name, 0o755).map_err(|e| {
+    dest_fd.mkdirat(skill_name, 0o700).map_err(|e| {
         if e.kind() == std::io::ErrorKind::AlreadyExists {
             format!("DestinationAlreadyExists: target '{skill_name}' already exists (EEXIST)")
         } else {
@@ -867,17 +902,23 @@ fn commit_repackaged_dir_fd(
                 .map_err(|e| format!("renameat '{dir_name}' into dst failed: {e}"))?;
         }
     }
-    for entry in ["SKILL.md", "plugin.json", "discovery-stub.json"] {
+    tmp_fd
+        .rename_entry_at("skills-lock.json", &dst_fd, "skills-lock.json")
+        .map_err(|e| format!("renameat 'skills-lock.json' failed: {e}"))?;
+    for entry in ["discovery-stub.json", "plugin.json", "SKILL.md"] {
         tmp_fd
             .rename_entry_at(entry, &dst_fd, entry)
             .map_err(|e| format!("renameat '{entry}' into dst failed: {e}"))?;
     }
-    tmp_fd
-        .rename_entry_at("skills-lock.json", &dst_fd, "skills-lock.json")
-        .map_err(|e| format!("renameat 'skills-lock.json' failed: {e}"))?;
     dst_fd
         .unlink_at(INFLIGHT_COMMIT_MARKER, false)
         .map_err(|e| format!("unlink inflight marker failed: {e}"))?;
+    if unsafe { libc::fchmod(dst_fd.as_raw(), 0o755) } < 0 {
+        return Err(format!(
+            "fchmod 0o755 '{skill_name}' failed: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
     if unsafe { libc::fsync(dst_fd.as_raw()) } < 0 {
         return Err(format!(
             "fsync '{skill_name}' directory failed: {}",
@@ -1022,7 +1063,35 @@ fn prepare_staged_payload_inner(
 ) -> Result<PreparedStage, String> {
     validate_safe_segment("skill_name", skill_name)?;
     validate_skill_metadata_text("description", description).map_err(|e| e.to_string())?;
-    validate_stub_field_budgets(skill_name, description, &capabilities, upstream_url)?;
+    let stage_version = manifest_override
+        .as_ref()
+        .map(|m| m.version.as_str())
+        .unwrap_or("1.0.0");
+    if let Some(ref ov) = manifest_override {
+        validate_safe_segment("manifest.name", &ov.name)?;
+        let ep = ov.entry_point.trim();
+        if ep != "SKILL.md" {
+            validate_locked_rel_path("manifest.entry_point", ep).map_err(|_| {
+                "BundleIntegrityMismatch: manifest.entry_point must be 'SKILL.md' or a safe relative script path".to_string()
+            })?;
+        }
+        if !(1..=3).contains(&ov.risk_tier) {
+            return Err(format!(
+                "ManifestValidation: risk_tier {} out of 1..=3",
+                ov.risk_tier
+            ));
+        }
+        if let Some(ref pov) = ov.prompt_overview {
+            crate::staging::validate_staged_prompt_content(pov).map_err(|e| e.to_string())?;
+        }
+    }
+    validate_stub_field_budgets(
+        skill_name,
+        stage_version,
+        description,
+        &capabilities,
+        upstream_url,
+    )?;
 
     let src_fd = SafeDirFd::open_root_nofollow(source_dir)?;
     let dest_fd = SafeDirFd::open_root_nofollow(dest_dir)?;
@@ -1045,18 +1114,47 @@ fn prepare_staged_payload_inner(
             .iter()
             .map(|s| (s.rel_path.as_str(), s.raw_bytes.as_slice())),
     );
-    let (manifest_version, manifest_risk_tier) = match &manifest_override {
-        Some(m) => (m.version.clone(), m.risk_tier),
-        None => ("1.0.0".to_string(), 2u8),
-    };
+    let (manifest_version, manifest_risk_tier, manifest_entry_point, manifest_tags) =
+        match &manifest_override {
+            Some(m) => (
+                m.version.clone(),
+                m.risk_tier,
+                m.entry_point.trim().to_string(),
+                m.tags.clone(),
+            ),
+            None => (
+                "1.0.0".to_string(),
+                2u8,
+                "SKILL.md".to_string(),
+                vec!["repackaged".to_string()],
+            ),
+        };
+    if manifest_entry_point != "SKILL.md" {
+        let has_matching_script = sources.iter().any(|s| {
+            s.bucket == RepackageAssetBucket::Scripts
+                && (format!("scripts/{}", s.rel_path) == manifest_entry_point
+                    || s.rel_path == manifest_entry_point)
+        });
+        if !has_matching_script {
+            return Err(format!(
+                "BundleIntegrityMismatch: manifest.entry_point '{manifest_entry_point}' missing from verified source scripts"
+            ));
+        }
+    }
     let skill_md = match skill_md_override {
-        Some(custom) => custom.to_string(),
+        Some(custom) => {
+            parse_and_validate_skill_frontmatter(custom).map_err(|e| e.to_string())?;
+            scan_skill_markdown_safety("SKILL.md", custom).map_err(|e| e.to_string())?;
+            custom.to_string()
+        }
         None => build_validated_skill_md_with_meta(
             skill_name,
             &manifest_version,
             manifest_risk_tier,
+            &manifest_entry_point,
             description,
             &capabilities,
+            &manifest_tags,
         )?,
     };
     let manifest = manifest_override.unwrap_or_else(|| SkillManifest {
@@ -1447,12 +1545,6 @@ impl SkillRepackager {
                 "MissingOrInvalidStagingCapability: unknown or already-consumed staging_token"
                     .to_string()
             })?;
-            // Single-use atomic capability consumption BEFORE commit attempt.
-            caps_fd.unlink_at(&cap_filename, false).map_err(|e| {
-                format!("CapabilityConsumeFailed: unable to consume staging_token ({e})")
-            })?;
-            let _ = dest_fd.unlink_at(".cowok-stage-caps", true);
-
             let record: StagingCapabilityRecord = serde_json::from_slice(&cap_bytes)
                 .map_err(|e| format!("CorruptStagingCapability: {e}"))?;
             if record.tmp_name != tmp_name || record.skill_name != skill_name {
@@ -1464,16 +1556,31 @@ impl SkillRepackager {
                 .map_err(|e| format!("open_subdir '{tmp_name}': {e}"))?;
             tmp_fd.ensure_private_dir_mode(tmp_name)?;
             if tmp_fd.dir_dev_ino()? != (record.tmp_dev, record.tmp_ino) {
+                let _ = cleanup_dir_fd_recursive(&dest_fd, tmp_name);
                 return Err("StagingProvenanceMismatch: tmp_dir inode changed since staging capability issuance".to_string());
             }
-            // Re-verify full staging integrity, quotas, zero symlinks/hardlinks, and cross-artifact parity via pinned FD before mkdirat(dst).
-            let verified_lock = verify_repackaged_dir_fd(&tmp_fd)?;
+            // Re-verify full staging integrity, quotas, zero symlinks/hardlinks, and cross-artifact parity via pinned FD before consuming capability & mkdirat(dst).
+            let verified_lock = match verify_repackaged_dir_fd(&tmp_fd) {
+                Ok(l) => l,
+                Err(e) => {
+                    let _ = cleanup_dir_fd_recursive(&dest_fd, tmp_name);
+                    return Err(e);
+                }
+            };
             if verified_lock.package_sha256 != record.package_sha256 {
+                let _ = cleanup_dir_fd_recursive(&dest_fd, tmp_name);
                 return Err(
                     "StagingProvenanceMismatch: package_sha256 diverged from issued capability"
                         .to_string(),
                 );
             }
+            let _ = recover_verified_inflight_orphan_fd(&dest_fd, skill_name)?;
+
+            // Single-use capability consumption AFTER provenance and integrity verification succeed.
+            caps_fd.unlink_at(&cap_filename, false).map_err(|e| {
+                format!("CapabilityConsumeFailed: unable to consume staging_token ({e})")
+            })?;
+            let _ = dest_fd.unlink_at(".cowok-stage-caps", true);
 
             let mut owned_dst = false;
             if let Err(primary) =
@@ -1706,9 +1813,23 @@ fn verify_repackaged_dir_fd(root_fd: &SafeDirFd) -> Result<SkillsLockFile, Strin
             let manifest: SkillManifest = serde_json::from_slice(&bytes)
                 .map_err(|e| format!("plugin.json invalid SkillManifest JSON: {e}"))?;
             let plugin = manifest_to_skill_plugin(&manifest);
+            if let Some(ref pov) = manifest.prompt_overview {
+                crate::staging::validate_staged_prompt_content(pov).map_err(|e| e.to_string())?;
+            }
+            let valid_entry_point = if manifest.entry_point == "SKILL.md" {
+                true
+            } else {
+                validate_locked_rel_path("plugin.json entry_point", &manifest.entry_point).is_ok()
+                    && lock.source_files.iter().any(|e| {
+                        e.packaged_path.starts_with("scripts/")
+                            && (e.packaged_path == manifest.entry_point
+                                || e.path == manifest.entry_point)
+                    })
+            };
             if plugin.id.is_empty()
                 || plugin.version.is_empty()
-                || plugin.entry_point != "SKILL.md"
+                || !valid_entry_point
+                || plugin.entry_point != manifest.entry_point
                 || manifest.name != lock.skill_name
                 || manifest.version != lock.version
             {
@@ -1729,6 +1850,7 @@ fn verify_repackaged_dir_fd(root_fd: &SafeDirFd) -> Result<SkillsLockFile, Strin
                 .map_err(|e| format!("discovery-stub.json invalid JSON: {e}"))?;
             validate_stub_field_budgets(
                 &stub.name,
+                &stub.version,
                 &stub.description,
                 &stub.capabilities,
                 stub.upstream_url.as_deref(),
@@ -1777,6 +1899,7 @@ fn verify_repackaged_dir_fd(root_fd: &SafeDirFd) -> Result<SkillsLockFile, Strin
         if fm.risk_tier != Some(manifest.risk_tier)
             || fm.description != manifest.description
             || fm.capabilities_required != manifest.capabilities_required
+            || fm.entry_point.as_deref().unwrap_or("SKILL.md") != manifest.entry_point
             || stub.name != lock.skill_name
             || stub.version != lock.version
             || stub.risk_tier != manifest.risk_tier
@@ -1816,6 +1939,8 @@ pub fn load_verified_staged_bundle_from_dir(
         let skill_md = String::from_utf8(skill_md_bytes)
             .map_err(|_| "SKILL.md must be valid UTF-8".to_string())?;
         let mut scripts = Vec::new();
+        let mut references = Vec::new();
+        let mut assets = Vec::new();
         for entry in &lock.source_files {
             if entry.packaged_path.starts_with("scripts/") {
                 let raw = open_nested_file_read(&root_fd, &entry.packaged_path)?;
@@ -1829,12 +1954,32 @@ pub fn load_verified_staged_bundle_from_dir(
                     rel_path: entry.packaged_path.clone(),
                     content,
                 });
+            } else if entry.packaged_path.starts_with("references/") {
+                let raw = open_nested_file_read(&root_fd, &entry.packaged_path)?;
+                let content = String::from_utf8(raw).map_err(|_| {
+                    format!(
+                        "Staged reference '{}' must be valid UTF-8",
+                        entry.packaged_path
+                    )
+                })?;
+                references.push(crate::lifecycle::StagedScriptFile {
+                    rel_path: entry.packaged_path.clone(),
+                    content,
+                });
+            } else if entry.packaged_path.starts_with("assets/") {
+                let raw = open_nested_file_read(&root_fd, &entry.packaged_path)?;
+                assets.push(crate::lifecycle::StagedAssetFile {
+                    rel_path: entry.packaged_path.clone(),
+                    bytes: raw,
+                });
             }
         }
         Ok(crate::lifecycle::StagedPluginBundle {
             manifest,
             skill_md,
             scripts,
+            references,
+            assets,
         })
     }
     #[cfg(not(unix))]
@@ -1952,6 +2097,8 @@ mod tests {
         std::fs::create_dir_all(staged.join("scripts")).unwrap();
         std::fs::create_dir_all(staged.join("references")).unwrap();
         std::fs::create_dir_all(staged.join("assets")).unwrap();
+        std::fs::write(staged.join("skills-lock.json"), "{}").unwrap();
+        std::fs::write(staged.join("discovery-stub.json"), "{}").unwrap();
         std::fs::write(staged.join("SKILL.md"), "# Incomplete").unwrap();
 
         let forged_tok = "a".repeat(64);

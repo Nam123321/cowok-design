@@ -77,9 +77,17 @@ fn extract_bounded_frontmatter(raw_content: &str) -> Result<&str, ValidationErro
 }
 
 fn reject_unsafe_yaml_tokens(yaml_body: &str) -> Result<(), ValidationError> {
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut in_block_scalar_indent: Option<usize> = None;
     for raw_line in yaml_body.lines() {
-        let mut in_single = false;
-        let mut in_double = false;
+        let line_indent = raw_line.len() - raw_line.trim_start_matches(' ').len();
+        if let Some(block_indent) = in_block_scalar_indent {
+            if raw_line.trim().is_empty() || line_indent > block_indent {
+                continue;
+            }
+            in_block_scalar_indent = None;
+        }
         let mut escaped = false;
         let bytes = raw_line.as_bytes();
         let mut idx = 0usize;
@@ -112,10 +120,25 @@ fn reject_unsafe_yaml_tokens(yaml_body: &str) -> Result<(), ValidationError> {
                 b'"' => in_double = true,
                 b'\'' => in_single = true,
                 b'#' if idx == 0 || bytes[idx - 1].is_ascii_whitespace() => break,
+                b'|' | b'>'
+                    if idx > 0
+                        && bytes[..idx]
+                            .iter()
+                            .rev()
+                            .find(|&&c| c != b' ' && c != b'\t')
+                            == Some(&b':')
+                        && raw_line[idx + 1..]
+                            .trim_matches(|c| matches!(c, '+' | '-' | ' ' | '\t'))
+                            .chars()
+                            .all(|c| c.is_ascii_digit()) =>
+                {
+                    in_block_scalar_indent = Some(line_indent);
+                    break;
+                }
                 b'&' | b'*' | b'!' => {
                     let prev_ok = idx == 0
                         || bytes[idx - 1].is_ascii_whitespace()
-                        || matches!(bytes[idx - 1], b':' | b'[' | b',');
+                        || matches!(bytes[idx - 1], b':' | b'[' | b'{' | b',');
                     let next_non_ws =
                         idx + 1 < bytes.len() && !bytes[idx + 1].is_ascii_whitespace();
                     if prev_ok && next_non_ws {
@@ -137,19 +160,75 @@ fn reject_unsafe_yaml_tokens(yaml_body: &str) -> Result<(), ValidationError> {
 
 fn check_duplicate_top_level_keys(yaml_body: &str) -> Result<(), ValidationError> {
     let mut seen = BTreeSet::new();
+    let mut in_single = false;
+    let mut in_double = false;
+    let mut block_indent: Option<usize> = None;
     for line in yaml_body.lines() {
-        if line.starts_with(char::is_whitespace)
-            || line.trim().is_empty()
-            || line.trim_start().starts_with('#')
-        {
+        let indent = line.len() - line.trim_start_matches(' ').len();
+        if let Some(bi) = block_indent {
+            if line.trim().is_empty() || indent > bi {
+                continue;
+            }
+            block_indent = None;
+        }
+        let was_in_quoted = in_single || in_double;
+        let mut esc = false;
+        for b in line.bytes() {
+            if in_double {
+                if esc {
+                    esc = false;
+                } else if b == b'\\' {
+                    esc = true;
+                } else if b == b'"' {
+                    in_double = false;
+                }
+            } else if in_single {
+                if b == b'\'' {
+                    in_single = false;
+                }
+            } else if b == b'"' {
+                in_double = true;
+            } else if b == b'\'' {
+                in_single = true;
+            } else if b == b'#' {
+                break;
+            }
+        }
+        if was_in_quoted {
             continue;
         }
-        if let Some((key, _)) = line.split_once(':') {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if trimmed.starts_with('{') && trimmed.ends_with('}') {
+            let inner = &trimmed[1..trimmed.len() - 1];
+            let mut flow_seen = BTreeSet::new();
+            for pair in inner.split(',') {
+                if let Some((raw_k, _)) = pair.split_once(':') {
+                    let fk = raw_k.trim().trim_matches('"').trim_matches('\'');
+                    if !fk.is_empty() && !flow_seen.insert(fk.to_string()) {
+                        return Err(ValidationError::YamlParseError(format!(
+                            "Duplicate YAML flow key '{fk}'"
+                        )));
+                    }
+                }
+            }
+            continue;
+        }
+        if line.starts_with(char::is_whitespace) {
+            continue;
+        }
+        if let Some((key, rest)) = line.split_once(':') {
             let k = key.trim().trim_matches('"').trim_matches('\'');
             if !k.is_empty() && !seen.insert(k.to_string()) {
                 return Err(ValidationError::YamlParseError(format!(
                     "Duplicate YAML key '{k}'"
                 )));
+            }
+            let rtrim = rest.trim();
+            if rtrim.starts_with('|') || rtrim.starts_with('>') {
+                block_indent = Some(indent);
             }
         }
     }
@@ -191,7 +270,13 @@ fn mapping_string_list(
         let s = item.as_str().ok_or_else(|| {
             ValidationError::YamlParseError(format!("List element in '{key}' must be a string"))
         })?;
-        out.push(s.to_string());
+        let trimmed = s.trim();
+        if trimmed.is_empty() {
+            return Err(ValidationError::YamlParseError(format!(
+                "Field '{key}' items must be non-empty strings"
+            )));
+        }
+        out.push(trimmed.to_string());
     }
     Ok(out)
 }

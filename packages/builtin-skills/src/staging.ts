@@ -52,26 +52,54 @@ function hashSortedUnique(hasher: crypto.Hash, items?: string[]): void {
   }
 }
 
+function lstatExists(targetPath: string): fs.Stats | null {
+  try {
+    return fs.lstatSync(targetPath);
+  } catch {
+    return null;
+  }
+}
+
+function writeReadOnlyNoFollow(filePath: string, content: string, mode = 0o444): void {
+  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0);
+  const fd = fs.openSync(filePath, flags, 0o600);
+  try {
+    const st = fs.fstatSync(fd);
+    if (!st.isFile() || st.nlink !== 1) {
+      throw new Error(`UnsafeSkillFileTypeOrHardlink: ${path.basename(filePath)}`);
+    }
+    fs.writeFileSync(fd, content, "utf8");
+    fs.fchmodSync(fd, mode);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 export function validateStagedPromptContent(overview: string): void {
-  const lower = overview.toLowerCase();
-  for (const tag of ["<important", "</important", "<system", "</system", "<!--", "-->", "<img"]) {
-    if (lower.includes(tag)) {
+  const folded = overview.normalize("NFKC");
+  const lower = folded.toLowerCase();
+  for (const tag of [
+    "<important", "</important", "<system", "</system", "<!--", "-->", "<img",
+    "<learned_cards_data", "</learned_cards_data", "<skill_catalog_data", "</skill_catalog_data",
+    "<learn_context", "</learn_context", "<assistant", "</assistant", "<tool_call", "</tool_call",
+  ]) {
+    if (lower.includes(tag) || overview.toLowerCase().includes(tag)) {
       throw new Error(`Disallowed prompt directive or HTML tag '${tag}' in PROMPT.md`);
     }
   }
-  if (/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/.test(overview)) {
+  if (/[\u00AD\u034F\u061C\u180E\u200B-\u200F\u2028-\u202E\u2060-\u2069\uFE00-\uFE0F\uFEFF]|\uDB40[\uDC01-\uDC7F]/.test(overview)) {
     throw new Error("Disallowed zero-width or bidirectional control Unicode character in PROMPT.md");
   }
-  if (/!\[[^\]]*\]\([^)]*\)/.test(lower)) {
+  if (/!\[[^\]]*\]\([^)]*\)|!\[[^\]]*\]\[[^\]]*\]/.test(lower)) {
     throw new Error("Disallowed Markdown image beacon in PROMPT.md");
   }
 }
 
 function ensureSafeBaseDir(baseDir: string): string {
   const absBase = path.resolve(baseDir);
-  if (fs.existsSync(absBase)) {
-    const stat = fs.lstatSync(absBase);
-    if (stat.isSymbolicLink() || !stat.isDirectory()) {
+  const baseStat = lstatExists(absBase);
+  if (baseStat) {
+    if (baseStat.isSymbolicLink() || !baseStat.isDirectory()) {
       throw new Error("baseStagingDir must be a real non-symlink directory");
     }
     return fs.realpathSync(absBase);
@@ -79,7 +107,7 @@ function ensureSafeBaseDir(baseDir: string): string {
 
   let cur = absBase;
   const missing: string[] = [];
-  while (!fs.existsSync(cur)) {
+  while (!lstatExists(cur)) {
     const parent = path.dirname(cur);
     if (parent === cur) break;
     missing.push(path.basename(cur));
@@ -94,7 +122,7 @@ function ensureSafeBaseDir(baseDir: string): string {
   let resolved = fs.realpathSync(cur);
   for (const segment of missing.reverse()) {
     resolved = path.join(resolved, segment);
-    if (!fs.existsSync(resolved)) {
+    if (!lstatExists(resolved)) {
       fs.mkdirSync(resolved, { recursive: false });
     }
     const segStat = fs.lstatSync(resolved);
@@ -106,8 +134,8 @@ function ensureSafeBaseDir(baseDir: string): string {
 }
 
 function restoreWritableRecursive(targetPath: string): void {
-  if (!fs.existsSync(targetPath)) return;
-  const stat = fs.lstatSync(targetPath);
+  const stat = lstatExists(targetPath);
+  if (!stat) return;
   if (stat.isSymbolicLink()) {
     throw new Error(`Refusing permission restore across symlink: ${targetPath}`);
   }
@@ -156,7 +184,7 @@ export class PerRunStagingManager {
   }
 
   private static assertSafeSegment(kind: string, segment: string): void {
-    if (!segment || segment === "." || segment === ".." || segment.includes("/") || segment.includes("\\") || segment.includes("\0") || /[\x00-\x1f\x7f]/.test(segment)) {
+    if (!segment || segment === "." || segment === ".." || segment.includes("/") || segment.includes("\\") || segment.includes("\0") || /[\x00-\x1f\x7f-\x9f]/.test(segment)) {
       throw new Error(`Invalid ${kind} segment '${segment}': path separators and traversal segments are forbidden`);
     }
   }
@@ -191,13 +219,11 @@ export class PerRunStagingManager {
         fs.mkdirSync(skillDir, { recursive: false });
 
         const manifestPath = path.join(skillDir, "plugin.json");
-        fs.writeFileSync(manifestPath, JSON.stringify(skill, null, 2), "utf8");
-        fs.chmodSync(manifestPath, 0o444);
+        writeReadOnlyNoFollow(manifestPath, JSON.stringify(skill, null, 2), 0o444);
 
         if (skill.prompt_overview) {
           const promptPath = path.join(skillDir, "PROMPT.md");
-          fs.writeFileSync(promptPath, skill.prompt_overview, "utf8");
-          fs.chmodSync(promptPath, 0o444);
+          writeReadOnlyNoFollow(promptPath, skill.prompt_overview, 0o444);
         }
 
         skillDirs.push(skillDir);
@@ -214,8 +240,7 @@ export class PerRunStagingManager {
       };
 
       const receiptPath = path.join(runDir, "run-receipt.json");
-      fs.writeFileSync(receiptPath, JSON.stringify(receipt, null, 2), "utf8");
-      fs.chmodSync(receiptPath, 0o444);
+      writeReadOnlyNoFollow(receiptPath, JSON.stringify(receipt, null, 2), 0o444);
 
       for (const dir of skillDirs) fs.chmodSync(dir, 0o555);
       fs.chmodSync(runDir, 0o555);
@@ -240,9 +265,20 @@ export class PerRunStagingManager {
 
   public cleanupRun(runId: string): void {
     PerRunStagingManager.assertSafeSegment("runId", runId);
-    const runDir = path.resolve(this.baseStagingDir, runId);
-    if (!fs.existsSync(runDir)) return;
-    if (fs.lstatSync(runDir).isSymbolicLink()) {
+    const absBase = path.resolve(this.baseStagingDir);
+    const baseStat = lstatExists(absBase);
+    if (!baseStat) return;
+    if (baseStat.isSymbolicLink() || !baseStat.isDirectory()) {
+      throw new Error(`Refusing cleanup across symlink or non-directory baseStagingDir: ${absBase}`);
+    }
+    const baseResolved = fs.realpathSync(absBase);
+    const runDir = path.resolve(baseResolved, runId);
+    if (!runDir.startsWith(`${baseResolved}${path.sep}`)) {
+      throw new Error(`Resolved runDir escaped baseStagingDir: ${runDir}`);
+    }
+    const runStat = lstatExists(runDir);
+    if (!runStat) return;
+    if (runStat.isSymbolicLink()) {
       throw new Error(`Refusing cleanup across symlink: ${runDir}`);
     }
     restoreWritableRecursive(runDir);

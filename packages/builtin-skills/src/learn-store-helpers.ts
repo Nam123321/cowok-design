@@ -61,20 +61,55 @@ export function hydratePersistedCard(rawCard: KnowledgeCard): KnowledgeCard {
   const content = validateLearnCardField("content", card.content, MAX_CARD_CONTENT_BYTES);
   const evidence = validateLearnCardField("source_evidence", card.source_evidence, MAX_CARD_EVIDENCE_BYTES);
   const sha = computeCardSha256(title, content);
-  if (card.content_sha256 !== sha || card.revision < 1) {
-    throw new LearnError("InvalidCardInput", `Persisted card '${cid}' failed revision or content_sha256 invariant`);
+  if (card.content_sha256 !== sha || card.revision < 1 || !Number.isSafeInteger(card.created_at) || card.created_at <= 0) {
+    throw new LearnError("InvalidCardInput", `Persisted card '${cid}' failed revision, timestamp, or content_sha256 invariant`);
+  }
+  let reviewedBy: string | null = card.reviewed_by;
+  let decisionReason: string | null = card.decision_reason;
+  const acceptedAt: number | null = card.accepted_at;
+  if (card.status === "PROPOSED") {
+    if (card.revision !== 1 || reviewedBy !== null || decisionReason !== null || acceptedAt !== null) {
+      throw new LearnError("InvalidCardInput", `Persisted PROPOSED card '${cid}' must not contain reviewer metadata`);
+    }
+  } else {
+    if (card.revision < 2 || !reviewedBy || !decisionReason || utf8Bytes(decisionReason.trim()) < 4) {
+      throw new LearnError("InvalidCardInput", `Persisted ${card.status} card '${cid}' missing valid approval provenance`);
+    }
+    reviewedBy = validateScopeSegment("reviewed_by", reviewedBy);
+    decisionReason = validateLearnCardField("decision_reason", decisionReason, 512);
+    if (card.status === "ACCEPTED") {
+      if (acceptedAt === null || !Number.isSafeInteger(acceptedAt) || acceptedAt < card.created_at) {
+        throw new LearnError("InvalidCardInput", `Persisted ACCEPTED card '${cid}' has invalid accepted_at timestamp`);
+      }
+    } else if (acceptedAt !== null) {
+      throw new LearnError("InvalidCardInput", `Persisted REJECTED card '${cid}' must not carry accepted_at`);
+    }
   }
   return {
     ...card,
     id: cid, tenant_id: tid, project_id: pid,
     idempotency_key: card.idempotency_key ? validateScopeSegment("idempotency_key", card.idempotency_key) : null,
     title, content, content_sha256: sha, source_evidence: evidence,
+    reviewed_by: reviewedBy, decision_reason: decisionReason, accepted_at: acceptedAt,
   };
 }
 
 export function verifyTokenSignatureAndTtl(st: PipelineState, tenantId: string, projectId: string, token: HumanApproverToken, nowS: number): void {
   const badText = [token.kid, token.actor_id, token.tenant_id, token.project_id, token.card_id, token.nonce].some((f) => !f || f !== f.trim());
-  const badMeta = badText || token.reason !== token.reason.trim() || utf8Bytes(token.reason) < 4 || !isValidSha256Hex(token.content_sha256) || !Number.isSafeInteger(token.expected_revision) || token.expected_revision < 1;
+  if (badText) {
+    throw new LearnError("UnauthorizedApprover", "Token scope fields must be non-empty trimmed identifiers");
+  }
+  try {
+    validateScopeSegment("token.kid", token.kid);
+    validateScopeSegment("token.actor_id", token.actor_id);
+    validateScopeSegment("token.tenant_id", token.tenant_id);
+    validateScopeSegment("token.project_id", token.project_id);
+    validateScopeSegment("token.card_id", token.card_id);
+    validateScopeSegment("token.nonce", token.nonce);
+  } catch (err) {
+    throw new LearnError("UnauthorizedApprover", err instanceof Error ? err.message : "Invalid token scope characters");
+  }
+  const badMeta = token.reason !== token.reason.trim() || utf8Bytes(token.reason) < 4 || !isValidSha256Hex(token.content_sha256) || !Number.isSafeInteger(token.expected_revision) || token.expected_revision < 1;
   if (token.actor_kind !== "HUMAN_WORKBENCH_SESSION" || badMeta || token.tenant_id !== tenantId || token.project_id !== projectId) {
     throw new LearnError("UnauthorizedApprover", "Invalid actor, token metadata, or tenant/project scope");
   }

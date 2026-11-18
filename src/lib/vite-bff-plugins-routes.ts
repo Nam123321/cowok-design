@@ -5,6 +5,7 @@ import * as pluginsRegistryRoute from "../app/api/plugins/registry/route";
 import * as pluginsDiscoveryRoute from "../app/api/plugins/discovery/route";
 import * as pluginsInstallsRoute from "../app/api/plugins/installs/route";
 import * as pluginTransitionsRoute from "../app/api/plugins/[id]/transitions/route";
+import * as pluginQuarantineRoute from "../app/api/plugins/[id]/quarantine/route";
 import * as pluginStagingPromotionsRoute from "../app/api/plugins/[id]/staging/promotions/route";
 import * as pluginStagingDiscardsRoute from "../app/api/plugins/[id]/staging/discards/route";
 import * as repackageBundlesRoute from "../app/api/plugins/repackager/bundles/route";
@@ -18,11 +19,14 @@ import * as learnCardsRoute from "../app/api/projects/[id]/learn/cards/route";
 import * as learnCardApprovalsRoute from "../app/api/projects/[id]/learn/cards/[cardId]/approvals/route";
 import * as learnCardRejectionsRoute from "../app/api/projects/[id]/learn/cards/[cardId]/rejections/route";
 import * as pluginStreamRoute from "../app/api/projects/[id]/plugins/stream/route";
-import type { RouteEntry } from "./vite-bff-flow-routes";
+import { safeDecodeSegment, type RouteEntry } from "./vite-bff-flow-routes";
 
 const noParams = (): Record<string, string> => ({});
-const idOnly = (m: RegExpExecArray): Record<string, string> => ({ id: m[1] });
-const projectAndCard = (m: RegExpExecArray): Record<string, string> => ({ id: m[1], cardId: m[2] });
+const idOnly = (m: RegExpExecArray): Record<string, string> => ({ id: safeDecodeSegment(m[1]) });
+const projectAndCard = (m: RegExpExecArray): Record<string, string> => ({
+  id: safeDecodeSegment(m[1]),
+  cardId: safeDecodeSegment(m[2]),
+});
 
 export const PLUGIN_ECOSYSTEM_ROUTES: RouteEntry[] = [
   { method: "GET", pattern: /^\/api\/plugins$/, extractParams: noParams, resolveHandler: () => pluginsRoute.GET },
@@ -30,6 +34,7 @@ export const PLUGIN_ECOSYSTEM_ROUTES: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/plugins\/discovery$/, extractParams: noParams, resolveHandler: () => pluginsDiscoveryRoute.POST },
   { method: "POST", pattern: /^\/api\/plugins\/installs$/, extractParams: noParams, resolveHandler: () => pluginsInstallsRoute.POST },
   { method: "POST", pattern: /^\/api\/plugins\/([^/]+)\/transitions$/, extractParams: idOnly, resolveHandler: () => pluginTransitionsRoute.POST },
+  { method: "POST", pattern: /^\/api\/plugins\/([^/]+)\/quarantine$/, extractParams: idOnly, resolveHandler: () => pluginQuarantineRoute.POST },
   { method: "POST", pattern: /^\/api\/plugins\/([^/]+)\/staging\/promotions$/, extractParams: idOnly, resolveHandler: () => pluginStagingPromotionsRoute.POST },
   { method: "POST", pattern: /^\/api\/plugins\/([^/]+)\/staging\/discards$/, extractParams: idOnly, resolveHandler: () => pluginStagingDiscardsRoute.POST },
   { method: "POST", pattern: /^\/api\/plugins\/repackager\/bundles$/, extractParams: noParams, resolveHandler: () => repackageBundlesRoute.POST },

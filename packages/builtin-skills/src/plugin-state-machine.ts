@@ -4,7 +4,14 @@ import type { SkillPlugin } from "@cowok-design/shared-types";
 import { detectBreakingChange, stableJsonEqual } from "./breaking-diff";
 import { nowUnixSeconds } from "./learn-sanitizer";
 import { ManifestUpdateOutcome, PluginLifecycleError } from "./lifecycle-errors";
-import { ManagedPluginRecord, ManagedPluginRecordSchema, PluginState, PluginStateSchema, StagedPluginBundle, StagedPluginBundleSchema } from "./lifecycle-types";
+import {
+  ManagedPluginRecord,
+  ManagedPluginRecordSchema,
+  PluginState,
+  PluginStateSchema,
+  StagedPluginBundleInput,
+  StagedPluginBundleSchema,
+} from "./lifecycle-types";
 import {
   assertManifestContract,
   derivePluginSlug,
@@ -176,7 +183,7 @@ export class PluginStateMachine {
     return { outcome: "APPLIED", report };
   }
 
-  public promoteStaging(bundleRaw: StagedPluginBundle, expectedRevision: number): void {
+  public promoteStaging(bundleRaw: StagedPluginBundleInput, expectedRevision: number): void {
     this.assertRevision(expectedRevision);
     if (this.plugin.quarantined) throw new PluginLifecycleError("QuarantinedReactivationForbidden", this.plugin.quarantine_reason ?? "quarantined");
     if (!this.plugin.breaking_change_isolated || this.plugin.state !== "ACTIVE" || !this.plugin.staging_manifest) {

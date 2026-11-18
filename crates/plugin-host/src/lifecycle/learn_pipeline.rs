@@ -18,7 +18,7 @@ pub const MAX_CARD_CONTENT_BYTES: usize = 4_096;
 pub const MAX_CARD_EVIDENCE_BYTES: usize = 512;
 pub const MAX_SCOPE_SEGMENT_BYTES: usize = 128;
 pub const MAX_APPROVAL_TTL_SECONDS: i64 = 900;
-pub const MAX_CARDS_PER_SCOPE: usize = 5_000;
+pub const MAX_CARDS_PER_SCOPE: usize = 1_000;
 pub const MAX_NONCES_PER_SCOPE: usize = 10_000;
 const APPROVER_HMAC_DOMAIN: &str = "cowok-learn-approver-v2";
 
@@ -712,21 +712,23 @@ impl HumanSessionAuthority {
                 "Only HUMAN_WORKBENCH_SESSION may mint approval tokens".to_string(),
             ));
         }
-        let aid = req.actor_id.trim();
-        let tid = req.tenant_id.trim();
-        let pid = req.project_id.trim();
-        let cid = req.card_id.trim();
+        let aid = validate_scope_segment("actor_id", req.actor_id.trim())
+            .map_err(|e| LearnError::UnauthorizedApprover(e.to_string()))?;
+        let tid = validate_scope_segment("tenant_id", req.tenant_id.trim())
+            .map_err(|e| LearnError::UnauthorizedApprover(e.to_string()))?;
+        let pid = validate_scope_segment("project_id", req.project_id.trim())
+            .map_err(|e| LearnError::UnauthorizedApprover(e.to_string()))?;
+        let cid = validate_scope_segment("card_id", req.card_id.trim())
+            .map_err(|e| LearnError::UnauthorizedApprover(e.to_string()))?;
+        let _kid = validate_scope_segment("kid", self.kid.trim())
+            .map_err(|e| LearnError::UnauthorizedApprover(e.to_string()))?;
         let sha = req.content_sha256.trim();
         let rs = req.reason.trim();
-        let n = req.nonce.trim();
-        if aid.is_empty()
-            || tid.is_empty()
-            || pid.is_empty()
-            || cid.is_empty()
-            || !is_valid_sha256_hex(sha)
+        let n = validate_scope_segment("nonce", req.nonce.trim())
+            .map_err(|e| LearnError::UnauthorizedApprover(e.to_string()))?;
+        if !is_valid_sha256_hex(sha)
             || req.expected_revision < 1
             || rs.len() < 4
-            || n.is_empty()
             || req.now_s <= 0
             || req.ttl_s <= 0
             || req.ttl_s > MAX_APPROVAL_TTL_SECONDS
@@ -735,6 +737,11 @@ impl HumanSessionAuthority {
                 "Malformed actor, scope, card binding, reason (<4B), nonce, timestamp, or TTL (1..=900s)".to_string(),
             ));
         }
+        let aid = aid.as_str();
+        let tid = tid.as_str();
+        let pid = pid.as_str();
+        let cid = cid.as_str();
+        let n = n.as_str();
         let expires_at_s = req
             .now_s
             .checked_add(req.ttl_s)
@@ -846,10 +853,42 @@ impl LearnPipeline {
                 MAX_CARD_EVIDENCE_BYTES,
             )?;
             let expected_sha = compute_content_sha256(&title, &content);
-            if card.revision < 1 || card.content_sha256 != expected_sha {
+            if card.revision < 1 || card.content_sha256 != expected_sha || card.created_at <= 0 {
                 return Err(LearnError::InvalidInput(format!(
-                    "Persisted card '{cid}' failed revision >= 1 or content_sha256 invariant"
+                    "Persisted card '{cid}' failed revision >= 1, created_at > 0, or content_sha256 invariant"
                 )));
+            }
+            match card.status {
+                CardStatus::Proposed => {
+                    if card.reviewed_by.is_some()
+                        || card.decision_reason.is_some()
+                        || card.accepted_at.is_some()
+                    {
+                        return Err(LearnError::InvalidInput(format!(
+                            "Persisted PROPOSED card '{cid}' must not carry reviewer/decision metadata"
+                        )));
+                    }
+                }
+                CardStatus::Accepted | CardStatus::Rejected => {
+                    let reviewer_ok = card
+                        .reviewed_by
+                        .as_deref()
+                        .is_some_and(|r| !r.trim().is_empty());
+                    let reason_ok = card
+                        .decision_reason
+                        .as_deref()
+                        .is_some_and(|r| r.trim().len() >= 4);
+                    let accepted_ok = if card.status == CardStatus::Accepted {
+                        card.accepted_at.is_some_and(|ts| ts >= card.created_at)
+                    } else {
+                        true
+                    };
+                    if card.revision < 2 || !reviewer_ok || !reason_ok || !accepted_ok {
+                        return Err(LearnError::InvalidInput(format!(
+                            "Persisted decided card '{cid}' failed provenance/revision/timestamp invariant"
+                        )));
+                    }
+                }
             }
             if pipeline
                 .cards
@@ -1033,6 +1072,14 @@ impl LearnPipeline {
             gate_report.gate_name.trim(),
             gate_report.evidence_hash.trim()
         );
+        // Normalize gate_report.timestamp (recorded in epoch ms by SQLite registry) to epoch seconds expected by KnowledgeCard/decide_card.
+        let raw_ts = *gate_report.timestamp;
+        let created_at_s = if raw_ts >= 1_000_000_000_000 {
+            raw_ts / 1_000
+        } else {
+            raw_ts
+        }
+        .max(1);
         self.propose_card_scoped(&ProposeCardInput {
             tenant_id,
             project_id,
@@ -1042,7 +1089,7 @@ impl LearnPipeline {
             title: &truncated_title,
             content: &issue_summary,
             source_evidence: &evidence,
-            created_at: *gate_report.timestamp,
+            created_at: created_at_s,
         })
     }
 
@@ -1058,17 +1105,21 @@ impl LearnPipeline {
                 "HUMAN_WORKBENCH_SESSION required".to_string(),
             ));
         }
-        if [
-            token.kid.as_str(),
-            token.actor_id.as_str(),
-            token.tenant_id.as_str(),
-            token.project_id.as_str(),
-            token.card_id.as_str(),
-            token.nonce.as_str(),
-        ]
-        .iter()
-        .any(|f| f.is_empty() || *f != f.trim())
-            || token.reason != token.reason.trim()
+        for (label, field) in [
+            ("kid", token.kid.as_str()),
+            ("actor_id", token.actor_id.as_str()),
+            ("tenant_id", token.tenant_id.as_str()),
+            ("project_id", token.project_id.as_str()),
+            ("card_id", token.card_id.as_str()),
+            ("nonce", token.nonce.as_str()),
+        ] {
+            if field != field.trim() || validate_scope_segment(label, field).is_err() {
+                return Err(LearnError::UnauthorizedApprover(
+                    "Malformed or invalid token scope/nonce characters/length".to_string(),
+                ));
+            }
+        }
+        if token.reason != token.reason.trim()
             || token.reason.len() < 4
             || !is_valid_sha256_hex(&token.content_sha256)
             || token.expected_revision < 1
@@ -1413,5 +1464,49 @@ mod tests {
         assert!(pipeline
             .get_active_prompt_injections("tenant-a", "proj-1", 1_500)
             .is_empty());
+    }
+
+    #[test]
+    fn test_from_persisted_state_rejects_tampered_provenance() {
+        let auth = HumanSessionAuthority::from_key_bytes([11u8; 32]);
+        let mut pipeline = LearnPipeline::with_authority(&auth);
+        let proposed = pipeline
+            .propose_card_scoped(&ProposeCardInput {
+                tenant_id: "tenant-a",
+                project_id: "proj-1",
+                id: "card-prov",
+                idempotency_key: None,
+                category: LearnCardCategory::Rule,
+                title: "Clean Rule",
+                content: "Validate persistence invariants",
+                source_evidence: "audit-log",
+                created_at: 1_700_000_000,
+            })
+            .unwrap()
+            .clone();
+
+        let mut tampered_proposed = proposed.clone();
+        tampered_proposed.accepted_at = Some(1_700_000_001);
+        assert!(LearnPipeline::from_persisted_state(
+            &auth,
+            vec![tampered_proposed],
+            vec![],
+            1_700_000_050,
+        )
+        .is_err());
+
+        let mut tampered_accepted = proposed;
+        tampered_accepted.status = CardStatus::Accepted;
+        tampered_accepted.revision = 1;
+        tampered_accepted.reviewed_by = Some("human".to_string());
+        tampered_accepted.decision_reason = Some("ok reason".to_string());
+        tampered_accepted.accepted_at = Some(1_700_000_010);
+        assert!(LearnPipeline::from_persisted_state(
+            &auth,
+            vec![tampered_accepted],
+            vec![],
+            1_700_000_050,
+        )
+        .is_err());
     }
 }

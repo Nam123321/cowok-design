@@ -570,7 +570,15 @@
     "discarding": "Đang hủy...",
     "discardBtn": "Hủy bản cập nhật",
     "rationalePlaceholder": "Nhập lý do (>= 4 ký tự)...",
-    "quarantinedLabel": "CÁCH LY"
+    "quarantinedLabel": "CÁCH LY",
+    "archiveBtn": "Lưu trữ",
+    "refreshBtn": "Làm mới",
+    "navLink": "Tiện ích",
+    "backToWorkbench": "Bàn làm việc",
+    "stagingImpactSummary": "Cập nhật v{{from}} -> v{{to}} có {{count}} thay đổi lớn; các luồng đang chạy vẫn cố định ở v{{from}} cho tới khi được duyệt.",
+    "quarantineBtn": "Cách ly",
+    "quarantinePlaceholder": "Lý do cách ly (>= 4 ký tự)...",
+    "quarantineReasonLabel": "Lý do cách ly"
   },
   "learn": {
     "revLabel": "Phiên bản",
@@ -599,6 +607,7 @@
     "retryBtn": "Thử lại",
     "cronPlaceholder": "0 */5 * * * *",
     "upstreamUrlPlaceholder": "https://github.com/to-chuc/kho-ma",
-    "saveScheduleBtn": "Lưu Lịch Đồng Bộ"
+    "saveScheduleBtn": "Lưu Lịch Đồng Bộ",
+    "vaultTokenRequired": "Cần mã thông báo GitHub trong Vault"
   }
 }

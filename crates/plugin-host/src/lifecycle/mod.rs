@@ -13,5 +13,5 @@ pub use learn_pipeline::{
 };
 pub use plugin_state_machine::{
     ManagedPlugin, ManagedPluginSnapshot, ManifestUpdateOutcome, PluginLifecycleError, PluginState,
-    StagedPluginBundle, StagedScriptFile,
+    StagedAssetFile, StagedPluginBundle, StagedScriptFile,
 };

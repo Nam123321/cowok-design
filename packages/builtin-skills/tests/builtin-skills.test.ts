@@ -201,6 +201,12 @@ description: ${"extremely detailed description ".repeat(30)}
       expect(fixed).toContain('tabindex="0"');
       expect(fixed).toContain("line-height: 1.5;");
       expect(fixed).toContain('name="viewport"');
+
+      const multiTab = `<button tabindex="5" title="Say “hi”"><svg></svg><svg></svg></button>`;
+      const fixedMulti = TriangleLinter.lintAndFix(multiTab).content;
+      expect(fixedMulti).toContain('tabindex="0"');
+      expect(fixedMulti).toContain('title="Say &quot;hi&quot;"');
+      expect((fixedMulti.match(/aria-hidden="true"/g) || []).length).toBe(2);
     });
   });
 
@@ -358,6 +364,35 @@ description: ${"extremely detailed description ".repeat(30)}
         report.issues.map((i) => i.rule_id).filter((id) => id.startsWith("RULE_GEO_")),
       );
       expect(distinctGeo.size).toBeGreaterThanOrEqual(25);
+    });
+
+    it("rejects symlinks/hardlinks across craft, prompt-templates & JSON axes and aligns 2px hairline spacing", () => {
+      const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "cowok-reg-sec-"));
+      try {
+        for (const dir of ["craft", "prompt-templates", "design-templates"]) {
+          fs.mkdirSync(path.join(tmpRoot, dir), { recursive: true });
+        }
+        const outside = path.join(tmpRoot, "outside.txt");
+        fs.writeFileSync(outside, '{"id":"bad-hardlink"}', "utf8");
+        fs.linkSync(outside, path.join(tmpRoot, "craft", "hardlink.md"));
+        fs.linkSync(outside, path.join(tmpRoot, "prompt-templates", "hardlink.md"));
+        fs.linkSync(outside, path.join(tmpRoot, "design-templates", "hardlink.json"));
+        fs.writeFileSync(path.join(tmpRoot, "craft", "ok.md"), "Clean rule", "utf8");
+
+        const reg = new BuiltinSkillsRegistry(tmpRoot);
+        reg.discover();
+        expect(reg.getCraftRule("ok")).toBeDefined();
+        expect(reg.getCraftRule("hardlink")).toBeUndefined();
+        expect(reg.getPromptTemplate("hardlink")).toBeUndefined();
+        expect(reg.getDesignTemplate("bad-hardlink")).toBeUndefined();
+      } finally {
+        fs.rmSync(tmpRoot, { recursive: true, force: true });
+      }
+
+      const hairlineReport = TriangleLinter.lint('<div style="padding: 1px; margin: 2px;"></div>');
+      expect(hairlineReport.issues.map((i) => i.rule_id)).not.toContain("RULE_GEO_06_SPACING_GRID_SCALE");
+      const offGridReport = TriangleLinter.lint('<div style="padding: 5px;"></div>');
+      expect(offGridReport.issues.map((i) => i.rule_id)).toContain("RULE_GEO_06_SPACING_GRID_SCALE");
     });
   });
 });

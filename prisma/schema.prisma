@@ -224,15 +224,23 @@ model ConstraintRule {
 }
 
 model GateReport {
-  id           String @id @default(uuid())
-  projectId    String @map("project_id")
-  gateName     String @map("gate_name")
-  passed       Int
-  checkerId    String @map("checker_id")
-  evidenceHash String @map("evidence_hash")
-  timestamp    BigInt
+  id            String @id @default(uuid())
+  tenantId      String @default("local-default") @map("tenant_id")
+  projectId     String @map("project_id")
+  correlationId String @default("") @map("correlation_id")
+  gateName      String @map("gate_name")
+  passed        Int
+  checkerId     String @map("checker_id")
+  targetId      String @default("") @map("target_id")
+  action        String @default("")
+  revision      BigInt @default(0)
+  fencingToken  BigInt @default(0) @map("fencing_token")
+  reasonCode    String @default("") @map("reason_code")
+  evidenceHash  String @map("evidence_hash")
+  timestamp     BigInt
 
   @@index([projectId, gateName])
+  @@index([projectId, gateName, targetId, timestamp(sort: Desc), id(sort: Desc)], map: "idx_gate_reports_project_gate_target")
   @@map("gate_reports")
 }
 
@@ -789,6 +797,7 @@ model KnowledgeCard {
 
   @@id([tenantId, projectId, id])
   @@unique([tenantId, projectId, idempotencyKey], where: { idempotencyKey: { not: null } }, map: "uq_knowledge_cards_idempotency")
+  @@unique([tenantId, projectId, contentSha256], where: { status: { not: "REJECTED" } }, map: "uq_knowledge_cards_active_hash")
   @@index([tenantId, projectId, status, createdAt, id])
   @@map("knowledge_cards")
 }
@@ -838,6 +847,7 @@ model DaemonSession {
   tenantId    String  @default("local-default") @map("tenant_id")
   userId      String  @default("local-operator") @map("user_id")
   role        String
+  actorKind   String  @default("AGENT_HMAC") @map("actor_kind")
   expiresAt   BigInt  @map("expires_at")
   createdAt   BigInt  @map("created_at")
   revokedAt   BigInt? @map("revoked_at")

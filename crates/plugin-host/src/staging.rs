@@ -3,11 +3,12 @@
 use crate::models::{SkillManifest, StagingRunReceipt};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::{self, Permissions};
+use std::fs::{self, OpenOptions, Permissions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 #[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 
 const KV_HASH_PROTOCOL: &[u8] = b"cowok-kv-hash-v1";
 
@@ -90,16 +91,21 @@ fn has_hidden_or_bidi_unicode(text: &str) -> bool {
     text.chars().any(|c| {
         matches!(
             c as u32,
-            0x200B..=0x200F
+            0x00AD
+                | 0x034F
+                | 0x061C
+                | 0x180E
+                | 0x200B..=0x200F
                 | 0x2028..=0x202E
-                | 0x2066..=0x2069
+                | 0x2060..=0x2069
+                | 0xFE00..=0xFE0F
                 | 0xFEFF
                 | 0xE0001..=0xE007F
         )
     })
 }
 
-/// Pure-Rust read-only homoglyph/NFKC shadow fold covering fullwidth, math-alnum, angle/dash variants, and combining marks.
+/// Pure-Rust read-only homoglyph/NFKC shadow fold covering fullwidth, math-alnum, ligatures, angle/dash variants, and combining marks.
 pub(crate) fn shadow_nfkc_fold(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for c in input.chars() {
@@ -107,15 +113,54 @@ pub(crate) fn shadow_nfkc_fold(input: &str) -> String {
         if (0x0300..=0x036F).contains(&code) {
             continue;
         }
+        match code {
+            0xFB00 => {
+                out.push_str("ff");
+                continue;
+            }
+            0xFB01 => {
+                out.push_str("fi");
+                continue;
+            }
+            0xFB02 => {
+                out.push_str("fl");
+                continue;
+            }
+            0xFB03 => {
+                out.push_str("ffi");
+                continue;
+            }
+            0xFB04 => {
+                out.push_str("ffl");
+                continue;
+            }
+            0xFB05 | 0xFB06 => {
+                out.push_str("st");
+                continue;
+            }
+            _ => {}
+        }
         let mapped = match code {
             0xFF01..=0xFF5E => char::from_u32(code - 0xFEE0).unwrap_or(c),
             0x3000 | 0x00A0 => ' ',
             0x2010..=0x2015 | 0x2212 | 0xFE58 | 0xFE63 => '-',
             0xFE64 | 0x27E8 | 0x3008 => '<',
             0xFE65 | 0x27E9 | 0x3009 => '>',
-            0x1D400..=0x1D419 => char::from_u32('A' as u32 + (code - 0x1D400)).unwrap_or(c),
-            0x1D41A..=0x1D433 => char::from_u32('a' as u32 + (code - 0x1D41A)).unwrap_or(c),
-            0x1D7CE..=0x1D7D7 => char::from_u32('0' as u32 + (code - 0x1D7CE)).unwrap_or(c),
+            // Mathematical Alphanumeric Symbols (U+1D400..=U+1D6A5: 13 styles x 52 letters each)
+            0x1D400..=0x1D6A3 => {
+                let offset = (code - 0x1D400) % 52;
+                let base = if offset < 26 {
+                    b'A' + offset as u8
+                } else {
+                    b'a' + (offset - 26) as u8
+                };
+                char::from(base)
+            }
+            // Mathematical digits (U+1D7CE..=U+1D7FF: 5 styles x 10 digits)
+            0x1D7CE..=0x1D7FF => {
+                let d = (code - 0x1D7CE) % 10;
+                char::from(b'0' + d as u8)
+            }
             _ => c,
         };
         out.push(mapped);
@@ -138,8 +183,9 @@ fn contains_markdown_image_beacon(lower: &str) -> bool {
     false
 }
 
-/// Validates staged prompt_overview content against prompt injection, invisible Unicode, and image beacons.
-pub fn validate_staged_prompt_content(overview: &str) -> std::io::Result<()> {
+/// Core low-level prompt directive/Unicode baseline check used by both `validate_staged_prompt_content`
+/// and `security_scanner::scan_skill_markdown_safety` without creating recursion.
+pub(crate) fn validate_staged_prompt_base(overview: &str) -> std::io::Result<()> {
     if has_hidden_or_bidi_unicode(overview) {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
@@ -174,67 +220,141 @@ pub fn validate_staged_prompt_content(overview: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Validates staged prompt_overview content via unified `scan_skill_markdown_safety` (IPI, XSS, HTML/Markdown beacons, Unicode spoofing).
+pub fn validate_staged_prompt_content(overview: &str) -> std::io::Result<()> {
+    crate::repackager::scan_skill_markdown_safety("PROMPT.md", overview)
+        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidData, err.to_string()))
+}
+
+/// Safely creates/validates a directory path component-by-component without traversing symlinks.
+pub fn ensure_safe_dir_no_symlink(base: &Path) -> std::io::Result<PathBuf> {
+    ensure_safe_base_dir(base)
+}
+
 fn ensure_safe_base_dir(base: &Path) -> std::io::Result<PathBuf> {
-    if let Ok(meta) = fs::symlink_metadata(base) {
-        if meta.file_type().is_symlink() || !meta.is_dir() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "base_staging_dir must be a real non-symlink directory",
-            ));
+    use std::path::Component;
+    let abs_base = if base.is_relative() {
+        std::env::current_dir()?.join(base)
+    } else {
+        base.to_path_buf()
+    };
+
+    let mut comps: Vec<std::ffi::OsString> = Vec::new();
+    for comp in abs_base.components() {
+        match comp {
+            Component::RootDir | Component::CurDir => {}
+            Component::ParentDir => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!(
+                        "Parent traversal '..' disallowed in staging path: {}",
+                        base.display()
+                    ),
+                ));
+            }
+            Component::Normal(seg) => comps.push(seg.to_os_string()),
+            Component::Prefix(_) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "Unsupported path prefix in staging path",
+                ));
+            }
         }
-        return fs::canonicalize(base);
     }
 
-    let mut cur = base.to_path_buf();
-    let mut missing: Vec<std::ffi::OsString> = Vec::new();
-    while fs::symlink_metadata(&cur).is_err() {
-        let Some(name) = cur.file_name().map(|s| s.to_os_string()) else {
-            break;
-        };
-        missing.push(name);
-        if !cur.pop() {
-            break;
+    let mut resolved = PathBuf::from("/");
+    let mut start_idx = 0usize;
+    #[cfg(target_os = "macos")]
+    if let Some(first) = comps.first().and_then(|s| s.to_str()) {
+        if matches!(first, "tmp" | "var" | "etc")
+            && fs::symlink_metadata(format!("/{first}")).is_ok_and(|m| m.file_type().is_symlink())
+        {
+            resolved = PathBuf::from(match first {
+                "tmp" => "/private/tmp",
+                "var" => "/private/var",
+                "etc" => "/private/etc",
+                _ => "/",
+            });
+            start_idx = 1;
         }
     }
 
-    let anchor_meta = fs::symlink_metadata(&cur)?;
-    if anchor_meta.file_type().is_symlink() || !anchor_meta.is_dir() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            format!(
-                "Symlink component disallowed in staging anchor: {}",
-                cur.display()
-            ),
-        ));
-    }
-
-    let mut resolved = fs::canonicalize(&cur)?;
-    for segment in missing.into_iter().rev() {
-        resolved.push(&segment);
-        match fs::create_dir(&resolved) {
-            Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-            Err(e) => return Err(e),
-        }
-        let meta = fs::symlink_metadata(&resolved)?;
-        if meta.file_type().is_symlink() || !meta.is_dir() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!(
-                    "Symlink component disallowed in staging path: {}",
-                    resolved.display()
-                ),
-            ));
+    for seg in comps.into_iter().skip(start_idx) {
+        resolved.push(&seg);
+        match fs::symlink_metadata(&resolved) {
+            Ok(meta) => {
+                if meta.file_type().is_symlink() || !meta.is_dir() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!(
+                            "Symlink or non-directory component disallowed in staging path: {}",
+                            resolved.display()
+                        ),
+                    ));
+                }
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                match fs::create_dir(&resolved) {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+                    Err(e) => return Err(e),
+                }
+                let meta = fs::symlink_metadata(&resolved)?;
+                if meta.file_type().is_symlink() || !meta.is_dir() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        format!(
+                            "Symlink or non-directory component disallowed in staging path: {}",
+                            resolved.display()
+                        ),
+                    ));
+                }
+            }
+            Err(err) => return Err(err),
         }
     }
     Ok(resolved)
 }
 
+fn write_file_nofollow_excl(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut opts = OpenOptions::new();
+    opts.write(true).create_new(true);
+    #[cfg(unix)]
+    opts.custom_flags(libc::O_NOFOLLOW);
+    let mut f = opts.open(path)?;
+    #[cfg(unix)]
+    {
+        let meta = f.metadata()?;
+        if !meta.is_file() || meta.nlink() != 1 {
+            let _ = fs::remove_file(path);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!(
+                    "Security violation: hardlinked/non-regular staged file at {}",
+                    path.display()
+                ),
+            ));
+        }
+    }
+    f.write_all(bytes)?;
+    f.sync_all()
+}
+
 fn set_path_readonly(path: &Path, is_dir: bool) -> std::io::Result<()> {
     #[cfg(unix)]
     {
+        use std::os::unix::fs::OpenOptionsExt;
         let mode = if is_dir { 0o555 } else { 0o444 };
-        fs::set_permissions(path, Permissions::from_mode(mode))
+        let mut opts = OpenOptions::new();
+        opts.read(true);
+        let flags = if is_dir {
+            libc::O_NOFOLLOW | libc::O_DIRECTORY
+        } else {
+            libc::O_NOFOLLOW
+        };
+        opts.custom_flags(flags);
+        let f = opts.open(path)?;
+        f.set_permissions(Permissions::from_mode(mode))
     }
     #[cfg(not(unix))]
     {
@@ -374,10 +494,17 @@ impl PerRunStager {
         sorted.sort_by(|a, b| a.0.name.as_bytes().cmp(b.0.name.as_bytes()));
 
         let mut staged_names = Vec::with_capacity(sorted.len());
+        let mut seen_names = BTreeSet::new();
         let mut skill_dirs = Vec::with_capacity(sorted.len());
 
         for &(skill, _) in &sorted {
             Self::validate_safe_segment("skill.name", &skill.name)?;
+            if !seen_names.insert(skill.name.as_str()) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("Duplicate skill name '{}' in staging run", skill.name),
+                ));
+            }
             if let Some(overview) = &skill.prompt_overview {
                 validate_staged_prompt_content(overview)?;
             }
@@ -387,12 +514,12 @@ impl PerRunStager {
 
             let manifest_path = skill_dir.join("plugin.json");
             let json = serde_json::to_string_pretty(skill).map_err(std::io::Error::other)?;
-            fs::write(&manifest_path, json)?;
+            write_file_nofollow_excl(&manifest_path, json.as_bytes())?;
             set_path_readonly(&manifest_path, false)?;
 
             if let Some(overview) = &skill.prompt_overview {
                 let overview_path = skill_dir.join("PROMPT.md");
-                fs::write(&overview_path, overview)?;
+                write_file_nofollow_excl(&overview_path, overview.as_bytes())?;
                 set_path_readonly(&overview_path, false)?;
             }
 
@@ -411,7 +538,7 @@ impl PerRunStager {
 
         let receipt_path = run_dir.join("run-receipt.json");
         let receipt_json = serde_json::to_string_pretty(&receipt).map_err(std::io::Error::other)?;
-        fs::write(&receipt_path, receipt_json)?;
+        write_file_nofollow_excl(&receipt_path, receipt_json.as_bytes())?;
         set_path_readonly(&receipt_path, false)?;
 
         for skill_dir in skill_dirs {
@@ -435,7 +562,8 @@ impl PerRunStager {
     /// Restores permissions safely on owned run directory and removes it without affecting siblings.
     pub fn cleanup_run(&self, run_id: &str) -> std::io::Result<()> {
         Self::validate_safe_segment("run_id", run_id)?;
-        let run_dir = self.base_staging_dir.join(run_id);
+        let safe_base = ensure_safe_base_dir(&self.base_staging_dir)?;
+        let run_dir = safe_base.join(run_id);
         let Ok(meta) = fs::symlink_metadata(&run_dir) else {
             return Ok(());
         };
@@ -447,6 +575,39 @@ impl PerRunStager {
         }
         restore_writable_recursive(&run_dir)?;
         fs::remove_dir_all(&run_dir)
+    }
+
+    /// Prunes expired run staging directories older than `max_age_secs` safely (skipping symlinks/non-dirs).
+    pub fn prune_expired_runs(&self, max_age_secs: u64) -> std::io::Result<usize> {
+        let safe_base = ensure_safe_base_dir(&self.base_staging_dir)?;
+        let now = std::time::SystemTime::now();
+        let mut removed = 0usize;
+        for entry in fs::read_dir(&safe_base)? {
+            let entry = entry?;
+            let path = entry.path();
+            let Ok(meta) = fs::symlink_metadata(&path) else {
+                continue;
+            };
+            if meta.file_type().is_symlink() || !meta.is_dir() {
+                continue;
+            }
+            let Ok(modified) = meta.modified() else {
+                continue;
+            };
+            let Ok(age) = now.duration_since(modified) else {
+                continue;
+            };
+            if age.as_secs() >= max_age_secs {
+                if let Some(name) = entry.file_name().to_str() {
+                    if Self::validate_safe_segment("run_id", name).is_ok()
+                        && self.cleanup_run(name).is_ok()
+                    {
+                        removed += 1;
+                    }
+                }
+            }
+        }
+        Ok(removed)
     }
 }
 

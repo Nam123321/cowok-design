@@ -106,6 +106,14 @@ export function setBffSessionHumanToken(sessionToken: string, humanSessionToken:
   }
 }
 
+/** Clears a stale cached daemon human session token so the BFF re-mints transparently on daemon restart. */
+export function clearBffSessionHumanToken(sessionToken: string): void {
+  const rec = sessionRegistry.get(sessionToken);
+  if (rec) {
+    delete rec.humanSessionToken;
+  }
+}
+
 /** Validates that a Host/Origin host string is loopback and matches the expected port when pinned. */
 export function isAllowedLoopbackHost(rawHost: string, expectedPort?: number | null): boolean {
   const host = rawHost.trim().toLowerCase();

@@ -11,26 +11,17 @@ import {
   stripSpoofedHeaders,
   type DaemonLockRecord,
 } from "./daemon-hmac";
+import { getOrInitWorkbenchHumanSecret } from "./daemon-secret.ts";
 import { logger } from "./logger.ts";
-import { setBffSessionHumanToken } from "./api-guard-session.ts";
+import { clearBffSessionHumanToken, setBffSessionHumanToken } from "./api-guard-session.ts";
 
 export { buildCanonicalHmacHeaders, stripSpoofedHeaders };
 
-const WORKBENCH_HUMAN_SECRET_SYMBOL = Symbol.for("cowok.workbenchHumanSecret");
-const WORKBENCH_SECRET_BYTES = 32;
-
-function getOrInitWorkbenchHumanSecret(): string {
-  const existing = process.env.COWOK_WORKBENCH_HUMAN_SECRET?.trim();
-  if (existing) return existing;
-  const g = globalThis as Record<PropertyKey, unknown>;
-  if (typeof g[WORKBENCH_HUMAN_SECRET_SYMBOL] === "string" && (g[WORKBENCH_HUMAN_SECRET_SYMBOL] as string).length > 0) {
-    return g[WORKBENCH_HUMAN_SECRET_SYMBOL] as string;
-  }
-  const generated = crypto.randomBytes(WORKBENCH_SECRET_BYTES).toString("hex");
-  g[WORKBENCH_HUMAN_SECRET_SYMBOL] = generated;
-  process.env.COWOK_WORKBENCH_HUMAN_SECRET = generated;
-  return generated;
-}
+const DAEMON_MIN_SCHEMA_VERSION = 11;
+const DAEMON_STARTUP_TIMEOUT_MS = 8_000;
+const DAEMON_POLL_INTERVAL_MS = 40;
+const HTTP_UNAUTHORIZED = 401;
+const HTTP_FORBIDDEN = 403;
 
 /**
  * Local workspace bootstrap default IDs.
@@ -38,7 +29,7 @@ function getOrInitWorkbenchHumanSecret(): string {
  * (projects 'cowok-design-default', 'cowok-ai-workbench', and 'markops-platform')
  * ensuring seamless offline dev bootstrap when no environment override is provided.
  */
-export const LOCAL_BOOTSTRAP_DEFAULTS = {
+const LOCAL_BOOTSTRAP_DEFAULTS = {
   flowProjectId:
     (typeof process !== "undefined" && process.env?.COWOK_DEFAULT_PROJECT_ID?.trim()) ||
     "11111111-1111-4111-8111-111111111111",
@@ -97,7 +88,7 @@ function readValidLock(workspaceRoot: string): DaemonLockRecord | null {
       !parsed.hmac_key_hex ||
       typeof parsed.schema_version !== "number" ||
       !Number.isFinite(parsed.schema_version) ||
-      parsed.schema_version < 8
+      parsed.schema_version < DAEMON_MIN_SCHEMA_VERSION
     ) {
       return null;
     }
@@ -164,7 +155,7 @@ async function verifyHealthAndSeedDefaultProject(lock: DaemonLockRecord, workspa
   const healthRes = await fetch(`http://127.0.0.1:${lock.port}/api/v1/health`);
   if (!healthRes.ok) throw new Error(`Daemon health check failed (${healthRes.status})`);
   const health = (await healthRes.json()) as { service?: string; schema_version?: number };
-  if (health.service !== "cowok-design-harness-daemon" || (health.schema_version ?? 0) < 8) {
+  if (health.service !== "cowok-design-harness-daemon" || (health.schema_version ?? 0) < DAEMON_MIN_SCHEMA_VERSION) {
     throw new Error("Unexpected daemon health identity or schema_version");
   }
   const seedingPromises = getSeededWorkspacePromises();
@@ -183,13 +174,14 @@ export async function ensureRunningDaemon(): Promise<DaemonLockRecord> {
   const wsRoot = resolveWorkspaceRoot();
   const existing = readValidLock(wsRoot);
   if (existing) {
+    getOrInitWorkbenchHumanSecret(wsRoot);
     await verifyHealthAndSeedDefaultProject(existing, wsRoot);
     return existing;
   }
   if (spawningPromise) return spawningPromise;
   spawningPromise = (async () => {
     try {
-      const humanSecret = getOrInitWorkbenchHumanSecret();
+      const humanSecret = getOrInitWorkbenchHumanSecret(wsRoot);
       const child = spawn(resolveDaemonBinaryPath(), [], {
         cwd: wsRoot,
         env: {
@@ -202,14 +194,14 @@ export async function ensureRunningDaemon(): Promise<DaemonLockRecord> {
         stdio: "ignore",
       });
       child.unref();
-      const deadline = Date.now() + 8_000;
+      const deadline = Date.now() + DAEMON_STARTUP_TIMEOUT_MS;
       while (Date.now() < deadline) {
         const lock = readValidLock(wsRoot);
         if (lock) {
           await verifyHealthAndSeedDefaultProject(lock, wsRoot);
           return lock;
         }
-        await new Promise((r) => setTimeout(r, 40));
+        await new Promise((r) => setTimeout(r, DAEMON_POLL_INTERVAL_MS));
       }
       throw new Error("Timed out waiting for harness-daemon lockfile startup");
     } finally {
@@ -222,6 +214,7 @@ export async function ensureRunningDaemon(): Promise<DaemonLockRecord> {
 async function resolveHumanSessionHeader(
   lock: DaemonLockRecord,
   opts: {
+    method?: string;
     bffSessionToken?: string;
     isHumanWorkbench?: boolean;
     humanSessionToken?: string;
@@ -230,35 +223,42 @@ async function resolveHumanSessionHeader(
 ): Promise<string | undefined> {
   if (opts.humanSessionToken?.trim()) return opts.humanSessionToken.trim();
   if (!opts.isHumanWorkbench || opts.principal.role === "viewer") return undefined;
-  const secret = process.env.COWOK_WORKBENCH_HUMAN_SECRET?.trim();
-  if (!secret) return undefined;
-  try {
-    const res = await fetch(`http://127.0.0.1:${lock.port}/api/v1/auth/workbench-session`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Host: `127.0.0.1:${lock.port}`,
-        "X-Cowok-Workbench-Secret": secret,
-      },
-      body: JSON.stringify({
-        tenantId: opts.principal.tenantId,
-        userId: opts.principal.userId,
-        role: opts.principal.role === "admin" ? "admin" : "editor",
-      }),
-    });
-    if (!res.ok) return undefined;
-    const data = (await res.json()) as { sessionToken?: string };
-    const tok = data.sessionToken?.trim();
-    if (tok && opts.bffSessionToken) {
-      setBffSessionHumanToken(opts.bffSessionToken, tok);
+  const secret = getOrInitWorkbenchHumanSecret(resolveWorkspaceRoot());
+  if (!secret) {
+    throw new Error("HUMAN_AUTH_MISCONFIGURED: Missing shared workbench human secret");
+  }
+  const res = await fetch(`http://127.0.0.1:${lock.port}/api/v1/auth/workbench-session`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Host: `127.0.0.1:${lock.port}`,
+      "X-Cowok-Workbench-Secret": secret,
+    },
+    body: JSON.stringify({
+      tenantId: opts.principal.tenantId,
+      userId: opts.principal.userId,
+      role: opts.principal.role === "admin" ? "admin" : "editor",
+    }),
+  });
+  if (!res.ok) {
+    const isWrite = opts.method && opts.method !== "GET" && opts.method !== "HEAD";
+    if (isWrite) {
+      throw new Error(`HUMAN_AUTH_MISCONFIGURED: Daemon workbench-session rejected (${res.status})`);
     }
-    return tok || undefined;
-  } catch {
     return undefined;
   }
+  const data = (await res.json()) as { sessionToken?: string };
+  const tok = data.sessionToken?.trim();
+  if (!tok) {
+    throw new Error("HUMAN_AUTH_MISCONFIGURED: Daemon returned empty workbench session token");
+  }
+  if (opts.bffSessionToken) {
+    setBffSessionHumanToken(opts.bffSessionToken, tok);
+  }
+  return tok;
 }
 
-export async function forwardToDaemonFlow(opts: {
+interface DaemonForwardOpts {
   method: string;
   daemonPath: string;
   rawQuery?: string;
@@ -270,12 +270,18 @@ export async function forwardToDaemonFlow(opts: {
   bffSessionToken?: string;
   isHumanWorkbench?: boolean;
   humanSessionToken?: string;
+  signal?: AbortSignal;
+}
+
+async function fetchDaemonOnce(params: {
+  lock: DaemonLockRecord;
+  opts: DaemonForwardOpts;
+  safeInbound: Record<string, string>;
+  rawQuery: string;
+  rawBody: string;
+  correlationId: string;
 }): Promise<Response> {
-  const safeInbound = opts.inboundHeaders ? stripSpoofedHeaders(opts.inboundHeaders) : {};
-  const lock = await ensureRunningDaemon();
-  const rawQuery = (opts.rawQuery || "").replace(/^\?/, "");
-  const rawBody = opts.body !== undefined ? JSON.stringify(opts.body) : "";
-  const correlationId = opts.correlationId || crypto.randomUUID();
+  const { lock, opts, safeInbound, rawQuery, rawBody, correlationId } = params;
   const resolvedHumanTok = await resolveHumanSessionHeader(lock, opts);
   const signedHeaders = buildCanonicalHmacHeaders({
     daemonNonce: lock.daemon_nonce, hmacKeyHex: lock.hmac_key_hex,
@@ -289,11 +295,37 @@ export async function forwardToDaemonFlow(opts: {
   headers["X-Cowok-Role"] = opts.principal.role;
   const targetUrl = `http://127.0.0.1:${lock.port}${opts.daemonPath}${rawQuery ? `?${rawQuery}` : ""}`;
   logger.info("bff_forward_daemon", { method: opts.method, path: opts.daemonPath, correlationId });
-  const upstream = await fetch(targetUrl, {
+  return fetch(targetUrl, {
     method: opts.method,
     headers,
     body: opts.method === "GET" || opts.method === "HEAD" || rawBody === "" ? undefined : rawBody,
+    signal: opts.signal,
   });
+}
+
+export async function forwardToDaemonFlow(opts: DaemonForwardOpts): Promise<Response> {
+  const safeInbound = opts.inboundHeaders ? stripSpoofedHeaders(opts.inboundHeaders) : {};
+  const lock = await ensureRunningDaemon();
+  const rawQuery = (opts.rawQuery || "").replace(/^\?/, "");
+  const rawBody = opts.body !== undefined ? JSON.stringify(opts.body) : "";
+  const correlationId = opts.correlationId || crypto.randomUUID();
+  let upstream = await fetchDaemonOnce({ lock, opts, safeInbound, rawQuery, rawBody, correlationId });
+  if (
+    (upstream.status === HTTP_UNAUTHORIZED || upstream.status === HTTP_FORBIDDEN) &&
+    opts.isHumanWorkbench &&
+    opts.humanSessionToken &&
+    opts.bffSessionToken
+  ) {
+    clearBffSessionHumanToken(opts.bffSessionToken);
+    upstream = await fetchDaemonOnce({
+      lock,
+      opts: { ...opts, humanSessionToken: undefined },
+      safeInbound,
+      rawQuery,
+      rawBody,
+      correlationId,
+    });
+  }
   return relayDaemonResponse(upstream, correlationId);
 }
 
@@ -327,5 +359,6 @@ export function forwardFromGuardedContext(
     bffSessionToken: ctx.bffSessionToken,
     isHumanWorkbench: ctx.isHumanWorkbench,
     humanSessionToken: ctx.humanSessionToken,
+    signal: req.signal,
   });
 }

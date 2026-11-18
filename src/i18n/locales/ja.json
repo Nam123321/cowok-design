@@ -570,7 +570,15 @@
     "discarding": "破棄中...",
     "discardBtn": "候補を破棄",
     "rationalePlaceholder": "理由を入力（4文字以上）...",
-    "quarantinedLabel": "隔離中"
+    "quarantinedLabel": "隔離中",
+    "archiveBtn": "アーカイブ",
+    "refreshBtn": "更新",
+    "navLink": "プラグイン",
+    "backToWorkbench": "ワークベンチ",
+    "stagingImpactSummary": "v{{from}} -> v{{to}} への更新には {{count}} 件の破壊的変更が含まれます。昇格するまで実行中のジョブは v{{from}} に固定されます。",
+    "quarantineBtn": "隔離",
+    "quarantinePlaceholder": "隔離理由 (>= 4文字)...",
+    "quarantineReasonLabel": "隔離理由"
   },
   "learn": {
     "revLabel": "リビジョン",
@@ -599,6 +607,7 @@
     "retryBtn": "再試行",
     "cronPlaceholder": "0 */5 * * * *",
     "upstreamUrlPlaceholder": "https://github.com/soshiki/repo",
-    "saveScheduleBtn": "スケジュール保存"
+    "saveScheduleBtn": "スケジュール保存",
+    "vaultTokenRequired": "Vault GitHub トークンが必要です"
   }
 }

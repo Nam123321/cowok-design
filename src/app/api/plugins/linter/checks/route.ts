@@ -1,7 +1,7 @@
 // @story 08.4
 import { guardedRoute } from "@/lib/api-guard";
 import { forwardFromGuardedContext } from "@/lib/daemon-client";
-import { TriangleLintRequestSchema } from "@/lib/validations/plugins";
+import { TriangleLintRequestSchema } from "@/lib/validations/plugins-repackager";
 
 export const POST = guardedRoute(
   (req, ctx, { body }) =>

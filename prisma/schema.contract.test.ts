@@ -99,11 +99,52 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V10__epic08_audit_remediation.sql"),
+      "utf-8"
+    )
+  );
+  // Mirror pool.rs apply_v11_columns idempotent column guards prior to V11 index creation
+  db.exec(`
+    ALTER TABLE gate_reports ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
+    ALTER TABLE gate_reports ADD COLUMN correlation_id TEXT NOT NULL DEFAULT '';
+    ALTER TABLE gate_reports ADD COLUMN target_id TEXT NOT NULL DEFAULT '';
+    ALTER TABLE gate_reports ADD COLUMN action TEXT NOT NULL DEFAULT '';
+    ALTER TABLE gate_reports ADD COLUMN revision BIGINT NOT NULL DEFAULT 0;
+    ALTER TABLE gate_reports ADD COLUMN fencing_token BIGINT NOT NULL DEFAULT 0;
+    ALTER TABLE gate_reports ADD COLUMN reason_code TEXT NOT NULL DEFAULT '';
+    ALTER TABLE daemon_sessions ADD COLUMN actor_kind TEXT NOT NULL DEFAULT 'AGENT_HMAC';
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V11__epic08_party_remediation.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
 
-describe("P1 Persistence Contract & SQLite WAL V1-V9 Mirror Verification (ADR-091)", () => {
+function parsePrismaModelColumns(schemaText: string, modelName: string): string[] {
+  const modelRe = new RegExp(`model\\s+${modelName}\\s+\\{([\\s\\S]*?)\\n\\}`, "m");
+  const match = modelRe.exec(schemaText);
+  if (!match) throw new Error(`Missing Prisma model ${modelName}`);
+  const cols: string[] = [];
+  for (const rawLine of match[1].split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("//") || line.startsWith("@@")) continue;
+    if (/^\w+\s+[A-Z]\w*[\?\[]*.*\s+@relation\(/.test(line)) continue;
+    const fieldMatch = /^([a-zA-Z_][a-zA-Z0-9_]*)\s+([A-Za-z0-9_]+)[\?\[]*/.exec(line);
+    if (!fieldMatch) continue;
+    const fieldName = fieldMatch[1];
+    const mapMatch = /@map\("([^"]+)"\)/.exec(line);
+    cols.push(mapMatch ? mapMatch[1] : fieldName);
+  }
+  return cols.sort();
+}
+
+describe("P1 Persistence Contract & SQLite WAL V1-V11 Mirror Verification (ADR-091)", () => {
   const schemaPath = path.resolve(__dirname, "schema.prisma");
   const migrationsDir = path.resolve(__dirname, "../crates/spec-registry/migrations");
 
@@ -248,12 +289,12 @@ describe("P1 Persistence Contract & SQLite WAL V1-V9 Mirror Verification (ADR-09
     expect(remainingEdges.count).toBe(0);
   });
 
-  it("UT-DB-06: verifies Story 08.4 V9 SQLite index parity with Prisma partialIndexes metadata", () => {
+  it("UT-DB-06: verifies Story 08.4 V9-V11 SQLite column and index parity with Prisma partialIndexes metadata", () => {
     const db = openMigratedMemoryDb();
     const schemaText = fs.readFileSync(path.resolve(__dirname, "schema.prisma"), "utf8");
     const sqliteIndexes = db
       .prepare(
-        "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name IN ('skill_plugins', 'knowledge_cards', 'plugin_cron_schedules')"
+        "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name IN ('skill_plugins', 'knowledge_cards', 'plugin_cron_schedules', 'gate_reports')"
       )
       .all() as Array<{ name: string; sql: string | null }>;
     const byName = new Map(sqliteIndexes.map((idx) => [idx.name, idx.sql ?? ""]));
@@ -263,13 +304,34 @@ describe("P1 Persistence Contract & SQLite WAL V1-V9 Mirror Verification (ADR-09
     expect(byName.get("uq_skill_plugins_active_slug")).toContain("WHERE lifecycle_state = 'ACTIVE'");
     expect(byName.has("uq_knowledge_cards_idempotency")).toBe(true);
     expect(byName.get("uq_knowledge_cards_idempotency")).toContain("WHERE idempotency_key IS NOT NULL");
+    expect(byName.has("uq_knowledge_cards_active_hash")).toBe(true);
+    expect(byName.get("uq_knowledge_cards_active_hash")).toContain("WHERE status != 'REJECTED'");
     expect(byName.has("uq_plugin_cron_schedules_scope_plugin")).toBe(true);
+    expect(byName.has("idx_gate_reports_project_gate_target")).toBe(true);
     expect(byName.has("skill_plugins_project_slug_ver_key")).toBe(false);
 
     expect(schemaText).toContain('previewFeatures = ["partialIndexes"]');
     expect(schemaText).toContain('map: "uq_skill_plugins_active_slug"');
     expect(schemaText).toContain('map: "uq_knowledge_cards_idempotency"');
+    expect(schemaText).toContain('map: "uq_knowledge_cards_active_hash"');
     expect(schemaText).toContain('map: "uq_plugin_cron_schedules_scope_plugin"');
+    expect(schemaText).toContain('map: "idx_gate_reports_project_gate_target"');
+
+    // Column-level PRAGMA table_info parity across V9-V11 Epic 08 models
+    const tableModelPairs: Array<[string, string]> = [
+      ["skill_plugins", "SkillPlugin"],
+      ["knowledge_cards", "KnowledgeCard"],
+      ["learn_consumed_nonces", "LearnConsumedNonce"],
+      ["plugin_cron_schedules", "PluginCronSchedule"],
+      ["gate_reports", "GateReport"],
+      ["daemon_sessions", "DaemonSession"],
+    ];
+    for (const [tableName, modelName] of tableModelPairs) {
+      const pragmaRows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+      const sqliteCols = pragmaRows.map((r) => r.name).sort();
+      const prismaCols = parsePrismaModelColumns(schemaText, modelName);
+      expect(sqliteCols, `Column parity for ${tableName} <-> ${modelName}`).toEqual(prismaCols);
+    }
 
     const now = Date.now();
     db.prepare(

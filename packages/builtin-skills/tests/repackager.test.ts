@@ -23,6 +23,8 @@ import {
 } from "../src/repackager";
 import { validateSkillFrontmatter } from "../src/validator";
 import { buildDiscoveryStub, verifyPinnedBridgeBinary } from "../src/repackager-bundle";
+import { validateStagedBundleSecurity } from "../src/staging-security";
+import { TriangleLinter } from "../src/triangle-linter";
 // @ts-ignore build-time ESM helper tested directly
 import { verifyBridgePinFile, writeBridgePinFile } from "../scripts/pin-bridge.mjs";
 
@@ -415,6 +417,95 @@ describe("Story 08.2: Skill Repackager, Discovery Stubs & Video Intake", () => {
 
       fs.writeFileSync(path.join(targetOk, "scripts", "clean.ts"), "export const tampered = true;", "utf8");
       expect(() => verifyRepackagedBundle(targetOk)).toThrow(/BundleIntegrityMismatch/);
+
+      expect(() =>
+        buildDiscoveryStub({
+          skillName: "ssrf-stub",
+          description: "Clean",
+          capabilities: [],
+          upstreamUrl: "http://169.254.169.254/latest/meta-data",
+          packageSha256: "a".repeat(64),
+        })
+      ).toThrow(/DiscoveryStub/);
+      expect(() =>
+        buildDiscoveryStub({
+          skillName: "ssrf-stub-2",
+          description: "Clean",
+          capabilities: [],
+          upstreamUrl: "https://127.0.0.1/repo",
+          packageSha256: "a".repeat(64),
+        })
+      ).toThrow(/DiscoveryStub/);
+    });
+
+    it("enforces Round 4 parity: staged references/assets, script tells, entry_point & design-systems symlink rejection, and case-insensitive lint_and_fix", () => {
+      // 1. Repackager security rejects require('fs'), node:vm/import('node:'), websocket(, xmlhttprequest
+      for (const bad of [
+        "const fs = require('fs');",
+        "await import('node:child_process');",
+        "new WebSocket('wss://evil.test');",
+        "new XMLHttpRequest();",
+      ]) {
+        expect(scanExternalScriptSecurity("bad.js", bad).valid).toBe(false);
+      }
+
+      // 2. Staged bundle security rejects unsafe staged references and text assets
+      const baseManifest = {
+        name: "safe-skill",
+        version: "1.0.0",
+        description: "Clean skill",
+        entry_point: "SKILL.md",
+        capabilities_required: ["specs.read"],
+        risk_tier: 1 as const,
+        parameters: null,
+        tags: [],
+        prompt_overview: null,
+      };
+      const baseSkillMd =
+        '---\nname: "safe-skill"\nversion: "1.0.0"\ndescription: "Clean skill"\ncapabilities_required: ["specs.read"]\nrisk_tier: 1\n---\n# Clean\n';
+      expect(() =>
+        validateStagedBundleSecurity({
+          manifest: baseManifest,
+          skill_md: baseSkillMd,
+          scripts: [],
+          references: [{ rel_path: "guide.md", content: "<script>alert(1)</script>" }],
+        })
+      ).toThrow(/StagingPromotionRejected/);
+      expect(() =>
+        validateStagedBundleSecurity({
+          manifest: baseManifest,
+          skill_md: baseSkillMd,
+          scripts: [],
+          assets: [{ rel_path: "badge.svg", bytes: Buffer.from("<svg onload=alert(1)/>", "utf8") }],
+        })
+      ).toThrow(/StagingPromotionRejected/);
+
+      // 3. Registry rejects symlinked design-systems & missing entry_point / mismatched capabilities_required
+      const regDir = makeTmp("cowok-r4-reg-");
+      const outTarget = makeTmp("cowok-r4-out-");
+      fs.symlinkSync(outTarget, path.join(regDir, "design-systems"), "dir");
+      const badSkillDir = path.join(regDir, "skills", "bad-ep");
+      fs.mkdirSync(badSkillDir, { recursive: true });
+      const missingEntry = ["scripts", "missing.ts"].join("/");
+      fs.writeFileSync(
+        path.join(badSkillDir, "SKILL.md"),
+        `---\nname: "bad-ep"\nversion: "1.0.0"\ndescription: "Clean"\nentry_point: "${missingEntry}"\ncapabilities_required: ["specs.read"]\nrisk_tier: 1\n---\n# Body\n`,
+        "utf8"
+      );
+      const reg = new BuiltinSkillsRegistry(regDir);
+      reg.discover();
+      expect(reg.getDesignSystem("v1")).toBeUndefined();
+      expect(reg.getSkill("bad-ep")).toBeUndefined();
+
+      // 4. Case-insensitive autoFix, fixed_content on report, & <head>\n + mixed-line shift invariance
+      const { content: fixedHtml, report } = TriangleLinter.lintAndFix(
+        "<HTML lang='en'><HEAD>\n</HEAD>\n<p style='LINE-HEIGHT: 1; padding: 3px; color: #6366F1'>Hi</p></HTML>"
+      );
+      expect(fixedHtml).toContain('name="viewport"');
+      expect(fixedHtml).toContain("line-height: 1.5;");
+      expect(fixedHtml).toContain("var(--action-primary");
+      expect(report.fixed_content).toBe(fixedHtml);
+      expect(report.new_in_this_call).toBe(0);
     });
   });
 });

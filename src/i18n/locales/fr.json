@@ -570,7 +570,15 @@
     "discarding": "Suppression...",
     "discardBtn": "Rejeter le Candidat",
     "rationalePlaceholder": "Saisir une justification (>= 4 car.)...",
-    "quarantinedLabel": "EN QUARANTAINE"
+    "quarantinedLabel": "EN QUARANTAINE",
+    "archiveBtn": "Archiver",
+    "refreshBtn": "Actualiser",
+    "navLink": "Extensions",
+    "backToWorkbench": "Atelier",
+    "stagingImpactSummary": "La mise à jour v{{from}} -> v{{to}} introduit {{count}} changement(s) majeur(s) ; les exécutions actives restent sur v{{from}} jusqu'à promotion.",
+    "quarantineBtn": "Quarantaine",
+    "quarantinePlaceholder": "Motif de mise en quarantaine (>= 4 caractères)...",
+    "quarantineReasonLabel": "Motif de quarantaine"
   },
   "learn": {
     "revLabel": "Révision",
@@ -599,6 +607,7 @@
     "retryBtn": "Réessayer",
     "cronPlaceholder": "0 */5 * * * *",
     "upstreamUrlPlaceholder": "https://github.com/organisation/depot",
-    "saveScheduleBtn": "Enregistrer Planif."
+    "saveScheduleBtn": "Enregistrer Planif.",
+    "vaultTokenRequired": "Jeton GitHub Vault requis"
   }
 }

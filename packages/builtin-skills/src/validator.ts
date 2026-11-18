@@ -21,7 +21,7 @@ export function estimateTokenCount(text: string): number {
   const trimmed = text.trim();
   if (!trimmed) return 0;
   const bpeTokens = getCl100kBpe().encode(trimmed, [], []).length;
-  const charEstimate = Math.ceil(trimmed.length / 4);
+  const charEstimate = Math.ceil(Array.from(trimmed).length / 4);
   const wordEstimate = Math.ceil(trimmed.split(/\s+/).filter(Boolean).length * 1.33);
   return Math.max(bpeTokens, charEstimate, wordEstimate);
 }
@@ -38,6 +38,7 @@ export interface ValidationResult {
     entry_point?: string;
     risk_tier?: number;
     capabilities_required?: string[];
+    tags?: string[];
   };
 }
 
@@ -71,7 +72,8 @@ function getStrictString(map: ReturnType<typeof parseDocument>["contents"], keys
     if (!pair || !isPair(pair)) continue;
     if (!isScalar(pair.value) || typeof pair.value.value !== "string") return { error: `Field '${key}' must be a string` };
     const trimmed = pair.value.value.trim();
-    if (trimmed) return { value: trimmed };
+    if (!trimmed) return { error: `Field '${key}' must not be empty` };
+    return { value: trimmed };
   }
   return {};
 }
@@ -132,14 +134,15 @@ export function validateSkillFrontmatter(rawContent: string): ValidationResult {
       ? "Field 'entry_point' must not be empty"
       : undefined;
   const capsRes = getStringList(doc, ["capabilities_required", "capabilities", "permissions"]);
+  const tagsRes = getStringList(doc, ["tags"]);
   const tierRes = parseRiskTier(doc);
-  const firstErr = nameRes.error ?? (!nameRes.value ? "Missing required field in frontmatter: name" : undefined) ?? descRes.error ?? (!descRes.value ? "Missing required field in frontmatter: description" : undefined) ?? verRes.error ?? entryRes.error ?? emptyEntryErr ?? capsRes.error ?? tierRes.error;
+  const firstErr = nameRes.error ?? (!nameRes.value ? "Missing required field in frontmatter: name" : undefined) ?? descRes.error ?? (!descRes.value ? "Missing required field in frontmatter: description" : undefined) ?? verRes.error ?? entryRes.error ?? emptyEntryErr ?? capsRes.error ?? tagsRes.error ?? tierRes.error;
   if (firstErr) return { valid: false, tokens, bytes: byteLen, error: firstErr };
 
   return {
     valid: true,
     tokens,
     bytes: byteLen,
-    fields: { name: nameRes.value, version: verRes.value, description: descRes.value, entry_point: entryRes.value, risk_tier: tierRes.value, capabilities_required: capsRes.values },
+    fields: { name: nameRes.value, version: verRes.value, description: descRes.value, entry_point: entryRes.value, risk_tier: tierRes.value, capabilities_required: capsRes.values, tags: tagsRes.values },
   };
 }

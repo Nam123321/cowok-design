@@ -88,6 +88,118 @@ pub fn parse_semver_strict(raw: &str) -> Result<SemVer, SemVerParseError> {
     })
 }
 
+fn diff_schema_node(
+    path: &str,
+    cur_obj: &serde_json::Map<String, serde_json::Value>,
+    cand_obj: &serde_json::Map<String, serde_json::Value>,
+    reasons: &mut Vec<String>,
+) {
+    let cur_req: BTreeSet<&str> = cur_obj
+        .get("required")
+        .and_then(|r| r.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|v| v.as_str())
+        .collect();
+    let cand_req: BTreeSet<&str> = cand_obj
+        .get("required")
+        .and_then(|r| r.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|v| v.as_str())
+        .collect();
+    for added in cand_req.difference(&cur_req) {
+        reasons.push(format!("Added new required parameter '{path}{added}'"));
+    }
+    for removed in cur_req.difference(&cand_req) {
+        reasons.push(format!(
+            "Removed previously required parameter '{path}{removed}'"
+        ));
+    }
+
+    if let (Some(c_add), Some(n_add)) = (
+        cur_obj.get("additionalProperties"),
+        cand_obj.get("additionalProperties"),
+    ) {
+        if c_add != n_add && n_add == &serde_json::Value::Bool(false) {
+            reasons.push(format!(
+                "Narrowed '{path}' with additionalProperties: false"
+            ));
+        }
+    } else if cur_obj.get("additionalProperties").is_none()
+        && cand_obj.get("additionalProperties") == Some(&serde_json::Value::Bool(false))
+    {
+        reasons.push(format!("Added 'additionalProperties: false' on '{path}'"));
+    }
+
+    for kw in ["$ref", "const", "pattern", "format"] {
+        if let Some(cv) = cur_obj.get(kw) {
+            if cand_obj.get(kw) != Some(cv) {
+                reasons.push(format!("Schema keyword '{kw}' changed on '{path}'"));
+            }
+        } else if (kw == "pattern" || kw == "format" || kw == "const") && cand_obj.contains_key(kw)
+        {
+            reasons.push(format!("Added tightening constraint '{kw}' on '{path}'"));
+        }
+    }
+    for comb in ["oneOf", "anyOf", "allOf"] {
+        if let Some(cv) = cur_obj.get(comb) {
+            if cand_obj.get(comb) != Some(cv) {
+                reasons.push(format!("Combinator '{comb}' modified on '{path}'"));
+            }
+        } else if cand_obj.contains_key(comb) {
+            reasons.push(format!("Added combinator constraint '{comb}' on '{path}'"));
+        }
+    }
+    if let (Some(ce), Some(ne)) = (
+        cur_obj.get("enum").and_then(|v| v.as_array()),
+        cand_obj.get("enum").and_then(|v| v.as_array()),
+    ) {
+        if ce.iter().any(|item| !ne.contains(item)) {
+            reasons.push(format!("Removed enum value(s) on '{path}'"));
+        }
+    } else if cur_obj.get("enum").is_none() && cand_obj.get("enum").is_some() {
+        reasons.push(format!("Added enum restriction on '{path}'"));
+    }
+
+    let cur_props = cur_obj.get("properties").and_then(|p| p.as_object());
+    let cand_props = cand_obj.get("properties").and_then(|p| p.as_object());
+    if let (Some(cp), Some(np)) = (cur_props, cand_props) {
+        for (prop_name, old_schema) in cp {
+            match np.get(prop_name) {
+                None => reasons.push(format!("Removed parameter property '{path}{prop_name}'")),
+                Some(new_schema) => {
+                    if extract_schema_type_kind(old_schema) != extract_schema_type_kind(new_schema)
+                    {
+                        reasons.push(format!("Parameter '{path}{prop_name}' type changed"));
+                    } else if let (Some(co), Some(no)) =
+                        (old_schema.as_object(), new_schema.as_object())
+                    {
+                        diff_schema_node(&format!("{path}{prop_name}."), co, no, reasons);
+                    }
+                }
+            }
+        }
+    } else if cur_props.is_some() && cand_props.is_none() {
+        reasons.push(format!(
+            "Removed parameter 'properties' definition on '{path}'"
+        ));
+    }
+
+    if let (Some(ci), Some(ni)) = (
+        cur_obj.get("items").and_then(|v| v.as_object()),
+        cand_obj.get("items").and_then(|v| v.as_object()),
+    ) {
+        let cv = serde_json::Value::Object(ci.clone());
+        let nv = serde_json::Value::Object(ni.clone());
+        if extract_schema_type_kind(&cv) != extract_schema_type_kind(&nv) {
+            reasons.push(format!("Array items type changed on '{path}items'"));
+        } else {
+            diff_schema_node(&format!("{path}items."), ci, ni, reasons);
+        }
+    }
+}
+
 fn diff_parameter_schemas(
     current: &Option<serde_json::Value>,
     candidate: &Option<serde_json::Value>,
@@ -128,45 +240,7 @@ fn diff_parameter_schemas(
         return;
     };
 
-    let cur_req: BTreeSet<&str> = cur_obj
-        .get("required")
-        .and_then(|r| r.as_array())
-        .into_iter()
-        .flatten()
-        .filter_map(|v| v.as_str())
-        .collect();
-    let cand_req: BTreeSet<&str> = cand_obj
-        .get("required")
-        .and_then(|r| r.as_array())
-        .into_iter()
-        .flatten()
-        .filter_map(|v| v.as_str())
-        .collect();
-
-    for added in cand_req.difference(&cur_req) {
-        reasons.push(format!("Added new required parameter '{added}'"));
-    }
-    for removed in cur_req.difference(&cand_req) {
-        reasons.push(format!("Removed previously required parameter '{removed}'"));
-    }
-
-    let cur_props = cur_obj.get("properties").and_then(|p| p.as_object());
-    let cand_props = cand_obj.get("properties").and_then(|p| p.as_object());
-    if let (Some(cp), Some(np)) = (cur_props, cand_props) {
-        for (prop_name, old_schema) in cp {
-            match np.get(prop_name) {
-                None => reasons.push(format!("Removed parameter property '{prop_name}'")),
-                Some(new_schema) => {
-                    if extract_schema_type_kind(old_schema) != extract_schema_type_kind(new_schema)
-                    {
-                        reasons.push(format!("Parameter '{prop_name}' type changed"));
-                    }
-                }
-            }
-        }
-    } else if cur_props.is_some() && cand_props.is_none() {
-        reasons.push("Removed parameter 'properties' definition".to_string());
-    }
+    diff_schema_node("", cur_obj, cand_obj, reasons);
 }
 
 /// Authoritative structural manifest & SemVer breaking-change detector (EC-E08-03).

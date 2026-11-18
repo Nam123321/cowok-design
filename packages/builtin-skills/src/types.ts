@@ -93,6 +93,7 @@ export interface TriangleLintReport {
   passed: boolean;
   duration_ms: number;
   issues: LintIssue[];
+  fixed_content?: string;
 }
 
 type usize = number;

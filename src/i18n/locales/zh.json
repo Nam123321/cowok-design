@@ -570,7 +570,15 @@
     "discarding": "正在丢弃...",
     "discardBtn": "丢弃候选版本",
     "rationalePlaceholder": "输入理由（至少 4 个字符）...",
-    "quarantinedLabel": "已隔离"
+    "quarantinedLabel": "已隔离",
+    "archiveBtn": "归档",
+    "refreshBtn": "刷新",
+    "navLink": "插件",
+    "backToWorkbench": "工作台",
+    "stagingImpactSummary": "从 v{{from}} 更新至 v{{to}} 包含 {{count}} 项破坏性变更；在提升前，活跃运行仍固定在 v{{from}}。",
+    "quarantineBtn": "隔离",
+    "quarantinePlaceholder": "隔离原因 (>= 4 个字符)...",
+    "quarantineReasonLabel": "隔离原因"
   },
   "learn": {
     "revLabel": "修订版",
@@ -599,6 +607,7 @@
     "retryBtn": "重试",
     "cronPlaceholder": "0 */5 * * * *",
     "upstreamUrlPlaceholder": "https://github.com/zuzhi/cangku",
-    "saveScheduleBtn": "保存计划"
+    "saveScheduleBtn": "保存计划",
+    "vaultTokenRequired": "需要 Vault GitHub 令牌"
   }
 }

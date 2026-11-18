@@ -4,7 +4,9 @@ export type { Bucket } from "./repackager-assets";
 export { classifyAndValidateSourceAsset, scanSkillMarkdownSafety } from "./repackager-assets";
 
 function normalizeScriptForScanDual(content: string): Array<{ cased: string; lower: string }> {
-  const noHidden = content.replace(/[\u200B-\u200F\u2028-\u202E\u2066-\u2069\uFEFF\u{E0001}-\u{E007F}]/gu, "");
+  const noHidden = content
+    .normalize("NFKC")
+    .replace(/[\u00AD\u034F\u061C\u180E\u200B-\u200F\u2028-\u202E\u2060-\u2069\uFE00-\uFE0F\uFEFF]|\uDB40[\uDC01-\uDC7F]/gu, "");
   const joined = noHidden.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\\\n/g, "");
   const multiFolded = joined.replace(/(['"`])[ \t\n]*\+[ \t\n]*(['"`])/g, "");
   return multiFolded.split("\n").map((line) => {
@@ -29,8 +31,8 @@ function normalizeScriptForScanDual(content: string): Array<{ cased: string; low
 function hasCallOrIndirect(haystack: string, ident: string, caseInsensitive = true): boolean {
   const esc = ident.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const flags = caseInsensitive ? "i" : "";
-  return new RegExp(`(?<![a-zA-Z0-9_])${esc}(?![a-zA-Z0-9_])[ \\t]*(?:\\(|\\?\\.\\(|\\)|;|,)`, flags).test(haystack)
-    || new RegExp(`(?:,|(?<![=!<>])=)[ \\t]*${esc}(?![a-zA-Z0-9_])`, flags).test(haystack)
+  return new RegExp(`(?<![a-zA-Z0-9_])${esc}(?![a-zA-Z0-9_])[ \\t]*(?:\\(|\\?\\.\\(|\\)|;|,|:|\\}|\\])`, flags).test(haystack)
+    || new RegExp(`(?:,|(?<![=!<>])=|:|\\{|\\[)[ \\t]*${esc}(?![a-zA-Z0-9_])`, flags).test(haystack)
     || new RegExp(`\\[[ \\t]*['"\`]${esc}['"\`][ \\t]*\\]`, flags).test(haystack);
 }
 
@@ -38,17 +40,30 @@ function hasCallOrIndirect(haystack: string, ident: string, caseInsensitive = tr
 export function scanExternalScriptSecurity(filename: string, content: string): { valid: boolean; error?: string } {
   const shellTells = [
     "curl|bash", "curl|sh", "wget -o-|bash", "wget -o-|sh", "wget|bash", "wget|sh",
-    "child_process.exec", "child_process.spawn", '["exec"]', "['exec']", "[`exec`]",
-    '["execsync"]', "['execsync']", "[`execsync`]", "execsync(", "execfilesync(", "spawnsync(",
-    "execfile(", "system(", "popen(", "subprocess.call", "subprocess.popen", "subprocess.run",
-    "subprocess.check_output", "os.exec", "std::process::command", "deno.command", "bun.spawn", "bun.$", "os.system", "rm -rf /", "env -s",
+    "child_process.exec", "child_process.spawn", "node:child_process", "require(\"child_process\")", "require('child_process')",
+    '["exec"]', "['exec']", "[`exec`]", '["execsync"]', "['execsync']", "[`execsync`]",
+    "execsync(", "execfilesync(", "spawnsync(", "execfile(", "system(", "popen(",
+    "subprocess.call", "subprocess.popen", "subprocess.run", "subprocess.check_output",
+    "os.exec", "std::process::command", "deno.command", "bun.spawn", "bun.$", "os.system",
+    "rm -rf /", "env -s", "bash -c", "sh -c",
   ];
   const evalTells = [
     "window.eval", "globalthis.eval", 'self["eval"]', "self['eval']", 'global["eval"]', "global['eval']",
-    '["eval"]', "['eval']", "[`eval`]", "base64 -d", "base64 --decode", "buffer.from(", "fromcharcode(",
-    "fromcodepoint(", "dangerously" + "setinnerhtml", "reflect.construct(function", ".constructor(", "__import__(",
+    '["eval"]', "['eval']", "[`eval`]", "base64 -d", "base64 --decode", "buffer.from(",
+    "fromcharcode(", "[\"fromcharcode\"]", "['fromcharcode']", "[`fromcharcode`]",
+    "fromcodepoint(", "[\"fromcodepoint\"]", "['fromcodepoint']", "[`fromcodepoint`]",
+    'require("fs")', "require('fs')", 'require("node:fs")', "require('node:fs')",
+    'require("http")', "require('http')", 'require("https")', "require('https')",
+    'require("net")', "require('net')", 'import("child_process"', "import('child_process'",
+    'import("node:', "import('node:", "deno.run",
+    "dangerously" + "setinnerhtml", "reflect.construct(function", ".constructor(", "__import__(",
+    "node:vm", "vm.runinnewcontext", "vm.runinthiscontext", "vm.compilefunction",
   ];
-  const netTells = ["nc -e", "/bin/sh", "/bin/bash", "socket.connect", "telemetry-exfil.com", "requests.", "urllib.", "http.request", "https.request", "axios.", '["fetch"]', "['fetch']", "[`fetch`]", "curl ", "curl|", "wget ", "wget|"];
+  const netTells = [
+    "nc -e", "/bin/sh", "/bin/bash", "socket.connect", "telemetry-exfil.com", "requests.", "urllib.",
+    "http.request", "https.request", "axios.", '["fetch"]', "['fetch']", "[`fetch`]",
+    "curl ", "curl|", "wget ", "wget|", "websocket(", "navigator.sendbeacon", "xmlhttprequest",
+  ];
   const traversalTells = ["../", "..\\", "~/.ssh", ".ssh/", "/etc/passwd", "/etc/shadow", "/root/", "/proc/self"];
   const base = filename.split(/[/\\]/).pop() ?? filename;
   const ext = base.includes(".") ? base.split(".").pop()?.toLowerCase() ?? "" : "";

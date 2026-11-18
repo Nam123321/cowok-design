@@ -52,9 +52,12 @@ import * as sdiIntentRoute from "../app/api/projects/[id]/sdi/intent/route";
 import * as sdiClarificationRoute from "../app/api/projects/[id]/sdi/clarification/route";
 
 export type { RouteFn };
+const MAX_PROJECT_NAME_LEN = 160;
+const MAX_PROJECT_BRIEF_LEN = 4000;
+
 const ProjectPatchSchema = z.object({
-  name: z.string().min(1).max(160).optional(),
-  product_brief: z.string().max(4000).optional(),
+  name: z.string().min(1).max(MAX_PROJECT_NAME_LEN).optional(),
+  product_brief: z.string().max(MAX_PROJECT_BRIEF_LEN).optional(),
 });
 const idOnly = (m: RegExpExecArray): Record<string, string> => ({ id: m[1] });
 const noParams = (): Record<string, string> => ({});

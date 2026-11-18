@@ -1377,6 +1377,8 @@ fn validate_ip_ssrf(
                 }
             } else if v6.is_unspecified() {
                 return Err(format!("Unspecified IPv6 target '{v6}' is blocked"));
+            } else if v6.is_multicast() {
+                return Err(format!("Multicast IPv6 target '{v6}' is blocked"));
             } else {
                 let segments = v6.segments();
                 let is_v4_embedded = segments[0] == 0
@@ -1391,10 +1393,28 @@ fn validate_ip_ssrf(
                     && segments[3] == 0
                     && segments[4] == 0
                     && segments[5] == 0;
+                let is_nat64_local =
+                    segments[0] == 0x0064 && segments[1] == 0xff9b && segments[2] == 0x0001;
+                let is_6to4 = segments[0] == 0x2002;
+                let is_teredo = segments[0] == 0x2001 && segments[1] == 0x0000;
+                let is_isatap = (segments[4] & 0xfcff) == 0 && segments[5] == 0x5efe;
 
-                if is_v4_embedded || is_nat64_embedded {
+                if is_nat64_local || is_teredo {
+                    return Err(format!(
+                        "Transition tunnel/local-use IPv6 target '{v6}' is blocked (SSRF prevention)"
+                    ));
+                }
+
+                if is_v4_embedded || is_nat64_embedded || is_6to4 || is_isatap {
                     let embedded_v4 = if is_v4_embedded {
                         v6.to_ipv4()
+                    } else if is_6to4 {
+                        Some(std::net::Ipv4Addr::new(
+                            (segments[1] >> 8) as u8,
+                            (segments[1] & 0xff) as u8,
+                            (segments[2] >> 8) as u8,
+                            (segments[2] & 0xff) as u8,
+                        ))
                     } else {
                         Some(std::net::Ipv4Addr::new(
                             (segments[6] >> 8) as u8,

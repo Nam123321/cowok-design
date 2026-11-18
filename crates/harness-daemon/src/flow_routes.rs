@@ -39,12 +39,12 @@ use crate::routes::legacy_workbench_v6::{
 };
 use crate::routes::plugins::{
     handle_approve_learn_card, handle_compile_skill_prompt_bundle, handle_discard_staging,
-    handle_discover_plugin, handle_get_plugin_schedule, handle_install_plugin,
-    handle_list_learn_cards, handle_list_plugins, handle_promote_staging,
-    handle_propose_learn_card, handle_reject_learn_card, handle_repackage_bundle,
-    handle_repackage_discovery_stub, handle_repackage_video_intake, handle_stream_plugin_events,
-    handle_transition_plugin, handle_triangle_lint, handle_trigger_plugin_sync,
-    handle_upsert_plugin_schedule,
+    handle_discover_plugin, handle_get_plugin_registry, handle_get_plugin_schedule,
+    handle_install_plugin, handle_list_learn_cards, handle_list_plugins, handle_promote_staging,
+    handle_propose_learn_card, handle_quarantine_plugin, handle_reject_learn_card,
+    handle_repackage_bundle, handle_repackage_discovery_stub, handle_repackage_video_intake,
+    handle_stream_plugin_events, handle_transition_plugin, handle_triangle_lint,
+    handle_trigger_plugin_sync, handle_upsert_plugin_schedule,
 };
 
 use crate::routes::doctor_usage::handle_get_doctor_usage;
@@ -190,12 +190,16 @@ fn flow_workbench_routes() -> Router<DaemonAppState> {
         )
         .route("/api/v1/settings/vault", put(handle_update_vault_settings))
         .route("/api/v1/plugins", get(handle_list_plugins))
-        .route("/api/v1/plugins/registry", get(handle_list_plugins))
+        .route("/api/v1/plugins/registry", get(handle_get_plugin_registry))
         .route("/api/v1/plugins/discovery", post(handle_discover_plugin))
         .route("/api/v1/plugins/installs", post(handle_install_plugin))
         .route(
             "/api/v1/plugins/:id/transitions",
             post(handle_transition_plugin),
+        )
+        .route(
+            "/api/v1/plugins/:id/quarantine",
+            post(handle_quarantine_plugin),
         )
         .route(
             "/api/v1/plugins/:id/staging/promotions",

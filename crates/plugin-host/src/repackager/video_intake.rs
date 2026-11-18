@@ -4,20 +4,34 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts",
+    ts(export, export_to = "../../../packages/shared-types/src/generated/")
+)]
 pub struct VideoFrameCheckpoint {
     pub frame_id: String,
     pub timestamp_s: f64,
     pub action_label: String,
     pub ui_intent: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
     pub coordinate_bounds: Option<[f64; 4]>, // [x, y, w, h]
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(
+    feature = "ts",
+    ts(export, export_to = "../../../packages/shared-types/src/generated/")
+)]
 pub struct VideoStoryboardReceipt {
     pub video_source: String,
     pub duration_s: f64,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub total_checkpoints: usize,
     pub checkpoints: Vec<VideoFrameCheckpoint>,
+    #[cfg_attr(feature = "ts", ts(type = "number"))]
     pub generated_at: i64,
 }
 

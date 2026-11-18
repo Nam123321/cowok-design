@@ -1,10 +1,14 @@
 // @story 08.1
 // @implements AC-01, AC-02, AC-05, AC-06
 use crate::models::SkillManifest;
+use crate::repackager::repackager_engine::MAX_SKILL_NAME_BYTES;
+use crate::repackager::security_scanner::{
+    scan_skill_markdown_safety, validate_skill_metadata_text,
+};
 use crate::validator::{parse_and_validate_skill_frontmatter, FrontmatterMetadata};
 use domain::models::SkillPlugin;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default)]
@@ -12,6 +16,7 @@ pub struct SkillRegistry {
     skills: HashMap<String, SkillManifest>,
     skill_md_hashes: HashMap<String, String>,
     skills_dir: Option<PathBuf>,
+    rejected_skills: Vec<(String, String)>,
 }
 
 fn sha256_hex(content: &str) -> String {
@@ -54,6 +59,67 @@ fn verify_frontmatter_parity(
             meta.entry_point, manifest.entry_point
         ));
     }
+    let fm_caps: BTreeSet<&str> = meta
+        .capabilities_required
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let man_caps: BTreeSet<&str> = manifest
+        .capabilities_required
+        .iter()
+        .map(String::as_str)
+        .collect();
+    if fm_caps != man_caps {
+        return Err(
+            "SKILL.md capabilities_required does not match plugin.json capabilities_required"
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
+fn validate_skill_entry_point(folder: &Path, entry_point: &str) -> Result<(), String> {
+    let ep = entry_point.trim();
+    if ep.is_empty()
+        || ep.starts_with('/')
+        || ep.ends_with('/')
+        || ep.contains('\\')
+        || ep.contains('\0')
+        || ep.chars().any(|c| c.is_control())
+        || ep
+            .split('/')
+            .any(|seg| seg.is_empty() || seg == "." || seg == "..")
+    {
+        return Err(format!("unsafe skill entry_point '{entry_point}'"));
+    }
+    if ep == "SKILL.md" {
+        return Ok(());
+    }
+    let mut cur = folder.to_path_buf();
+    let segments: Vec<&str> = ep.split('/').collect();
+    for (idx, seg) in segments.iter().enumerate() {
+        cur.push(seg);
+        let meta = std::fs::symlink_metadata(&cur)
+            .map_err(|e| format!("entry_point '{ep}' missing/unreadable: {e}"))?;
+        if meta.file_type().is_symlink() {
+            return Err(format!("entry_point '{ep}' symlink component rejected"));
+        }
+        let is_last = idx + 1 == segments.len();
+        if is_last {
+            if !meta.is_file() {
+                return Err(format!("entry_point '{ep}' must be a regular file"));
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                if meta.nlink() != 1 {
+                    return Err(format!("entry_point '{ep}' hardlink rejected (nlink != 1)"));
+                }
+            }
+        } else if !meta.is_dir() {
+            return Err(format!("entry_point '{ep}' parent is not a directory"));
+        }
+    }
     Ok(())
 }
 
@@ -67,6 +133,7 @@ impl SkillRegistry {
             skills: HashMap::new(),
             skill_md_hashes: HashMap::new(),
             skills_dir: Some(dir.as_ref().to_path_buf()),
+            rejected_skills: Vec::new(),
         };
         let _ = registry.discover();
         registry
@@ -100,6 +167,7 @@ impl SkillRegistry {
 
     /// Scans the configured directory in deterministic lexicographical order for agentskills.io skills.
     pub fn discover(&mut self) -> Result<usize, String> {
+        self.rejected_skills.clear();
         let Some(dir) = self.skills_dir.clone() else {
             return Ok(0);
         };
@@ -122,14 +190,59 @@ impl SkillRegistry {
             if meta.file_type().is_symlink() || !meta.is_dir() {
                 continue;
             }
-            if path.join("SKILL.md").exists() || path.join("plugin.json").exists() {
-                if let Ok((manifest, md_sha)) = self.load_skill_with_hash(&path) {
-                    self.register_with_hash(manifest, md_sha);
-                    count += 1;
+            if std::fs::symlink_metadata(path.join("SKILL.md")).is_ok()
+                || std::fs::symlink_metadata(path.join("plugin.json")).is_ok()
+            {
+                match self.load_skill_with_hash(&path) {
+                    Ok((manifest, md_sha)) => {
+                        self.register_with_hash(manifest, md_sha);
+                        count += 1;
+                    }
+                    Err(err) => {
+                        self.rejected_skills
+                            .push((path.display().to_string(), err.clone()));
+                        eprintln!(
+                            "SkillRegistry::discover rejected '{}': {err}",
+                            path.display()
+                        );
+                    }
                 }
             }
         }
         Ok(count)
+    }
+
+    /// Returns `(folder_path, error)` pairs for skills rejected during the latest `discover()` pass.
+    pub fn last_rejections(&self) -> &[(String, String)] {
+        &self.rejected_skills
+    }
+
+    fn read_regular_utf8_nofollow(file_path: &Path, label: &str) -> Result<String, String> {
+        use std::io::Read;
+        let mut opts = std::fs::OpenOptions::new();
+        opts.read(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.custom_flags(libc::O_NOFOLLOW);
+        }
+        let mut file = opts
+            .open(file_path)
+            .map_err(|e| format!("{label} open failed (symlink/missing): {e}"))?;
+        let meta = file.metadata().map_err(|e| e.to_string())?;
+        if !meta.is_file() {
+            return Err(format!("{label} must be a regular non-symlink file"));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            if meta.nlink() != 1 {
+                return Err(format!("{label} hardlink is forbidden (nlink != 1)"));
+            }
+        }
+        let mut out = String::new();
+        file.read_to_string(&mut out).map_err(|e| e.to_string())?;
+        Ok(out)
     }
 
     fn load_skill_with_hash(
@@ -142,7 +255,9 @@ impl SkillRegistry {
         }
 
         let mut verified_repackaged = false;
-        if folder.join("skills-lock.json").exists() || folder.join("discovery-stub.json").exists() {
+        if std::fs::symlink_metadata(folder.join("skills-lock.json")).is_ok()
+            || std::fs::symlink_metadata(folder.join("discovery-stub.json")).is_ok()
+        {
             crate::SkillRepackager::verify_repackaged_bundle(folder)?;
             verified_repackaged = true;
         }
@@ -150,40 +265,21 @@ impl SkillRegistry {
         let skill_md_path = folder.join("SKILL.md");
         let plugin_json_path = folder.join("plugin.json");
 
-        let (frontmatter, md_sha) = if skill_md_path.exists() {
-            let md_meta = std::fs::symlink_metadata(&skill_md_path).map_err(|e| e.to_string())?;
-            if md_meta.file_type().is_symlink() || !md_meta.is_file() {
-                return Err("SKILL.md must be a regular non-symlink file".to_string());
-            }
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::MetadataExt;
-                if md_meta.nlink() > 1 {
-                    return Err("SKILL.md hardlink is forbidden".to_string());
-                }
-            }
-            let content = std::fs::read_to_string(&skill_md_path).map_err(|e| e.to_string())?;
+        let (frontmatter, md_sha) = if std::fs::symlink_metadata(&skill_md_path).is_ok() {
+            let content = Self::read_regular_utf8_nofollow(&skill_md_path, "SKILL.md")?;
             let meta =
                 parse_and_validate_skill_frontmatter(&content).map_err(|e| format!("{:?}", e))?;
+            scan_skill_markdown_safety("SKILL.md", &content).map_err(|e| e.to_string())?;
+            validate_skill_metadata_text("SKILL.md name", &meta.name).map_err(|e| e.to_string())?;
+            validate_skill_metadata_text("SKILL.md description", &meta.description)
+                .map_err(|e| e.to_string())?;
             (Some(meta), Some(sha256_hex(&content)))
         } else {
             (None, None)
         };
 
-        if plugin_json_path.exists() {
-            let pj_meta =
-                std::fs::symlink_metadata(&plugin_json_path).map_err(|e| e.to_string())?;
-            if pj_meta.file_type().is_symlink() || !pj_meta.is_file() {
-                return Err("plugin.json must be a regular non-symlink file".to_string());
-            }
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::MetadataExt;
-                if pj_meta.nlink() > 1 {
-                    return Err("plugin.json hardlink is forbidden".to_string());
-                }
-            }
-            let json_str = std::fs::read_to_string(&plugin_json_path).map_err(|e| e.to_string())?;
+        if std::fs::symlink_metadata(&plugin_json_path).is_ok() {
+            let json_str = Self::read_regular_utf8_nofollow(&plugin_json_path, "plugin.json")?;
             let manifest: SkillManifest =
                 serde_json::from_str(&json_str).map_err(|e| e.to_string())?;
             if !(1..=3).contains(&manifest.risk_tier) {
@@ -204,6 +300,15 @@ impl SkillRegistry {
                     );
                 }
             }
+            validate_skill_metadata_text("plugin.json name", &manifest.name)
+                .map_err(|e| e.to_string())?;
+            validate_skill_metadata_text("plugin.json description", &manifest.description)
+                .map_err(|e| e.to_string())?;
+            if let Some(ref pov) = manifest.prompt_overview {
+                scan_skill_markdown_safety("plugin.json prompt_overview", pov)
+                    .map_err(|e| e.to_string())?;
+            }
+            validate_skill_entry_point(folder, &manifest.entry_point)?;
             if manifest.tags.iter().any(|t| t == "repackaged") && !verified_repackaged {
                 crate::SkillRepackager::verify_repackaged_bundle(folder)?;
             }
@@ -220,12 +325,14 @@ impl SkillRegistry {
         if !is_safe_skill_name(&meta.name) {
             return Err(format!("unsafe skill manifest name: {}", meta.name));
         }
+        let ep = meta.entry_point.unwrap_or_else(|| "SKILL.md".to_string());
+        validate_skill_entry_point(folder, &ep)?;
         Ok((
             SkillManifest {
                 name: meta.name,
                 version: meta.version.unwrap_or_else(|| "1.0.0".to_string()),
                 description: meta.description,
-                entry_point: meta.entry_point.unwrap_or_else(|| "SKILL.md".to_string()),
+                entry_point: ep,
                 capabilities_required: meta.capabilities_required,
                 risk_tier: meta.risk_tier.unwrap_or(1),
                 parameters: None,
@@ -280,6 +387,7 @@ impl SkillRegistry {
 
 fn is_safe_skill_name(name: &str) -> bool {
     !name.is_empty()
+        && name.len() <= MAX_SKILL_NAME_BYTES
         && name != "."
         && name != ".."
         && name

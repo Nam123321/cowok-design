@@ -570,7 +570,15 @@
     "discarding": "폐기 중...",
     "discardBtn": "후보 폐기",
     "rationalePlaceholder": "사유 입력 (4자 이상)...",
-    "quarantinedLabel": "격리됨"
+    "quarantinedLabel": "격리됨",
+    "archiveBtn": "보관",
+    "refreshBtn": "새로고침",
+    "navLink": "플러그인",
+    "backToWorkbench": "워크벤치",
+    "stagingImpactSummary": "v{{from}} -> v{{to}} 업데이트에 {{count}}개의 호환성 중단 변경이 포함되어 있으며, 승격 전까지 활성 실행은 v{{from}}에 고정됩니다.",
+    "quarantineBtn": "격리",
+    "quarantinePlaceholder": "격리 사유 (>= 4자)...",
+    "quarantineReasonLabel": "격리 사유"
   },
   "learn": {
     "revLabel": "리비전",
@@ -599,6 +607,7 @@
     "retryBtn": "다시 시도",
     "cronPlaceholder": "0 */5 * * * *",
     "upstreamUrlPlaceholder": "https://github.com/jojik/jeojangso",
-    "saveScheduleBtn": "일정 저장"
+    "saveScheduleBtn": "일정 저장",
+    "vaultTokenRequired": "Vault GitHub 토큰이 필요합니다"
   }
 }

@@ -18,8 +18,8 @@ pub use lifecycle::{
     HumanApproverToken, HumanSessionAuthority, KnowledgeCard, LearnCardCategory, LearnError,
     LearnPipeline, ManagedPlugin, ManagedPluginSnapshot, ManifestUpdateOutcome, MintTokenInput,
     PluginLifecycleError, PluginState, PromptInjectionResult, ProposeCardInput, SemVer,
-    StagedPluginBundle, StagedScriptFile, StorageConstraintError, StorageConstraintTarget,
-    MAX_LEARN_PROMPT_TOKENS,
+    StagedAssetFile, StagedPluginBundle, StagedScriptFile, StorageConstraintError,
+    StorageConstraintTarget, MAX_LEARN_PROMPT_TOKENS,
 };
 pub use models::{
     LintIssue, LintIssueCategory, LintSeverity, SkillManifest, StagingRunReceipt,
@@ -29,12 +29,12 @@ pub use registry::SkillRegistry;
 pub use repackager::{
     classify_and_validate_source_asset, load_verified_staged_bundle_from_dir,
     manifest_to_skill_plugin, scan_external_script_security, scan_skill_markdown_safety,
-    validate_safe_segment, DiscoveryStub, LockedSkillEntry, RepackageAssetBucket, RepackageReceipt,
-    RepackageSecurityError, SkillRepackager, SkillsLockFile, StagedBundleReceipt,
-    VideoFrameCheckpoint, VideoIntakeError, VideoIntakeProcessor, VideoStoryboardReceipt,
-    MAX_DISCOVERY_STUB_BYTES,
+    validate_safe_segment, validate_skill_metadata_text, DiscoveryStub, LockedSkillEntry,
+    RepackageAssetBucket, RepackageReceipt, RepackageSecurityError, SkillRepackager,
+    SkillsLockFile, StagedBundleReceipt, VideoFrameCheckpoint, VideoIntakeError,
+    VideoIntakeProcessor, VideoStoryboardReceipt, MAX_DISCOVERY_STUB_BYTES,
 };
-pub use staging::{validate_staged_prompt_content, PerRunStager};
+pub use staging::{ensure_safe_dir_no_symlink, validate_staged_prompt_content, PerRunStager};
 pub use triangle_linter::{
     auto_fix_issues, check_geometric_and_wcag_rules, scan_slop_and_tells, TriangleLinter,
 };

@@ -124,12 +124,28 @@ export const BreakingDiffReportSchema = z.object({
 }) satisfies z.ZodType<RustBreakingDiffReport, z.ZodTypeDef, unknown>;
 export type BreakingDiffReport = z.infer<typeof BreakingDiffReportSchema>;
 
+const StagedScriptFileSchema = z.object({ rel_path: z.string(), content: z.string() });
+const StagedAssetFileSchema = z.object({
+  rel_path: z.string(),
+  bytes: z.array(z.number().int().min(0).max(255)),
+});
+
 export const StagedPluginBundleSchema = z.object({
   manifest: LifecycleSkillManifestSchema,
   skill_md: z.string(),
-  scripts: z.array(z.object({ rel_path: z.string(), content: z.string() })).default([]),
+  scripts: z.array(StagedScriptFileSchema).default([]),
+  references: z.array(StagedScriptFileSchema).default([]),
+  assets: z.array(StagedAssetFileSchema).default([]),
 }) satisfies z.ZodType<RustStagedPluginBundle, z.ZodTypeDef, unknown>;
 export type StagedPluginBundle = z.infer<typeof StagedPluginBundleSchema>;
+export type StagedPluginBundleInput = z.input<typeof StagedPluginBundleSchema>;
+const _stagedBundleKeyCheck: [
+  Exclude<keyof StagedPluginBundle, keyof RustStagedPluginBundle>,
+  Exclude<keyof RustStagedPluginBundle, keyof StagedPluginBundle>,
+] extends [never, never]
+  ? true
+  : never = true;
+void _stagedBundleKeyCheck;
 
 export const KnowledgeCardSchema = z.object({
   id: z.string().min(1),

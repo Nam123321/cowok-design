@@ -3,14 +3,15 @@
 import React, { useState } from "react";
 import { BrandIcon } from "../../components/ui/BrandIcon";
 import { useTranslation } from "../../hooks/useTranslation";
-import type { KnowledgeCardDto } from "../../lib/validations/plugins";
+import { MAX_LEARN_TOKENS, type KnowledgeCardDto } from "../../lib/validations/plugins-learn-cron";
 import { sanitizeLearnMarkdownPreview } from "./sanitizeMarkdownPreview";
 import "./plugins.css";
 
 const QUEUE_ICON_SIZE = 14;
 const MIN_RATIONALE_CHARS = 4;
-const MAX_LEARN_TOKENS = 1500;
+const MAX_RATIONALE_CHARS = 500;
 const CHARS_PER_TOKEN = 4;
+const XML_CARD_OVERHEAD_TOKENS = 24;
 const SHA_PREFIX_LEN = 12;
 
 type CardFilter = "ALL" | "PROPOSED" | "ACCEPTED" | "REJECTED";
@@ -20,6 +21,8 @@ export interface LearnCardReviewQueueProps {
   loading: boolean;
   error: string | null;
   pendingActionId: string | null;
+  actionFeedback?: string | null;
+  initialFilter?: CardFilter;
   onRefresh: () => void;
   onApprove: (card: KnowledgeCardDto, reason: string) => void;
   onReject: (card: KnowledgeCardDto, reason: string) => void;
@@ -32,9 +35,16 @@ function statusBadgeClass(status: KnowledgeCardDto["status"]): string {
 }
 
 function estimateAcceptedTokens(cards: KnowledgeCardDto[]): number {
+  const encoder = new TextEncoder();
   return cards
     .filter((c) => c.status === "ACCEPTED")
-    .reduce((acc, c) => acc + Math.ceil((c.title.length + c.content.length) / CHARS_PER_TOKEN), 0);
+    .reduce(
+      (acc, c) =>
+        acc +
+        XML_CARD_OVERHEAD_TOKENS +
+        Math.ceil(encoder.encode(`${c.title}\n${c.sourceEvidence}\n${c.content}`).length / CHARS_PER_TOKEN),
+      0
+    );
 }
 
 const LearnCardRationaleBar: React.FC<{
@@ -53,6 +63,7 @@ const LearnCardRationaleBar: React.FC<{
         className="plugin-eco-rationale-input"
         data-testid={`input-learn-reason-${card.id}`}
         minLength={MIN_RATIONALE_CHARS}
+        maxLength={MAX_RATIONALE_CHARS}
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder={t("learn.rationalePlaceholder", "Enter approval/rejection rationale (>= 4 chars)...")}
@@ -156,12 +167,35 @@ const LearnQueueBody: React.FC<
       </div>
     );
   }
-  const busy = pendingActionId !== null;
   return (
     <div className="plugin-eco-list">
       {cards.map((card) => (
-        <LearnCardItem key={card.id} card={card} busy={busy} onApprove={onApprove} onReject={onReject} />
+        <LearnCardItem
+          key={card.id}
+          card={card}
+          busy={pendingActionId === `approve:${card.id}` || pendingActionId === `reject:${card.id}`}
+          onApprove={onApprove}
+          onReject={onReject}
+        />
       ))}
+    </div>
+  );
+};
+
+const LearnQueueHeader: React.FC<{ usedTokens: number }> = ({ usedTokens }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="plugin-eco-header">
+      <div className="plugin-eco-title-group">
+        <BrandIcon name="tool" size={QUEUE_ICON_SIZE} color="var(--human-accent)" />
+        <h3 className="plugin-eco-title">{t("learn.queueTitle", "LEARN Knowledge Review Queue")}</h3>
+      </div>
+      <div className="plugin-eco-actions">
+        <span className="plugin-eco-badge" data-testid="learn-token-budget">
+          {t("learn.budgetLabel", "Prompt Budget")}: {usedTokens}/{MAX_LEARN_TOKENS}
+        </span>
+        <span className="plugin-eco-badge plugin-eco-badge-human">HUMAN_ONLY</span>
+      </div>
     </div>
   );
 };
@@ -171,30 +205,26 @@ export const LearnCardReviewQueue: React.FC<LearnCardReviewQueueProps> = ({
   loading,
   error,
   pendingActionId,
+  actionFeedback,
+  initialFilter = "ALL",
   onRefresh,
   onApprove,
   onReject,
 }) => {
   const { t } = useTranslation();
-  const [filter, setFilter] = useState<CardFilter>("ALL");
+  const [filter, setFilter] = useState<CardFilter>(initialFilter);
   const visibleCards = filter === "ALL" ? cards : cards.filter((c) => c.status === filter);
   const usedTokens = estimateAcceptedTokens(cards);
 
   return (
     <section className="plugin-eco-section" data-ff-id="learn-card-review-queue" data-testid="learn-card-queue">
-      <div className="plugin-eco-header">
-        <div className="plugin-eco-title-group">
-          <BrandIcon name="tool" size={QUEUE_ICON_SIZE} color="var(--human-accent)" />
-          <h3 className="plugin-eco-title">{t("learn.queueTitle", "LEARN Knowledge Review Queue")}</h3>
-        </div>
-        <div className="plugin-eco-actions">
-          <span className="plugin-eco-badge" data-testid="learn-token-budget">
-            {t("learn.budgetLabel", "Prompt Budget")}: {usedTokens}/{MAX_LEARN_TOKENS}
-          </span>
-          <span className="plugin-eco-badge plugin-eco-badge-human">HUMAN_ONLY</span>
-        </div>
-      </div>
+      <LearnQueueHeader usedTokens={usedTokens} />
       <LearnFilterTabs filter={filter} onChange={setFilter} />
+      {actionFeedback && (
+        <div className="plugin-eco-badge plugin-eco-badge-active" data-testid="learn-action-feedback">
+          {actionFeedback}
+        </div>
+      )}
       {error && (
         <div className="plugin-eco-error-box" role="alert" data-testid="learn-queue-error">
           <span>{error}</span>

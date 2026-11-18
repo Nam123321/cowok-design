@@ -1,7 +1,7 @@
 // @story 08.4
 import { guardedRoute } from "@/lib/api-guard";
 import { forwardFromGuardedContext } from "@/lib/daemon-client";
-import { UpsertCronScheduleRequestSchema } from "@/lib/validations/plugins";
+import { UpsertCronScheduleRequestSchema } from "@/lib/validations/plugins-learn-cron";
 
 export const GET = guardedRoute(
   (req, ctx) =>

@@ -1,6 +1,9 @@
 // @story 08.1
 // @implements AC-04, AC-08
 import { LintIssue, LintIssueCategory, LintSeverity, TriangleLintReport } from "./types";
+import { autoFixIssues, countNewlyIntroducedIssues } from "./triangle-linter-autofix";
+
+export { autoFixIssues };
 
 interface RuleSpec {
   id: string;
@@ -66,26 +69,74 @@ const SLOP_RULES: RuleSpec[] = [
   },
 ];
 
+function parseHexLuminance(hex: string): number | null {
+  const clean = hex.trim().replace(/^#/, "");
+  const full = clean.length === 3
+    ? `${clean[0]}${clean[0]}${clean[1]}${clean[1]}${clean[2]}${clean[2]}`
+    : clean.length === 6
+    ? clean
+    : null;
+  if (!full || !/^[0-9a-f]{6}$/i.test(full)) return null;
+  const ch = [0, 2, 4].map((i) => {
+    const c = Number.parseInt(full.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+}
+
+function hasLowContrastHexPair(lower: string): boolean {
+  const fgMatch = /(?:^|[;\s"'])color:\s*(#[0-9a-f]{3,6})\b/i.exec(lower);
+  const bgMatch = /(?:background(?:-color)?:\s*(#[0-9a-f]{3,6}))\b/i.exec(lower);
+  const bgHex = bgMatch?.[1] ?? (lower.includes("bg-white") ? "#ffffff" : lower.includes("bg-black") ? "#000000" : null);
+  if (fgMatch && bgHex) {
+    const l1 = parseHexLuminance(fgMatch[1]);
+    const l2 = parseHexLuminance(bgHex);
+    if (l1 !== null && l2 !== null) {
+      const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+      return ratio < 4.5;
+    }
+  }
+  return ["color: #999", "color: #aaa", "color: #bbb"].some((k) => lower.includes(k))
+    && ["background: #fff", "bg-white", "background-color: #fff"].some((b) => lower.includes(b));
+}
+
+function hasOffGridSpacing(lower: string): boolean {
+  for (const m of lower.matchAll(/(?:padding|margin|gap)(?:-(?:top|right|bottom|left))?\s*:\s*([^;"]+)/g)) {
+    for (const px of m[1].matchAll(/\b(\d+)px\b/g)) {
+      const v = Number.parseInt(px[1], 10);
+      if (v > 2 && v % 4 !== 0) return true;
+    }
+  }
+  return false;
+}
+
+function hasHighZIndex(lower: string): boolean {
+  for (const m of lower.matchAll(/(?:z-index:\s*|z-\[)(\d+)/g)) {
+    if (Number.parseInt(m[1], 10) > 9999) return true;
+  }
+  return false;
+}
+
 const GEO_LINE_RULES: RuleSpec[] = [
   { id: "RULE_GEO_01_CONCENTRIC_RADIUS", cat: "GeometricLayout", sev: "Warning", msg: "Verify concentric border radius: R_inner = max(4, R_outer - P/2)", fix: true, match: (l) => (l.includes("border-radius") || l.includes("rounded")) && l.includes("padding") && l.includes("inner") },
-  { id: "RULE_GEO_02_WCAG_CONTRAST_AA", cat: "WcagContrast", sev: "Error", msg: "Contrast ratio falls below WCAG 2.2 AA (4.5:1). Darken foreground text.", fix: true, match: (l) => ["color: #999", "color: #aaa", "color: #bbb"].some((k) => l.includes(k)) && ["background: #fff", "bg-white", "background-color: #fff"].some((b) => l.includes(b)) },
+  { id: "RULE_GEO_02_WCAG_CONTRAST_AA", cat: "WcagContrast", sev: "Error", msg: "Contrast ratio falls below WCAG 2.2 AA (4.5:1). Darken foreground text.", fix: true, match: hasLowContrastHexPair },
   { id: "RULE_GEO_03_TEXT_OVERFLOW", cat: "GeometricLayout", sev: "Warning", msg: "Fixed width text element lacks overflow/ellipsis or word-break guard.", fix: true, match: (l) => (l.includes("width:") || l.includes("w-[")) && ["<p", "<span", "<h"].some((t) => l.includes(t)) && l.includes("px") && !["truncate", "ellipsis", "break-words", "overflow"].some((g) => l.includes(g)) },
   { id: "RULE_GEO_04_TOUCH_TARGET", cat: "GeometricLayout", sev: "Warning", msg: "Interactive button height < 44px without touch target expansion.", fix: false, match: (l) => (l.includes("<button") || l.includes('class="btn"')) && ["height: 24px", "height: 28px", "height: 32px"].some((h) => l.includes(h)) },
   { id: "RULE_GEO_05_LINE_HEIGHT_RATIO", cat: "GeometricLayout", sev: "Warning", msg: "Paragraph line-height is 1.0; body text requires line-height between 1.4 and 1.6.", fix: true, match: (l) => (l.includes("line-height: 1;") || l.includes("leading-none")) && ["<p", "body", "prose"].some((t) => l.includes(t)) },
-  { id: "RULE_GEO_06_SPACING_GRID_SCALE", cat: "GeometricLayout", sev: "Warning", msg: "Off-grid spacing pixel literal detected; align to 4px/8px geometric rhythm.", fix: false, match: (l) => ["padding: 13px", "padding: 15px", "margin: 7px", "gap: 11px"].some((p) => l.includes(p)) },
+  { id: "RULE_GEO_06_SPACING_GRID_SCALE", cat: "GeometricLayout", sev: "Warning", msg: "Off-grid spacing pixel literal detected; align to 4px/8px geometric rhythm.", fix: false, match: hasOffGridSpacing },
   { id: "RULE_GEO_08_MIN_FONT_SIZE", cat: "GeometricLayout", sev: "Error", msg: "Font size < 10px violates minimum readability standard.", fix: true, match: (l) => ["font-size: 8px", "font-size: 9px", "text-[8px]", "text-[9px]"].some((f) => l.includes(f)) },
   { id: "RULE_GEO_09_HORIZONTAL_OVERFLOW", cat: "GeometricLayout", sev: "Warning", msg: "Large fixed pixel width risks horizontal overflow on tablet/mobile viewports.", fix: false, match: (l) => ["min-width: 1200px", "width: 1440px", "w-[1200px]", "w-[1440px]"].some((w) => l.includes(w)) && !l.includes("max-width") },
   { id: "RULE_GEO_10_INTERACTIVE_ROLE_FOCUS", cat: "WcagContrast", sev: "Error", msg: "'outline: none' removes keyboard focus ring without providing focus-visible alternative.", fix: true, match: (l) => (l.includes("outline: none") || l.includes("outline: 0")) && !["focus-visible", "ring", "box-shadow"].some((g) => l.includes(g)) },
   { id: "RULE_GEO_11_ASPECT_RATIO_DISTORTION", cat: "GeometricLayout", sev: "Info", msg: "Image element lacks explicit aspect-ratio or object-fit styling to prevent layout shift.", fix: false, match: (l) => l.includes("<img") && !["aspect-ratio", "object-fit", "width="].some((g) => l.includes(g)) },
   { id: "RULE_GEO_12_COLOR_ONLY_STATUS", cat: "WcagContrast", sev: "Warning", msg: "Status badge conveys state via color only without label or icon indicator.", fix: false, match: (l) => (l.includes("bg-red-500") || l.includes("bg-green-500")) && l.includes("badge") && !l.includes("aria-label") && (l.includes("></") || l.includes("status-dot")) },
   { id: "RULE_GEO_13_TRUNCATION_TOOLTIP", cat: "GeometricLayout", sev: "Info", msg: "Truncated text element lacks accessible title or aria-label fallback.", fix: false, match: (l) => (l.includes("truncate") || l.includes("text-overflow: ellipsis")) && !l.includes("title=") && !l.includes("aria-label=") },
-  { id: "RULE_GEO_14_Z_INDEX_INFLATION", cat: "GeometricLayout", sev: "Warning", msg: "Uncontrolled z-index inflation (>9999). Use structured stacking context layers.", fix: true, match: (l) => l.includes("z-index: 99999") || l.includes("z-index: 999999") || l.includes("z-[99999]") },
+  { id: "RULE_GEO_14_Z_INDEX_INFLATION", cat: "GeometricLayout", sev: "Warning", msg: "Uncontrolled z-index inflation (>9999). Use structured stacking context layers.", fix: true, match: hasHighZIndex },
   { id: "RULE_GEO_16_ICON_ALIGNMENT", cat: "WcagContrast", sev: "Info", msg: "Icon missing 'aria-hidden=\"true\"' or accessible 'aria-label'.", fix: true, match: (l) => (l.includes("<svg") || l.includes('class="icon')) && !l.includes("aria-hidden") && !l.includes("aria-label") },
   { id: "RULE_GEO_17_MEDIA_CONTROLS_A11Y", cat: "WcagContrast", sev: "Warning", msg: "Media element lacks native 'controls' attribute for keyboard/assistive playback.", fix: false, match: (l) => (l.includes("<video") || l.includes("<audio")) && !l.includes("controls") },
   { id: "RULE_GEO_18_BACKDROP_FILTER_FALLBACK", cat: "GeometricLayout", sev: "Warning", msg: "'backdrop-filter' used without fallback background color for unsupported browsers.", fix: true, match: (l) => l.includes("backdrop-filter") && !l.includes("background") && !l.includes("bg-") },
   { id: "RULE_GEO_21_BUTTON_TYPE_EXPLICIT", cat: "WcagContrast", sev: "Info", msg: "Button element lacks explicit type=\"button|submit|reset\" attribute.", fix: false, match: (l) => l.includes("<button") && !l.includes("type=") },
   { id: "RULE_GEO_22_FORM_LABEL_ASSOCIATION", cat: "WcagContrast", sev: "Warning", msg: "Form input lacks id (for <label for=\"...\">) or aria-label attribute.", fix: false, match: (l) => l.includes("<input") && !l.includes('type="hidden"') && !l.includes("aria-label") && !l.includes("id=") },
-  { id: "RULE_GEO_23_TAB_ORDER_INTEGRITY", cat: "WcagContrast", sev: "Error", msg: 'Positive tabindex disrupts natural DOM reading order. Use tabindex="0" or "-1".', fix: true, match: (l) => l.includes('tabindex="1"') || l.includes('tabindex="2"') || l.includes('tabindex="3"') },
+  { id: "RULE_GEO_23_TAB_ORDER_INTEGRITY", cat: "WcagContrast", sev: "Error", msg: 'Positive tabindex disrupts natural DOM reading order. Use tabindex="0" or "-1".', fix: true, match: (l) => /\btabindex\s*=\s*(?:["'][1-9]\d*["']|[1-9]\d*(?=[\s>]))/.test(l) },
   { id: "RULE_GEO_24_TRANSITION_PERFORMANCE", cat: "GeometricLayout", sev: "Warning", msg: "Animating layout properties (width/height/top/left) triggers reflow. Use transform/opacity.", fix: false, match: (l) => (l.includes("transition:") || l.includes("transition-all")) && ["width", "height", "top", "left"].some((p) => l.includes(p)) },
   { id: "RULE_GEO_25_STICKY_HEADER_SHADOW", cat: "GeometricLayout", sev: "Info", msg: "Sticky header lacks bottom border or elevation shadow to separate from scrolled content.", fix: true, match: (l) => l.includes("position: sticky") && l.includes("top: 0") && !l.includes("border") && !l.includes("shadow") },
 ];
@@ -113,7 +164,7 @@ export function scanSlopAndTells(content: string): LintIssue[] {
   });
 
   const beaconSpec: RuleSpec = { id: "ANTI_SLOP_07_EXTERNAL_BEACON", cat: "SyntaxIntegrity", sev: "Error", msg: "Detected external image URL beacon in Markdown or <img> element.", fix: false, match: () => true };
-  for (const re of [/!\[[^\]]*\]\(\s*https?:\/\/[^)]*\)/gi, /<img\b[^>]*\bsrc\s*=\s*["']https?:\/\/[^"']*["'][^>]*>/gi]) {
+  for (const re of [/!\[[^\]]*\]\(\s*https?:\/\/[^)]*\)/gi, /<img\b[^>]*\bsrc\s*=\s*["']\s*https?:\/\/[^"']*["'][^>]*>/gi]) {
     for (const m of content.matchAll(re)) {
       const idx = m.index ?? 0;
       issues.push(makeIssue(beaconSpec, content.slice(0, idx).split("\n").length, m[0].replace(/\s+/g, " ")));
@@ -139,37 +190,6 @@ export function checkGeometricAndWcagRules(content: string): LintIssue[] {
   return issues;
 }
 
-export function autoFixIssues(content: string): { fixed: string; count: number } {
-  let fixed = content;
-  let count = 0;
-
-  if (/[“”‘’]/.test(fixed)) {
-    fixed = fixed.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
-    count++;
-  }
-  if (fixed.includes("#6366f1") || fixed.includes("#8b5cf6") || fixed.includes("#7c3aed")) {
-    fixed = fixed.replace(/#6366f1/g, "var(--action-primary, #2563eb)").replace(/#8b5cf6/g, "var(--action-primary-hover, #1d4ed8)").replace(/#7c3aed/g, "var(--action-primary, #2563eb)");
-    count++;
-  }
-  if (/tabindex="[1-9]"/.test(fixed)) {
-    fixed = fixed.replace(/tabindex="[1-9]"/g, 'tabindex="0"');
-    count++;
-  }
-  if (fixed.includes("<svg") && !fixed.includes("aria-hidden") && !fixed.includes("aria-label")) {
-    fixed = fixed.replace(/<svg/g, '<svg aria-hidden="true"');
-    count++;
-  }
-  if (fixed.includes("line-height: 1;")) {
-    fixed = fixed.replace(/line-height: 1;/g, "line-height: 1.5;");
-    count++;
-  }
-  if (fixed.includes("<head>") && !fixed.includes('name="viewport"')) {
-    fixed = fixed.replace("<head>", '<head>\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">');
-    count++;
-  }
-  return { fixed, count };
-}
-
 export class TriangleLinter {
   static lint(content: string): TriangleLintReport {
     const start = Date.now();
@@ -186,17 +206,20 @@ export class TriangleLinter {
 
   static lintAndFix(content: string): { content: string; report: TriangleLintReport } {
     const start = Date.now();
+    const initialReport = this.lint(content);
     const { fixed, count } = autoFixIssues(content);
     const recheck = this.lint(fixed);
+    const newInThisCall = countNewlyIntroducedIssues(initialReport.issues, recheck.issues);
     return {
       content: fixed,
       report: {
         total_issues: recheck.total_issues,
-        new_in_this_call: recheck.total_issues,
+        new_in_this_call: newInThisCall,
         fixed_issues: count,
         passed: recheck.passed,
         duration_ms: Date.now() - start,
         issues: recheck.issues,
+        fixed_content: fixed,
       },
     };
   }

@@ -12,6 +12,7 @@ import {
   HTTP_FORBIDDEN,
   HTTP_OK,
   HTTP_PAYLOAD_TOO_LARGE,
+  buildWorkbenchProofCookieHeader,
   handleBootstrapSession,
   injectBootCapMeta,
   issueBootCapToken,
@@ -32,7 +33,7 @@ let cachedMatcher: RouteMatcher | null = null;
 let previewViteServerPromise: Promise<ViteDevServer> | null = null;
 
 /** Closes any headless ViteDevServer created for `vite preview` SSR route loading. */
-export async function closePreviewBffServer(): Promise<void> {
+async function closePreviewBffServer(): Promise<void> {
   cachedMatcher = null;
   const pending = previewViteServerPromise;
   previewViteServerPromise = null;
@@ -102,11 +103,25 @@ function sendWebResponse(res: ServerResponse, webRes: Response): Promise<void> {
 
   if (isStream && webRes.body) {
     if (typeof res.flushHeaders === "function") res.flushHeaders();
-    const nodeStream = Readable.fromWeb(webRes.body as unknown as WebReadableStream<Uint8Array>);
+    const webBody = webRes.body;
+    const nodeStream = Readable.fromWeb(webBody as unknown as WebReadableStream<Uint8Array>);
     return new Promise((resolve, reject) => {
-      nodeStream.on("error", reject);
-      res.on("error", reject);
-      res.on("close", resolve);
+      const teardown = () => {
+        nodeStream.destroy();
+        void webBody.cancel().catch(() => undefined);
+      };
+      nodeStream.on("error", (err) => {
+        teardown();
+        reject(err);
+      });
+      res.on("error", (err) => {
+        teardown();
+        reject(err);
+      });
+      res.on("close", () => {
+        teardown();
+        resolve();
+      });
       res.on("finish", resolve);
       nodeStream.pipe(res);
     });
@@ -117,8 +132,21 @@ function sendWebResponse(res: ServerResponse, webRes: Response): Promise<void> {
   });
 }
 
+function isSpaHtmlNavigation(req: IncomingMessage, pathname: string): boolean {
+  const method = (req.method || "GET").toUpperCase();
+  if (method !== "GET" || pathname.startsWith("/api/") || pathname.startsWith("/@") || pathname.startsWith("/src/")) {
+    return false;
+  }
+  const hasAssetExt = /\.[a-z0-9]{1,8}$/i.test(pathname) && pathname !== "/index.html";
+  if (hasAssetExt) return false;
+  const accept = String(req.headers.accept || "");
+  if (accept && !accept.includes("text/html") && !accept.includes("*/*")) return false;
+  const fetchMode = String(req.headers["sec-fetch-mode"] || "").trim().toLowerCase();
+  return !fetchMode || fetchMode === "navigate";
+}
+
 /** Dispatches incoming Node HTTP requests into Vite BFF route handlers or passes through to Vite. */
-export async function dispatchMiddlewareRequest(
+async function dispatchMiddlewareRequest(
   req: IncomingMessage,
   res: ServerResponse,
   next: Connect.NextFunction,
@@ -150,12 +178,22 @@ export async function dispatchMiddlewareRequest(
     if (Array.isArray(v)) headers.set(k, v.join(", "));
     else if (typeof v === "string") headers.set(k, v);
   }
-  const webReq = new Request(parsedUrl.toString(), {
-    method,
-    headers,
-    body: method === "GET" || method === "HEAD" || rawBuf.length === 0 ? undefined : new Uint8Array(rawBuf),
-  });
-  await sendWebResponse(res, await matched.handler(webReq, { params: matched.params }));
+  const reqAbort = new AbortController();
+  const onReqClose = () => reqAbort.abort();
+  req.on("close", onReqClose);
+  res.on("close", onReqClose);
+  try {
+    const webReq = new Request(parsedUrl.toString(), {
+      method,
+      headers,
+      body: method === "GET" || method === "HEAD" || rawBuf.length === 0 ? undefined : new Uint8Array(rawBuf),
+      signal: reqAbort.signal,
+    });
+    await sendWebResponse(res, await matched.handler(webReq, { params: matched.params }));
+  } finally {
+    req.off("close", onReqClose);
+    res.off("close", onReqClose);
+  }
 }
 
 function bindServerPortLifecycle(
@@ -180,14 +218,14 @@ function tryServePreviewIndexHtml(
   server: PreviewServer,
   bootCapToken: string
 ): boolean {
-  const method = (req.method || "GET").toUpperCase();
   const pathname = (req.url || "/").split("?")[0];
-  if (method !== "GET" || (pathname !== "/" && pathname !== "/index.html")) return false;
+  if (!isSpaHtmlNavigation(req, pathname)) return false;
   const distHtmlPath = path.resolve(server.config.root, server.config.build?.outDir || "dist", "index.html");
   if (!fs.existsSync(distHtmlPath)) return false;
   res.statusCode = HTTP_OK;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Set-Cookie", buildWorkbenchProofCookieHeader(bootCapToken));
   res.end(injectBootCapMeta(fs.readFileSync(distHtmlPath, "utf8"), bootCapToken));
   return true;
 }
@@ -203,6 +241,10 @@ export function cowokLoopbackBffPlugin(): Plugin {
     configureServer(server) {
       bindServerPortLifecycle(server.httpServer, bootCapToken);
       server.middlewares.use((req, res, next) => {
+        const pathname = (req.url || "/").split("?")[0];
+        if (isSpaHtmlNavigation(req, pathname)) {
+          res.setHeader("Set-Cookie", buildWorkbenchProofCookieHeader(bootCapToken));
+        }
         dispatchMiddlewareRequest(req, res, next, server).catch(next);
       });
     },

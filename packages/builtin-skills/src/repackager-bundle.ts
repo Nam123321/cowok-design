@@ -6,7 +6,6 @@ import * as path from "path";
 import * as crypto from "crypto";
 import {
   DiscoveryStub,
-  DiscoveryStubSchema,
   SkillManifest,
   SkillPluginDto,
   SkillPluginDtoSchema,
@@ -15,10 +14,11 @@ import {
   StagedBundleReceiptSchema,
 } from "./types";
 import { COMPILED_RELEASE_BRIDGE_SHA256 } from "./bridge-pin";
-import { scanSkillMarkdownSafety } from "./repackager-assets";
+import { buildDiscoveryStub, MAX_DISCOVERY_STUB_BYTES } from "./repackager-stub";
 
+export type { DiscoveryStub };
+export { buildDiscoveryStub, MAX_DISCOVERY_STUB_BYTES };
 export const PKG_HASH_DOMAIN = Buffer.from("cowok-pkg-hash-v1", "utf8");
-export const MAX_DISCOVERY_STUB_BYTES = 1536;
 export const MAX_SINGLE_FILE_BYTES = 1048576;
 
 let sessionBridgePin: { filePath: string; sha256Hex: string } | null = null;
@@ -50,10 +50,12 @@ function areAncestorsTrusted(parentDir: string): boolean {
   const parts = path.resolve(parentDir).split(path.sep).filter(Boolean);
   let cur: string = path.sep;
   for (let i = 0; i < parts.length; i++) {
-    cur = path.join(cur, parts[i]);
     if (process.platform === "darwin" && i === 0 && MACOS_ROOT_SYMLINKS.has(parts[0])) {
+      const priv = fs.lstatSync("/private");
+      if (priv.isSymbolicLink() || !isSafeNonWritableNode(priv, true)) return false;
       cur = path.join("/private", parts[0]);
-      continue;
+    } else {
+      cur = path.join(cur, parts[i]);
     }
     const st = fs.lstatSync(cur);
     if (st.isSymbolicLink() || !isSafeNonWritableNode(st, true)) return false;
@@ -184,61 +186,6 @@ export function computePackageSha256(entries: Array<{ relPath: string; raw: Buff
     h.update(item.raw);
   }
   return h.digest("hex");
-}
-
-function validateSafeSkillSegment(segment: string): void {
-  if (!segment || segment === "." || segment === ".." || Buffer.byteLength(segment, "utf8") > 64 || !/^[A-Za-z0-9._-]+$/.test(segment)) {
-    throw new Error(`Invalid skill_name '${segment}': unsafe characters, traversal segment, or length > 64B`);
-  }
-}
-
-function validateUpstreamUrl(url: string): void {
-  if (Buffer.byteLength(url, "utf8") > 256 || !/^https?:\/\/[^/\s@]+/i.test(url) || url.includes("@") || /[\s\x00-\x1f\x7f-\x9f]/.test(url)) {
-    throw new Error("Invalid or oversized upstream_url for DiscoveryStub");
-  }
-}
-
-export function buildDiscoveryStub(params: {
-  skillName: string;
-  description: string;
-  capabilities: string[];
-  upstreamUrl?: string;
-  packageSha256: string;
-}): { stub: DiscoveryStub; stubJson: string } {
-  const { skillName, description, capabilities, upstreamUrl, packageSha256 } = params;
-  validateSafeSkillSegment(skillName);
-  scanSkillMarkdownSafety("description", description);
-  if (description.replace(/\r\n?/g, "\n").split("\n").some((l) => l.trim() === "---")) {
-    throw new Error("YAML delimiter '---' line forbidden inside frontmatter field");
-  }
-  if (Buffer.byteLength(description, "utf8") > 320) throw new Error("DiscoveryStub overflow: description > 320B");
-  if (capabilities.length > 16 || capabilities.some((c) => Buffer.byteLength(c, "utf8") > 48)) {
-    throw new Error("DiscoveryStub overflow: capabilities limit exceeded");
-  }
-  for (const cap of capabilities) scanSkillMarkdownSafety("capability", cap);
-  if (upstreamUrl !== undefined) validateUpstreamUrl(upstreamUrl);
-  const stub: DiscoveryStub = {
-    name: skillName,
-    version: "1.0.0",
-    description,
-    ...(upstreamUrl !== undefined ? { upstream_url: upstreamUrl } : {}),
-    capabilities,
-    risk_tier: 2,
-    package_sha256: packageSha256,
-    stub_size_bytes: 0,
-  };
-  for (let i = 0; i < 8; i++) {
-    const finalJson = JSON.stringify(stub, null, 2);
-    const bytes = Buffer.byteLength(finalJson, "utf8");
-    if (bytes === stub.stub_size_bytes) {
-      if (bytes > MAX_DISCOVERY_STUB_BYTES) {
-        throw new Error(`DiscoveryStubFailClosed: ${bytes}B > ${MAX_DISCOVERY_STUB_BYTES}B`);
-      }
-      return { stub: DiscoveryStubSchema.parse(stub), stubJson: finalJson };
-    }
-    stub.stub_size_bytes = bytes;
-  }
-  throw new Error("DiscoveryStubFailClosed: stub_size_bytes failed to converge to serialized byte length");
 }
 
 export interface StagedBundleReceipt {

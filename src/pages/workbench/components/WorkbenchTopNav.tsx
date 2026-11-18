@@ -6,6 +6,7 @@ import { useTranslation } from "../../../hooks/useTranslation";
 export type ThemeMode = "warm" | "dim" | "night" | "night-low" | "monochrome";
 
 export interface WorkbenchTopNavProps {
+  projectId?: string;
   projectName: string;
   activeSessionTitle?: string;
   isStandaloneConversation?: boolean;
@@ -23,6 +24,7 @@ export interface WorkbenchTopNavProps {
 }
 
 export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
+  projectId,
   projectName,
   activeSessionTitle,
   isStandaloneConversation = false,
@@ -31,6 +33,7 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
   onDiscardDraft,
 }) => {
   const { t } = useTranslation();
+  const pluginCenterHref = projectId ? `/plugins?projectId=${encodeURIComponent(projectId)}` : "/plugins";
 
   return (
     <header
@@ -190,7 +193,28 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
       </div>
 
       {/* Right Zone: Clean Global Window Context (Tab-specific DAG/Slide controls are strictly scoped inside the active tab) */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <a
+          href={pluginCenterHref}
+          data-testid="nav-plugin-center"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "5px",
+            padding: "3px 8px",
+            fontSize: "11px",
+            fontWeight: 500,
+            color: "var(--text-secondary)",
+            textDecoration: "none",
+            borderRadius: "var(--radius-xs)",
+            border: "1px solid var(--border-subtle)",
+            backgroundColor: "var(--bg-workspace)",
+          }}
+        >
+          <BrandIcon name="plugin" size={11} color="currentColor" />
+          <span>{t("plugins.navLink", "Plugins")}</span>
+        </a>
+      </div>
     </header>
   );
 };

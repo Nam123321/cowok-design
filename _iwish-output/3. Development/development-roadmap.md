@@ -2,7 +2,7 @@
 *(Comprehensive Product Phased Roadmap & Dependency Matrix)*
 
 > **Phiên bản:** v3.0-Universal  
-> **Ngày cập nhật:** 2026-11-13  
+> **Ngày cập nhật:** 2026-11-18  
 > **Trạng thái:** Active SSOT Baseline (Folder `3. Development`)  
 > **Bản thể dự án (Archetypes):** universal-hybrid-saas  
 > **Ngân sách Worktree đồng thời:** $\le 5$ song song (Tuân thủ trần Worktree Quota $\le 5$)  
@@ -19,11 +19,12 @@ Hệ thống tính toán lộ trình dựa trên nguyên tắc **Mỏ neo Bậc 
 | STT | Mã Epic & Tên Module | Trạng Thái | Thực Thể Dữ Liệu & Hợp Đồng Đã Sẵn Sàng Cung Cấp |
 | :---: | :--- | :---: | :--- |
 | **Epic 03** | Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher | `3` stories | `completed` | Zero-dependency baseline anchor |
+| **Epic 08** | agentskills.io Repackager Engine, Built-in Harness Skills & GitHub Cron Lifecycle | `4` stories | `completed` | Zero-dependency baseline anchor |
 
 ### 1.2. Thống Kê Active Delta Cần Triển Khai
 - **Tổng số Epics dự án:** 12
-- **Epics đã hoàn thành (Maturity Baseline):** 1
-- **Epics đang triển khai / Backlog:** 11
+- **Epics đã hoàn thành (Maturity Baseline):** 2
+- **Epics đang triển khai / Backlog:** 10
 - **Số làn sóng phát triển (Waves):** 5 Waves
 - **Số luồng song song (Parallel Tracks):** 5 Tracks
 
@@ -41,11 +42,10 @@ Hệ thống tính toán lộ trình dựa trên nguyên tắc **Mỏ neo Bậc 
 | **Epic 05** | Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR | `Stream-4` | `Epic 07`, `Epic 10` | `Epic 02`, `Epic 04` |
 | **Epic 06** | Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench | `Stream-5` | `Epic 07` | `Epic 03`, `Epic 04` |
 | **Epic 07** | 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter | `Stream-1` | `Epic 12` | `Epic 05`, `Epic 06` |
-| **Epic 08** | agentskills.io Repackager Engine, 6 Built-in Harness Skills & GitHub Cron Lifecycle | `Stream-2` | `Epic 09`, `Epic 10` | `Epic 01`, `Epic 02` |
-| **Epic 09** | Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine | `Stream-3` | `Epic 10`, `Epic 11` | `Epic 03`, `Epic 08` |
-| **Epic 10** | cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design Tournament | `Stream-4` | `Epic 11` | `Epic 05`, `Epic 08`, `Epic 09` |
-| **Epic 11** | POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Compiler-Grade Open MCP Ecosystem | `Stream-5` | `Epic 12` | `Epic 02`, `Epic 09`, `Epic 10` |
-| **Epic 12** | 4-Channel Packaging & Distribution Architecture | `Stream-1` | *(Không có)* | `Epic 07`, `Epic 11` |
+| **Epic 09** | Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine | `Stream-2` | `Epic 10`, `Epic 11` | `Epic 03`, `Epic 08` |
+| **Epic 10** | cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design Tournament | `Stream-3` | `Epic 11` | `Epic 05`, `Epic 08`, `Epic 09` |
+| **Epic 11** | POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Compiler-Grade Open MCP Ecosystem | `Stream-4` | `Epic 12` | `Epic 02`, `Epic 09`, `Epic 10` |
+| **Epic 12** | 4-Channel Packaging & Distribution Architecture | `Stream-5` | *(Không có)* | `Epic 07`, `Epic 11` |
 
 ### 2.2. Sơ Đồ Đồ Thị Khối Liên Kết Phụ Thuộc (Macro-DAG Flowchart)
 
@@ -53,13 +53,13 @@ Hệ thống tính toán lộ trình dựa trên nguyên tắc **Mỏ neo Bậc 
 flowchart TD
 flowchart TD
     E03["Epic 03: Project-Scoped Configurable Constraint Engine & <1 (Completed)"]
+    E08["Epic 08: agentskills.io Repackager Engine, Built-in Harness (Completed)"]
     E01["Epic 01: Cargo Workspace, Domain Contracts ts-rs & 16-Table"]
     E02["Epic 02: JIT Prompt Assembler & 3-Profile Model Capability "]
     E04["Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kern"]
     E05["Epic 05: Option 5 2D Storyboard, Entry-First Live HTML, Per"]
     E06["Epic 06: Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Wo"]
     E07["Epic 07: 17-Rule Multi-Viewport Visual Eval Gate & Self-Con"]
-    E08["Epic 08: agentskills.io Repackager Engine, 6 Built-in Harne"]
     E09["Epic 09: Design-Only REA & Awesome-RE Forge & JEV — TypeSaf"]
     E10["Epic 10: cowok Master Orchestrator, advisor Meta-Agent, OPC"]
     E11["Epic 11: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & "]
@@ -73,8 +73,6 @@ flowchart TD
     E04 --> E06
     E05 --> E07
     E06 --> E07
-    E01 --> E08
-    E02 --> E08
     E03 --> E09
     E08 --> E09
     E05 --> E10
@@ -123,11 +121,11 @@ Thứ tự ưu tiên và phân bổ Wave không chỉ dựa vào phụ thuộc k
 
 | Làn Sóng | Tên Làn Sóng & Mục Tiêu Trọng Tâm | Danh Mục Epics & Sub-Epic Phase Slices | Lát Cắt Giá Trị Dọc Bàn Giao (Vertical Value Slice) | Điều Kiện Tiền Đề Mở Khóa (Unblock Condition) |
 | :---: | :--- | :--- | :--- | :--- |
-| **Horizon 1** | Wave 1: Vertical Value Increment 1 | `Epic 01` | Delivery of core capabilities for Wave 1 | Baseline hoàn tất |
+| **Horizon 1** | Wave 1: Vertical Value Increment 1 | `Epic 01`, `Epic 09` | Delivery of core capabilities for Wave 1 | Baseline hoàn tất |
 | **Horizon 2** | Wave 2: Vertical Value Increment 2 | `Epic 02`, `Epic 04` | Delivery of core capabilities for Wave 2 | Horizon 1 Sync Barrier hoàn tất |
-| **Horizon 3** | Wave 3: Vertical Value Increment 3 | `Epic 08`, `Epic 05`, `Epic 06` | Delivery of core capabilities for Wave 3 | Horizon 2 Sync Barrier hoàn tất |
-| **Horizon 4** | Wave 4: Vertical Value Increment 4 | `Epic 09`, `Epic 07` | Delivery of core capabilities for Wave 4 | Horizon 3 Sync Barrier hoàn tất |
-| **Horizon 5** | Wave 5: Vertical Value Increment 5 | `Epic 10`, `Epic 11`, `Epic 12` | Delivery of core capabilities for Wave 5 | Horizon 4 Sync Barrier hoàn tất |
+| **Horizon 3** | Wave 3: Vertical Value Increment 3 | `Epic 05`, `Epic 06` | Delivery of core capabilities for Wave 3 | Horizon 2 Sync Barrier hoàn tất |
+| **Horizon 4** | Wave 4: Vertical Value Increment 4 | `Epic 10`, `Epic 07` | Delivery of core capabilities for Wave 4 | Horizon 3 Sync Barrier hoàn tất |
+| **Horizon 5** | Wave 5: Vertical Value Increment 5 | `Epic 11`, `Epic 12` | Delivery of core capabilities for Wave 5 | Horizon 4 Sync Barrier hoàn tất |
 
 ### 5.2. Biểu Đồ Gantt Tiến Độ Thực Thi Đa Làn Sóng (Multi-Wave Phased Gantt)
 
@@ -140,18 +138,17 @@ gantt
 
     section Horizon 1
     Epic 01 Cargo Workspace, Domain Contracts ts-rs & 16-Table :active, e01, 2026-10-22, 10d
+    Epic 09 Design-Only REA & Awesome-RE Forge & JEV — TypeSaf :active, e09, 2026-10-22, 10d
     section Horizon 2
     Epic 02 JIT Prompt Assembler & 3-Profile Model Capability  : e02, 2026-10-22, 10d
     Epic 04 Flow-First 2D SVG Bezier DAG Studio, Security Kern : e04, 2026-10-22, 10d
     section Horizon 3
-    Epic 08 agentskills.io Repackager Engine, 6 Built-in Harne : e08, 2026-10-22, 10d
     Epic 05 Option 5 2D Storyboard, Entry-First Live HTML, Per : e05, 2026-10-22, 10d
     Epic 06 Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Wo : e06, 2026-10-22, 10d
     section Horizon 4
-    Epic 09 Design-Only REA & Awesome-RE Forge & JEV — TypeSaf : e09, 2026-10-22, 10d
+    Epic 10 cowok Master Orchestrator, advisor Meta-Agent, OPC : e10, 2026-10-22, 10d
     Epic 07 17-Rule Multi-Viewport Visual Eval Gate & Self-Con : e07, 2026-10-22, 10d
     section Horizon 5
-    Epic 10 cowok Master Orchestrator, advisor Meta-Agent, OPC : e10, 2026-10-22, 10d
     Epic 11 POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging &  : e11, 2026-10-22, 10d
     Epic 12 4-Channel Packaging & Distribution Architecture : e12, 2026-10-22, 10d
 ```
@@ -165,6 +162,7 @@ Từ Wave hiện tại, hệ thống lọc ra các **Lát Cắt Hành Động P0
 | Mã Lát Cắt | Module / Epic Trọng Tâm | Danh Sách Story IDs Triển Khai Ngay | Luồng (Track) | Lý Do Kích Hoạt Tức Thời (Activation Rationale) |
 | :---: | :--- | :--- | :---: | :--- |
 | **P0.1** | **Epic 01**: Cargo Workspace, Domain Contracts (ts-rs) & 16-Table SQLite Registry (Immediate P0 Anchor) | `01.1`, `01.2`, `01.3` | `Stream-1` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
+| **P0.2** | **Epic 09**: Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine (Immediate P0 Anchor) | `09.1`, `09.2`, `09.3` | `Stream-2` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
 
 ---
 

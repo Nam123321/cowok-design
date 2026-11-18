@@ -1,0 +1,139 @@
+// @story 08.4
+// @implements AC-01, AC-04, AC-05
+import React, { useState } from "react";
+import { useTranslation } from "../../hooks/useTranslation";
+import {
+  PLUGIN_CENTER_CARDS,
+  validateCronSchedules,
+  validateLearnCards,
+  validatePluginCards,
+} from "../plugin-center/cards";
+import { CronSyncStatus } from "./CronSyncStatus";
+import { LearnCardReviewQueue } from "./LearnCardReviewQueue";
+import { PluginRegistryPanel } from "./PluginRegistryPanel";
+import { usePluginRegistry } from "./hooks/usePluginRegistry";
+
+export interface PluginCenterWorkspaceProps {
+  projectId: string;
+  hostSlotId: string;
+  cardSchemaVersion: number;
+  initialScope?: "mcp" | "automations";
+  initialLearnFilter?: "ALL" | "PROPOSED" | "ACCEPTED" | "REJECTED";
+  headerTabIds?: readonly string[];
+}
+
+function updateTabQueryParam(nextScope: "mcp" | "automations", preserveLearnTab: boolean): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (url.pathname !== "/plugins" && url.pathname !== "/plugins/") return;
+  if (nextScope === "automations") url.searchParams.set("tab", "cron");
+  else if (preserveLearnTab) url.searchParams.set("tab", "learn");
+  else url.searchParams.delete("tab");
+  window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+}
+
+const PluginCenterMcpContent: React.FC<{
+  registry: ReturnType<typeof usePluginRegistry>;
+  initialLearnFilter: "ALL" | "PROPOSED" | "ACCEPTED" | "REJECTED";
+}> = ({ registry, initialLearnFilter }) => {
+  const pluginCheck = validatePluginCards(registry.plugins);
+  const cardCheck = validateLearnCards(registry.learnCards);
+  return (
+    <>
+      <PluginRegistryPanel
+        plugins={pluginCheck.valid}
+        loading={registry.loading}
+        error={registry.pluginError ?? pluginCheck.error}
+        pendingActionId={registry.actionPendingId}
+        actionFeedback={registry.actionFeedback}
+        onRefresh={() => void registry.refreshAll()}
+        onTransition={(plugin, target) => void registry.transitionPlugin(plugin, target)}
+        onQuarantine={(plugin, reason) => void registry.quarantinePlugin(plugin, reason)}
+        onPromoteStaging={(plugin, reason) => void registry.promoteStaging(plugin, reason)}
+        onDiscardStaging={(plugin, reason) => void registry.discardStaging(plugin, reason)}
+      />
+      <LearnCardReviewQueue
+        cards={cardCheck.valid}
+        loading={registry.loading}
+        error={registry.learnError ?? cardCheck.error}
+        pendingActionId={registry.actionPendingId}
+        actionFeedback={registry.actionFeedback}
+        initialFilter={initialLearnFilter}
+        onRefresh={() => void registry.refreshAll()}
+        onApprove={(card, reason) => void registry.approveLearnCard(card, reason)}
+        onReject={(card, reason) => void registry.rejectLearnCard(card, reason)}
+      />
+    </>
+  );
+};
+
+const PluginCenterHeader: React.FC<{
+  scope: "mcp" | "automations";
+  onSwitchScope: (next: "mcp" | "automations") => void;
+}> = ({ scope, onSwitchScope }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="plugin-eco-header">
+      <div className="plugin-eco-title-group">
+        <a href="/" className="plugin-eco-btn" data-testid="btn-back-to-workbench" style={{ textDecoration: "none" }}>
+          {t("plugins.backToWorkbench", "Workbench")}
+        </a>
+        <h1 className="plugin-eco-title">{t("plugins.registryTitle", "AgentSkills Registry & Staging")}</h1>
+      </div>
+      <div className="plugin-eco-tabs" role="tablist">
+        <button type="button" className={`plugin-eco-tab ${scope === "mcp" ? "plugin-eco-tab-active" : ""}`} onClick={() => onSwitchScope("mcp")}>
+          {t("settings.tabMcp", "MCP & Tiện ích")}
+        </button>
+        <button type="button" className={`plugin-eco-tab ${scope === "automations" ? "plugin-eco-tab-active" : ""}`} onClick={() => onSwitchScope("automations")}>
+          {t("settings.tabAutomations", "Tự động hóa")}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export const PluginCenterWorkspace: React.FC<PluginCenterWorkspaceProps> = ({
+  projectId,
+  hostSlotId,
+  cardSchemaVersion,
+  initialScope = "mcp",
+  initialLearnFilter = "ALL",
+  headerTabIds = [],
+}) => {
+  const [scope, setScope] = useState<"mcp" | "automations">(initialScope);
+  const registry = usePluginRegistry(projectId, scope);
+  const switchScope = (next: "mcp" | "automations") => {
+    setScope(next);
+    updateTabQueryParam(next, initialLearnFilter === "PROPOSED");
+  };
+  const cronPlugins = registry.plugins.filter((p) => p.sourceType !== "builtin" || Boolean(p.upstreamRepoUrl));
+  const cronScheduleCheck = validateCronSchedules(registry.schedulesByPlugin);
+
+  return (
+    <main
+      className="plugin-eco-section"
+      data-host-slot={hostSlotId}
+      data-host-tabs={headerTabIds.join(",")}
+      data-card-schema={cardSchemaVersion}
+      data-project-id={projectId}
+      style={{ maxWidth: "960px", margin: "24px auto" }}
+    >
+      <PluginCenterHeader scope={scope} onSwitchScope={switchScope} />
+      {scope === "mcp" ? (
+        <PluginCenterMcpContent registry={registry} initialLearnFilter={initialLearnFilter} />
+      ) : (
+        <CronSyncStatus
+          plugins={cronPlugins}
+          schedulesByPlugin={cronScheduleCheck.valid}
+          loading={registry.loading}
+          error={registry.cronError ?? cronScheduleCheck.error}
+          pendingActionId={registry.actionPendingId}
+          actionFeedback={registry.actionFeedback}
+          onRefresh={() => void registry.refreshAll()}
+          onSyncNow={(plugin, refreshAuth) => void registry.triggerSyncNow(plugin, refreshAuth)}
+          onSaveSchedule={(plugin, cronExpr, url) => registry.saveSchedule(plugin, cronExpr, url)}
+        />
+      )}
+    </main>
+  );
+};

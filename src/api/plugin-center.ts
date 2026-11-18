@@ -8,47 +8,58 @@ import {
   CompiledPromptSnapshotDtoSchema,
   type CronScheduleStatusDto,
   CronScheduleStatusDtoSchema,
-  type DiscoverOrInstallPluginRequest,
-  DiscoverOrInstallPluginRequestSchema,
-  type DiscoveryDescriptorRequest,
-  DiscoveryDescriptorRequestSchema,
-  DiscoveryDescriptorResponseSchema,
   type HumanOnlyDecisionReceiptDto,
   HumanOnlyDecisionReceiptDtoSchema,
   type KnowledgeCardDto,
   KnowledgeCardDtoSchema,
   type LearnCardDecisionRequest,
   LearnCardDecisionRequestSchema,
-  type PluginSummaryDto,
-  PluginSummaryDtoSchema,
   type ProposeLearnCardRequest,
   ProposeLearnCardRequestSchema,
-  type RepackageBundleRequest,
-  RepackageBundleRequestSchema,
-  type RepackageReceipt,
-  RepackageReceiptSchema,
-  type StagingDecisionRequest,
-  StagingDecisionRequestSchema,
-  type TransitionPluginRequest,
-  TransitionPluginRequestSchema,
-  type TriangleLintReport,
-  TriangleLintReportSchema,
-  type TriangleLintRequest,
-  TriangleLintRequestSchema,
   type TriggerSyncRequest,
   TriggerSyncRequestSchema,
   type UpsertCronScheduleRequest,
   UpsertCronScheduleRequestSchema,
+} from "../lib/validations/plugins-learn-cron";
+import {
+  type DiscoverOrInstallPluginRequest,
+  DiscoverOrInstallPluginRequestSchema,
+  type PluginSummaryDto,
+  PluginSummaryDtoSchema,
+  type QuarantinePluginRequest,
+  QuarantinePluginRequestSchema,
+  type StagingDecisionRequest,
+  StagingDecisionRequestSchema,
+  type TransitionPluginRequest,
+  TransitionPluginRequestSchema,
+} from "../lib/validations/plugins";
+import {
+  type DiscoveryDescriptorRequest,
+  DiscoveryDescriptorRequestSchema,
+  type DiscoveryDescriptorResponse,
+  DiscoveryDescriptorResponseSchema,
+  type RepackageBundleRequest,
+  RepackageBundleRequestSchema,
+  type RepackageReceipt,
+  RepackageReceiptSchema,
+  type TriangleLintReport,
+  TriangleLintReportSchema,
+  type TriangleLintRequest,
+  TriangleLintRequestSchema,
   type VideoIntakeRequest,
   VideoIntakeRequestSchema,
   type VideoStoryboardReceipt,
   VideoStoryboardReceiptSchema,
-} from "../lib/validations/plugins";
+} from "../lib/validations/plugins-repackager";
 import { HarnessDaemonTransport } from "./harness-daemon-transport";
 
 const SSE_DATA_PREFIX_LEN = 5;
 
-function parsePluginSseFrame(frame: string, onRefresh: () => void): void {
+function parsePluginSseFrame(
+  frame: string,
+  onRefresh: () => void,
+  onConnected?: () => void
+): void {
   const dataLines = frame
     .split("\n")
     .filter((line) => line.startsWith("data:"))
@@ -57,7 +68,8 @@ function parsePluginSseFrame(frame: string, onRefresh: () => void): void {
   if (!dataLines) return;
   try {
     const parsed = JSON.parse(dataLines) as { kind?: string };
-    if (parsed.kind === "refresh") onRefresh();
+    if (parsed.kind === "connected") onConnected?.();
+    else if (parsed.kind === "refresh") onRefresh();
   } catch {
     // Ignore malformed heartbeat frames
   }
@@ -65,21 +77,28 @@ function parsePluginSseFrame(frame: string, onRefresh: () => void): void {
 
 async function consumePluginSseStream(
   body: ReadableStream<Uint8Array>,
-  onRefresh: () => void
+  onRefresh: () => void,
+  onConnected?: () => void,
+  signal?: AbortSignal
 ): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  const onAbort = () => {
+    void reader.cancel().catch(() => undefined);
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
   try {
-    while (true) {
+    while (!signal?.aborted) {
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
       const frames = buffer.split("\n\n");
       buffer = frames.pop() ?? "";
-      for (const frame of frames) parsePluginSseFrame(frame, onRefresh);
+      for (const frame of frames) parsePluginSseFrame(frame, onRefresh, onConnected);
     }
   } finally {
+    signal?.removeEventListener("abort", onAbort);
     reader.releaseLock();
   }
 }
@@ -131,6 +150,14 @@ export class PluginEcosystemClient extends HarnessDaemonTransport {
     });
   }
 
+  quarantinePlugin(pluginId: string, input: QuarantinePluginRequest): Promise<PluginSummaryDto> {
+    const validated = QuarantinePluginRequestSchema.parse(input);
+    return this.request(`/api/plugins/${encodeURIComponent(pluginId)}/quarantine`, PluginSummaryDtoSchema, {
+      method: "POST",
+      body: JSON.stringify(validated),
+    });
+  }
+
   promotePluginStaging(pluginId: string, input: StagingDecisionRequest): Promise<PluginSummaryDto> {
     const validated = StagingDecisionRequestSchema.parse(input);
     return this.request(
@@ -157,7 +184,7 @@ export class PluginEcosystemClient extends HarnessDaemonTransport {
     });
   }
 
-  generateDiscoveryStub(input: DiscoveryDescriptorRequest): Promise<Record<string, unknown>> {
+  generateDiscoveryStub(input: DiscoveryDescriptorRequest): Promise<DiscoveryDescriptorResponse> {
     const validated = DiscoveryDescriptorRequestSchema.parse(input);
     return this.request("/api/plugins/repackager/discovery-stubs", DiscoveryDescriptorResponseSchema, {
       method: "POST",
@@ -261,14 +288,13 @@ export class PluginEcosystemClient extends HarnessDaemonTransport {
   /** Subscribes to authenticated project-scoped plugin/LEARN/cron SSE refresh events. */
   async subscribePluginEvents(
     projectId: string,
-    opts: { signal?: AbortSignal; onRefresh: () => void }
+    opts: { signal?: AbortSignal; onRefresh: () => void; onConnected?: () => void }
   ): Promise<void> {
     const streamPath = `/api/projects/${encodeURIComponent(projectId)}/plugins/stream`;
     const res = await this.openEventStream(streamPath, opts.signal);
     if (!res.body) return;
-    await consumePluginSseStream(res.body, opts.onRefresh);
+    await consumePluginSseStream(res.body, opts.onRefresh, opts.onConnected, opts.signal);
   }
 }
 
-export const apiPlugins = new PluginEcosystemClient();
-export const apiPluginCenter = apiPlugins;
+export const apiPluginCenter = new PluginEcosystemClient();

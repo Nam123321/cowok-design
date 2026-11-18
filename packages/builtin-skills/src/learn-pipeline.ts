@@ -123,6 +123,9 @@ export class LearnPipeline {
     if (cards.some((c) => c.tenant_id === tid && c.project_id === pid && c.content_sha256 === sha && c.status !== "REJECTED")) {
       throw new LearnError("DuplicateActiveContent", "matching active/proposed content hash already exists");
     }
+    if (input.created_at !== undefined && (!Number.isSafeInteger(input.created_at) || input.created_at <= 0)) {
+      throw new LearnError("InvalidCardInput", "created_at must be a positive integer unix timestamp");
+    }
     const card: KnowledgeCard = {
       id: cid, tenant_id: tid, project_id: pid, idempotency_key: idemKey, category, title, content,
       content_sha256: sha, status: "PROPOSED", source_evidence: evidence, revision: 1,
@@ -139,10 +142,12 @@ export class LearnPipeline {
     const content = issues.length === 0
       ? `Gate '${gr.gate_name.trim()}' reported failure by checker '${gr.checker_id.trim()}' (evidence ${gr.evidence_hash.trim()}).`
       : issues.slice(0, 6).map((iss) => `[${iss.rule_id.trim()}] ${iss.message.trim()}`).join("; ");
+    const rawTs = gr.timestamp >= 1_000_000_000_000 ? Math.floor(gr.timestamp / 1000) : Math.floor(gr.timestamp);
+    const normalizedTs = Number.isSafeInteger(rawTs) ? Math.max(1, rawTs) : nowUnixSeconds();
     return this.proposeCardScoped({
       tenant_id: tenantId, project_id: projectId, id, idempotency_key: idempotencyKey, category: "ANTI_PATTERN",
       title: Array.from(`Gate failure remediation: ${gr.gate_name.trim()}`).slice(0, 120).join(""),
-      content, source_evidence: `gate:${gr.gate_name.trim()}:${gr.evidence_hash.trim()}`, created_at: gr.timestamp,
+      content, source_evidence: `gate:${gr.gate_name.trim()}:${gr.evidence_hash.trim()}`, created_at: normalizedTs,
     });
   }
 
@@ -192,7 +197,8 @@ export class LearnPipeline {
 
   public renderPromptFencedCards(tenantId: string, projectId: string, maxTokens = MAX_LEARN_PROMPT_TOKENS): PromptInjectionResult {
     const [tid, pid] = [tenantId.trim(), projectId.trim()];
-    const limit = Math.min(Math.max(0, maxTokens), MAX_LEARN_PROMPT_TOKENS);
+    const safeMax = Number.isFinite(maxTokens) ? maxTokens : MAX_LEARN_PROMPT_TOKENS;
+    const limit = Math.min(Math.max(0, Math.floor(safeMax)), MAX_LEARN_PROMPT_TOKENS);
     const eligible = this.getState().cards.filter((c) => c.status === "ACCEPTED" && c.tenant_id === tid && c.project_id === pid)
       .sort((a, b) => (a.created_at !== b.created_at ? (a.created_at < b.created_at ? -1 : 1) : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     const cardIds: string[] = [];

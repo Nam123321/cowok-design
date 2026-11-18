@@ -86,7 +86,14 @@ export class HumanSessionAuthority {
     const actorKind = ActorKindSchema.parse(req.actor_kind);
     if (actorKind !== "HUMAN_WORKBENCH_SESSION") throw new LearnError("UnauthorizedApprover", "Only HUMAN_WORKBENCH_SESSION may mint approval tokens");
     const action = CardDecisionActionSchema.parse(req.action);
-    const [aid, tid, pid, cid, sha, rs, n] = [req.actor_id, req.tenant_id, req.project_id, req.card_id, req.content_sha256, req.reason, req.nonce].map((s) => s.trim());
+    const [aid, tid, pid, cid, n] = [
+      validateScopeSegment("actor_id", req.actor_id),
+      validateScopeSegment("tenant_id", req.tenant_id),
+      validateScopeSegment("project_id", req.project_id),
+      validateScopeSegment("card_id", req.card_id),
+      validateScopeSegment("nonce", req.nonce),
+    ];
+    const [sha, rs] = [req.content_sha256.trim(), req.reason.trim()];
     const validTiming =
       Number.isSafeInteger(req.expected_revision) && req.expected_revision >= 1 &&
       Number.isSafeInteger(req.now_s) && req.now_s > 0 &&

@@ -212,8 +212,10 @@ pub fn record_gate_report_tx(
     hasher.update(canonical.as_bytes());
     let evidence_hash = format!("{:x}", hasher.finalize());
     conn.execute(
-        "INSERT INTO gate_reports (id, project_id, gate_name, passed, checker_id, evidence_hash, timestamp)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO gate_reports (
+            id, project_id, gate_name, passed, checker_id, evidence_hash, timestamp,
+            tenant_id, correlation_id, target_id, action, revision, fencing_token, reason_code
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
         params![
             id,
             input.project_id,
@@ -221,7 +223,14 @@ pub fn record_gate_report_tx(
             if input.passed { 1 } else { 0 },
             input.checker_id,
             evidence_hash,
-            now_ms
+            now_ms,
+            input.tenant_id,
+            input.correlation_id,
+            input.target_id,
+            input.action,
+            i64::try_from(input.revision).unwrap_or(i64::MAX),
+            input.fencing_token,
+            input.reason_code,
         ],
     )
     .map_err(|e| map_sqlite_error(e, "insert_gate_report"))?;
@@ -355,6 +364,31 @@ fn demote_conflicting_active_plugins_tx(
     active_plugin_id: &str,
     updated_at: i64,
 ) -> Result<(), HarnessError> {
+    let demoted: Vec<(String, u64)> = {
+        let mut stmt = tx
+            .prepare(
+                "SELECT id, revision FROM skill_plugins
+                 WHERE tenant_id = ?1 AND project_id = ?2 AND plugin_slug = ?3
+                   AND id != ?4 AND lifecycle_state = 'ACTIVE'",
+            )
+            .map_err(|e| map_sqlite_error(e, "prepare_list_conflicting_active_plugins"))?;
+        let rows = stmt
+            .query_map(
+                params![tenant_id, project_id, plugin_slug, active_plugin_id],
+                |r| {
+                    Ok((
+                        r.get::<_, String>(0)?,
+                        u64::try_from(r.get::<_, i64>(1)?.max(1)).unwrap_or(1),
+                    ))
+                },
+            )
+            .map_err(|e| map_sqlite_error(e, "list_conflicting_active_plugins"))?;
+        let mut items = Vec::new();
+        for item in rows {
+            items.push(item.map_err(|e| map_sqlite_error(e, "read_conflicting_active_plugin"))?);
+        }
+        items
+    };
     tx.execute(
         "UPDATE skill_plugins
          SET lifecycle_state = 'DEPRECATED',
@@ -376,8 +410,24 @@ fn demote_conflicting_active_plugins_tx(
             active_plugin_id,
         ],
     )
-    .map(|_| ())
-    .map_err(|e| map_sqlite_error(e, "demote_prior_active_plugin"))
+    .map_err(|e| map_sqlite_error(e, "demote_prior_active_plugin"))?;
+    for (demoted_id, prev_rev) in demoted {
+        let audit = AuditReceiptInput {
+            tenant_id,
+            project_id,
+            correlation_id: active_plugin_id,
+            gate_name: "plugin_demote_conflict",
+            passed: true,
+            checker_id: "spec-registry",
+            target_id: &demoted_id,
+            action: "DEPRECATED",
+            revision: prev_rev + 1,
+            fencing_token: 0,
+            reason_code: "SUPERSEDED_BY_ACTIVE_PROMOTION",
+        };
+        record_gate_report_tx(tx, &audit)?;
+    }
+    Ok(())
 }
 
 pub fn upsert_plugin_record(
@@ -397,72 +447,188 @@ pub fn upsert_plugin_record(
                 row.updated_at,
             )?;
         }
-        tx.execute(
-            "INSERT INTO skill_plugins (
-                id, tenant_id, project_id, plugin_slug, version, lifecycle_state, source_type,
-                source_repo_url, upstream_repo_url, upstream_commit_sha, cron_schedule,
-                skill_md_path, plugin_json_path, manifest_json, last_synced_at, revision,
-                staging_version, staging_manifest_json, staging_diff_reasons_json,
-                staging_bundle_dir, staging_package_sha256, breaking_change_isolated,
-                quarantined, quarantine_reason, updated_at
-             ) VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7,
-                ?8, ?9, ?10, ?11,
-                ?12, ?13, ?14, ?15, ?16,
-                ?17, ?18, ?19,
-                ?20, ?21, ?22,
-                ?23, ?24, ?25
-             )
-             ON CONFLICT(id) DO UPDATE SET
-                lifecycle_state = excluded.lifecycle_state,
-                source_type = excluded.source_type,
-                source_repo_url = excluded.source_repo_url,
-                upstream_repo_url = excluded.upstream_repo_url,
-                upstream_commit_sha = excluded.upstream_commit_sha,
-                cron_schedule = excluded.cron_schedule,
-                skill_md_path = excluded.skill_md_path,
-                plugin_json_path = excluded.plugin_json_path,
-                manifest_json = excluded.manifest_json,
-                last_synced_at = excluded.last_synced_at,
-                revision = excluded.revision,
-                staging_version = excluded.staging_version,
-                staging_manifest_json = excluded.staging_manifest_json,
-                staging_diff_reasons_json = excluded.staging_diff_reasons_json,
-                staging_bundle_dir = excluded.staging_bundle_dir,
-                staging_package_sha256 = excluded.staging_package_sha256,
-                breaking_change_isolated = excluded.breaking_change_isolated,
-                quarantined = excluded.quarantined,
-                quarantine_reason = excluded.quarantine_reason,
-                updated_at = excluded.updated_at",
-            params![
-                row.id,
-                row.tenant_id,
-                row.project_id,
-                row.plugin_slug,
-                row.version,
-                row.lifecycle_state,
-                row.source_type,
-                row.source_repo_url,
-                row.upstream_repo_url,
-                row.upstream_commit_sha,
-                row.cron_schedule,
-                row.skill_md_path,
-                row.plugin_json_path,
-                row.manifest_json,
-                row.last_synced_at,
-                i64::try_from(row.revision.max(1)).unwrap_or(i64::MAX),
-                row.staging_version,
-                row.staging_manifest_json,
-                row.staging_diff_reasons_json,
-                row.staging_bundle_dir,
-                row.staging_package_sha256,
-                if row.breaking_change_isolated { 1 } else { 0 },
-                if row.quarantined { 1 } else { 0 },
-                row.quarantine_reason,
+        let affected = tx
+            .execute(
+                "INSERT INTO skill_plugins (
+                    id, tenant_id, project_id, plugin_slug, version, lifecycle_state, source_type,
+                    source_repo_url, upstream_repo_url, upstream_commit_sha, cron_schedule,
+                    skill_md_path, plugin_json_path, manifest_json, last_synced_at, revision,
+                    staging_version, staging_manifest_json, staging_diff_reasons_json,
+                    staging_bundle_dir, staging_package_sha256, breaking_change_isolated,
+                    quarantined, quarantine_reason, updated_at
+                 ) VALUES (
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7,
+                    ?8, ?9, ?10, ?11,
+                    ?12, ?13, ?14, ?15, ?16,
+                    ?17, ?18, ?19,
+                    ?20, ?21, ?22,
+                    ?23, ?24, ?25
+                 )
+                 ON CONFLICT(id) DO UPDATE SET
+                    lifecycle_state = excluded.lifecycle_state,
+                    source_type = excluded.source_type,
+                    source_repo_url = excluded.source_repo_url,
+                    upstream_repo_url = excluded.upstream_repo_url,
+                    upstream_commit_sha = excluded.upstream_commit_sha,
+                    cron_schedule = excluded.cron_schedule,
+                    skill_md_path = excluded.skill_md_path,
+                    plugin_json_path = excluded.plugin_json_path,
+                    manifest_json = excluded.manifest_json,
+                    last_synced_at = excluded.last_synced_at,
+                    revision = excluded.revision,
+                    staging_version = excluded.staging_version,
+                    staging_manifest_json = excluded.staging_manifest_json,
+                    staging_diff_reasons_json = excluded.staging_diff_reasons_json,
+                    staging_bundle_dir = excluded.staging_bundle_dir,
+                    staging_package_sha256 = excluded.staging_package_sha256,
+                    breaking_change_isolated = excluded.breaking_change_isolated,
+                    quarantined = excluded.quarantined,
+                    quarantine_reason = excluded.quarantine_reason,
+                    updated_at = excluded.updated_at
+                 WHERE skill_plugins.tenant_id = excluded.tenant_id
+                   AND skill_plugins.project_id = excluded.project_id
+                   AND skill_plugins.lifecycle_state != 'ARCHIVED'
+                   AND skill_plugins.quarantined = 0",
+                params![
+                    row.id,
+                    row.tenant_id,
+                    row.project_id,
+                    row.plugin_slug,
+                    row.version,
+                    row.lifecycle_state,
+                    row.source_type,
+                    row.source_repo_url,
+                    row.upstream_repo_url,
+                    row.upstream_commit_sha,
+                    row.cron_schedule,
+                    row.skill_md_path,
+                    row.plugin_json_path,
+                    row.manifest_json,
+                    row.last_synced_at,
+                    i64::try_from(row.revision.max(1)).unwrap_or(i64::MAX),
+                    row.staging_version,
+                    row.staging_manifest_json,
+                    row.staging_diff_reasons_json,
+                    row.staging_bundle_dir,
+                    row.staging_package_sha256,
+                    if row.breaking_change_isolated { 1 } else { 0 },
+                    if row.quarantined { 1 } else { 0 },
+                    row.quarantine_reason,
+                    row.updated_at,
+                ],
+            )
+            .map_err(|e| map_sqlite_error(e, "upsert_skill_plugin"))?;
+        if affected == 0 {
+            return Err(HarnessError::ValidationFailed {
+                reason: "PLUGIN_RESURRECTION_OR_QUARANTINE_BLOCKED: cannot overwrite ARCHIVED, quarantined, or cross-scope plugin via upsert".to_string(),
+            });
+        }
+        if let Some(a) = audit {
+            record_gate_report_tx(tx, a)?;
+        }
+        Ok(row.clone())
+    })
+}
+
+/// Idempotently materializes a plugin row only if absent (never overwrites existing state/revision).
+pub fn insert_plugin_if_absent(
+    pool: &SqlitePool,
+    row: &SkillPluginRow,
+    audit: Option<&AuditReceiptInput<'_>>,
+) -> Result<SkillPluginRow, HarnessError> {
+    run_immediate_tx(pool, "insert_plugin_if_absent", |tx| {
+        verify_project_scope(tx, &row.tenant_id, &row.project_id)?;
+        let existing_sql = format!(
+            "SELECT {SELECT_SKILL_PLUGIN_COLS} FROM skill_plugins sp
+             WHERE sp.tenant_id = ?1 AND sp.project_id = ?2 AND (sp.id = ?3 OR sp.plugin_slug = ?4)
+             LIMIT 1"
+        );
+        if let Some(existing) = tx
+            .query_row(
+                &existing_sql,
+                params![row.tenant_id, row.project_id, row.id, row.plugin_slug],
+                map_skill_plugin_row,
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "insert_plugin_if_absent_lookup"))?
+        {
+            return Ok(existing);
+        }
+
+        if row.lifecycle_state == "ACTIVE" {
+            demote_conflicting_active_plugins_tx(
+                tx,
+                &row.tenant_id,
+                &row.project_id,
+                &row.plugin_slug,
+                &row.id,
                 row.updated_at,
-            ],
-        )
-        .map_err(|e| map_sqlite_error(e, "upsert_skill_plugin"))?;
+            )?;
+        }
+        let affected = tx
+            .execute(
+                "INSERT INTO skill_plugins (
+                    id, tenant_id, project_id, plugin_slug, version, lifecycle_state, source_type,
+                    source_repo_url, upstream_repo_url, upstream_commit_sha, cron_schedule,
+                    skill_md_path, plugin_json_path, manifest_json, last_synced_at, revision,
+                    staging_version, staging_manifest_json, staging_diff_reasons_json,
+                    staging_bundle_dir, staging_package_sha256, breaking_change_isolated,
+                    quarantined, quarantine_reason, updated_at
+                 ) VALUES (
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7,
+                    ?8, ?9, ?10, ?11,
+                    ?12, ?13, ?14, ?15, ?16,
+                    ?17, ?18, ?19,
+                    ?20, ?21, ?22,
+                    ?23, ?24, ?25
+                 )
+                 ON CONFLICT(id) DO NOTHING",
+                params![
+                    row.id,
+                    row.tenant_id,
+                    row.project_id,
+                    row.plugin_slug,
+                    row.version,
+                    row.lifecycle_state,
+                    row.source_type,
+                    row.source_repo_url,
+                    row.upstream_repo_url,
+                    row.upstream_commit_sha,
+                    row.cron_schedule,
+                    row.skill_md_path,
+                    row.plugin_json_path,
+                    row.manifest_json,
+                    row.last_synced_at,
+                    i64::try_from(row.revision.max(1)).unwrap_or(i64::MAX),
+                    row.staging_version,
+                    row.staging_manifest_json,
+                    row.staging_diff_reasons_json,
+                    row.staging_bundle_dir,
+                    row.staging_package_sha256,
+                    if row.breaking_change_isolated { 1 } else { 0 },
+                    if row.quarantined { 1 } else { 0 },
+                    row.quarantine_reason,
+                    row.updated_at,
+                ],
+            )
+            .map_err(|e| map_sqlite_error(e, "insert_plugin_if_absent"))?;
+        if affected == 0 {
+            let scoped_sql = format!(
+                "SELECT {SELECT_SKILL_PLUGIN_COLS} FROM skill_plugins sp
+                 WHERE sp.id = ?1 AND sp.tenant_id = ?2 AND sp.project_id = ?3"
+            );
+            return tx
+                .query_row(
+                    &scoped_sql,
+                    params![row.id, row.tenant_id, row.project_id],
+                    map_skill_plugin_row,
+                )
+                .optional()
+                .map_err(|e| map_sqlite_error(e, "insert_plugin_if_absent_reread"))?
+                .ok_or_else(|| HarnessError::ValidationFailed {
+                    reason: "PLUGIN_RESURRECTION_OR_QUARANTINE_BLOCKED: plugin id belongs to a different tenant or project".to_string(),
+                });
+        }
         if let Some(a) = audit {
             record_gate_report_tx(tx, a)?;
         }
@@ -564,6 +730,23 @@ pub fn update_plugin_cas(
             }));
         }
 
+        if !next.breaking_change_isolated && next.staging_manifest_json.is_none() {
+            tx.execute(
+                "UPDATE plugin_cron_schedules
+                 SET sync_status = 'IDLE',
+                     consecutive_failures = 0,
+                     next_retry_at = NULL,
+                     last_error_code = NULL,
+                     last_error_message = NULL,
+                     updated_at = ?1
+                 WHERE tenant_id = ?2 AND project_id = ?3 AND plugin_id = ?4
+                   AND sync_status = 'FAILED'
+                   AND last_error_code = 'PendingStagingMustBeResolved'",
+                params![next.updated_at, next.tenant_id, next.project_id, next.id],
+            )
+            .map_err(|e| map_sqlite_error(e, "reset_cron_after_staging_resolution"))?;
+        }
+
         if let Some(a) = audit {
             record_gate_report_tx(tx, a)?;
         }
@@ -632,7 +815,7 @@ pub fn list_consumed_nonces_scoped(
         .prepare(
             "SELECT tenant_id, project_id, nonce, expires_at_s, consumed_at
              FROM learn_consumed_nonces
-             WHERE tenant_id = ?1 AND project_id = ?2 AND expires_at_s > ?3
+             WHERE tenant_id = ?1 AND project_id = ?2 AND expires_at_s >= ?3
              ORDER BY consumed_at ASC, nonce ASC",
         )
         .map_err(|e| map_sqlite_error(e, "prepare_list_nonces"))?;
@@ -685,6 +868,20 @@ pub fn insert_learn_card_tx(
             }
         }
 
+        let scope_count: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) FROM knowledge_cards WHERE tenant_id = ?1 AND project_id = ?2",
+                params![card.tenant_id, card.project_id],
+                |r| r.get(0),
+            )
+            .map_err(|e| map_sqlite_error(e, "count_scope_learn_cards"))?;
+        if scope_count >= 1_000 {
+            return Err(HarnessError::ValidationFailed {
+                reason: "LEARN_SCOPE_CAPACITY_EXCEEDED: scope reached max 1000 knowledge cards"
+                    .to_string(),
+            });
+        }
+
         tx.execute(
             "INSERT INTO knowledge_cards (
                 id, tenant_id, project_id, idempotency_key, category, title, content,
@@ -725,12 +922,23 @@ pub fn commit_learn_card_decision(
     nonce_record: &ConsumedNonceRow,
     audit: Option<&AuditReceiptInput<'_>>,
 ) -> Result<Result<KnowledgeCardRow, CasFailure>, HarnessError> {
+    commit_learn_card_decision_with_evidence(pool, expected_revision, updated, nonce_record, audit)
+        .map(|res| res.map(|(card, _)| card))
+}
+
+pub fn commit_learn_card_decision_with_evidence(
+    pool: &SqlitePool,
+    expected_revision: u64,
+    updated: &KnowledgeCardRow,
+    nonce_record: &ConsumedNonceRow,
+    audit: Option<&AuditReceiptInput<'_>>,
+) -> Result<Result<(KnowledgeCardRow, Option<String>), CasFailure>, HarnessError> {
     run_immediate_tx(pool, "commit_learn_card_decision", |tx| {
         verify_project_scope(tx, &updated.tenant_id, &updated.project_id)?;
 
         tx.execute(
             "DELETE FROM learn_consumed_nonces
-             WHERE tenant_id = ?1 AND project_id = ?2 AND expires_at_s <= ?3",
+             WHERE tenant_id = ?1 AND project_id = ?2 AND expires_at_s < ?3",
             params![
                 nonce_record.tenant_id,
                 nonce_record.project_id,
@@ -814,10 +1022,12 @@ pub fn commit_learn_card_decision(
         )
         .map_err(|e| map_sqlite_error(e, "insert_consumed_nonce"))?;
 
-        if let Some(a) = audit {
-            record_gate_report_tx(tx, a)?;
-        }
-        Ok(Ok(updated.clone()))
+        let evidence_hash = if let Some(a) = audit {
+            Some(record_gate_report_tx(tx, a)?)
+        } else {
+            None
+        };
+        Ok(Ok((updated.clone(), evidence_hash)))
     })
 }
 
@@ -883,6 +1093,32 @@ pub fn list_all_cron_schedules(
     let mut out = Vec::new();
     for item in rows {
         out.push(item.map_err(|e| map_sqlite_error(e, "read_cron_schedule"))?);
+    }
+    Ok(out)
+}
+
+/// Lists cron schedules whose owning `skill_plugins` row is neither quarantined nor ARCHIVED.
+pub fn list_active_cron_schedules(
+    conn: &Connection,
+) -> Result<Vec<PluginCronScheduleRow>, HarnessError> {
+    let sql = "SELECT s.id, s.tenant_id, s.project_id, s.plugin_id, s.cron_expression, \
+        s.upstream_repo_url, s.last_etag, s.last_commit_sha, s.lease_owner, s.fencing_token, \
+        s.stale_after_timestamp, s.consecutive_failures, s.next_retry_at, s.sync_status, \
+        s.last_error_code, s.last_error_message, s.updated_at \
+        FROM plugin_cron_schedules s \
+        INNER JOIN skill_plugins sp \
+          ON sp.id = s.plugin_id AND sp.tenant_id = s.tenant_id AND sp.project_id = s.project_id \
+        WHERE sp.quarantined = 0 AND sp.lifecycle_state != 'ARCHIVED' \
+        ORDER BY s.updated_at ASC, s.id ASC";
+    let mut stmt = conn
+        .prepare(sql)
+        .map_err(|e| map_sqlite_error(e, "prepare_list_active_cron_schedules"))?;
+    let rows = stmt
+        .query_map([], map_cron_schedule_row)
+        .map_err(|e| map_sqlite_error(e, "query_list_active_cron_schedules"))?;
+    let mut out = Vec::new();
+    for item in rows {
+        out.push(item.map_err(|e| map_sqlite_error(e, "read_active_cron_schedule"))?);
     }
     Ok(out)
 }
@@ -991,7 +1227,15 @@ pub fn claim_cron_lease(
                      stale_after_timestamp = ?2,
                      updated_at = ?3
                  WHERE tenant_id = ?4 AND project_id = ?5 AND plugin_id = ?6
-                   AND sync_status != 'RUNNING'",
+                   AND sync_status != 'RUNNING'
+                   AND EXISTS (
+                       SELECT 1 FROM skill_plugins sp
+                       WHERE sp.id = plugin_cron_schedules.plugin_id
+                         AND sp.tenant_id = plugin_cron_schedules.tenant_id
+                         AND sp.project_id = plugin_cron_schedules.project_id
+                         AND sp.quarantined = 0
+                         AND sp.lifecycle_state != 'ARCHIVED'
+                   )",
                 params![
                     lease_owner,
                     stale_at,
@@ -1011,7 +1255,16 @@ pub fn claim_cron_lease(
                      updated_at = ?3
                  WHERE tenant_id = ?4 AND project_id = ?5 AND plugin_id = ?6
                    AND sync_status NOT IN ('RUNNING', 'AUTH_REQUIRED', 'FAILED')
-                   AND (next_retry_at IS NULL OR next_retry_at <= ?3)",
+                   AND (next_retry_at IS NULL OR next_retry_at <= ?3)
+                   AND EXISTS (
+                       SELECT 1 FROM skill_plugins sp
+                       WHERE sp.id = plugin_cron_schedules.plugin_id
+                         AND sp.tenant_id = plugin_cron_schedules.tenant_id
+                         AND sp.project_id = plugin_cron_schedules.project_id
+                         AND sp.quarantined = 0
+                         AND sp.lifecycle_state != 'ARCHIVED'
+                         AND sp.breaking_change_isolated = 0
+                   )",
                 params![
                     lease_owner,
                     stale_at,
@@ -1044,6 +1297,8 @@ pub fn claim_cron_lease(
 
 pub fn refresh_cron_lease(
     pool: &SqlitePool,
+    tenant_id: &str,
+    project_id: &str,
     plugin_id: &str,
     fencing_token: i64,
     now_ms: i64,
@@ -1054,10 +1309,13 @@ pub fn refresh_cron_lease(
         .execute(
             "UPDATE plugin_cron_schedules
              SET stale_after_timestamp = ?1, updated_at = ?2
-             WHERE plugin_id = ?3 AND fencing_token = ?4 AND sync_status = 'RUNNING'",
+             WHERE tenant_id = ?3 AND project_id = ?4 AND plugin_id = ?5
+               AND fencing_token = ?6 AND sync_status = 'RUNNING'",
             params![
                 now_ms.saturating_add(lease_ttl_ms.max(1_000)),
                 now_ms,
+                tenant_id,
+                project_id,
                 plugin_id,
                 fencing_token
             ],
@@ -1091,16 +1349,24 @@ pub fn reap_stale_cron_leases(pool: &SqlitePool, now_ms: i64) -> Result<usize, H
     run_immediate_tx(pool, "reap_stale_cron_leases", |tx| {
         tx.execute(
             "UPDATE plugin_cron_schedules
-             SET sync_status = 'FAILED',
+             SET sync_status = CASE
+                     WHEN consecutive_failures + 1 >= ?2 THEN 'FAILED'
+                     ELSE 'BACKOFF'
+                 END,
                  fencing_token = fencing_token + 1,
                  lease_owner = NULL,
                  stale_after_timestamp = NULL,
+                 consecutive_failures = consecutive_failures + 1,
+                 next_retry_at = CASE
+                     WHEN consecutive_failures + 1 >= ?2 THEN NULL
+                     ELSE ?1 + ?3
+                 END,
                  last_error_code = 'LEASE_ORPHANED',
                  last_error_message = 'Cron sync lease expired or worker crashed; fence invalidated',
                  updated_at = ?1
              WHERE sync_status = 'RUNNING'
                AND (stale_after_timestamp IS NULL OR stale_after_timestamp < ?1)",
-            params![now_ms],
+            params![now_ms, MAX_CONSECUTIVE_CRON_FAILURES, DEFAULT_LEASE_TTL_MS],
         )
         .map_err(|e| map_sqlite_error(e, "reap_stale_cron_leases"))
     })
@@ -1122,11 +1388,18 @@ pub struct FencedCronCommit<'a> {
     pub updated_at: i64,
 }
 
-pub fn commit_cron_fenced(
+pub struct PluginCasUpdateSpec<'a> {
+    pub expected_revision: u64,
+    pub next: &'a SkillPluginRow,
+    pub audit: Option<&'a AuditReceiptInput<'a>>,
+}
+
+pub fn commit_cron_and_plugin_fenced(
     pool: &SqlitePool,
     commit: &FencedCronCommit<'_>,
+    plugin_update: Option<PluginCasUpdateSpec<'_>>,
 ) -> Result<bool, HarnessError> {
-    run_immediate_tx(pool, "commit_cron_fenced", |tx| {
+    run_immediate_tx(pool, "commit_cron_and_plugin_fenced", |tx| {
         let changed = tx
             .execute(
                 "UPDATE plugin_cron_schedules
@@ -1161,7 +1434,88 @@ pub fn commit_cron_fenced(
         if changed == 0 {
             return Ok(false);
         }
-        if commit.sync_status == "SUCCEEDED" {
+
+        if let Some(ref spec) = plugin_update {
+            verify_project_scope(tx, &spec.next.tenant_id, &spec.next.project_id)?;
+            let expected_rev_i64 = i64::try_from(spec.expected_revision.max(1)).unwrap_or(i64::MAX);
+            let next_rev_i64 = i64::try_from(spec.next.revision.max(1)).unwrap_or(i64::MAX);
+            if spec.next.lifecycle_state == "ACTIVE" {
+                demote_conflicting_active_plugins_tx(
+                    tx,
+                    &spec.next.tenant_id,
+                    &spec.next.project_id,
+                    &spec.next.plugin_slug,
+                    &spec.next.id,
+                    spec.next.updated_at,
+                )?;
+            }
+            let plugin_affected = tx
+                .execute(
+                    "UPDATE skill_plugins SET
+                        version = ?1,
+                        lifecycle_state = ?2,
+                        source_type = ?3,
+                        source_repo_url = ?4,
+                        upstream_repo_url = ?5,
+                        upstream_commit_sha = ?6,
+                        cron_schedule = ?7,
+                        skill_md_path = ?8,
+                        plugin_json_path = ?9,
+                        manifest_json = ?10,
+                        last_synced_at = ?11,
+                        revision = ?12,
+                        staging_version = ?13,
+                        staging_manifest_json = ?14,
+                        staging_diff_reasons_json = ?15,
+                        staging_bundle_dir = ?16,
+                        staging_package_sha256 = ?17,
+                        breaking_change_isolated = ?18,
+                        quarantined = ?19,
+                        quarantine_reason = ?20,
+                        updated_at = ?21
+                     WHERE id = ?22 AND tenant_id = ?23 AND project_id = ?24 AND revision = ?25",
+                    params![
+                        spec.next.version,
+                        spec.next.lifecycle_state,
+                        spec.next.source_type,
+                        spec.next.source_repo_url,
+                        spec.next.upstream_repo_url,
+                        spec.next.upstream_commit_sha,
+                        spec.next.cron_schedule,
+                        spec.next.skill_md_path,
+                        spec.next.plugin_json_path,
+                        spec.next.manifest_json,
+                        spec.next.last_synced_at,
+                        next_rev_i64,
+                        spec.next.staging_version,
+                        spec.next.staging_manifest_json,
+                        spec.next.staging_diff_reasons_json,
+                        spec.next.staging_bundle_dir,
+                        spec.next.staging_package_sha256,
+                        if spec.next.breaking_change_isolated {
+                            1
+                        } else {
+                            0
+                        },
+                        if spec.next.quarantined { 1 } else { 0 },
+                        spec.next.quarantine_reason,
+                        spec.next.updated_at,
+                        spec.next.id,
+                        spec.next.tenant_id,
+                        spec.next.project_id,
+                        expected_rev_i64,
+                    ],
+                )
+                .map_err(|e| map_sqlite_error(e, "update_fenced_synced_plugin_cas"))?;
+            if plugin_affected == 0 {
+                return Err(HarnessError::ValidationFailed {
+                    reason: "CAS_CONFLICT_SYNCED_PLUGIN: concurrent plugin modification rolled back fenced cron commit".to_string(),
+                });
+            }
+            if let Some(a) = spec.audit {
+                record_gate_report_tx(tx, a)?;
+            }
+        } else if commit.sync_status == "SUCCEEDED" {
             tx.execute(
                 "UPDATE skill_plugins
                  SET upstream_commit_sha = COALESCE(?1, upstream_commit_sha),
@@ -1180,4 +1534,11 @@ pub fn commit_cron_fenced(
         }
         Ok(true)
     })
+}
+
+pub fn commit_cron_fenced(
+    pool: &SqlitePool,
+    commit: &FencedCronCommit<'_>,
+) -> Result<bool, HarnessError> {
+    commit_cron_and_plugin_fenced(pool, commit, None)
 }

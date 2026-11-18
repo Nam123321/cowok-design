@@ -743,6 +743,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "constraint-engine",
+ "croner",
  "domain",
  "flow-graph",
  "futures-util",
@@ -760,6 +761,7 @@ dependencies = [
  "tokio",
  "tokio-cron-scheduler",
  "tower",
+ "ts-rs",
  "uuid",
  "zeroize",
 ]

@@ -87,6 +87,22 @@ pub fn v9_migration_checksum() -> String {
     cached_migration_sha256(&CACHE, V9_MIGRATION_SQL)
 }
 
+pub const V10_MIGRATION_SQL: &str = include_str!("../migrations/V10__epic08_audit_remediation.sql");
+pub const V10_MIGRATION_NAME: &str = "V10__epic08_audit_remediation.sql";
+
+pub fn v10_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V10_MIGRATION_SQL)
+}
+
+pub const V11_MIGRATION_SQL: &str = include_str!("../migrations/V11__epic08_party_remediation.sql");
+pub const V11_MIGRATION_NAME: &str = "V11__epic08_party_remediation.sql";
+
+pub fn v11_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V11_MIGRATION_SQL)
+}
+
 /// Configuration for the embedded SQLite WAL connection pool.
 #[derive(Debug, Clone)]
 pub struct SqliteWalConfig {
@@ -342,6 +358,8 @@ impl SqlitePool {
             Self::apply_v7_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v8_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v9_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v10_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v11_migration_if_needed(&mut conn, &config.db_path)?;
         }
         harden_sqlite_files(&config.db_path)?;
 
@@ -797,25 +815,82 @@ impl SqlitePool {
         )
     }
 
+    fn apply_v11_columns(tx: &Connection) -> Result<(), HarnessError> {
+        Self::ensure_columns_idempotent(
+            tx,
+            "gate_reports",
+            &[
+                ("tenant_id", "TEXT NOT NULL DEFAULT 'local-default'"),
+                ("correlation_id", "TEXT NOT NULL DEFAULT ''"),
+                ("target_id", "TEXT NOT NULL DEFAULT ''"),
+                ("action", "TEXT NOT NULL DEFAULT ''"),
+                ("revision", "BIGINT NOT NULL DEFAULT 0"),
+                ("fencing_token", "BIGINT NOT NULL DEFAULT 0"),
+                ("reason_code", "TEXT NOT NULL DEFAULT ''"),
+            ][..],
+        )?;
+        Self::ensure_columns_idempotent(
+            tx,
+            "daemon_sessions",
+            &[("actor_kind", "TEXT NOT NULL DEFAULT 'AGENT_HMAC'")][..],
+        )
+    }
+
     fn cached_genesis_db_bytes(parent_dir: &Path) -> Result<&'static [u8], HarnessError> {
-        static GENESIS_BYTES: OnceLock<Result<Vec<u8>, String>> = OnceLock::new();
-        let res = GENESIS_BYTES.get_or_init(|| {
-            let mut mem_conn =
-                Connection::open_in_memory().map_err(|e| format!("open_genesis_memory: {e}"))?;
-            Self::apply_genesis_single_tx(&mut mem_conn).map_err(|e| format!("{e:?}"))?;
+        static GENESIS_BYTES: OnceLock<Vec<u8>> = OnceLock::new();
+        static GENESIS_INIT_LOCK: OnceLock<std::sync::Mutex<()>> = OnceLock::new();
+        if let Some(cached) = GENESIS_BYTES.get() {
+            return Ok(cached.as_slice());
+        }
+        let _init_guard = GENESIS_INIT_LOCK
+            .get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .map_err(|_| HarnessError::ValidationFailed {
+                reason: "GENESIS_LOCK_POISONED".to_string(),
+            })?;
+        if let Some(cached) = GENESIS_BYTES.get() {
+            return Ok(cached.as_slice());
+        }
+        let built = (|| -> Result<Vec<u8>, HarnessError> {
+            let mut mem_conn = Connection::open_in_memory()
+                .map_err(|e| map_sqlite_error(e, "open_genesis_memory"))?;
+            Self::apply_genesis_single_tx(&mut mem_conn)?;
             let tmp_path = parent_dir.join(format!(".genesis-tpl-{}.tmp", uuid::Uuid::new_v4()));
             let _ = fs::remove_file(&tmp_path);
             let target_str = tmp_path.to_string_lossy().into_owned();
             let vac_res = mem_conn.execute("VACUUM INTO ?1;", params![target_str]);
-            let bytes = vac_res
-                .map_err(|e| format!("vacuum_genesis: {e}"))
-                .and_then(|_| fs::read(&tmp_path).map_err(|e| format!("read_genesis: {e}")));
+            let read_res = vac_res
+                .map_err(|e| map_sqlite_error(e, "vacuum_genesis"))
+                .and_then(|_| {
+                    use std::io::Read;
+                    let mut opts = OpenOptions::new();
+                    opts.read(true);
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::OpenOptionsExt;
+                        opts.custom_flags(libc::O_NOFOLLOW);
+                    }
+                    let mut f =
+                        opts.open(&tmp_path)
+                            .map_err(|e| HarnessError::ValidationFailed {
+                                reason: format!("GENESIS_READ_FAILED: {e}"),
+                            })?;
+                    let mut buf = Vec::new();
+                    f.read_to_end(&mut buf)
+                        .map_err(|e| HarnessError::ValidationFailed {
+                            reason: format!("GENESIS_READ_FAILED: {e}"),
+                        })?;
+                    Ok(buf)
+                });
             let _ = fs::remove_file(&tmp_path);
-            bytes
-        });
-        res.as_deref()
-            .map_err(|reason| HarnessError::ValidationFailed {
-                reason: reason.clone(),
+            read_res
+        })()?;
+        let _ = GENESIS_BYTES.set(built);
+        GENESIS_BYTES
+            .get()
+            .map(|v| v.as_slice())
+            .ok_or_else(|| HarnessError::ValidationFailed {
+                reason: "GENESIS_CACHE_INIT_FAILED".to_string(),
             })
     }
 
@@ -872,6 +947,11 @@ impl SqlitePool {
         Self::apply_v9_columns(&tx)?;
         tx.execute_batch(V9_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "genesis_v9"))?;
+        tx.execute_batch(V10_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v10"))?;
+        Self::apply_v11_columns(&tx)?;
+        tx.execute_batch(V11_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v11"))?;
 
         let now = Utc::now().timestamp_millis();
         for (version, name, sha) in [
@@ -882,6 +962,8 @@ impl SqlitePool {
             (7i64, V7_MIGRATION_NAME, v7_migration_checksum()),
             (8i64, V8_MIGRATION_NAME, v8_migration_checksum()),
             (9i64, V9_MIGRATION_NAME, v9_migration_checksum()),
+            (10i64, V10_MIGRATION_NAME, v10_migration_checksum()),
+            (11i64, V11_MIGRATION_NAME, v11_migration_checksum()),
         ] {
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
@@ -1277,6 +1359,177 @@ impl SqlitePool {
         Ok(())
     }
 
+    fn apply_v10_migration_if_needed(
+        conn: &mut Connection,
+        db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v10_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE name = ?1",
+                params![V10_MIGRATION_NAME],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v10_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V10]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+
+        let populated_rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM knowledge_cards", [], |r| r.get(0))
+            .unwrap_or(0);
+        if populated_rows > 0 {
+            Self::create_versioned_backup(conn, db_path, "v10")?;
+        }
+        if !conn.is_autocommit() {
+            return Err(HarnessError::ValidationFailed {
+                reason: "V10_MIGRATION_PRECONDITION_FAILED: connection must be in autocommit mode"
+                    .to_string(),
+            });
+        }
+        conn.execute_batch(
+            "PRAGMA foreign_keys = OFF;
+             PRAGMA legacy_alter_table = OFF;",
+        )
+        .map_err(|e| map_sqlite_error(e, "disable_fk_for_v10_rebuild"))?;
+        let fk_off: i64 = conn
+            .query_row("PRAGMA foreign_keys;", [], |r| r.get(0))
+            .map_err(|e| map_sqlite_error(e, "verify_fk_off_v10"))?;
+        if fk_off != 0 {
+            return Err(HarnessError::ValidationFailed {
+                reason: "V10_MIGRATION_PRECONDITION_FAILED: PRAGMA foreign_keys remained ON"
+                    .to_string(),
+            });
+        }
+        let tx_res = (|| -> Result<(), HarnessError> {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Exclusive)
+                .map_err(|e| map_sqlite_error(e, "begin_exclusive_v10"))?;
+            tx.execute_batch(V10_MIGRATION_SQL)
+                .map_err(|e| map_sqlite_error(e, "execute_v10_sql"))?;
+            let fk_violation_count: usize = {
+                let mut stmt = tx
+                    .prepare("PRAGMA foreign_key_check;")
+                    .map_err(|e| map_sqlite_error(e, "prepare_fk_check_v10"))?;
+                let rows = stmt
+                    .query_map([], |r| r.get::<_, String>(0))
+                    .map_err(|e| map_sqlite_error(e, "run_fk_check_v10"))?;
+                rows.count()
+            };
+            if fk_violation_count > 0 {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "V10_MIGRATION_FK_CHECK_FAILED: {fk_violation_count} foreign key violation(s)"
+                    ),
+                });
+            }
+            let max_version: i64 = tx
+                .query_row(
+                    "SELECT COALESCE(MAX(version), 9) FROM schema_migrations",
+                    [],
+                    |r| r.get(0),
+                )
+                .map_err(|e| map_sqlite_error(e, "max_schema_version_v10"))?;
+            let assigned_version = (max_version + 1).max(10);
+            tx.execute(
+                "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+                 VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    assigned_version,
+                    V10_MIGRATION_NAME,
+                    expected_sha,
+                    Utc::now().timestamp_millis()
+                ],
+            )
+            .map_err(|e| map_sqlite_error(e, "insert_v10_schema_migration"))?;
+            tx.commit()
+                .map_err(|e| map_sqlite_error(e, "commit_v10_migration"))?;
+            Ok(())
+        })();
+        let restore_res = conn.execute_batch("PRAGMA foreign_keys = ON;");
+        tx_res?;
+        restore_res.map_err(|e| map_sqlite_error(e, "restore_fk_on_v10"))?;
+        let fk_on: i64 = conn
+            .query_row("PRAGMA foreign_keys;", [], |r| r.get(0))
+            .map_err(|e| map_sqlite_error(e, "verify_fk_on_v10"))?;
+        if fk_on != 1 {
+            return Err(HarnessError::ValidationFailed {
+                reason:
+                    "V10_MIGRATION_POSTCONDITION_FAILED: PRAGMA foreign_keys did not restore to 1"
+                        .to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    fn apply_v11_migration_if_needed(
+        conn: &mut Connection,
+        db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v11_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE name = ?1",
+                params![V11_MIGRATION_NAME],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v11_migration_ledger"))?;
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V11]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+        let populated_rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM knowledge_cards", [], |r| r.get(0))
+            .unwrap_or(0);
+        if populated_rows > 0 {
+            Self::create_versioned_backup(conn, db_path, "v11")?;
+        }
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v11"))?;
+        Self::apply_v11_columns(&tx)?;
+        tx.execute_batch(V11_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v11_sql"))?;
+        let max_version: i64 = tx
+            .query_row(
+                "SELECT COALESCE(MAX(version), 10) FROM schema_migrations",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(|e| map_sqlite_error(e, "max_schema_version_v11"))?;
+        let assigned_version = (max_version + 1).max(11);
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![
+                assigned_version,
+                V11_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
+        )
+        .map_err(|e| map_sqlite_error(e, "insert_v11_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v11_migration"))?;
+        Ok(())
+    }
+
     fn compute_screen_artifacts_digest(conn: &Connection) -> Result<(usize, String), HarnessError> {
         let mut stmt = conn
             .prepare(
@@ -1317,16 +1570,19 @@ impl SqlitePool {
         db_path: &Path,
         version_tag: &str,
     ) -> Result<(), HarnessError> {
-        let _ = conn.execute_batch("PRAGMA wal_checkpoint(PASSIVE);");
+        let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
         let ts = Utc::now().timestamp_millis();
         let bak_path = PathBuf::from(format!("{}.pre-{version_tag}.{ts}.bak", db_path.display()));
-        fs::copy(db_path, &bak_path).map_err(|e| HarnessError::ValidationFailed {
-            reason: format!(
-                "{}_BACKUP_FAILED [{}]: {e}",
-                version_tag.to_uppercase(),
-                bak_path.display()
-            ),
-        })?;
+        let bak_str = bak_path.to_string_lossy().into_owned();
+        conn.execute("VACUUM INTO ?1;", params![bak_str])
+            .or_else(|_| fs::copy(db_path, &bak_path).map(|_| 0))
+            .map_err(|e| HarnessError::ValidationFailed {
+                reason: format!(
+                    "{}_BACKUP_FAILED [{}]: {e}",
+                    version_tag.to_uppercase(),
+                    bak_path.display()
+                ),
+            })?;
         enforce_unix_mode(&bak_path, 0o600)?;
 
         // Retain at most the 2 newest .pre-<tag>.*.bak files
@@ -1392,12 +1648,28 @@ impl SqlitePool {
         #[cfg(unix)]
         let conn = {
             use std::os::unix::fs::OpenOptionsExt;
-            let _ = OpenOptions::new()
+            let _f = OpenOptions::new()
                 .read(true)
                 .write(true)
                 .create(true)
                 .mode(0o600)
-                .open(&config.db_path);
+                .custom_flags(libc::O_NOFOLLOW)
+                .open(&config.db_path)
+                .map_err(|e| {
+                    if e.raw_os_error() == Some(libc::ELOOP) {
+                        HarnessError::PathTraversalDenied {
+                            path: config.db_path.display().to_string(),
+                        }
+                    } else {
+                        map_sqlite_error(
+                            rusqlite::Error::SqliteFailure(
+                                rusqlite::ffi::Error::new(libc::EIO),
+                                Some(e.to_string()),
+                            ),
+                            "open_connection_nofollow",
+                        )
+                    }
+                })?;
             Connection::open(&config.db_path).map_err(|e| map_sqlite_error(e, "open_connection"))?
         };
         #[cfg(not(unix))]

@@ -1141,31 +1141,19 @@ pub async fn handle_upsert_vault_key(
         ));
     }
 
-    let safe_cred = sanitize_credential_ref(&api_key_trimmed);
-    let vault_ref = if matches!(vault_mode.as_str(), "keychain" | "vault_0600") {
-        let store_clone = store.clone();
-        let pid_clone = provider_id.clone();
-        let key_clone = api_key_trimmed.clone();
-        tokio::task::spawn_blocking(move || store_clone.upsert_secret(&pid_clone, &key_clone, None))
-            .await
-            .map_err(|e| json_err(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_IO", e.to_string()))?
-            .map_err(|e| json_err(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_IO", e))?
-    } else if vault_mode == "ram_only" {
-        state
-            .ram_vault
-            .upsert(&principal.tenant_id, &provider_id, &api_key_trimmed);
-        format!("vault://ram_only/{provider_id}")
-    } else {
-        state.ram_vault.remove(&principal.tenant_id, &provider_id);
-        format!("vault://ephemeral/{provider_id}")
-    };
-    if vault_mode != "ram_only" {
-        state.ram_vault.remove(&principal.tenant_id, &provider_id);
-    }
-
     let pool = state.registry.pool().clone();
     let tenant_id_for_clear = principal.tenant_id.clone();
     let provider_id_for_clear = provider_id.clone();
+    let safe_cred = sanitize_credential_ref(&api_key_trimmed);
+    let expected_vault_ref = if matches!(vault_mode.as_str(), "keychain" | "vault_0600") {
+        format!("vault://vault_0600/{}/{}", principal.tenant_id, provider_id)
+    } else if vault_mode == "ram_only" {
+        format!("vault://ram_only/{provider_id}")
+    } else {
+        format!("vault://ephemeral/{provider_id}")
+    };
+
+    let vault_mode_db = vault_mode.clone();
     let saved = run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
         let now_ms = Utc::now().timestamp_millis();
@@ -1186,7 +1174,7 @@ pub async fn handle_upsert_vault_key(
                     "UPDATE agent_settings
                      SET credential_ref = ?1, vault_mode = ?2, status = 'configured', updated_at = ?3
                      WHERE id = ?4",
-                    params![safe_cred, vault_mode, now_ms, ex_id],
+                    params![safe_cred, vault_mode_db, now_ms, ex_id],
                 )?;
                 ex_id
             } else {
@@ -1196,7 +1184,7 @@ pub async fn handle_upsert_vault_key(
                         credential_ref, is_default, status, permission_mode, vault_mode,
                         onboarding_done, created_at, updated_at
                      ) VALUES (?1, ?2, NULL, ?3, ?3, '', ?4, 0, 'configured', 'ask-every-time', ?5, 1, ?6, ?6)",
-                    params![new_id, principal.tenant_id, provider_id, safe_cred, vault_mode, now_ms],
+                    params![new_id, principal.tenant_id, provider_id, safe_cred, vault_mode_db, now_ms],
                 )?;
                 new_id.clone()
             };
@@ -1212,7 +1200,7 @@ pub async fn handle_upsert_vault_key(
                         id: r.get(0)?,
                         provider_id: pid,
                         key_hint: r.get(2)?,
-                        vault_ref: vault_ref.clone(),
+                        vault_ref: expected_vault_ref.clone(),
                         vault_mode: vm,
                         status: r.get(4)?,
                         created_at: epoch_ms_to_iso(r.get(5)?),
@@ -1229,16 +1217,71 @@ pub async fn handle_upsert_vault_key(
     })
     .await?;
 
+    if matches!(vault_mode.as_str(), "keychain" | "vault_0600") {
+        let store_clone = store.clone();
+        let tid_clone = tenant_id_for_clear.clone();
+        let pid_clone = provider_id_for_clear.clone();
+        let key_clone = api_key_trimmed.clone();
+        if let Err(err) = tokio::task::spawn_blocking(move || {
+            store_clone.upsert_secret_scoped(&tid_clone, &pid_clone, &key_clone, None)
+        })
+        .await
+        .map_err(|e| json_err(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_IO", e.to_string()))?
+        {
+            let pool_rb = state.registry.pool().clone();
+            let row_id = saved.id.clone();
+            let _ = run_db(move || {
+                if let Ok(conn) = pool_rb.connection() {
+                    let _ = conn.execute(
+                        "UPDATE agent_settings SET credential_ref = '', status = 'unconfigured' WHERE id = ?1",
+                        params![row_id],
+                    );
+                }
+                Ok(())
+            })
+            .await;
+            return Err(json_err(StatusCode::INTERNAL_SERVER_ERROR, "VAULT_IO", err));
+        }
+        state
+            .ram_vault
+            .remove(&tenant_id_for_clear, &provider_id_for_clear);
+    } else if vault_mode == "ram_only" {
+        state.ram_vault.upsert(
+            &tenant_id_for_clear,
+            &provider_id_for_clear,
+            &api_key_trimmed,
+        );
+    } else {
+        state
+            .ram_vault
+            .remove(&tenant_id_for_clear, &provider_id_for_clear);
+    }
+
     if matches!(provider_id_for_clear.as_str(), "github" | "github_plugins") {
         let pool_clear = state.registry.pool().clone();
         let tid_clear = tenant_id_for_clear;
+        let sse_clear = state.sse_tx.clone();
         let _ = run_db(move || {
-            spec_registry::plugin_store::clear_auth_required_schedules_for_tenant(
+            let cleared = spec_registry::plugin_store::clear_auth_required_schedules_for_tenant(
                 &pool_clear,
                 &tid_clear,
                 Utc::now().timestamp_millis(),
             )
-            .map_err(|e| map_harness_resp(e, "clear_auth_required_schedules"))
+            .map_err(|e| map_harness_resp(e, "clear_auth_required_schedules"))?;
+            if cleared > 0 {
+                if let Ok(conn) = pool_clear.connection() {
+                    if let Ok(mut stmt) = conn.prepare(
+                        "SELECT DISTINCT project_id FROM plugin_cron_schedules WHERE tenant_id = ?1",
+                    ) {
+                        if let Ok(rows) = stmt.query_map(rusqlite::params![&tid_clear], |r| r.get::<_, String>(0)) {
+                            for pid in rows.flatten() {
+                                let _ = sse_clear.send(pid);
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(())
         })
         .await;
     }
@@ -1256,36 +1299,41 @@ pub async fn handle_delete_vault_key(
     let key_lookup = key_id.clone();
 
     let tenant_for_db = principal.tenant_id.clone();
-    let (cnt, matched_providers) = run_db(move || {
+    let (cnt, orphaned_providers) = run_db(move || {
         let mut conn = pool.connection().map_err(|e| map_harness_resp(e, "conn"))?;
-        let mut providers = Vec::new();
-        {
-            let mut stmt = conn
-                .prepare("SELECT provider_id FROM agent_settings WHERE tenant_id = ?1 AND (id = ?2 OR provider_id = ?2)")
-                .map_err(|e| map_harness_resp(map_sqlite_error(e, "lookup_vault_key"), "delete"))?;
-            let rows = stmt
-                .query_map(params![tenant_for_db, key_lookup], |r| {
-                    r.get::<_, String>(0)
-                })
-                .map_err(|e| map_harness_resp(map_sqlite_error(e, "lookup_vault_key"), "delete"))?;
-            for row_res in rows {
-                let p = row_res.map_err(|e| {
-                    map_harness_resp(map_sqlite_error(e, "lookup_vault_key_row"), "delete")
-                })?;
-                providers.push(p);
-            }
-        }
-        let cnt = retry_on_busy("delete_vault_key", || {
+        let now_ms = Utc::now().timestamp_millis();
+        let (cnt, orphaned) = retry_on_busy("delete_vault_key", || {
             let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            let mut providers = Vec::new();
+            {
+                let mut stmt = tx.prepare(
+                    "SELECT DISTINCT provider_id FROM agent_settings WHERE tenant_id = ?1 AND (id = ?2 OR provider_id = ?2)",
+                )?;
+                let rows = stmt.query_map(params![tenant_for_db, key_lookup], |r| r.get::<_, String>(0))?;
+                for row_res in rows {
+                    providers.push(row_res?);
+                }
+            }
             let c = tx.execute(
-                "UPDATE agent_settings SET credential_ref = '' WHERE tenant_id = ?1 AND (id = ?2 OR provider_id = ?2)",
-                params![tenant_for_db, key_lookup],
+                "UPDATE agent_settings SET credential_ref = '', status = 'unconfigured', updated_at = ?3 WHERE tenant_id = ?1 AND (id = ?2 OR provider_id = ?2)",
+                params![tenant_for_db, key_lookup, now_ms],
             )?;
+            let mut to_purge = Vec::new();
+            for pid in providers {
+                let remaining: i64 = tx.query_row(
+                    "SELECT COUNT(*) FROM agent_settings WHERE tenant_id = ?1 AND provider_id = ?2 AND credential_ref != ''",
+                    params![tenant_for_db, pid],
+                    |r| r.get(0),
+                )?;
+                if remaining == 0 {
+                    to_purge.push(pid);
+                }
+            }
             tx.commit()?;
-            Ok::<usize, rusqlite::Error>(c)
+            Ok::<(usize, Vec<String>), rusqlite::Error>((c, to_purge))
         })
         .map_err(|e| map_harness_resp(e, "delete_vault_key"))?;
-        Ok((cnt, providers))
+        Ok((cnt, orphaned))
     })
     .await?;
 
@@ -1297,13 +1345,14 @@ pub async fn handle_delete_vault_key(
         ));
     }
 
-    for pid in &matched_providers {
+    for pid in &orphaned_providers {
         state.ram_vault.remove(&principal.tenant_id, pid);
     }
     let store_clone = store.clone();
+    let tenant_for_vault = principal.tenant_id.clone();
     tokio::task::spawn_blocking(move || -> Result<(), String> {
-        for pid in matched_providers {
-            store_clone.delete_secret(&pid, None)?;
+        for pid in orphaned_providers {
+            store_clone.delete_secret_scoped(&tenant_for_vault, &pid, None)?;
         }
         Ok(())
     })

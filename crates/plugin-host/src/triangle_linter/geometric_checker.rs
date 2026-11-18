@@ -23,6 +23,111 @@ fn geo_issue(
     }
 }
 
+fn parse_hex_color(raw: &str) -> Option<(u8, u8, u8)> {
+    let hex = raw.trim().strip_prefix('#')?;
+    if hex.len() == 3 && hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        let mut chars = hex.chars();
+        let r = u8::from_str_radix(&chars.next()?.to_string().repeat(2), 16).ok()?;
+        let g = u8::from_str_radix(&chars.next()?.to_string().repeat(2), 16).ok()?;
+        let b = u8::from_str_radix(&chars.next()?.to_string().repeat(2), 16).ok()?;
+        return Some((r, g, b));
+    }
+    if hex.len() == 6 && hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+        let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+        let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+        return Some((r, g, b));
+    }
+    None
+}
+
+fn srgb_luminance(rgb: (u8, u8, u8)) -> f64 {
+    let lin = |c: u8| -> f64 {
+        let v = f64::from(c) / 255.0;
+        if v <= 0.03928 {
+            v / 12.92
+        } else {
+            ((v + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * lin(rgb.0) + 0.7152 * lin(rgb.1) + 0.0722 * lin(rgb.2)
+}
+
+fn wcag_contrast_ratio(fg: (u8, u8, u8), bg: (u8, u8, u8)) -> f64 {
+    let l1 = srgb_luminance(fg);
+    let l2 = srgb_luminance(bg);
+    let (hi, lo) = if l1 >= l2 { (l1, l2) } else { (l2, l1) };
+    (hi + 0.05) / (lo + 0.05)
+}
+
+fn extract_css_prop_value<'a>(lower: &'a str, prop: &str) -> Option<&'a str> {
+    let idx = lower.find(prop)?;
+    let after = &lower[idx + prop.len()..];
+    let colon_trimmed = after.trim_start();
+    let val = colon_trimmed.split([';', '"', '\'', ')']).next()?.trim();
+    Some(val)
+}
+
+fn extract_hex_after_prop(lower: &str, prop: &str) -> Option<(u8, u8, u8)> {
+    let val = extract_css_prop_value(lower, prop)?;
+    let hash_idx = val.find('#')?;
+    let hex_token: String = val[hash_idx..]
+        .chars()
+        .take_while(|c| *c == '#' || c.is_ascii_hexdigit())
+        .collect();
+    parse_hex_color(&hex_token)
+}
+
+fn has_off_grid_spacing_px(lower: &str) -> bool {
+    for prop in [
+        "padding:",
+        "padding-left:",
+        "padding-right:",
+        "padding-top:",
+        "padding-bottom:",
+        "margin:",
+        "margin-left:",
+        "margin-right:",
+        "margin-top:",
+        "margin-bottom:",
+        "gap:",
+    ] {
+        let mut search = lower;
+        while let Some(idx) = search.find(prop) {
+            search = &search[idx + prop.len()..];
+            let segment = search.split([';', '"', '\'']).next().unwrap_or("");
+            for tok in segment.split_whitespace() {
+                if let Some(num_str) = tok.strip_suffix("px") {
+                    if let Ok(px) = num_str.parse::<i32>() {
+                        if px > 2 && px % 4 != 0 {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+fn has_inflated_z_index(lower: &str) -> bool {
+    for prefix in ["z-index:", "z-["] {
+        if let Some(idx) = lower.find(prefix) {
+            let digits: String = lower[idx + prefix.len()..]
+                .trim_start()
+                .chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect();
+            if let Ok(z) = digits.parse::<i64>() {
+                if z > 9999 {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 fn check_line_layout_rules(lower: &str, line: &str, line_num: usize, issues: &mut Vec<LintIssue>) {
     if (lower.contains("border-radius") || lower.contains("rounded"))
         && lower.contains("padding")
@@ -84,10 +189,7 @@ fn check_line_layout_rules(lower: &str, line: &str, line_num: usize, issues: &mu
             true,
         ));
     }
-    if ["padding: 13px", "padding: 15px", "margin: 7px", "gap: 11px"]
-        .iter()
-        .any(|p| lower.contains(p))
-    {
+    if has_off_grid_spacing_px(lower) {
         issues.push(geo_issue(
             "RULE_GEO_06_SPACING_GRID_SCALE",
             LintIssueCategory::GeometricLayout,
@@ -158,10 +260,7 @@ fn check_line_layout_rules(lower: &str, line: &str, line_num: usize, issues: &mu
             false,
         ));
     }
-    if lower.contains("z-index: 99999")
-        || lower.contains("z-index: 999999")
-        || lower.contains("z-[99999]")
-    {
+    if has_inflated_z_index(lower) {
         issues.push(geo_issue(
             "RULE_GEO_14_Z_INDEX_INFLATION",
             LintIssueCategory::GeometricLayout,
@@ -202,13 +301,28 @@ fn check_line_layout_rules(lower: &str, line: &str, line_num: usize, issues: &mu
 }
 
 fn check_line_wcag_rules(lower: &str, line: &str, line_num: usize, issues: &mut Vec<LintIssue>) {
-    if (lower.contains("color: #999")
-        || lower.contains("color: #aaa")
-        || lower.contains("color: #bbb"))
-        && (lower.contains("background: #fff")
-            || lower.contains("background-color: #fff")
-            || lower.contains("bg-white"))
-    {
+    let fg_opt = if lower.contains("background-color:") {
+        extract_hex_after_prop(lower.trim_start_matches(|_| false), "color:")
+            .or_else(|| extract_hex_after_prop(lower, "; color:"))
+            .or_else(|| extract_hex_after_prop(lower, " color:"))
+    } else {
+        extract_hex_after_prop(lower, "color:")
+    };
+    let fg_actual = if lower.contains("background-color:") {
+        let cleaned = lower.replace("background-color:", "bgcol:");
+        extract_hex_after_prop(&cleaned, "color:")
+    } else {
+        fg_opt
+    };
+    let bg_opt = extract_hex_after_prop(lower, "background-color:")
+        .or_else(|| extract_hex_after_prop(lower, "background:"))
+        .or_else(|| lower.contains("bg-white").then_some((255, 255, 255)))
+        .or_else(|| lower.contains("bg-black").then_some((0, 0, 0)));
+    let low_contrast = match (fg_actual, bg_opt) {
+        (Some(fg), Some(bg)) => wcag_contrast_ratio(fg, bg) < 4.5,
+        _ => false,
+    };
+    if low_contrast {
         issues.push(geo_issue(
             "RULE_GEO_02_WCAG_CONTRAST_AA",
             LintIssueCategory::WcagContrast,
@@ -292,10 +406,7 @@ fn check_line_wcag_rules(lower: &str, line: &str, line_num: usize, issues: &mut 
             false,
         ));
     }
-    if lower.contains("tabindex=\"1\"")
-        || lower.contains("tabindex=\"2\"")
-        || lower.contains("tabindex=\"3\"")
-    {
+    if has_positive_tabindex(lower) {
         issues.push(geo_issue(
             "RULE_GEO_23_TAB_ORDER_INTEGRITY",
             LintIssueCategory::WcagContrast,
@@ -306,6 +417,30 @@ fn check_line_wcag_rules(lower: &str, line: &str, line_num: usize, issues: &mut 
             true,
         ));
     }
+}
+
+fn has_positive_tabindex(lower: &str) -> bool {
+    let mut cursor = lower;
+    while let Some(pos) = cursor.find("tabindex") {
+        let rest = cursor[pos + "tabindex".len()..].trim_start();
+        if let Some(after_eq) = rest.strip_prefix('=') {
+            let trimmed = after_eq.trim_start();
+            let val = if let Some(q) = trimmed.strip_prefix('"') {
+                q.split('"').next().unwrap_or("")
+            } else if let Some(q) = trimmed.strip_prefix('\'') {
+                q.split('\'').next().unwrap_or("")
+            } else {
+                trimmed.split_whitespace().next().unwrap_or("")
+            };
+            if let Ok(num) = val.trim().parse::<i32>() {
+                if num > 0 {
+                    return true;
+                }
+            }
+        }
+        cursor = &cursor[pos + "tabindex".len()..];
+    }
+    false
 }
 
 fn check_document_level_rules(lower_full: &str, issues: &mut Vec<LintIssue>) {
