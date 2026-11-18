@@ -90,9 +90,11 @@ function isSingleUserPrivateGroupLinux(gid: number, ownerUid: number): boolean {
   return members.size === 1 && members.has(ownerUid);
 }
 
-function isSafeNonWritableNode(st: fs.Stats, wantDir: boolean): boolean {
+function isSafeNonWritableNode(st: fs.Stats, wantDir: boolean, allowLinuxCargoHardlink = false): boolean {
   const uid = typeof process.getuid === "function" ? process.getuid() : null;
-  const typeOk = wantDir ? st.isDirectory() : st.isFile() && st.nlink === 1;
+  // On Linux, Cargo hardlinks target/{debug,release}/<bin> with target/.../deps/<bin>-<hash> (nlink === 2).
+  const maxFileLinks = allowLinuxCargoHardlink && process.platform === "linux" ? 2 : 1;
+  const typeOk = wantDir ? st.isDirectory() : st.isFile() && st.nlink >= 1 && st.nlink <= maxFileLinks;
   if (!typeOk || (uid !== null && st.uid !== uid && st.uid !== 0)) return false;
   if ((st.mode & 0o002) !== 0) return false;
   if ((st.mode & 0o020) !== 0) {
@@ -107,8 +109,8 @@ function readNoFollowRegularBytes(filePath: string, requireExec: boolean): Buffe
   try {
     const st = fs.fstatSync(fd);
     const execOk = !requireExec || (st.mode & 0o111) !== 0;
-    if (!execOk || !isSafeNonWritableNode(st, false)) {
-      throw new Error(`UnsafeSkillFileTypeOrHardlink: ${path.basename(filePath)} (mode=0${(st.mode & 0o777).toString(8)}, uid=${st.uid}, gid=${st.gid})`);
+    if (!execOk || !isSafeNonWritableNode(st, false, requireExec)) {
+      throw new Error(`UnsafeSkillFileTypeOrHardlink: ${path.basename(filePath)} (mode=0${(st.mode & 0o777).toString(8)}, nlink=${st.nlink}, uid=${st.uid}, gid=${st.gid})`);
     }
     return fs.readFileSync(fd);
   } finally {

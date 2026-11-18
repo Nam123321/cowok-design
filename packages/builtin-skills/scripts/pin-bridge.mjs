@@ -85,7 +85,8 @@ export function hashVerifiedExecutable(binPath) {
   const fd = fs.openSync(binPath, flags);
   try {
     const st = fs.fstatSync(fd);
-    if (!st.isFile() || st.nlink !== 1 || (st.mode & 0o111) === 0 || !isSafeNonWritable(st)) {
+    const maxBinLinks = process.platform === "linux" ? 2 : 1;
+    if (!st.isFile() || st.nlink < 1 || st.nlink > maxBinLinks || (st.mode & 0o111) === 0 || !isSafeNonWritable(st)) {
       throw new Error(`Untrusted binary mode/nlink at ${binPath}`);
     }
     const bytes = fs.readFileSync(fd);
