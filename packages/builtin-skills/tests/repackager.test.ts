@@ -358,6 +358,13 @@ describe("Story 08.2: Skill Repackager, Discovery Stubs & Video Intake", () => {
       expect(verifyPinnedBridgeBinary(debugBin, debugBinSha)).toBe(debugBin);
       expect(() => verifyPinnedBridgeBinary(debugBin, "0".repeat(64))).toThrow(/PluginHostBridgeUnavailable/);
 
+      // World-writable bridge binary copy MUST always fail-closed on every OS
+      const worldWritableCopy = path.join(otherDst, "ww_bridge_bin");
+      fs.copyFileSync(debugBin, worldWritableCopy);
+      fs.chmodSync(worldWritableCopy, 0o757);
+      const wwSha = crypto.createHash("sha256").update(fs.readFileSync(worldWritableCopy)).digest("hex");
+      expect(() => verifyPinnedBridgeBinary(worldWritableCopy, wwSha)).toThrow(/PluginHostBridgeUnavailable/);
+
       const prevEnvMode = process.env.NODE_ENV;
       const prevSha = process.env.COWOK_PLUGIN_HOST_REPACKAGER_SHA256;
       try {

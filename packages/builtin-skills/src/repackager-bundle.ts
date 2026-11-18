@@ -25,10 +25,80 @@ let sessionBridgePin: { filePath: string; sha256Hex: string } | null = null;
 
 const MACOS_ROOT_SYMLINKS = new Set(["tmp", "var", "etc"]);
 
+let cachedLinuxGroupUsers: Map<number, Set<number>> | null | undefined;
+
+function getLinuxGroupUsers(): Map<number, Set<number>> | null {
+  if (cachedLinuxGroupUsers !== undefined) return cachedLinuxGroupUsers;
+  if (process.platform !== "linux") {
+    cachedLinuxGroupUsers = null;
+    return null;
+  }
+  try {
+    const passwdLines = fs.readFileSync("/etc/passwd", "utf8").split("\n");
+    const groupLines = fs.readFileSync("/etc/group", "utf8").split("\n");
+    const nameToUid = new Map<string, number>();
+    const map = new Map<number, Set<number>>();
+    for (const raw of passwdLines) {
+      if (!raw || raw.startsWith("#")) continue;
+      const parts = raw.split(":");
+      if (parts.length < 4) continue;
+      const uid = Number(parts[2]);
+      const gid = Number(parts[3]);
+      if (Number.isInteger(uid)) nameToUid.set(parts[0], uid);
+      if (Number.isInteger(uid) && Number.isInteger(gid) && uid !== 0) {
+        let set = map.get(gid);
+        if (!set) {
+          set = new Set<number>();
+          map.set(gid, set);
+        }
+        set.add(uid);
+      }
+    }
+    for (const raw of groupLines) {
+      if (!raw || raw.startsWith("#")) continue;
+      const parts = raw.split(":");
+      if (parts.length < 4) continue;
+      const gid = Number(parts[2]);
+      if (!Number.isInteger(gid)) continue;
+      const members = parts[3].split(",").map((m) => m.trim()).filter(Boolean);
+      for (const m of members) {
+        const u = nameToUid.get(m);
+        if (u !== undefined && u !== 0) {
+          let set = map.get(gid);
+          if (!set) {
+            set = new Set<number>();
+            map.set(gid, set);
+          }
+          set.add(u);
+        }
+      }
+    }
+    cachedLinuxGroupUsers = map;
+    return map;
+  } catch {
+    cachedLinuxGroupUsers = null;
+    return null;
+  }
+}
+
+function isSingleUserPrivateGroupLinux(gid: number, ownerUid: number): boolean {
+  if (process.platform !== "linux" || ownerUid === 0) return false;
+  const groups = getLinuxGroupUsers();
+  if (!groups) return false;
+  const members = groups.get(gid);
+  if (!members || members.size === 0) return false;
+  return members.size === 1 && members.has(ownerUid);
+}
+
 function isSafeNonWritableNode(st: fs.Stats, wantDir: boolean): boolean {
   const uid = typeof process.getuid === "function" ? process.getuid() : null;
   const typeOk = wantDir ? st.isDirectory() : st.isFile() && st.nlink === 1;
-  return typeOk && (st.mode & 0o022) === 0 && (uid === null || st.uid === uid || st.uid === 0);
+  if (!typeOk || (uid !== null && st.uid !== uid && st.uid !== 0)) return false;
+  if ((st.mode & 0o002) !== 0) return false;
+  if ((st.mode & 0o020) !== 0) {
+    return uid !== null && isSingleUserPrivateGroupLinux(st.gid, st.uid);
+  }
+  return true;
 }
 
 function readNoFollowRegularBytes(filePath: string, requireExec: boolean): Buffer {
@@ -38,7 +108,7 @@ function readNoFollowRegularBytes(filePath: string, requireExec: boolean): Buffe
     const st = fs.fstatSync(fd);
     const execOk = !requireExec || (st.mode & 0o111) !== 0;
     if (!execOk || !isSafeNonWritableNode(st, false)) {
-      throw new Error(`UnsafeSkillFileTypeOrHardlink: ${path.basename(filePath)}`);
+      throw new Error(`UnsafeSkillFileTypeOrHardlink: ${path.basename(filePath)} (mode=0${(st.mode & 0o777).toString(8)}, uid=${st.uid}, gid=${st.gid})`);
     }
     return fs.readFileSync(fd);
   } finally {
@@ -46,30 +116,37 @@ function readNoFollowRegularBytes(filePath: string, requireExec: boolean): Buffe
   }
 }
 
-function areAncestorsTrusted(parentDir: string): boolean {
+function assertAncestorsTrusted(parentDir: string): void {
   const parts = path.resolve(parentDir).split(path.sep).filter(Boolean);
   let cur: string = path.sep;
   for (let i = 0; i < parts.length; i++) {
     if (process.platform === "darwin" && i === 0 && MACOS_ROOT_SYMLINKS.has(parts[0])) {
       const priv = fs.lstatSync("/private");
-      if (priv.isSymbolicLink() || !isSafeNonWritableNode(priv, true)) return false;
+      if (priv.isSymbolicLink() || !isSafeNonWritableNode(priv, true)) {
+        throw new Error(`Untrusted ancestor /private (mode=0${(priv.mode & 0o777).toString(8)}, uid=${priv.uid}, gid=${priv.gid})`);
+      }
       cur = path.join("/private", parts[0]);
     } else {
       cur = path.join(cur, parts[i]);
     }
     const st = fs.lstatSync(cur);
-    if (st.isSymbolicLink() || !isSafeNonWritableNode(st, true)) return false;
+    if (st.isSymbolicLink() || !isSafeNonWritableNode(st, true)) {
+      throw new Error(`Untrusted ancestor ${cur} (sym=${st.isSymbolicLink()}, mode=0${(st.mode & 0o777).toString(8)}, uid=${st.uid}, gid=${st.gid})`);
+    }
   }
-  return true;
+}
+
+function tryVerifyBridgeExecutable(candidate: string): { digest: Buffer | null; reason?: string } {
+  try {
+    assertAncestorsTrusted(path.dirname(candidate));
+    return { digest: crypto.createHash("sha256").update(readNoFollowRegularBytes(candidate, true)).digest() };
+  } catch (err) {
+    return { digest: null, reason: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 function isTrustedBridgeExecutable(candidate: string): Buffer | null {
-  try {
-    if (!areAncestorsTrusted(path.dirname(candidate))) return null;
-    return crypto.createHash("sha256").update(readNoFollowRegularBytes(candidate, true)).digest();
-  } catch {
-    return null;
-  }
+  return tryVerifyBridgeExecutable(candidate).digest;
 }
 
 function timingSafeHexMatch(actualDigest: Buffer, expectedHex: string): boolean {
@@ -124,11 +201,11 @@ function resolveBridgeBinary(): string {
       stdio: "pipe",
       timeout: 180_000,
     });
-    const builtDigest = isTrustedBridgeExecutable(debugBin);
-    if (!builtDigest) {
-      throw new Error("PluginHostBridgeUnavailable: failed building trusted plugin_host_repackager binary");
+    const check = tryVerifyBridgeExecutable(debugBin);
+    if (!check.digest) {
+      throw new Error(`PluginHostBridgeUnavailable: failed building trusted plugin_host_repackager binary (${check.reason || "unknown"})`);
     }
-    sessionBridgePin = { filePath: debugBin, sha256Hex: builtDigest.toString("hex") };
+    sessionBridgePin = { filePath: debugBin, sha256Hex: check.digest.toString("hex") };
   }
   return verifyPinnedBridgeBinary(sessionBridgePin.filePath, sessionBridgePin.sha256Hex);
 }

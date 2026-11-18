@@ -15,9 +15,49 @@ function __dirname_compat() {
   return path.dirname(fileURLToPath(import.meta.url));
 }
 
-function isSafeDirNode(st) {
+function isSingleUserPrivateGroupLinux(gid, ownerUid) {
+  if (process.platform !== "linux" || ownerUid === 0) return false;
+  try {
+    const passwdLines = fs.readFileSync("/etc/passwd", "utf8").split("\n");
+    const groupLines = fs.readFileSync("/etc/group", "utf8").split("\n");
+    const nameToUid = new Map();
+    const members = new Set();
+    for (const raw of passwdLines) {
+      if (!raw || raw.startsWith("#")) continue;
+      const parts = raw.split(":");
+      if (parts.length < 4) continue;
+      const uid = Number(parts[2]);
+      const pGid = Number(parts[3]);
+      if (Number.isInteger(uid)) nameToUid.set(parts[0], uid);
+      if (Number.isInteger(uid) && pGid === gid && uid !== 0) members.add(uid);
+    }
+    for (const raw of groupLines) {
+      if (!raw || raw.startsWith("#")) continue;
+      const parts = raw.split(":");
+      if (parts.length < 4 || Number(parts[2]) !== gid) continue;
+      for (const m of parts[3].split(",").map((v) => v.trim()).filter(Boolean)) {
+        const u = nameToUid.get(m);
+        if (u !== undefined && u !== 0) members.add(u);
+      }
+    }
+    return members.size === 1 && members.has(ownerUid);
+  } catch {
+    return false;
+  }
+}
+
+function isSafeNonWritable(st) {
   const uid = typeof process.getuid === "function" ? process.getuid() : null;
-  return st.isDirectory() && !st.isSymbolicLink() && (st.mode & 0o022) === 0 && (uid === null || st.uid === uid || st.uid === 0);
+  if (uid !== null && st.uid !== uid && st.uid !== 0) return false;
+  if ((st.mode & 0o002) !== 0) return false;
+  if ((st.mode & 0o020) !== 0) {
+    return uid !== null && isSingleUserPrivateGroupLinux(st.gid, st.uid);
+  }
+  return true;
+}
+
+function isSafeDirNode(st) {
+  return st.isDirectory() && !st.isSymbolicLink() && isSafeNonWritable(st);
 }
 
 function assertAncestorsTrusted(targetPath) {
@@ -45,7 +85,7 @@ export function hashVerifiedExecutable(binPath) {
   const fd = fs.openSync(binPath, flags);
   try {
     const st = fs.fstatSync(fd);
-    if (!st.isFile() || st.nlink !== 1 || (st.mode & 0o111) === 0 || (st.mode & 0o022) !== 0) {
+    if (!st.isFile() || st.nlink !== 1 || (st.mode & 0o111) === 0 || !isSafeNonWritable(st)) {
       throw new Error(`Untrusted binary mode/nlink at ${binPath}`);
     }
     const bytes = fs.readFileSync(fd);
