@@ -122,7 +122,7 @@ function resolveBridgeBinary(): string {
     execFileSync("cargo", ["build", "--quiet", "-p", "plugin-host", "--bin", "plugin_host_repackager"], {
       cwd: repoRoot,
       stdio: "pipe",
-      timeout: 60_000,
+      timeout: 180_000,
     });
     const builtDigest = isTrustedBridgeExecutable(debugBin);
     if (!builtDigest) {

@@ -262,22 +262,32 @@ fn ensure_safe_base_dir(base: &Path) -> std::io::Result<PathBuf> {
         }
     }
 
-    let mut resolved = PathBuf::from("/");
-    let mut start_idx = 0usize;
-    #[cfg(target_os = "macos")]
-    if let Some(first) = comps.first().and_then(|s| s.to_str()) {
-        if matches!(first, "tmp" | "var" | "etc")
-            && fs::symlink_metadata(format!("/{first}")).is_ok_and(|m| m.file_type().is_symlink())
+    let (mut resolved, start_idx) = {
+        #[cfg(target_os = "macos")]
         {
-            resolved = PathBuf::from(match first {
-                "tmp" => "/private/tmp",
-                "var" => "/private/var",
-                "etc" => "/private/etc",
-                _ => "/",
-            });
-            start_idx = 1;
+            let mut mac_resolved = PathBuf::from("/");
+            let mut mac_start = 0usize;
+            if let Some(first) = comps.first().and_then(|s| s.to_str()) {
+                if matches!(first, "tmp" | "var" | "etc")
+                    && fs::symlink_metadata(format!("/{first}"))
+                        .is_ok_and(|m| m.file_type().is_symlink())
+                {
+                    mac_resolved = PathBuf::from(match first {
+                        "tmp" => "/private/tmp",
+                        "var" => "/private/var",
+                        "etc" => "/private/etc",
+                        _ => "/",
+                    });
+                    mac_start = 1;
+                }
+            }
+            (mac_resolved, mac_start)
         }
-    }
+        #[cfg(not(target_os = "macos"))]
+        {
+            (PathBuf::from("/"), 0usize)
+        }
+    };
 
     for seg in comps.into_iter().skip(start_idx) {
         resolved.push(&seg);

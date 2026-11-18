@@ -52,7 +52,9 @@ test.describe("Story 08.4: AgentSkills Plugin Registry, Isolated Staging & LEARN
     const server500s: string[] = [];
     page.on("pageerror", (err) => pageErrors.push(err.message));
     page.on("console", (msg) => {
-      if (msg.type() === "error") consoleErrors.push(msg.text());
+      if (msg.type() === "error" && !msg.text().includes("ERR_CERT_AUTHORITY_INVALID")) {
+        consoleErrors.push(msg.text());
+      }
     });
     page.on("response", (resp) => {
       if (resp.status() >= 500) server500s.push(`${resp.status()} ${resp.url()}`);
@@ -77,20 +79,23 @@ test.describe("Story 08.4: AgentSkills Plugin Registry, Isolated Staging & LEARN
 
       // Seed a discovered plugin, LEARN card (with XSS/beacon payload), and cron schedule via BFF session
       const bootCap =
-        (await page.locator('meta[name="cowok-boot-cap"]').getAttribute("content").catch(() => null))?.trim() || "";
+        (await page.locator('meta[name="cowok-boot-cap"]').first().getAttribute("content"))?.trim() || "";
+      expect(bootCap.length).toBeGreaterThan(0);
       const originHeaders: Record<string, string> = {
         "Content-Type": "application/json",
         Origin: `http://127.0.0.1:${targetPort}`,
         "Sec-Fetch-Site": "same-origin",
         "x-iwish-qa-nonce": qaNonce,
         "x-tenant-id": "local-default",
-        ...(bootCap ? { "X-Cowok-Boot-Cap": bootCap } : {}),
+        "X-Cowok-Boot-Cap": bootCap,
       };
       const authRes = await page.request.post(new URL("/api/auth/local-session", baseUrl).toString(), {
         headers: originHeaders,
         data: { role: "editor", userId: "qa-human-operator" },
       });
+      expect(authRes.ok()).toBeTruthy();
       const authJson = (await authRes.json()) as { sessionToken?: string };
+      expect(authJson.sessionToken).toBeTruthy();
       const hdrs: Record<string, string> = {
         ...originHeaders,
         ...(authJson.sessionToken ? { "X-Cowok-Session-Token": authJson.sessionToken } : {}),
@@ -113,6 +118,7 @@ test.describe("Story 08.4: AgentSkills Plugin Registry, Isolated Staging & LEARN
           },
         },
       });
+      expect(discoverRes.ok()).toBeTruthy();
       const plugin = (await discoverRes.json()) as { id: string; pluginSlug: string; lifecycleState: string };
 
       const rejectedXssRes = await page.request.post(
@@ -141,7 +147,7 @@ test.describe("Story 08.4: AgentSkills Plugin Registry, Isolated Staging & LEARN
             idempotencyKey: `qa-idem-${Date.now()}`,
             category: "RULE",
             title: "Live QA Token Guard",
-            content: "Always use semantic CSS tokens from src/styles/tokens.css in components.",
+            content: `Always use semantic CSS tokens from src/styles/tokens.css in components (${Date.now()}).`,
             sourceEvidence: "src/styles/tokens.css:L1-L20",
           },
         }

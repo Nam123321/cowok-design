@@ -397,7 +397,6 @@ mod unix_fd {
             };
             // On macOS, /tmp, /var, and /etc are root-owned system symlinks to /private/*; resolve only those fixed OS prefixes before walking user segments with O_NOFOLLOW.
             let mut comps: Vec<String> = Vec::new();
-            let mut anchor = "/";
             for comp in abs.components() {
                 match comp {
                     Component::RootDir => {}
@@ -417,21 +416,31 @@ mod unix_fd {
                     Component::Prefix(_) => return Err("Unsupported path prefix".to_string()),
                 }
             }
-            #[cfg(target_os = "macos")]
-            if let Some(first) = comps.first().map(|s| s.as_str()) {
-                if matches!(first, "tmp" | "var" | "etc")
-                    && std::fs::symlink_metadata(format!("/{first}"))
-                        .is_ok_and(|m| m.file_type().is_symlink())
+            let anchor = {
+                #[cfg(target_os = "macos")]
                 {
-                    anchor = match first {
-                        "tmp" => "/private/tmp",
-                        "var" => "/private/var",
-                        "etc" => "/private/etc",
-                        _ => "/",
-                    };
-                    comps.remove(0);
+                    let mut mac_anchor = "/";
+                    if let Some(first) = comps.first().map(|s| s.as_str()) {
+                        if matches!(first, "tmp" | "var" | "etc")
+                            && std::fs::symlink_metadata(format!("/{first}"))
+                                .is_ok_and(|m| m.file_type().is_symlink())
+                        {
+                            mac_anchor = match first {
+                                "tmp" => "/private/tmp",
+                                "var" => "/private/var",
+                                "etc" => "/private/etc",
+                                _ => "/",
+                            };
+                            comps.remove(0);
+                        }
+                    }
+                    mac_anchor
                 }
-            }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    "/"
+                }
+            };
             let c_anchor = CString::new(anchor).map_err(|e| e.to_string())?;
             let fd = unsafe {
                 libc::open(
