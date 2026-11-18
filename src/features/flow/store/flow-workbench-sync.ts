@@ -6,6 +6,7 @@ import { normalizeFixtureRef, normalizeViewportPreset } from "../../../lib/valid
 import { classifyThreeWayConflict, computeDraftDelta } from "./draft-delta";
 import { cloneStructuralSnapshot, createDefaultClusters } from "./flow-workbench-mutations";
 import { clearSessionDraft, generateDraftUuid } from "./session-recovery";
+import { sharedChatStore, toSessionChatKey } from "./shared-chat-sync";
 import {
   canonicalToEdgeType,
   type FlowWorkbenchState,
@@ -42,6 +43,8 @@ export function snapshotDtoToStructural(dto: FlowGraphSnapshot): StructuralSnaps
     edgeType: canonicalToEdgeType(t.flowType),
     conditionLabel: t.guardCondition || undefined,
     guardCondition: t.guardCondition,
+    sourceCtaFfId: t.sourceCtaFfId ?? null,
+    maxLoopIterations: t.maxLoopIterations ?? undefined,
     version: t.version,
     status: "synced",
   }));
@@ -74,11 +77,31 @@ export function applyServerSnapshotToState(state: FlowWorkbenchState, snap: Stru
   clearSessionDraft(state.projectId);
 }
 
+export function buildFlowChangesDraftJson(
+  projectId: string,
+  draftId: string,
+  delta: ReturnType<typeof computeDraftDelta>
+): string {
+  return JSON.stringify(
+    {
+      schema: "cowok-design.flow-diff.v1",
+      fileName: "flow-changes-draft.json",
+      projectId,
+      draftId,
+      structuralDeltas: delta.payload,
+      touchedNodeIds: Array.from(delta.touchedNodeIds),
+      touchedEdgeIds: Array.from(delta.touchedEdgeIds),
+    },
+    null,
+    2
+  );
+}
+
 export async function runSyncDeployDraft(
   getState: () => FlowWorkbenchState,
   projectId: string,
   notify: () => void
-): Promise<{ ok: boolean; status: "synced" | "conflict" | "error"; message?: string }> {
+): Promise<{ ok: boolean; status: "synced" | "conflict" | "error"; message?: string; flowChangesDraftJson?: string }> {
   const initial = getState();
   initial.projectId = projectId;
   const draftId = initial.draftId || generateDraftUuid();
@@ -89,10 +112,18 @@ export async function runSyncDeployDraft(
   try {
     const preSend = getState();
     const delta = computeDraftDelta(preSend.lastSyncedSnapshot, preSend, draftId);
+    const flowChangesDraftJson = buildFlowChangesDraftJson(projectId, draftId, delta);
     const committed = await apiFlowWorkbench.deployDraft(projectId, delta.payload);
     applyServerSnapshotToState(getState(), snapshotDtoToStructural(committed));
+    sharedChatStore.appendMessage(toSessionChatKey(projectId, "default-flow"), {
+      id: `flow-draft-${draftId}`,
+      sender: "agent",
+      text: `[flow-changes-draft.json] Applied structuralDeltas (nodes: ${delta.touchedNodeIds.size}, edges: ${delta.touchedEdgeIds.size}).`,
+      timestamp: `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`,
+      createdAtMs: Date.now(),
+    });
     notify();
-    return { ok: true, status: "synced" };
+    return { ok: true, status: "synced", flowChangesDraftJson };
   } catch (err) {
     if (err instanceof FlowApiError && err.status === 409) {
       const curr = getState();

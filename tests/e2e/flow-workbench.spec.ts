@@ -57,8 +57,8 @@ test.describe("Story 04.1: Unified DualMainPanel Workbench, Rust SQLite WAL SSOT
     await expect(iframe).toHaveAttribute("referrerpolicy", "no-referrer");
 
     await expect(page.getByTestId("toggle-design-cdn-btn")).toHaveCount(0);
-    await expect(page.getByTestId("pointer-mode-interact")).toBeVisible();
-    await expect(page.getByTestId("pointer-mode-inspect")).toBeVisible();
+    await expect(page.getByTestId("pointer-mode-toggle")).toBeVisible();
+    await expect(page.getByTestId("walkthrough-playback-btn")).toBeVisible();
 
     // Capture Initial Light Mode Screenshot
     const screenshotInitPath = path.join(evidenceDir, "screenshot-workbench-init.png");
@@ -103,7 +103,7 @@ test.describe("Story 04.1: Unified DualMainPanel Workbench, Rust SQLite WAL SSOT
       .evaluate((el) => getComputedStyle(el).borderTopWidth);
     expect(footerBorderTop).toBe("0px");
 
-    // Image 1: Active tabs on Night Mode use neutral elevated surface + 2px orange bottom line (NO solid blue fill)
+    // Night Mode Zero-Amber Monochrome: Active tabs use neutral elevated surface + 2px #F1F5F9 bottom line (NO solid blue fill, NO amber/cyan)
     const activeTabStyles = await page
       .getByTestId("canvas-tab-tab-userflow")
       .evaluate((el) => {
@@ -112,7 +112,7 @@ test.describe("Story 04.1: Unified DualMainPanel Workbench, Rust SQLite WAL SSOT
       });
     expect(activeTabStyles.borderBottomWidth).toBe("2px");
     expect(activeTabStyles.bg).not.toBe("rgb(0, 87, 255)");
-    expect(activeTabStyles.borderBottomColor).toBe("rgb(255, 154, 47)");
+    expect(activeTabStyles.borderBottomColor).toBe("rgb(241, 245, 249)");
 
     const activeLensStyles = await page
       .getByTestId("lens-userflow-btn")
@@ -156,7 +156,7 @@ test.describe("Story 04.1: Unified DualMainPanel Workbench, Rust SQLite WAL SSOT
       `[SECURITY-NONCE] Verified live DOM hydration and token: ${nonce.slice(0, 8)}...`,
       `[TDR-001] Rust SQLite WAL SSOT deploy-draft persisted across full page reload (${nodesBefore + 1} nodes)`,
       `[PD-02=A] Shorten Chat 40px rail verified; seamless sidebar footer & 144px rolling composer verified`,
-      `[COWOK-NIGHT-UX] Active tabs verified with 2px #FF9A2F bottom indicator and neutral elevated fill`,
+      `[COWOK-NIGHT-UX] Active tabs verified with 2px #F1F5F9 bottom indicator (DESIGN.md Zero-Amber) and neutral elevated fill`,
       `[TDR-003] Sandboxed HTML iframe (allow-scripts allow-forms, 0 allow-same-origin) + Design CDN toggle verified`,
       `[VERDICT] ALL ACCEPTANCE CRITERIA PASSED LIVE GROUNDING AUDIT`,
     ];

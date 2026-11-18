@@ -11,6 +11,7 @@ export interface DagRightVerticalDockProps {
   canUndo: boolean;
   canRedo: boolean;
   isMinimapOpen: boolean;
+  isReadOnly?: boolean;
   onAddNode: () => void;
   onAutoLayout?: () => void;
   onUndo: () => void;
@@ -29,9 +30,8 @@ const BUTTON_OPACITY_ENABLED = 1;
 
 const DOCK_CONTAINER_STYLE: React.CSSProperties = {
   position: "absolute",
-  right: "16px",
-  top: "50%",
-  transform: "translateY(-50%)",
+  right: "12px",
+  top: "12px",
   display: "flex",
   flexDirection: "column",
   gap: "3px",
@@ -184,6 +184,7 @@ export const DagRightVerticalDock: React.FC<DagRightVerticalDockProps> = ({
   canUndo,
   canRedo,
   isMinimapOpen,
+  isReadOnly = false,
   onAddNode,
   onAutoLayout,
   onUndo,
@@ -204,7 +205,7 @@ export const DagRightVerticalDock: React.FC<DagRightVerticalDockProps> = ({
 
   return (
     <aside className="dag-right-vertical-dock" aria-label={t("flow.dagDockAria", "Thanh công cụ đồ thị 2D")} style={DOCK_CONTAINER_STYLE}>
-      <DockButton onClick={onAddNode} title={addNodeLabel} ariaLabel={addNodeLabel} fontWeight={FONT_WEIGHT_SEMIBOLD}>
+      <DockButton onClick={onAddNode} disabled={isReadOnly} title={addNodeLabel} ariaLabel={addNodeLabel} fontWeight={FONT_WEIGHT_SEMIBOLD}>
         <BrandIcon name="plus" size={DOCK_ICON_SIZE_LG} color="currentColor" />
       </DockButton>
       {onAutoLayout && (

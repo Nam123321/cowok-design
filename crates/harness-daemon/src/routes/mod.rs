@@ -10,6 +10,7 @@ pub mod execution_sessions;
 pub mod execution_stream;
 pub mod execution_sweeper;
 pub mod fs_jail;
+pub mod github_ide_integrations;
 pub mod legacy_proposals;
 pub mod legacy_router;
 pub mod legacy_sdi;

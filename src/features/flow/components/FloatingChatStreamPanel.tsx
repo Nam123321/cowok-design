@@ -103,7 +103,7 @@ const ScopeChipStrip: React.FC<{
             {n.screenKey}
           </span>
           {selectedNodes.length > 1 && (
-            <button type="button" onClick={() => onDeselectNode(n.id)} aria-label={`${t("floatingChat.deselectNode", "Bỏ chọn")} ${n.screenKey}`} style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center" }}>
+            <button type="button" onClick={(e) => { e.stopPropagation(); onDeselectNode(n.id); }} aria-label={`${t("floatingChat.deselectNode", "Bỏ chọn")} ${n.screenKey}`} style={{ border: "none", background: "transparent", color: "var(--text-muted)", cursor: "pointer", width: "16px", height: "16px", minWidth: "16px", padding: "2px", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <BrandIcon name="close" size={10} color="currentColor" />
             </button>
           )}
@@ -167,8 +167,8 @@ const JobControlBar: React.FC<{
       <span style={{ fontWeight: 600, color: isInterrupted ? "var(--state-danger)" : "var(--action-primary)", display: "inline-flex", alignItems: "center", gap: "5px" }}>
         <BrandIcon name={canResume ? "clock" : "execution-pipeline"} size={11} color="currentColor" />
         <span>{label}</span>
-        {fencingToken ? <span style={{ fontFamily: "var(--font-mono)", fontSize: "9.5px", color: "var(--text-muted)" }}>fence:{fencingToken}</span> : null}
-        {projectSeq ? <span style={{ fontFamily: "var(--font-mono)", fontSize: "9.5px", color: "var(--text-muted)" }}>seq:{projectSeq}</span> : null}
+        {fencingToken ? <span style={{ fontFamily: "var(--font-mono)", fontSize: "9.5px", color: "var(--text-muted)" }}>{`${t("floatingChat.fenceLabel", "fence:")} ${fencingToken}`}</span> : null}
+        {projectSeq ? <span style={{ fontFamily: "var(--font-mono)", fontSize: "9.5px", color: "var(--text-muted)" }}>{`${t("floatingChat.seqLabel", "seq:")} ${projectSeq}`}</span> : null}
       </span>
       <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
         <button type="button" onClick={() => (canResume ? onResumeJob(activeJobId) : onPauseJob(activeJobId))} style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px" }}>

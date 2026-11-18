@@ -8,6 +8,7 @@ import { sharedChatStore } from "../../../features/flow/store/shared-chat-sync";
 import { MainSidebar, ChatSession } from "./MainSidebar";
 import { AgentChatPanel } from "./AgentChatPanel";
 import { CanvasTabItem } from "../../../features/flow/components/CompanionCanvasTab";
+import { useNodeProposalController } from "../../../features/proposals/hooks/useNodeProposalController";
 import { useWorkbenchSplitter } from "../hooks/useWorkbenchSplitter";
 import { useWorkbenchAttachments } from "../hooks/useWorkbenchAttachments";
 import { useWorkbenchGraphHandlers } from "../hooks/useWorkbenchGraphHandlers";
@@ -44,6 +45,7 @@ export interface WorkbenchBodyLayoutProps {
   splitter: ReturnType<typeof useWorkbenchSplitter>;
   attachments: ReturnType<typeof useWorkbenchAttachments>;
   graphHandlers: ReturnType<typeof useWorkbenchGraphHandlers>;
+  isModalOpen?: boolean;
   state: FlowWorkbenchState;
   store: ReturnType<typeof createNewFlowWorkbenchStore>;
 }
@@ -75,6 +77,14 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
   const selectedScopeNodes = p.state.nodes.filter(
     (n) => n.id === p.state.selectedNodeId || (p.state.selectedNodeIds && p.state.selectedNodeIds.includes(n.id))
   );
+  const primaryNode = selectedScopeNodes.find((n) => n.id === p.state.selectedNodeId) || selectedScopeNodes[0] || null;
+  const proposalCtrl = useNodeProposalController({
+    projectId: resolvedProjectId,
+    selectedNodeId: p.state.selectedNodeId,
+    selectedNodeKey: primaryNode?.screenKey || null,
+    isModalOpen: Boolean(p.isModalOpen),
+    isInlineCodeOpen: false,
+  });
 
   return (
     <div className="workbench-body-layout" aria-label={t("workbench.appName", "cowok-design")} style={{ display: "flex", flex: 1, overflowX: "auto", overflowY: "hidden", position: "relative", scrollBehavior: "smooth", width: "100%", height: "100%" }}>
@@ -89,7 +99,7 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
         onTogglePinSession={p.onTogglePinSession} onRenameSession={p.onRenameSession} onDeleteSession={p.onDeleteSession}
         onRenameProject={p.onRenameProject} onDeleteProject={p.onDeleteProject} onLinkProjectFolder={p.onLinkProjectFolder}
       />
-      <div className="dual-main-panel" style={{ display: "flex", flex: 1, minWidth: "650px", overflow: "hidden", position: "relative" }}>
+      <div className="dual-main-panel" style={{ display: "flex", flex: 1, minWidth: "744px", overflow: "hidden", position: "relative" }}>
         <AgentChatPanel
           projectId={resolvedProjectId} activeSessionId={p.activeSessionId} selectedNodes={selectedScopeNodes}
           onDeselectNode={(id) => p.store.selectNode(id, true)}
@@ -100,6 +110,15 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
           width={p.splitter.chatWidth} isShortened={p.splitter.isChatShortened}
           onToggleShorten={p.splitter.handleToggleShortenChat} attachmentChips={p.attachments.attachmentChips}
           onRemoveAttachmentChip={p.attachments.handleRemoveAttachmentChip} onOpenSettings={p.onOpenSettings}
+          proposalControls={{
+            selectedNodeId: p.state.selectedNodeId,
+            selectedNodeKey: primaryNode?.screenKey || null,
+            proposalsCount: proposalCtrl.proposalsCount,
+            isDesignerTalkOpen: proposalCtrl.isDesignerTalkOpen,
+            isDrawerOpen: proposalCtrl.isDrawerOpen,
+            onToggleDesignerTalk: () => proposalCtrl.setIsDesignerTalkOpen((prev) => !prev),
+            onToggleDrawer: () => proposalCtrl.setIsDrawerOpen((prev) => !prev),
+          }}
         />
         <WorkbenchSplitterDivider isDragging={p.splitter.isDraggingSplitter} onMouseDown={p.splitter.handleSplitterMouseDown} />
         <WorkbenchCanvasTabArea
@@ -109,6 +128,7 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
           isLeftChatCollapsed={p.splitter.isChatShortened}
           onOpenSettings={p.onOpenSettings}
           onOpenLeftChat={p.splitter.isChatShortened ? p.splitter.handleToggleShortenChat : undefined}
+          proposalController={proposalCtrl}
         />
       </div>
       {p.attachments.quoteTooltip?.visible && (

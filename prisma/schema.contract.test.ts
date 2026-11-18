@@ -73,7 +73,64 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
-  // Mirror pool.rs idempotent V9 column guards prior to V9 12-step rebuild of skill_plugins
+  // Mirror pool.rs idempotent V9 column guards prior to V9 12-step rebuild
+  db.exec(`
+    ALTER TABLE sdi_intents ADD COLUMN routing_mode TEXT NOT NULL DEFAULT 'direct_edit';
+    ALTER TABLE sdi_intents ADD COLUMN gap_questions_json TEXT;
+    ALTER TABLE sdi_intents ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE flow_nodes ADD COLUMN portal_group TEXT;
+    ALTER TABLE flow_nodes ADD COLUMN shared_app_shell_id TEXT;
+    ALTER TABLE flow_nodes ADD COLUMN mini_skeleton_html TEXT;
+    ALTER TABLE flow_nodes ADD COLUMN cta_pills_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE flow_nodes ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE screen_fixtures ADD COLUMN preset_key TEXT;
+    ALTER TABLE screen_fixtures ADD COLUMN sample_rows_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE screen_fixtures ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE flow_graphs ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V9__epic05_storyboard_proposals_handoff.sql"),
+      "utf-8"
+    )
+  );
+  // Mirror pool.rs idempotent V10 column guards
+  db.exec(`
+    ALTER TABLE change_proposals ADD COLUMN node_id TEXT;
+    ALTER TABLE change_proposals ADD COLUMN batch_id TEXT;
+    ALTER TABLE change_proposals ADD COLUMN composite_scope_key TEXT NOT NULL DEFAULT '';
+    ALTER TABLE change_proposals ADD COLUMN content_mode TEXT NOT NULL DEFAULT 'full_file';
+    ALTER TABLE change_proposals ADD COLUMN base_file_hashes_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE change_proposals ADD COLUMN visual_diff_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE change_proposals ADD COLUMN gate_receipt_id TEXT;
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V10__story_05_2_proposals_receipts_tradeoffs.sql"),
+      "utf-8"
+    )
+  );
+  // Mirror pool.rs idempotent V11 column guards
+  db.exec(`
+    ALTER TABLE chat_sessions ADD COLUMN forked_from_session_id TEXT REFERENCES chat_sessions(id) ON DELETE SET NULL;
+    ALTER TABLE chat_sessions ADD COLUMN forked_from_message_id TEXT REFERENCES chat_messages(id) ON DELETE SET NULL;
+    ALTER TABLE chat_artifact_snapshots ADD COLUMN proposal_id TEXT REFERENCES change_proposals(id) ON DELETE SET NULL;
+    ALTER TABLE chat_artifact_snapshots ADD COLUMN parent_snapshot_id TEXT REFERENCES chat_artifact_snapshots(id) ON DELETE SET NULL;
+    ALTER TABLE chat_artifact_snapshots ADD COLUMN node_snapshot_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE version_snapshots ADD COLUMN proposal_id TEXT REFERENCES change_proposals(id) ON DELETE SET NULL;
+    ALTER TABLE version_snapshots ADD COLUMN parent_snapshot_id TEXT REFERENCES version_snapshots(id) ON DELETE SET NULL;
+    ALTER TABLE version_snapshots ADD COLUMN chat_artifact_snapshot_id TEXT REFERENCES chat_artifact_snapshots(id) ON DELETE SET NULL;
+    ALTER TABLE github_pull_requests ADD COLUMN snapshot_id TEXT REFERENCES version_snapshots(id) ON DELETE SET NULL;
+    ALTER TABLE github_pull_requests ADD COLUMN handoff_manifest_sha256 TEXT NOT NULL DEFAULT '';
+    ALTER TABLE github_pull_requests ADD COLUMN visual_diff_summary_json TEXT NOT NULL DEFAULT '{}';
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V11__story_05_3_snapshots_fork_handoff.sql"),
+      "utf-8"
+    )
+  );
+  // Mirror pool.rs idempotent V12 column guards prior to V12 12-step rebuild of skill_plugins
   db.exec(`
     ALTER TABLE skill_plugins ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
     ALTER TABLE skill_plugins ADD COLUMN source_type TEXT NOT NULL DEFAULT 'local';
@@ -95,17 +152,17 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
   `);
   db.exec(
     fs.readFileSync(
-      path.join(migrationsDir, "V9__epic08_plugins_learn_cron.sql"),
+      path.join(migrationsDir, "V12__epic08_plugins_learn_cron.sql"),
       "utf-8"
     )
   );
   db.exec(
     fs.readFileSync(
-      path.join(migrationsDir, "V10__epic08_audit_remediation.sql"),
+      path.join(migrationsDir, "V13__epic08_audit_remediation.sql"),
       "utf-8"
     )
   );
-  // Mirror pool.rs apply_v11_columns idempotent column guards prior to V11 index creation
+  // Mirror pool.rs apply_v14_columns idempotent column guards prior to V14 index creation
   db.exec(`
     ALTER TABLE gate_reports ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
     ALTER TABLE gate_reports ADD COLUMN correlation_id TEXT NOT NULL DEFAULT '';
@@ -118,13 +175,25 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
   `);
   db.exec(
     fs.readFileSync(
-      path.join(migrationsDir, "V11__epic08_party_remediation.sql"),
+      path.join(migrationsDir, "V14__epic08_party_remediation.sql"),
       "utf-8"
     )
   );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
+
+const PRISMA_SCALAR_TYPES = new Set([
+  "String",
+  "Int",
+  "BigInt",
+  "Boolean",
+  "Float",
+  "Bytes",
+  "DateTime",
+  "Decimal",
+  "Json",
+]);
 
 function parsePrismaModelColumns(schemaText: string, modelName: string): string[] {
   const modelRe = new RegExp(`model\\s+${modelName}\\s+\\{([\\s\\S]*?)\\n\\}`, "m");
@@ -134,17 +203,17 @@ function parsePrismaModelColumns(schemaText: string, modelName: string): string[
   for (const rawLine of match[1].split("\n")) {
     const line = rawLine.trim();
     if (!line || line.startsWith("//") || line.startsWith("@@")) continue;
-    if (/^\w+\s+[A-Z]\w*[\?\[]*.*\s+@relation\(/.test(line)) continue;
-    const fieldMatch = /^([a-zA-Z_][a-zA-Z0-9_]*)\s+([A-Za-z0-9_]+)[\?\[]*/.exec(line);
+    const fieldMatch = /^([a-zA-Z_][a-zA-Z0-9_]*)\s+([A-Za-z0-9_]+)([\?\[]*)/.exec(line);
     if (!fieldMatch) continue;
-    const fieldName = fieldMatch[1];
+    const [, fieldName, fieldType, suffix] = fieldMatch;
+    if (!PRISMA_SCALAR_TYPES.has(fieldType) || suffix.includes("[")) continue;
     const mapMatch = /@map\("([^"]+)"\)/.exec(line);
     cols.push(mapMatch ? mapMatch[1] : fieldName);
   }
   return cols.sort();
 }
 
-describe("P1 Persistence Contract & SQLite WAL V1-V11 Mirror Verification (ADR-091)", () => {
+describe("P1 Persistence Contract & SQLite WAL V1-V14 Mirror Verification (ADR-091)", () => {
   const schemaPath = path.resolve(__dirname, "schema.prisma");
   const migrationsDir = path.resolve(__dirname, "../crates/spec-registry/migrations");
 
@@ -162,10 +231,14 @@ describe("P1 Persistence Contract & SQLite WAL V1-V11 Mirror Verification (ADR-0
     expect(mappedTables).toContain("daemon_sessions");
     expect(mappedTables).toContain("daemon_replay_nonces");
     expect(mappedTables).toContain("workspace_sync_intents");
+    expect(mappedTables).toContain("idempotency_records");
+    expect(mappedTables).toContain("proposal_target_nodes");
+    expect(mappedTables).toContain("proposal_gate_receipts");
+    expect(mappedTables).toContain("proposal_tradeoffs");
     expect(mappedTables).toContain("knowledge_cards");
     expect(mappedTables).toContain("learn_consumed_nonces");
     expect(mappedTables).toContain("plugin_cron_schedules");
-    expect(mappedTables).toHaveLength(45);
+    expect(mappedTables).toHaveLength(49);
   });
 
   it("UT-DB-02: executes V1-V9 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
@@ -289,12 +362,12 @@ describe("P1 Persistence Contract & SQLite WAL V1-V11 Mirror Verification (ADR-0
     expect(remainingEdges.count).toBe(0);
   });
 
-  it("UT-DB-06: verifies Story 08.4 V9-V11 SQLite column and index parity with Prisma partialIndexes metadata", () => {
+  it("UT-DB-06: verifies Story 05.3 V11 & Story 08.4 V12-V14 columns, indexes, and Prisma partialIndexes parity", () => {
     const db = openMigratedMemoryDb();
     const schemaText = fs.readFileSync(path.resolve(__dirname, "schema.prisma"), "utf8");
     const sqliteIndexes = db
       .prepare(
-        "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name IN ('skill_plugins', 'knowledge_cards', 'plugin_cron_schedules', 'gate_reports')"
+        "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name IN ('skill_plugins', 'knowledge_cards', 'plugin_cron_schedules', 'gate_reports', 'chat_sessions', 'chat_artifact_snapshots', 'version_snapshots', 'github_pull_requests')"
       )
       .all() as Array<{ name: string; sql: string | null }>;
     const byName = new Map(sqliteIndexes.map((idx) => [idx.name, idx.sql ?? ""]));
@@ -309,6 +382,16 @@ describe("P1 Persistence Contract & SQLite WAL V1-V11 Mirror Verification (ADR-0
     expect(byName.has("uq_plugin_cron_schedules_scope_plugin")).toBe(true);
     expect(byName.has("idx_gate_reports_project_gate_target")).toBe(true);
     expect(byName.has("skill_plugins_project_slug_ver_key")).toBe(false);
+    for (const expectedIdx of [
+      "idx_chat_sessions_forked_from",
+      "idx_artifact_snapshots_proposal",
+      "idx_artifact_snapshots_parent",
+      "idx_version_snapshots_proposal",
+      "idx_version_snapshots_parent",
+      "idx_github_prs_snapshot",
+    ]) {
+      expect(byName.has(expectedIdx)).toBe(true);
+    }
 
     expect(schemaText).toContain('previewFeatures = ["partialIndexes"]');
     expect(schemaText).toContain('map: "uq_skill_plugins_active_slug"');
@@ -317,7 +400,7 @@ describe("P1 Persistence Contract & SQLite WAL V1-V11 Mirror Verification (ADR-0
     expect(schemaText).toContain('map: "uq_plugin_cron_schedules_scope_plugin"');
     expect(schemaText).toContain('map: "idx_gate_reports_project_gate_target"');
 
-    // Column-level PRAGMA table_info parity across V9-V11 Epic 08 models
+    // Column-level PRAGMA table_info parity across V12-V14 Epic 08 models
     const tableModelPairs: Array<[string, string]> = [
       ["skill_plugins", "SkillPlugin"],
       ["knowledge_cards", "KnowledgeCard"],
@@ -331,6 +414,22 @@ describe("P1 Persistence Contract & SQLite WAL V1-V11 Mirror Verification (ADR-0
       const sqliteCols = pragmaRows.map((r) => r.name).sort();
       const prismaCols = parsePrismaModelColumns(schemaText, modelName);
       expect(sqliteCols, `Column parity for ${tableName} <-> ${modelName}`).toEqual(prismaCols);
+    }
+
+    // Verify Story 05.3 V11 additive columns exist in both SQLite and schema.prisma
+    for (const [table, cols] of [
+      ["chat_sessions", ["forked_from_session_id", "forked_from_message_id"]],
+      ["chat_artifact_snapshots", ["proposal_id", "parent_snapshot_id", "node_snapshot_json"]],
+      ["version_snapshots", ["proposal_id", "parent_snapshot_id", "chat_artifact_snapshot_id"]],
+      ["github_pull_requests", ["snapshot_id", "handoff_manifest_sha256", "visual_diff_summary_json"]],
+    ] as const) {
+      const tableCols = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(
+        (r) => r.name
+      );
+      for (const col of cols) {
+        expect(tableCols).toContain(col);
+        expect(schemaText).toContain(`@map("${col}")`);
+      }
     }
 
     const now = Date.now();

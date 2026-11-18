@@ -2,6 +2,12 @@
 // @implements AC-01, AC-02, AC-03, AC-04, AC-05, AC-06
 import { z } from "zod";
 import {
+  BindGitRemoteSchema,
+  ConnectGitHubSchema,
+  SelectGitHubSchema,
+  SetDefaultIdeSchema,
+} from "./validations/github-ide-integration";
+import {
   ProbeCliInputSchema,
   UpsertAgentSettingInputSchema,
   UpsertMcpServerInputSchema,
@@ -39,15 +45,20 @@ import * as singleSpecRoute from "../app/api/projects/[id]/specs/[spec_key]/rout
 import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize/route";
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
 import * as versionSnapshotsRoute from "../app/api/projects/[id]/snapshots/route";
+import * as singleSnapshotRoute from "../app/api/projects/[id]/snapshots/[snapshotId]/route";
 import * as exportSnapshotRoute from "../app/api/projects/[id]/snapshots/export/route";
 import * as downloadSnapshotRoute from "../app/api/projects/[id]/snapshots/export/download/route";
 import * as snapshotPrRoute from "../app/api/projects/[id]/snapshots/pr/route";
 import * as revertSnapshotRoute from "../app/api/projects/[id]/snapshots/[snapshotId]/revert/route";
+import * as forkTurnSnapshotRoute from "../app/api/projects/[id]/snapshots/[turnSnapshotId]/fork/route";
+import * as openIdeHandoffRoute from "../app/api/projects/[id]/handoff/open-ide/route";
 import * as proposalsRoute from "../app/api/projects/[id]/proposals/route";
 import * as singleProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/route";
 import * as validateProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/validate/route";
 import * as applyProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/apply/route";
 import * as rejectProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/reject/route";
+import * as diffProposalRoute from "../app/api/projects/[id]/proposals/[proposalId]/diff/route";
+import * as decideTradeoffRoute from "../app/api/projects/[id]/proposals/[proposalId]/tradeoffs/[tradeoffId]/decide/route";
 import * as sdiIntentRoute from "../app/api/projects/[id]/sdi/intent/route";
 import * as sdiClarificationRoute from "../app/api/projects/[id]/sdi/clarification/route";
 
@@ -118,8 +129,15 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/snapshots\/export\/download$/, extractParams: idOnly, resolveHandler: () => downloadSnapshotRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/snapshots\/export$/, extractParams: idOnly, resolveHandler: () => exportSnapshotRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/snapshots\/pr$/, extractParams: idOnly, resolveHandler: () => snapshotPrRoute.POST },
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/snapshots\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/snapshots/${safeEncodeSegment(m[2])}`),
+  { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/snapshots\/([^/]+)$/, extractParams: (m) => ({ id: m[1], snapshotId: m[2] }), resolveHandler: () => singleSnapshotRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/snapshots\/([^/]+)\/revert$/, extractParams: (m) => ({ id: m[1], snapshotId: m[2] }), resolveHandler: () => revertSnapshotRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/snapshots\/([^/]+)\/fork$/, extractParams: (m) => ({ id: m[1], turnSnapshotId: m[2] }), resolveHandler: () => forkTurnSnapshotRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/handoff\/open-ide$/, extractParams: idOnly, resolveHandler: () => openIdeHandoffRoute.POST },
+  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/integrations\/status$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/integrations/status`),
+  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/integrations\/github\/connect$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/integrations/github/connect`, ConnectGitHubSchema),
+  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/integrations\/github\/select$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/integrations/github/select`, SelectGitHubSchema),
+  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/integrations\/git-remote$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/integrations/git-remote`, BindGitRemoteSchema),
+  proxyRoute("POST", /^\/api\/projects\/([^/]+)\/integrations\/ide\/default$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/integrations/ide/default`, SetDefaultIdeSchema),
 
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/proposals$/, extractParams: idOnly, resolveHandler: () => proposalsRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals$/, extractParams: idOnly, resolveHandler: () => proposalsRoute.POST },
@@ -127,6 +145,8 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/validate$/, extractParams: (m) => ({ id: m[1], proposalId: m[2] }), resolveHandler: () => validateProposalRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/apply$/, extractParams: (m) => ({ id: m[1], proposalId: m[2] }), resolveHandler: () => applyProposalRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/reject$/, extractParams: (m) => ({ id: m[1], proposalId: m[2] }), resolveHandler: () => rejectProposalRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/diff$/, extractParams: (m) => ({ id: m[1], proposalId: m[2] }), resolveHandler: () => diffProposalRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/proposals\/([^/]+)\/tradeoffs\/([^/]+)\/decide$/, extractParams: (m) => ({ id: m[1], proposalId: m[2], tradeoffId: m[3] }), resolveHandler: () => decideTradeoffRoute.POST },
 
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/sdi\/intent$/, extractParams: idOnly, resolveHandler: () => sdiIntentRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/sdi\/intent$/, extractParams: idOnly, resolveHandler: () => sdiIntentRoute.POST },

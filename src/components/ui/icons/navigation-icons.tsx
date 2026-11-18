@@ -77,7 +77,11 @@ export function ExternalLinkIcon({ size = 24, strokeWidth = 1.8, ...props }: Cow
 }
 
 export function PlayIcon({ size = 24, strokeWidth = 1.8, ...props }: CowokIconProps) {
-  return <svg viewBox="0 0 24 24" width={size} height={size} {...base} strokeWidth={strokeWidth} {...props}><polygon points="6 3 20 12 6 21 6 3" /></svg>;
+  return <svg viewBox="0 0 24 24" width={size} height={size} {...base} strokeWidth={strokeWidth} {...props}><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" /></svg>;
+}
+
+export function PauseIcon({ size = 24, strokeWidth = 1.8, ...props }: CowokIconProps) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} {...base} strokeWidth={strokeWidth} {...props}><rect x="6" y="4" width="4" height="16" rx="1.2" /><rect x="14" y="4" width="4" height="16" rx="1.2" /></svg>;
 }
 
 export const NAV_ICON_COMPONENTS = {
@@ -93,6 +97,7 @@ export const NAV_ICON_COMPONENTS = {
   reply: ReplyIcon,
   switch: SwitchIcon,
   play: PlayIcon,
+  pause: PauseIcon,
   "chevron-down": ChevronDownIcon,
   "chevron-right": ChevronRightIcon,
   "panel-close": PanelLeftCloseIcon,

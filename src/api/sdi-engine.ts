@@ -33,13 +33,23 @@ export class SdiEngineClient extends HarnessDaemonTransport {
     );
   }
 
-  compileIntent(projectId: string, input: CompileIntentInput): Promise<DesignIntentResponse> {
+  compileIntent(
+    projectId: string,
+    input: CompileIntentInput,
+    options?: { idempotencyKey?: string }
+  ): Promise<DesignIntentResponse> {
     const validated = CompileIntentSchema.parse(input);
+    const headers: Record<string, string> = {};
+    const ikey = options?.idempotencyKey || input.idempotencyKey;
+    if (ikey) {
+      headers["Idempotency-Key"] = ikey;
+    }
     return this.request(
       `/api/projects/${encodeURIComponent(projectId)}/sdi/intent`,
       DesignIntentResponseSchema,
       {
         method: "POST",
+        headers,
         body: JSON.stringify(validated),
       }
     );

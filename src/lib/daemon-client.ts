@@ -17,7 +17,7 @@ import { clearBffSessionHumanToken, setBffSessionHumanToken } from "./api-guard-
 
 export { buildCanonicalHmacHeaders, stripSpoofedHeaders };
 
-const DAEMON_MIN_SCHEMA_VERSION = 11;
+const DAEMON_MIN_SCHEMA_VERSION = 14;
 const DAEMON_STARTUP_TIMEOUT_MS = 8_000;
 const DAEMON_POLL_INTERVAL_MS = 40;
 const HTTP_UNAUTHORIZED = 401;
@@ -295,11 +295,13 @@ async function fetchDaemonOnce(params: {
   headers["X-Cowok-Role"] = opts.principal.role;
   const targetUrl = `http://127.0.0.1:${lock.port}${opts.daemonPath}${rawQuery ? `?${rawQuery}` : ""}`;
   logger.info("bff_forward_daemon", { method: opts.method, path: opts.daemonPath, correlationId });
+  // Only propagate AbortSignal in Node server runtimes (jsdom swaps global AbortSignal across realms).
+  const serverSignal = typeof window === "undefined" ? opts.signal : undefined;
   return fetch(targetUrl, {
     method: opts.method,
     headers,
     body: opts.method === "GET" || opts.method === "HEAD" || rawBody === "" ? undefined : rawBody,
-    signal: opts.signal,
+    ...(serverSignal ? { signal: serverSignal } : {}),
   });
 }
 

@@ -6,10 +6,41 @@ import { useFormatter } from "../../../hooks/useFormatter";
 import { SpatialMarqueeSelectionSchema } from "../../../lib/validations/flow-workbench";
 
 export const MIN_MARQUEE_PX = 16;
+const CLICK_MAX_DELTA_PX = 6;
+
+interface ElementRectEntry {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+function findDeepestElementAtPoint(
+  x: number,
+  y: number,
+  elementRects?: Record<string, ElementRectEntry>
+): string | null {
+  if (!elementRects) return null;
+  let bestId: string | null = null;
+  let bestArea = Number.POSITIVE_INFINITY;
+  for (const [id, r] of Object.entries(elementRects)) {
+    if (r.width <= 0 || r.height <= 0) continue;
+    if (x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height) {
+      const area = r.width * r.height;
+      if (area < bestArea) {
+        bestArea = area;
+        bestId = id;
+      }
+    }
+  }
+  return bestId;
+}
 
 export const MarqueeSelectionOverlay: React.FC<{
-  onRegionClick: (regionId: string, label: string) => void;
-}> = ({ onRegionClick }) => {
+  nodeLabel?: string;
+  elementRects?: Record<string, ElementRectEntry>;
+  onRegionClick: (regionId: string, label: string, ffId?: string) => void;
+}> = ({ nodeLabel = "SCR", elementRects, onRegionClick }) => {
   const { locale } = useTranslation();
   const { formatNumber } = useFormatter({ locale });
   const [marquee, setMarquee] = useState({
@@ -53,6 +84,15 @@ export const MarqueeSelectionOverlay: React.FC<{
         const rLeft = Math.round(Math.min(marquee.startX, e.clientX - rect.left));
         const rTop = Math.round(Math.min(marquee.startY, e.clientY - rect.top));
         setMarquee((prev) => ({ ...prev, isDragging: false }));
+        if (rw < CLICK_MAX_DELTA_PX && rh < CLICK_MAX_DELTA_PX) {
+          const hitId = findDeepestElementAtPoint(rLeft, rTop, elementRects) || "sec-header";
+          onRegionClick(
+            `[data-ff-id="${hitId}"]`,
+            `@[Element ${nodeLabel} • #${hitId}]`,
+            hitId
+          );
+          return;
+        }
         const valid = SpatialMarqueeSelectionSchema.safeParse({
           x: rLeft,
           y: rTop,

@@ -1,0 +1,13 @@
+# False-positive test fixtures from historical Story 05.1 / 05.3 commits (synthetic test strings, zero real credentials)
+45c5e2780d1fdc191926ac6e7fc61ad66e38113c:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:330
+45c5e2780d1fdc191926ac6e7fc61ad66e38113c:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:358
+45c5e2780d1fdc191926ac6e7fc61ad66e38113c:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:373
+45c5e2780d1fdc191926ac6e7fc61ad66e38113c:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:391
+45c5e2780d1fdc191926ac6e7fc61ad66e38113c:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:406
+45c5e2780d1fdc191926ac6e7fc61ad66e38113c:crates/harness-daemon/tests/story_05_3_snapshots_handoff.rs:generic-api-key:890
+51735b41908cca3bea5c1be6c95bde9685f9e8cc:crates/harness-daemon/tests/story_05_3_snapshots_handoff.rs:generic-api-key:890
+9a5b2e41f4a13d1a4c772cc41c714c175e84144b:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:326
+9a5b2e41f4a13d1a4c772cc41c714c175e84144b:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:348
+9a5b2e41f4a13d1a4c772cc41c714c175e84144b:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:363
+9a5b2e41f4a13d1a4c772cc41c714c175e84144b:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:378
+9a5b2e41f4a13d1a4c772cc41c714c175e84144b:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:393

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { apiFlowExecution } from "@/api/flow-execution";
 import { globalKeyedParallelCoordinator, type NodeStatusSnapshot } from "../store/keyed-parallel-coordinator";
 import { sharedChatStore, toSessionChatKey } from "../store/shared-chat-sync";
+import type { SdiClarificationCardData } from "@/components/workbench/ChatStreamPrimitives";
 export { dispatchNodeExecutionToDaemon, dispatchSteerToDaemon, dispatchTransitionToDaemon } from "./dispatchNodeExecution";
 
 export const FLOATING_CHAT_BOUNDS = {
@@ -26,6 +27,7 @@ export interface FloatingChatMessage {
   timestamp: number;
   projectSeq?: number;
   fencingToken?: number;
+  sdiClarification?: SdiClarificationCardData;
 }
 
 function clampBound(val: number, min: number, max: number): number {

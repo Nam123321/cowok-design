@@ -10,9 +10,11 @@ use spec_registry::plugin_store::{
     ConsumedNonceRow, FencedCronCommit, KnowledgeCardRow, SkillPluginRow,
 };
 use spec_registry::pool::{
-    v3_migration_checksum, v4_migration_checksum, v5_migration_checksum, v6_migration_checksum,
-    v7_migration_checksum, v8_migration_checksum, v9_migration_checksum, SqlitePool,
-    SqliteWalConfig, V1_MIGRATION_SQL, V2_MIGRATION_SQL, V3_MIGRATION_SQL, V4_MIGRATION_SQL,
+    v12_migration_checksum, v13_migration_checksum, v14_migration_checksum, v3_migration_checksum,
+    v4_migration_checksum, v5_migration_checksum, v6_migration_checksum, v7_migration_checksum,
+    v8_migration_checksum, v9_migration_checksum, SqlitePool, SqliteWalConfig, V12_MIGRATION_NAME,
+    V12_MIGRATION_SQL, V13_MIGRATION_NAME, V13_MIGRATION_SQL, V14_MIGRATION_NAME,
+    V14_MIGRATION_SQL, V1_MIGRATION_SQL, V2_MIGRATION_SQL, V3_MIGRATION_SQL, V4_MIGRATION_SQL,
     V5_MIGRATION_SQL, V6_MIGRATION_SQL, V7_MIGRATION_SQL, V8_MIGRATION_NAME, V8_MIGRATION_SQL,
     V9_MIGRATION_NAME,
 };
@@ -175,7 +177,50 @@ fn v9_upgrades_populated_v8_dedups_enabled_and_preserves_discovered() {
 }
 
 #[test]
-fn v9_allocates_dynamic_version_when_v9_occupied_by_sibling_story() {
+fn v12_through_v14_apply_deterministically_after_v11_and_fail_closed_on_tamper() {
+    let dir = tempdir().expect("tempdir");
+    let cowok_dir = dir.path().join(".cowok-design");
+    std::fs::create_dir_all(&cowok_dir).expect("mkdir");
+    let db_path = cowok_dir.join("cowok-design.sqlite3");
+    seed_v8_database(&db_path);
+
+    let pool = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, dir.path())).expect("open");
+    let conn = pool.connection().expect("conn");
+    for (expected_ver, name, expected_sha) in [
+        (9i64, V9_MIGRATION_NAME, v9_migration_checksum()),
+        (12i64, V12_MIGRATION_NAME, v12_migration_checksum()),
+        (13i64, V13_MIGRATION_NAME, v13_migration_checksum()),
+        (14i64, V14_MIGRATION_NAME, v14_migration_checksum()),
+    ] {
+        let (ver, sha): (i64, String) = conn
+            .query_row(
+                "SELECT version, checksum_sha256 FROM schema_migrations WHERE name = ?1",
+                params![name],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .expect("migration row");
+        assert_eq!(ver, expected_ver, "deterministic slot for {name}");
+        assert_eq!(sha, expected_sha, "checksum match for {name}");
+    }
+
+    // Tampering with V12 checksum must fail closed
+    drop(conn);
+    drop(pool);
+    {
+        let conn = Connection::open(&db_path).expect("tamper open");
+        conn.execute(
+            "UPDATE schema_migrations SET checksum_sha256 = 'tampered' WHERE name = ?1",
+            params![V12_MIGRATION_NAME],
+        )
+        .expect("tamper");
+    }
+    let err = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, dir.path()))
+        .expect_err("must fail closed on V12 checksum mismatch");
+    assert!(format!("{err:?}").contains("MIGRATION_CHECKSUM_MISMATCH"));
+}
+
+#[test]
+fn legacy_epic08_v9_to_v11_slots_rekey_to_v12_to_v14_and_backfill_epic05() {
     let dir = tempdir().expect("tempdir");
     let cowok_dir = dir.path().join(".cowok-design");
     std::fs::create_dir_all(&cowok_dir).expect("mkdir");
@@ -183,41 +228,93 @@ fn v9_allocates_dynamic_version_when_v9_occupied_by_sibling_story() {
     seed_v8_database(&db_path);
 
     {
-        let conn = Connection::open(&db_path).expect("open");
-        conn.execute(
-            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
-             VALUES (9, 'V9__story_05_1_sibling.sql', 'deadbeef', 1500)",
-            [],
+        let conn = Connection::open(&db_path).expect("open legacy epic08");
+        conn.execute_batch("PRAGMA foreign_keys = OFF;")
+            .expect("fk off");
+        conn.execute_batch(
+            "ALTER TABLE skill_plugins ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
+             ALTER TABLE skill_plugins ADD COLUMN source_type TEXT NOT NULL DEFAULT 'local';
+             ALTER TABLE skill_plugins ADD COLUMN upstream_repo_url TEXT;
+             ALTER TABLE skill_plugins ADD COLUMN upstream_commit_sha TEXT;
+             ALTER TABLE skill_plugins ADD COLUMN cron_schedule TEXT;
+             ALTER TABLE skill_plugins ADD COLUMN skill_md_path TEXT NOT NULL DEFAULT 'SKILL.md';
+             ALTER TABLE skill_plugins ADD COLUMN plugin_json_path TEXT NOT NULL DEFAULT 'plugin.json';
+             ALTER TABLE skill_plugins ADD COLUMN last_synced_at BIGINT;
+             ALTER TABLE skill_plugins ADD COLUMN revision BIGINT NOT NULL DEFAULT 1;
+             ALTER TABLE skill_plugins ADD COLUMN staging_version TEXT;
+             ALTER TABLE skill_plugins ADD COLUMN staging_manifest_json TEXT;
+             ALTER TABLE skill_plugins ADD COLUMN staging_diff_reasons_json TEXT;
+             ALTER TABLE skill_plugins ADD COLUMN staging_bundle_dir TEXT;
+             ALTER TABLE skill_plugins ADD COLUMN staging_package_sha256 TEXT;
+             ALTER TABLE skill_plugins ADD COLUMN breaking_change_isolated INTEGER NOT NULL DEFAULT 0;
+             ALTER TABLE skill_plugins ADD COLUMN quarantined INTEGER NOT NULL DEFAULT 0;
+             ALTER TABLE skill_plugins ADD COLUMN quarantine_reason TEXT;",
         )
-        .expect("claim v9 by sibling");
+        .expect("v12 pre-cols");
+        conn.execute_batch(V12_MIGRATION_SQL).expect("legacy v9");
+        conn.execute_batch(V13_MIGRATION_SQL).expect("legacy v10");
+        conn.execute_batch(
+            "ALTER TABLE gate_reports ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'local-default';
+             ALTER TABLE gate_reports ADD COLUMN correlation_id TEXT NOT NULL DEFAULT '';
+             ALTER TABLE gate_reports ADD COLUMN target_id TEXT NOT NULL DEFAULT '';
+             ALTER TABLE gate_reports ADD COLUMN action TEXT NOT NULL DEFAULT '';
+             ALTER TABLE gate_reports ADD COLUMN revision BIGINT NOT NULL DEFAULT 0;
+             ALTER TABLE gate_reports ADD COLUMN fencing_token BIGINT NOT NULL DEFAULT 0;
+             ALTER TABLE gate_reports ADD COLUMN reason_code TEXT NOT NULL DEFAULT '';
+             ALTER TABLE daemon_sessions ADD COLUMN actor_kind TEXT NOT NULL DEFAULT 'AGENT_HMAC';",
+        )
+        .expect("v14 pre-cols");
+        conn.execute_batch(V14_MIGRATION_SQL).expect("legacy v11");
+
+        for (ver, legacy_name, sha) in [
+            (
+                9i64,
+                "V9__epic08_plugins_learn_cron.sql",
+                v12_migration_checksum(),
+            ),
+            (
+                10i64,
+                "V10__epic08_audit_remediation.sql",
+                v13_migration_checksum(),
+            ),
+            (
+                11i64,
+                "V11__epic08_party_remediation.sql",
+                v14_migration_checksum(),
+            ),
+        ] {
+            conn.execute(
+                "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+                 VALUES (?1, ?2, ?3, 1500)",
+                params![ver, legacy_name, sha],
+            )
+            .expect("insert legacy epic08 slot");
+        }
     }
 
-    let pool = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, dir.path())).expect("open");
+    let pool = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, dir.path()))
+        .expect("rekey legacy epic08 slots and backfill V9..V11");
     let conn = pool.connection().expect("conn");
-    let (ver, sha): (i64, String) = conn
-        .query_row(
-            "SELECT version, checksum_sha256 FROM schema_migrations WHERE name = ?1",
-            params![V9_MIGRATION_NAME],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        )
-        .expect("v9 row");
-    assert_eq!(ver, 10, "must dynamically allocate next version (>= 9)");
-    assert_eq!(sha, v9_migration_checksum());
-
-    // Tampering with checksum must fail closed
-    drop(conn);
-    drop(pool);
-    {
-        let conn = Connection::open(&db_path).expect("tamper open");
-        conn.execute(
-            "UPDATE schema_migrations SET checksum_sha256 = 'tampered' WHERE name = ?1",
-            params![V9_MIGRATION_NAME],
-        )
-        .expect("tamper");
-    }
-    let err = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, dir.path()))
-        .expect_err("must fail closed on V9 checksum mismatch");
-    assert!(format!("{err:?}").contains("MIGRATION_CHECKSUM_MISMATCH"));
+    let entries: Vec<(i64, String)> = {
+        let mut stmt = conn
+            .prepare("SELECT version, name FROM schema_migrations WHERE version >= 9 ORDER BY version ASC")
+            .expect("prep");
+        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .expect("query")
+            .map(Result::unwrap)
+            .collect()
+    };
+    assert_eq!(
+        entries,
+        vec![
+            (9, V9_MIGRATION_NAME.to_string()),
+            (10, spec_registry::pool::V10_MIGRATION_NAME.to_string()),
+            (11, spec_registry::pool::V11_MIGRATION_NAME.to_string()),
+            (12, V12_MIGRATION_NAME.to_string()),
+            (13, V13_MIGRATION_NAME.to_string()),
+            (14, V14_MIGRATION_NAME.to_string()),
+        ]
+    );
 }
 
 #[test]

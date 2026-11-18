@@ -1,10 +1,13 @@
 {
   "schema_version": "1.0.0",
   "project_slug": "cowok-design",
-  "verified_state_sha": "f76a062ebd54cb7ba56f424a29c3309e3f7a68d074832b072811d1f3d3b27d96",
-  "generated_at": "2026-11-18T10:57:44.346405",
+  "verified_state_sha": "b303bc44ac2a188cb96a1934447cbeca8dd5696a39f190ac1719afbd4475458a",
+  "generated_at": "2026-11-18T11:55:14.403125",
   "maturity_baseline_epics": [
+    "01",
     "03",
+    "04",
+    "05",
     "08"
   ],
   "waves": [
@@ -13,7 +16,8 @@
       "wave_name": "Wave 1: Vertical Value Increment 1",
       "status": "active",
       "epics": [
-        "01",
+        "02",
+        "06",
         "09"
       ],
       "sub_epic_slices": [],
@@ -32,8 +36,8 @@
       "wave_name": "Wave 2: Vertical Value Increment 2",
       "status": "pending",
       "epics": [
-        "02",
-        "04"
+        "07",
+        "10"
       ],
       "sub_epic_slices": [],
       "vertical_value_slice": "Delivery of core capabilities for Wave 2",
@@ -51,8 +55,7 @@
       "wave_name": "Wave 3: Vertical Value Increment 3",
       "status": "pending",
       "epics": [
-        "05",
-        "06"
+        "11"
       ],
       "sub_epic_slices": [],
       "vertical_value_slice": "Delivery of core capabilities for Wave 3",
@@ -70,30 +73,10 @@
       "wave_name": "Wave 4: Vertical Value Increment 4",
       "status": "pending",
       "epics": [
-        "10",
-        "07"
-      ],
-      "sub_epic_slices": [],
-      "vertical_value_slice": "Delivery of core capabilities for Wave 4",
-      "parallel_tracks": [
-        "Stream-1",
-        "Stream-2",
-        "Stream-3",
-        "Stream-4",
-        "Stream-5"
-      ],
-      "stream_execution_chains": []
-    },
-    {
-      "wave_id": 5,
-      "wave_name": "Wave 5: Vertical Value Increment 5",
-      "status": "pending",
-      "epics": [
-        "11",
         "12"
       ],
       "sub_epic_slices": [],
-      "vertical_value_slice": "Delivery of core capabilities for Wave 5",
+      "vertical_value_slice": "Delivery of core capabilities for Wave 4",
       "parallel_tracks": [
         "Stream-1",
         "Stream-2",
@@ -106,43 +89,30 @@
   ],
   "allowed_stories_by_wave": {
     "wave_1": [
-      "01.1",
-      "01.2",
-      "01.3",
+      "02.1",
+      "02.2",
+      "02.3",
+      "06.1",
+      "06.2",
+      "06.3",
       "09.1",
       "09.2",
       "09.3"
     ],
     "wave_2": [
-      "02.1",
-      "02.2",
-      "02.3",
-      "04.1",
-      "04.2",
-      "04.3",
-      "04.4",
-      "04.5"
-    ],
-    "wave_3": [
-      "05.1",
-      "05.2",
-      "05.3",
-      "06.1",
-      "06.2",
-      "06.3"
-    ],
-    "wave_4": [
-      "10.1",
-      "10.2",
-      "10.3",
       "07.1",
       "07.2",
-      "07.3"
+      "07.3",
+      "10.1",
+      "10.2",
+      "10.3"
     ],
-    "wave_5": [
+    "wave_3": [
       "11.1",
       "11.2",
-      "11.3",
+      "11.3"
+    ],
+    "wave_4": [
       "12.1",
       "12.2",
       "12.3"
@@ -151,18 +121,30 @@
   "immediate_p0_action_slices": [
     {
       "slice_id": "P0.1",
-      "epic_id": "01",
-      "name": "Cargo Workspace, Domain Contracts (ts-rs) & 16-Table SQLite Registry (Immediate P0 Anchor)",
+      "epic_id": "02",
+      "name": "JIT Prompt Assembler & 3-Profile Model Capability Adapter (Immediate P0 Anchor)",
       "story_ids": [
-        "01.1",
-        "01.2",
-        "01.3"
+        "02.1",
+        "02.2",
+        "02.3"
       ],
       "track": "Stream-1",
       "rationale": "Zero blocker risk anchor for Wave 1 unblocking downstream business workflows."
     },
     {
       "slice_id": "P0.2",
+      "epic_id": "06",
+      "name": "Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench (Immediate P0 Anchor)",
+      "story_ids": [
+        "06.1",
+        "06.2",
+        "06.3"
+      ],
+      "track": "Stream-2",
+      "rationale": "Zero blocker risk anchor for Wave 1 unblocking downstream business workflows."
+    },
+    {
+      "slice_id": "P0.3",
       "epic_id": "09",
       "name": "Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine (Immediate P0 Anchor)",
       "story_ids": [
@@ -170,7 +152,7 @@
         "09.2",
         "09.3"
       ],
-      "track": "Stream-2",
+      "track": "Stream-4",
       "rationale": "Zero blocker risk anchor for Wave 1 unblocking downstream business workflows."
     }
   ],

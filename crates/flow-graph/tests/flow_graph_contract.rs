@@ -54,6 +54,7 @@ fn it_dag_01_to_05_orthogonal_occ_cycle_check_batch_layout_and_idempotency() {
             viewport_preset: "desktop-1440".into(),
             pos_x: 100.0,
             pos_y: 120.0,
+            ..Default::default()
         },
     )
     .expect("create n1");
@@ -91,6 +92,7 @@ fn it_dag_01_to_05_orthogonal_occ_cycle_check_batch_layout_and_idempotency() {
             flow_type: "main".into(),
             trigger_event: "onClick".into(),
             guard_condition: None,
+            ..Default::default()
         },
     )
     .expect_err("self loop");
@@ -118,6 +120,7 @@ fn it_dag_01_to_05_orthogonal_occ_cycle_check_batch_layout_and_idempotency() {
             viewport_preset: "desktop-1440".into(),
             pos_x: 420.0,
             pos_y: 120.0,
+            ..Default::default()
         }],
         updated_nodes: vec![],
         deleted_nodes: vec![],
@@ -129,9 +132,11 @@ fn it_dag_01_to_05_orthogonal_occ_cycle_check_batch_layout_and_idempotency() {
             flow_type: "if_else".into(),
             trigger_event: "onSubmit".into(),
             guard_condition: Some("auth.ok".into()),
+            ..Default::default()
         }],
         updated_transitions: vec![],
         deleted_transitions: vec![],
+        ..Default::default()
     };
 
     let deployed = deploy_draft(&pool, "local-default", &project_id, &draft_req).expect("deploy");
@@ -162,6 +167,7 @@ fn it_dag_01_to_05_orthogonal_occ_cycle_check_batch_layout_and_idempotency() {
             flow_type: "main".into(),
             trigger_event: "onClick".into(),
             guard_condition: None,
+            ..Default::default()
         },
     )
     .expect_err("cycle");
@@ -258,6 +264,7 @@ fn it_dag_01_to_05_orthogonal_occ_cycle_check_batch_layout_and_idempotency() {
             viewport_preset: "desktop-1440".into(),
             pos_x: 0.0,
             pos_y: 0.0,
+            ..Default::default()
         },
     )
     .expect_err("invalid fixture_ref must fail validation");
@@ -283,6 +290,7 @@ fn it_dag_01_to_05_orthogonal_occ_cycle_check_batch_layout_and_idempotency() {
             viewport_preset: "tablet".into(),
             pos_x: 10.0,
             pos_y: 20.0,
+            ..Default::default()
         },
     )
     .expect("legacy tablet viewport alias must normalize");
@@ -306,6 +314,7 @@ fn it_dag_01_to_05_orthogonal_occ_cycle_check_batch_layout_and_idempotency() {
             viewport_preset: "bogus-vp".into(),
             pos_x: 0.0,
             pos_y: 0.0,
+            ..Default::default()
         },
     )
     .expect_err("invalid viewport_preset must fail validation");

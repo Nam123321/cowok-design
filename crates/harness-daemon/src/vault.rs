@@ -402,7 +402,7 @@ impl VaultStore {
         Ok(())
     }
 
-    fn scoped_key(tenant_id: &str, provider_id: &str) -> String {
+    pub(crate) fn scoped_key(tenant_id: &str, provider_id: &str) -> String {
         let tid = tenant_id.trim();
         let pid = provider_id.trim().to_ascii_lowercase();
         format!("tenant::{tid}::{pid}")

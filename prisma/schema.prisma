@@ -245,20 +245,23 @@ model GateReport {
 }
 
 model SdiIntent {
-  id               String  @id @default(uuid())
-  tenantId         String  @default("local-default") @map("tenant_id")
-  projectId        String  @map("project_id")
-  rawPrompt        String  @map("raw_prompt")
-  intentType       String  @map("intent_type")
-  targetScopeJson  String  @default("{}") @map("target_scope_json")
-  ambiguityScore   Float   @default(0.0) @map("ambiguity_score")
-  riskScore        Float   @default(0.0) @map("risk_score")
-  variantsJson     String? @map("variants_json")
+  id                String  @id @default(uuid())
+  tenantId          String  @default("local-default") @map("tenant_id")
+  projectId         String  @map("project_id")
+  rawPrompt         String  @map("raw_prompt")
+  intentType        String  @map("intent_type")
+  routingMode       String  @default("direct_edit") @map("routing_mode")
+  targetScopeJson   String  @default("{}") @map("target_scope_json")
+  ambiguityScore    Float   @default(0.0) @map("ambiguity_score")
+  riskScore         Float   @default(0.0) @map("risk_score")
+  variantsJson      String? @map("variants_json")
+  gapQuestionsJson  String? @map("gap_questions_json")
   selectedVariantId String? @map("selected_variant_id")
-  status           String  @default("clarifying")
-  designIntentJson String? @map("design_intent_json")
-  createdAt        String  @map("created_at")
-  updatedAt        String  @map("updated_at")
+  status            String  @default("clarifying")
+  designIntentJson  String? @map("design_intent_json")
+  revision          Int     @default(1)
+  createdAt         String  @map("created_at")
+  updatedAt         String  @map("updated_at")
 
   @@index([tenantId, projectId])
   @@map("sdi_intents")
@@ -300,6 +303,7 @@ model FlowGraph {
   title         String @default("Default Flow")
   version       Int    @default(1)
   layoutVersion Int    @default(1) @map("layout_version")
+  revision      Int    @default(1)
   updatedAt     BigInt @map("updated_at")
 
   @@unique([projectId, portalKey])
@@ -344,26 +348,31 @@ model Storyboard {
 }
 
 model FlowNode {
-  id                 String @id @default(uuid())
-  graphId            String @map("graph_id")
-  tenantId           String @map("tenant_id")
-  projectId          String @map("project_id")
-  portalId           String @default("default") @map("portal_id")
-  screenKey          String @map("screen_key")
+  id                 String  @id @default(uuid())
+  graphId            String  @map("graph_id")
+  tenantId           String  @map("tenant_id")
+  projectId          String  @map("project_id")
+  portalId           String  @default("default") @map("portal_id")
+  screenKey          String  @map("screen_key")
   title              String
-  nodeType           String @default("screen") @map("node_type")
-  routePath          String @default("/") @map("route_path")
-  componentEntryPath String @default("") @map("component_entry_path")
-  fixtureRef         String @default("Default") @map("fixture_ref")
-  fixtureJson        String @default("{}") @map("fixture_json")
-  note               String @default("")
-  viewportPreset     String @default("desktop-1440") @map("viewport_preset")
-  posX               Float  @default(0.0) @map("pos_x")
-  posY               Float  @default(0.0) @map("pos_y")
-  version            Int    @default(1)
-  layoutVersion      Int    @default(1) @map("layout_version")
-  createdAt          BigInt @map("created_at")
-  updatedAt          BigInt @map("updated_at")
+  nodeType           String  @default("screen") @map("node_type")
+  routePath          String  @default("/") @map("route_path")
+  componentEntryPath String  @default("") @map("component_entry_path")
+  fixtureRef         String  @default("Default") @map("fixture_ref")
+  fixtureJson        String  @default("{}") @map("fixture_json")
+  note               String  @default("")
+  viewportPreset     String  @default("desktop-1440") @map("viewport_preset")
+  posX               Float   @default(0.0) @map("pos_x")
+  posY               Float   @default(0.0) @map("pos_y")
+  portalGroup        String? @map("portal_group")
+  sharedAppShellId   String? @map("shared_app_shell_id")
+  miniSkeletonHtml   String? @map("mini_skeleton_html")
+  ctaPillsJson       String  @default("[]") @map("cta_pills_json")
+  version            Int     @default(1)
+  layoutVersion      Int     @default(1) @map("layout_version")
+  revision           Int     @default(1)
+  createdAt          BigInt  @map("created_at")
+  updatedAt          BigInt  @map("updated_at")
 
   outgoingTransitions FlowTransition[]  @relation("SourceTransitions")
   incomingTransitions FlowTransition[]  @relation("TargetTransitions")
@@ -381,18 +390,21 @@ model FlowNode {
 }
 
 model FlowTransition {
-  id             String  @id @default(uuid())
-  graphId        String  @map("graph_id")
-  tenantId       String  @map("tenant_id")
-  projectId      String  @map("project_id")
-  sourceNodeId   String  @map("source_node_id")
-  targetNodeId   String  @map("target_node_id")
-  flowType       String  @default("main") @map("flow_type")
-  triggerEvent   String  @default("onClick") @map("trigger_event")
-  guardCondition String? @map("guard_condition")
-  version        Int     @default(1)
-  createdAt      BigInt  @map("created_at")
-  updatedAt      BigInt  @map("updated_at")
+  id                String  @id @default(uuid())
+  graphId           String  @map("graph_id")
+  tenantId          String  @map("tenant_id")
+  projectId         String  @map("project_id")
+  sourceNodeId      String  @map("source_node_id")
+  targetNodeId      String  @map("target_node_id")
+  flowType          String  @default("main") @map("flow_type")
+  triggerEvent      String  @default("onClick") @map("trigger_event")
+  guardCondition    String? @map("guard_condition")
+  sourceCtaFfId     String? @map("source_cta_ff_id")
+  maxLoopIterations Int     @default(3) @map("max_loop_iterations")
+  version           Int     @default(1)
+  revision          Int     @default(1)
+  createdAt         BigInt  @map("created_at")
+  updatedAt         BigInt  @map("updated_at")
 
   sourceNode FlowNode @relation("SourceTransitions", fields: [sourceNodeId, tenantId, projectId], references: [id, tenantId, projectId], onDelete: Cascade)
   targetNode FlowNode @relation("TargetTransitions", fields: [targetNodeId, tenantId, projectId], references: [id, tenantId, projectId], onDelete: Cascade)
@@ -439,15 +451,18 @@ model ElementComment {
 }
 
 model ScreenFixture {
-  id          String @id @default(uuid())
-  tenantId    String @default("local-default") @map("tenant_id")
-  projectId   String @map("project_id")
-  nodeId      String @map("node_id")
-  variant     String @default("default")
-  payloadJson String @default("{}") @map("payload_json")
-  isDefault   Int    @default(0) @map("is_default")
-  createdAt   BigInt @map("created_at")
-  updatedAt   BigInt @map("updated_at")
+  id             String  @id @default(uuid())
+  tenantId       String  @default("local-default") @map("tenant_id")
+  projectId      String  @map("project_id")
+  nodeId         String  @map("node_id")
+  variant        String  @default("default")
+  payloadJson    String  @default("{}") @map("payload_json")
+  isDefault      Int     @default(0) @map("is_default")
+  presetKey      String? @map("preset_key")
+  sampleRowsJson String  @default("[]") @map("sample_rows_json")
+  revision       Int     @default(1)
+  createdAt      BigInt  @map("created_at")
+  updatedAt      BigInt  @map("updated_at")
 
   @@unique([projectId, nodeId, variant])
   @@index([tenantId, projectId, nodeId])
@@ -524,18 +539,21 @@ model ExecutionEvent {
 // ============================================================================
 
 model ChatSession {
-  id            String  @id @default(uuid())
-  tenantId      String  @default("local-default") @map("tenant_id")
-  projectId     String  @map("project_id")
-  title         String
-  modelProvider String  @default("gemini") @map("model_provider")
-  archivedAt    BigInt? @map("archived_at")
-  createdAt     BigInt  @map("created_at")
-  updatedAt     BigInt  @map("updated_at")
+  id                  String  @id @default(uuid())
+  tenantId            String  @default("local-default") @map("tenant_id")
+  projectId           String  @map("project_id")
+  title               String
+  modelProvider       String  @default("gemini") @map("model_provider")
+  archivedAt          BigInt? @map("archived_at")
+  forkedFromSessionId String? @map("forked_from_session_id")
+  forkedFromMessageId String? @map("forked_from_message_id")
+  createdAt           BigInt  @map("created_at")
+  updatedAt           BigInt  @map("updated_at")
 
   messages ChatMessage[]
 
   @@index([projectId, createdAt])
+  @@index([forkedFromSessionId, forkedFromMessageId], map: "idx_chat_sessions_forked_from")
   @@map("chat_sessions")
 }
 
@@ -576,19 +594,25 @@ model ChatMessageNodeScope {
 }
 
 model ChatArtifactSnapshot {
-  id           String  @id @default(uuid())
-  projectId    String  @map("project_id")
-  sessionId    String  @map("session_id")
-  messageId    String  @map("message_id")
-  nodeId       String? @map("node_id")
-  artifactType String  @map("artifact_type")
-  contentHash  String  @map("content_hash")
-  manifestJson String  @map("manifest_json")
-  createdAt    BigInt  @map("created_at")
+  id               String  @id @default(uuid())
+  tenantId         String  @default("local-default") @map("tenant_id")
+  projectId        String  @map("project_id")
+  sessionId        String  @map("session_id")
+  messageId        String  @map("message_id")
+  nodeId           String? @map("node_id")
+  proposalId       String? @map("proposal_id")
+  parentSnapshotId String? @map("parent_snapshot_id")
+  artifactType     String  @map("artifact_type")
+  contentHash      String  @map("content_hash")
+  manifestJson     String  @map("manifest_json")
+  nodeSnapshotJson String  @default("{}") @map("node_snapshot_json")
+  createdAt        BigInt  @map("created_at")
 
   message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([projectId, sessionId, messageId])
+  @@index([proposalId], map: "idx_artifact_snapshots_proposal")
+  @@index([parentSnapshotId], map: "idx_artifact_snapshots_parent")
   @@map("chat_artifact_snapshots")
 }
 
@@ -643,6 +667,13 @@ model ChangeProposal {
   projectId            String   @map("project_id")
   specKey              String   @map("spec_key")
   intentId             String?  @map("intent_id")
+  nodeId               String?  @map("node_id")
+  batchId              String?  @map("batch_id")
+  compositeScopeKey    String   @default("") @map("composite_scope_key")
+  contentMode          String   @default("full_file") @map("content_mode")
+  baseFileHashesJson   String   @default("{}") @map("base_file_hashes_json")
+  visualDiffJson       String   @default("{}") @map("visual_diff_json")
+  gateReceiptId        String?  @map("gate_receipt_id")
   title                String   @default("")
   description          String   @default("")
   filesJson            String   @default("[]") @map("files_json")
@@ -653,41 +684,110 @@ model ChangeProposal {
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @default(now()) @map("updated_at")
 
+  targetNodes  ProposalTargetNode[]
+  gateReceipts ProposalGateReceipt[]
+  tradeoffs    ProposalTradeoff[]
+
   @@index([projectId, updatedAt])
+  @@index([projectId, nodeId])
   @@map("change_proposals")
 }
 
+model ProposalTargetNode {
+  proposalId String @map("proposal_id")
+  tenantId   String @default("local-default") @map("tenant_id")
+  projectId  String @map("project_id")
+  nodeId     String @map("node_id")
+
+  proposal ChangeProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@id([proposalId, nodeId])
+  @@index([tenantId, projectId, nodeId])
+  @@map("proposal_target_nodes")
+}
+
+model ProposalGateReceipt {
+  id                 String @id @default(uuid())
+  tenantId           String @default("local-default") @map("tenant_id")
+  projectId          String @map("project_id")
+  proposalId         String @map("proposal_id")
+  diffSha256         String @map("diff_sha256")
+  constraintsSha256  String @map("constraints_sha256")
+  workspaceHeadSha256 String @map("workspace_head_sha256")
+  checksJson         String @default("[]") @map("checks_json")
+  exitCode           Int    @map("exit_code")
+  receiptHmac        String @map("receipt_hmac")
+  createdAt          String @map("created_at")
+
+  proposal ChangeProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId, createdAt])
+  @@map("proposal_gate_receipts")
+}
+
+model ProposalTradeoff {
+  id               String  @id @default(uuid())
+  tenantId         String  @default("local-default") @map("tenant_id")
+  projectId        String  @map("project_id")
+  proposalId       String  @map("proposal_id")
+  nodeId           String? @map("node_id")
+  elementFfId      String  @map("element_ff_id")
+  badgeIndex       Int     @map("badge_index")
+  designNote       String  @default("") @map("design_note")
+  insteadLabel     String  @default("") @map("instead_label")
+  insteadPatchJson String  @default("null") @map("instead_patch_json")
+  decision         String  @default("pending")
+  askPrompt        String? @map("ask_prompt")
+  decidedAt        String? @map("decided_at")
+  createdAt        String  @map("created_at")
+
+  proposal ChangeProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, badgeIndex])
+  @@index([proposalId, badgeIndex])
+  @@map("proposal_tradeoffs")
+}
+
 model VersionSnapshot {
-  id             String   @id @default(uuid())
-  tenantId       String   @default("local-default") @map("tenant_id")
-  projectId      String   @map("project_id")
-  snapshotTag    String   @map("snapshot_tag")
-  versionTag     String   @default("") @map("version_tag")
-  label          String   @default("")
-  description    String   @default("")
-  trigger        String   @default("manual")
-  treeSha256     String   @default("") @map("tree_sha256")
-  filesJson      String   @default("[]") @map("files_json")
-  manifestSha256 String   @map("manifest_sha256")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @default(now()) @map("updated_at")
+  id                     String   @id @default(uuid())
+  tenantId               String   @default("local-default") @map("tenant_id")
+  projectId              String   @map("project_id")
+  snapshotTag            String   @map("snapshot_tag")
+  versionTag             String   @default("") @map("version_tag")
+  label                  String   @default("")
+  description            String   @default("")
+  trigger                String   @default("manual")
+  treeSha256             String   @default("") @map("tree_sha256")
+  filesJson              String   @default("[]") @map("files_json")
+  manifestSha256         String   @map("manifest_sha256")
+  proposalId             String?  @map("proposal_id")
+  parentSnapshotId       String?  @map("parent_snapshot_id")
+  chatArtifactSnapshotId String?  @map("chat_artifact_snapshot_id")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @default(now()) @map("updated_at")
 
   @@index([projectId, createdAt])
+  @@index([proposalId], map: "idx_version_snapshots_proposal")
+  @@index([parentSnapshotId], map: "idx_version_snapshots_parent")
   @@map("version_snapshots")
 }
 
 model GithubPullRequest {
-  id         String   @id @default(uuid())
-  tenantId   String   @default("local-default") @map("tenant_id")
-  projectId  String   @map("project_id")
-  prNumber   Int      @map("pr_number")
-  branchName String   @map("branch_name")
-  title      String
-  prUrl      String   @default("") @map("pr_url")
-  status     String   @default("OPEN")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @default(now()) @map("updated_at")
+  id                     String   @id @default(uuid())
+  tenantId               String   @default("local-default") @map("tenant_id")
+  projectId              String   @map("project_id")
+  prNumber               Int      @map("pr_number")
+  branchName             String   @map("branch_name")
+  title                  String
+  prUrl                  String   @default("") @map("pr_url")
+  status                 String   @default("OPEN")
+  snapshotId             String?  @map("snapshot_id")
+  handoffManifestSha256  String   @default("") @map("handoff_manifest_sha256")
+  visualDiffSummaryJson  String   @default("{}") @map("visual_diff_summary_json")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @default(now()) @map("updated_at")
 
+  @@index([snapshotId], map: "idx_github_prs_snapshot")
   @@map("github_pull_requests")
 }
 
@@ -884,4 +984,20 @@ model WorkspaceSyncIntent {
   @@index([projectId, state, createdAt])
   @@index([tenantId, updatedAt])
   @@map("workspace_sync_intents")
+}
+
+model IdempotencyRecord {
+  tenantId         String  @map("tenant_id")
+  actorId          String  @map("actor_id")
+  idempotencyKey   String  @map("idempotency_key")
+  requestSha256    String  @map("request_sha256")
+  status           String
+  leaseExpiresAt   BigInt  @map("lease_expires_at")
+  responseStatus   Int?    @map("response_status")
+  responseBodyJson String? @map("response_body_json")
+  expiresAt        BigInt  @map("expires_at")
+
+  @@id([tenantId, actorId, idempotencyKey])
+  @@index([expiresAt])
+  @@map("idempotency_records")
 }

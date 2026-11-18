@@ -57,6 +57,15 @@
       "htmlCode": "projects/9168334019814804214/files/f870f206c2984d5ab7efad11d6e58356",
       "localScreenshot": "_iwish-output/mockups/mockup-lay-07-opc-fleet-pty-hub.png",
       "localHtml": "_iwish-output/adhoc-workspace/scratch/stitch-mockup-lay-07.html"
+    },
+    "STORY-05-1-Workbench": {
+      "screenId": "72703936cd3e4d37b8e4c0c1046ac276",
+      "screenName": "projects/9168334019814804214/screens/72703936cd3e4d37b8e4c0c1046ac276",
+      "title": "Story 05.1 Workbench — Cowok-Design (PAT-01 Three-Zone & Option 5 Storyboard Spine)",
+      "screenshot": "projects/9168334019814804214/files/83543a7aedef4b1faad94f307b42db23",
+      "htmlCode": "projects/9168334019814804214/files/c98a35cd6f284ac596b45fb6a5564860",
+      "localScreenshot": "_iwish-output/mockups/mockup-story-05.1-workbench.png",
+      "localHtml": "_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-05/Story-05.1/preview.html"
     }
   }
 }

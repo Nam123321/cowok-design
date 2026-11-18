@@ -79,28 +79,56 @@ pub fn v8_migration_checksum() -> String {
     cached_migration_sha256(&CACHE, V8_MIGRATION_SQL)
 }
 
-pub const V9_MIGRATION_SQL: &str = include_str!("../migrations/V9__epic08_plugins_learn_cron.sql");
-pub const V9_MIGRATION_NAME: &str = "V9__epic08_plugins_learn_cron.sql";
+pub const V9_MIGRATION_SQL: &str =
+    include_str!("../migrations/V9__epic05_storyboard_proposals_handoff.sql");
+pub const V9_MIGRATION_NAME: &str = "V9__epic05_storyboard_proposals_handoff.sql";
 
 pub fn v9_migration_checksum() -> String {
     static CACHE: OnceLock<String> = OnceLock::new();
     cached_migration_sha256(&CACHE, V9_MIGRATION_SQL)
 }
 
-pub const V10_MIGRATION_SQL: &str = include_str!("../migrations/V10__epic08_audit_remediation.sql");
-pub const V10_MIGRATION_NAME: &str = "V10__epic08_audit_remediation.sql";
+pub const V10_MIGRATION_SQL: &str =
+    include_str!("../migrations/V10__story_05_2_proposals_receipts_tradeoffs.sql");
+pub const V10_MIGRATION_NAME: &str = "V10__story_05_2_proposals_receipts_tradeoffs.sql";
 
 pub fn v10_migration_checksum() -> String {
     static CACHE: OnceLock<String> = OnceLock::new();
     cached_migration_sha256(&CACHE, V10_MIGRATION_SQL)
 }
 
-pub const V11_MIGRATION_SQL: &str = include_str!("../migrations/V11__epic08_party_remediation.sql");
-pub const V11_MIGRATION_NAME: &str = "V11__epic08_party_remediation.sql";
+pub const V11_MIGRATION_SQL: &str =
+    include_str!("../migrations/V11__story_05_3_snapshots_fork_handoff.sql");
+pub const V11_MIGRATION_NAME: &str = "V11__story_05_3_snapshots_fork_handoff.sql";
 
 pub fn v11_migration_checksum() -> String {
     static CACHE: OnceLock<String> = OnceLock::new();
     cached_migration_sha256(&CACHE, V11_MIGRATION_SQL)
+}
+
+pub const V12_MIGRATION_SQL: &str =
+    include_str!("../migrations/V12__epic08_plugins_learn_cron.sql");
+pub const V12_MIGRATION_NAME: &str = "V12__epic08_plugins_learn_cron.sql";
+
+pub fn v12_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V12_MIGRATION_SQL)
+}
+
+pub const V13_MIGRATION_SQL: &str = include_str!("../migrations/V13__epic08_audit_remediation.sql");
+pub const V13_MIGRATION_NAME: &str = "V13__epic08_audit_remediation.sql";
+
+pub fn v13_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V13_MIGRATION_SQL)
+}
+
+pub const V14_MIGRATION_SQL: &str = include_str!("../migrations/V14__epic08_party_remediation.sql");
+pub const V14_MIGRATION_NAME: &str = "V14__epic08_party_remediation.sql";
+
+pub fn v14_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V14_MIGRATION_SQL)
 }
 
 /// Configuration for the embedded SQLite WAL connection pool.
@@ -357,9 +385,13 @@ impl SqlitePool {
             Self::apply_v6_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v7_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v8_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::reconcile_legacy_epic08_v9_to_v11_slots(&mut conn, &config.db_path)?;
             Self::apply_v9_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v10_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v11_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v12_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v13_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v14_migration_if_needed(&mut conn, &config.db_path)?;
         }
         harden_sqlite_files(&config.db_path)?;
 
@@ -790,6 +822,123 @@ impl SqlitePool {
     }
 
     fn apply_v9_columns(tx: &Connection) -> Result<(), HarnessError> {
+        for (table, cols) in [
+            (
+                "sdi_intents",
+                &[
+                    ("routing_mode", "TEXT NOT NULL DEFAULT 'direct_edit'"),
+                    ("gap_questions_json", "TEXT"),
+                    ("revision", "INTEGER NOT NULL DEFAULT 1"),
+                ][..],
+            ),
+            (
+                "flow_nodes",
+                &[
+                    ("portal_group", "TEXT"),
+                    ("shared_app_shell_id", "TEXT"),
+                    ("mini_skeleton_html", "TEXT"),
+                    ("cta_pills_json", "TEXT NOT NULL DEFAULT '[]'"),
+                    ("revision", "INTEGER NOT NULL DEFAULT 1"),
+                ][..],
+            ),
+            (
+                "screen_fixtures",
+                &[
+                    ("preset_key", "TEXT"),
+                    ("sample_rows_json", "TEXT NOT NULL DEFAULT '[]'"),
+                    ("revision", "INTEGER NOT NULL DEFAULT 1"),
+                ][..],
+            ),
+            (
+                "flow_graphs",
+                &[("revision", "INTEGER NOT NULL DEFAULT 1")][..],
+            ),
+        ] {
+            Self::ensure_columns_idempotent(tx, table, cols)?;
+        }
+        Ok(())
+    }
+
+    fn apply_v10_columns(tx: &Connection) -> Result<(), HarnessError> {
+        Self::ensure_columns_idempotent(
+            tx,
+            "change_proposals",
+            &[
+                ("node_id", "TEXT"),
+                ("batch_id", "TEXT"),
+                ("composite_scope_key", "TEXT NOT NULL DEFAULT ''"),
+                ("content_mode", "TEXT NOT NULL DEFAULT 'full_file'"),
+                ("base_file_hashes_json", "TEXT NOT NULL DEFAULT '{}'"),
+                ("visual_diff_json", "TEXT NOT NULL DEFAULT '{}'"),
+                ("gate_receipt_id", "TEXT"),
+            ],
+        )
+    }
+
+    fn apply_v11_columns(tx: &Connection) -> Result<(), HarnessError> {
+        for (table, cols) in [
+            (
+                "chat_sessions",
+                &[
+                    (
+                        "forked_from_session_id",
+                        "TEXT REFERENCES chat_sessions(id) ON DELETE SET NULL",
+                    ),
+                    (
+                        "forked_from_message_id",
+                        "TEXT REFERENCES chat_messages(id) ON DELETE SET NULL",
+                    ),
+                ][..],
+            ),
+            (
+                "chat_artifact_snapshots",
+                &[
+                    (
+                        "proposal_id",
+                        "TEXT REFERENCES change_proposals(id) ON DELETE SET NULL",
+                    ),
+                    (
+                        "parent_snapshot_id",
+                        "TEXT REFERENCES chat_artifact_snapshots(id) ON DELETE SET NULL",
+                    ),
+                    ("node_snapshot_json", "TEXT NOT NULL DEFAULT '{}'"),
+                ][..],
+            ),
+            (
+                "version_snapshots",
+                &[
+                    (
+                        "proposal_id",
+                        "TEXT REFERENCES change_proposals(id) ON DELETE SET NULL",
+                    ),
+                    (
+                        "parent_snapshot_id",
+                        "TEXT REFERENCES version_snapshots(id) ON DELETE SET NULL",
+                    ),
+                    (
+                        "chat_artifact_snapshot_id",
+                        "TEXT REFERENCES chat_artifact_snapshots(id) ON DELETE SET NULL",
+                    ),
+                ][..],
+            ),
+            (
+                "github_pull_requests",
+                &[
+                    (
+                        "snapshot_id",
+                        "TEXT REFERENCES version_snapshots(id) ON DELETE SET NULL",
+                    ),
+                    ("handoff_manifest_sha256", "TEXT NOT NULL DEFAULT ''"),
+                    ("visual_diff_summary_json", "TEXT NOT NULL DEFAULT '{}'"),
+                ][..],
+            ),
+        ] {
+            Self::ensure_columns_idempotent(tx, table, cols)?;
+        }
+        Ok(())
+    }
+
+    fn apply_v12_columns(tx: &Connection) -> Result<(), HarnessError> {
         Self::ensure_columns_idempotent(
             tx,
             "skill_plugins",
@@ -815,7 +964,7 @@ impl SqlitePool {
         )
     }
 
-    fn apply_v11_columns(tx: &Connection) -> Result<(), HarnessError> {
+    fn apply_v14_columns(tx: &Connection) -> Result<(), HarnessError> {
         Self::ensure_columns_idempotent(
             tx,
             "gate_reports",
@@ -947,11 +1096,20 @@ impl SqlitePool {
         Self::apply_v9_columns(&tx)?;
         tx.execute_batch(V9_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "genesis_v9"))?;
+        Self::apply_v10_columns(&tx)?;
         tx.execute_batch(V10_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "genesis_v10"))?;
         Self::apply_v11_columns(&tx)?;
         tx.execute_batch(V11_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "genesis_v11"))?;
+        Self::apply_v12_columns(&tx)?;
+        tx.execute_batch(V12_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v12"))?;
+        tx.execute_batch(V13_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v13"))?;
+        Self::apply_v14_columns(&tx)?;
+        tx.execute_batch(V14_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v14"))?;
 
         let now = Utc::now().timestamp_millis();
         for (version, name, sha) in [
@@ -964,6 +1122,9 @@ impl SqlitePool {
             (9i64, V9_MIGRATION_NAME, v9_migration_checksum()),
             (10i64, V10_MIGRATION_NAME, v10_migration_checksum()),
             (11i64, V11_MIGRATION_NAME, v11_migration_checksum()),
+            (12i64, V12_MIGRATION_NAME, v12_migration_checksum()),
+            (13i64, V13_MIGRATION_NAME, v13_migration_checksum()),
+            (14i64, V14_MIGRATION_NAME, v14_migration_checksum()),
         ] {
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
@@ -1236,16 +1397,102 @@ impl SqlitePool {
         Ok(())
     }
 
+    fn reconcile_legacy_epic08_v9_to_v11_slots(
+        conn: &mut Connection,
+        db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let slots = [
+            (
+                "V9__epic08_plugins_learn_cron.sql",
+                12i64,
+                V12_MIGRATION_NAME,
+                v12_migration_checksum(),
+            ),
+            (
+                "V10__epic08_audit_remediation.sql",
+                13i64,
+                V13_MIGRATION_NAME,
+                v13_migration_checksum(),
+            ),
+            (
+                "V11__epic08_party_remediation.sql",
+                14i64,
+                V14_MIGRATION_NAME,
+                v14_migration_checksum(),
+            ),
+        ];
+
+        let mut legacy_hits: Vec<(i64, &str, i64, &str)> = Vec::new();
+        for (old_name, target_ver, new_name, expected_sha) in slots {
+            let row: Option<(i64, String)> = conn
+                .query_row(
+                    "SELECT version, checksum_sha256 FROM schema_migrations WHERE name = ?1",
+                    params![old_name],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()
+                .map_err(|e| map_sqlite_error(e, "read_legacy_epic08_migration_slot"))?;
+            if let Some((old_ver, actual_sha)) = row {
+                if actual_sha != expected_sha {
+                    return Err(HarnessError::ValidationFailed {
+                        reason: format!(
+                            "MIGRATION_CHECKSUM_MISMATCH [{old_name}]: expected {expected_sha}, found {actual_sha}"
+                        ),
+                    });
+                }
+                legacy_hits.push((old_ver, old_name, target_ver, new_name));
+            }
+        }
+
+        if legacy_hits.is_empty() {
+            return Ok(());
+        }
+
+        for (_, _, target_ver, new_name) in &legacy_hits {
+            let occupant: Option<String> = conn
+                .query_row(
+                    "SELECT name FROM schema_migrations WHERE version = ?1",
+                    params![target_ver],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(|e| map_sqlite_error(e, "check_target_migration_slot"))?;
+            if let Some(occ_name) = occupant {
+                if occ_name != *new_name {
+                    return Err(HarnessError::ValidationFailed {
+                        reason: format!(
+                            "LEGACY_MIGRATION_REKEY_CONFLICT: version {target_ver} already occupied by {occ_name}"
+                        ),
+                    });
+                }
+            }
+        }
+
+        Self::create_versioned_backup(conn, db_path, "pre-epic08-rekey")?;
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_legacy_epic08_rekey"))?;
+        for (old_ver, old_name, target_ver, new_name) in legacy_hits.iter().rev() {
+            tx.execute(
+                "UPDATE schema_migrations SET version = ?1, name = ?2 WHERE version = ?3 AND name = ?4",
+                params![target_ver, new_name, old_ver, old_name],
+            )
+            .map_err(|e| map_sqlite_error(e, "update_legacy_epic08_slot"))?;
+        }
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_legacy_epic08_rekey"))?;
+        Ok(())
+    }
+
     fn apply_v9_migration_if_needed(
         conn: &mut Connection,
         db_path: &Path,
     ) -> Result<(), HarnessError> {
         let expected_sha = v9_migration_checksum();
-        // Key by symbolic migration name so Story 08.4 remains collision-free with parallel migrations (EC-E08-10).
         let recorded_sha: Option<String> = conn
             .query_row(
-                "SELECT checksum_sha256 FROM schema_migrations WHERE name = ?1",
-                params![V9_MIGRATION_NAME],
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 9",
+                [],
                 |r| r.get(0),
             )
             .optional()
@@ -1262,13 +1509,36 @@ impl SqlitePool {
             return Ok(());
         }
 
+        // Enforce pre-transaction PRAGMA foreign_keys = ON read-back = 1
+        let pre_fk: i64 = conn
+            .query_row("PRAGMA foreign_keys;", [], |r| r.get(0))
+            .map_err(|e| map_sqlite_error(e, "verify_pre_fk_on_v9"))?;
+        if pre_fk != 1 {
+            return Err(HarnessError::ValidationFailed {
+                reason: "V9_MIGRATION_PRECONDITION_FAILED: PRAGMA foreign_keys must be ON before migration"
+                    .to_string(),
+            });
+        }
+
         let populated_rows: i64 = conn
-            .query_row("SELECT COUNT(*) FROM skill_plugins", [], |r| r.get(0))
+            .query_row(
+                "SELECT (SELECT COUNT(*) FROM projects)
+                      + (SELECT COUNT(*) FROM flow_graphs)
+                      + (SELECT COUNT(*) FROM flow_nodes)
+                      + (SELECT COUNT(*) FROM flow_edges)",
+                [],
+                |r| r.get(0),
+            )
             .unwrap_or(0);
         if populated_rows > 0 {
             Self::create_versioned_backup(conn, db_path, "v9")?;
         }
 
+        let src_edge_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM flow_edges", [], |r| r.get(0))
+            .unwrap_or(0);
+
+        // SQLite 12-Step Rule: PRAGMA foreign_keys = OFF & legacy_alter_table = OFF MUST run OUTSIDE transaction
         if !conn.is_autocommit() {
             return Err(HarnessError::ValidationFailed {
                 reason: "V9_MIGRATION_PRECONDITION_FAILED: connection must be in autocommit mode"
@@ -1296,8 +1566,43 @@ impl SqlitePool {
                 .transaction_with_behavior(TransactionBehavior::Exclusive)
                 .map_err(|e| map_sqlite_error(e, "begin_exclusive_v9"))?;
             Self::apply_v9_columns(&tx)?;
-            tx.execute_batch(V9_MIGRATION_SQL)
-                .map_err(|e| map_sqlite_error(e, "execute_v9_sql"))?;
+
+            if let Some((sql_part1, sql_part2)) =
+                V9_MIGRATION_SQL.split_once("DROP TABLE flow_edges;")
+            {
+                tx.execute_batch(sql_part1)
+                    .map_err(|e| map_sqlite_error(e, "execute_v9_sql_part1"))?;
+
+                let mid_edge_count: i64 = tx
+                    .query_row("SELECT COUNT(*) FROM flow_edges_v9", [], |r| r.get(0))
+                    .map_err(|e| map_sqlite_error(e, "read_v9_mid_edge_count"))?;
+                if src_edge_count != mid_edge_count {
+                    return Err(HarnessError::ValidationFailed {
+                        reason: format!(
+                            "V9_MIGRATION_ROW_COUNT_MISMATCH: expected {src_edge_count}, found {mid_edge_count}"
+                        ),
+                    });
+                }
+
+                tx.execute_batch("DROP TABLE flow_edges;")
+                    .map_err(|e| map_sqlite_error(e, "execute_v9_drop_flow_edges"))?;
+                tx.execute_batch(sql_part2)
+                    .map_err(|e| map_sqlite_error(e, "execute_v9_sql_part2"))?;
+            } else {
+                tx.execute_batch(V9_MIGRATION_SQL)
+                    .map_err(|e| map_sqlite_error(e, "execute_v9_sql"))?;
+            }
+
+            let dst_edge_count: i64 = tx
+                .query_row("SELECT COUNT(*) FROM flow_edges", [], |r| r.get(0))
+                .map_err(|e| map_sqlite_error(e, "read_v9_post_swap_count"))?;
+            if src_edge_count != dst_edge_count {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "V9_MIGRATION_ROW_COUNT_MISMATCH: expected {src_edge_count}, found {dst_edge_count}"
+                    ),
+                });
+            }
 
             let fk_violation_count: usize = {
                 let mut stmt = tx
@@ -1316,20 +1621,10 @@ impl SqlitePool {
                 });
             }
 
-            let max_version: i64 = tx
-                .query_row(
-                    "SELECT COALESCE(MAX(version), 8) FROM schema_migrations",
-                    [],
-                    |r| r.get(0),
-                )
-                .map_err(|e| map_sqlite_error(e, "max_schema_version_v9"))?;
-            let assigned_version = (max_version + 1).max(9);
-
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
-                 VALUES (?1, ?2, ?3, ?4)",
+                 VALUES (9, ?1, ?2, ?3)",
                 params![
-                    assigned_version,
                     V9_MIGRATION_NAME,
                     expected_sha,
                     Utc::now().timestamp_millis()
@@ -1361,13 +1656,13 @@ impl SqlitePool {
 
     fn apply_v10_migration_if_needed(
         conn: &mut Connection,
-        db_path: &Path,
+        _db_path: &Path,
     ) -> Result<(), HarnessError> {
         let expected_sha = v10_migration_checksum();
         let recorded_sha: Option<String> = conn
             .query_row(
-                "SELECT checksum_sha256 FROM schema_migrations WHERE name = ?1",
-                params![V10_MIGRATION_NAME],
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 10",
+                [],
                 |r| r.get(0),
             )
             .optional()
@@ -1384,106 +1679,41 @@ impl SqlitePool {
             return Ok(());
         }
 
-        let populated_rows: i64 = conn
-            .query_row("SELECT COUNT(*) FROM knowledge_cards", [], |r| r.get(0))
-            .unwrap_or(0);
-        if populated_rows > 0 {
-            Self::create_versioned_backup(conn, db_path, "v10")?;
-        }
-        if !conn.is_autocommit() {
-            return Err(HarnessError::ValidationFailed {
-                reason: "V10_MIGRATION_PRECONDITION_FAILED: connection must be in autocommit mode"
-                    .to_string(),
-            });
-        }
-        conn.execute_batch(
-            "PRAGMA foreign_keys = OFF;
-             PRAGMA legacy_alter_table = OFF;",
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v10"))?;
+        Self::apply_v10_columns(&tx)?;
+        tx.execute_batch(V10_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v10_sql"))?;
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (10, ?1, ?2, ?3)",
+            params![
+                V10_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
         )
-        .map_err(|e| map_sqlite_error(e, "disable_fk_for_v10_rebuild"))?;
-        let fk_off: i64 = conn
-            .query_row("PRAGMA foreign_keys;", [], |r| r.get(0))
-            .map_err(|e| map_sqlite_error(e, "verify_fk_off_v10"))?;
-        if fk_off != 0 {
-            return Err(HarnessError::ValidationFailed {
-                reason: "V10_MIGRATION_PRECONDITION_FAILED: PRAGMA foreign_keys remained ON"
-                    .to_string(),
-            });
-        }
-        let tx_res = (|| -> Result<(), HarnessError> {
-            let tx = conn
-                .transaction_with_behavior(TransactionBehavior::Exclusive)
-                .map_err(|e| map_sqlite_error(e, "begin_exclusive_v10"))?;
-            tx.execute_batch(V10_MIGRATION_SQL)
-                .map_err(|e| map_sqlite_error(e, "execute_v10_sql"))?;
-            let fk_violation_count: usize = {
-                let mut stmt = tx
-                    .prepare("PRAGMA foreign_key_check;")
-                    .map_err(|e| map_sqlite_error(e, "prepare_fk_check_v10"))?;
-                let rows = stmt
-                    .query_map([], |r| r.get::<_, String>(0))
-                    .map_err(|e| map_sqlite_error(e, "run_fk_check_v10"))?;
-                rows.count()
-            };
-            if fk_violation_count > 0 {
-                return Err(HarnessError::ValidationFailed {
-                    reason: format!(
-                        "V10_MIGRATION_FK_CHECK_FAILED: {fk_violation_count} foreign key violation(s)"
-                    ),
-                });
-            }
-            let max_version: i64 = tx
-                .query_row(
-                    "SELECT COALESCE(MAX(version), 9) FROM schema_migrations",
-                    [],
-                    |r| r.get(0),
-                )
-                .map_err(|e| map_sqlite_error(e, "max_schema_version_v10"))?;
-            let assigned_version = (max_version + 1).max(10);
-            tx.execute(
-                "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
-                 VALUES (?1, ?2, ?3, ?4)",
-                params![
-                    assigned_version,
-                    V10_MIGRATION_NAME,
-                    expected_sha,
-                    Utc::now().timestamp_millis()
-                ],
-            )
-            .map_err(|e| map_sqlite_error(e, "insert_v10_schema_migration"))?;
-            tx.commit()
-                .map_err(|e| map_sqlite_error(e, "commit_v10_migration"))?;
-            Ok(())
-        })();
-        let restore_res = conn.execute_batch("PRAGMA foreign_keys = ON;");
-        tx_res?;
-        restore_res.map_err(|e| map_sqlite_error(e, "restore_fk_on_v10"))?;
-        let fk_on: i64 = conn
-            .query_row("PRAGMA foreign_keys;", [], |r| r.get(0))
-            .map_err(|e| map_sqlite_error(e, "verify_fk_on_v10"))?;
-        if fk_on != 1 {
-            return Err(HarnessError::ValidationFailed {
-                reason:
-                    "V10_MIGRATION_POSTCONDITION_FAILED: PRAGMA foreign_keys did not restore to 1"
-                        .to_string(),
-            });
-        }
+        .map_err(|e| map_sqlite_error(e, "insert_v10_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v10_migration"))?;
         Ok(())
     }
 
     fn apply_v11_migration_if_needed(
         conn: &mut Connection,
-        db_path: &Path,
+        _db_path: &Path,
     ) -> Result<(), HarnessError> {
         let expected_sha = v11_migration_checksum();
         let recorded_sha: Option<String> = conn
             .query_row(
-                "SELECT checksum_sha256 FROM schema_migrations WHERE name = ?1",
-                params![V11_MIGRATION_NAME],
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 11",
+                [],
                 |r| r.get(0),
             )
             .optional()
             .map_err(|e| map_sqlite_error(e, "read_v11_migration_ledger"))?;
+
         if let Some(actual_sha) = recorded_sha {
             if actual_sha != expected_sha {
                 return Err(HarnessError::ValidationFailed {
@@ -1494,31 +1724,17 @@ impl SqlitePool {
             }
             return Ok(());
         }
-        let populated_rows: i64 = conn
-            .query_row("SELECT COUNT(*) FROM knowledge_cards", [], |r| r.get(0))
-            .unwrap_or(0);
-        if populated_rows > 0 {
-            Self::create_versioned_backup(conn, db_path, "v11")?;
-        }
+
         let tx = conn
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|e| map_sqlite_error(e, "begin_immediate_v11"))?;
         Self::apply_v11_columns(&tx)?;
         tx.execute_batch(V11_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "execute_v11_sql"))?;
-        let max_version: i64 = tx
-            .query_row(
-                "SELECT COALESCE(MAX(version), 10) FROM schema_migrations",
-                [],
-                |r| r.get(0),
-            )
-            .map_err(|e| map_sqlite_error(e, "max_schema_version_v11"))?;
-        let assigned_version = (max_version + 1).max(11);
         tx.execute(
             "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
-             VALUES (?1, ?2, ?3, ?4)",
+             VALUES (11, ?1, ?2, ?3)",
             params![
-                assigned_version,
                 V11_MIGRATION_NAME,
                 expected_sha,
                 Utc::now().timestamp_millis()
@@ -1527,6 +1743,273 @@ impl SqlitePool {
         .map_err(|e| map_sqlite_error(e, "insert_v11_schema_migration"))?;
         tx.commit()
             .map_err(|e| map_sqlite_error(e, "commit_v11_migration"))?;
+        Ok(())
+    }
+
+    fn apply_v12_migration_if_needed(
+        conn: &mut Connection,
+        db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v12_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 12",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v12_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V12]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+
+        let populated_rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM skill_plugins", [], |r| r.get(0))
+            .unwrap_or(0);
+        if populated_rows > 0 {
+            Self::create_versioned_backup(conn, db_path, "v12")?;
+        }
+
+        if !conn.is_autocommit() {
+            return Err(HarnessError::ValidationFailed {
+                reason: "V12_MIGRATION_PRECONDITION_FAILED: connection must be in autocommit mode"
+                    .to_string(),
+            });
+        }
+        conn.execute_batch(
+            "PRAGMA foreign_keys = OFF;
+             PRAGMA legacy_alter_table = OFF;",
+        )
+        .map_err(|e| map_sqlite_error(e, "disable_fk_for_v12_rebuild"))?;
+
+        let fk_off: i64 = conn
+            .query_row("PRAGMA foreign_keys;", [], |r| r.get(0))
+            .map_err(|e| map_sqlite_error(e, "verify_fk_off_v12"))?;
+        if fk_off != 0 {
+            return Err(HarnessError::ValidationFailed {
+                reason: "V12_MIGRATION_PRECONDITION_FAILED: PRAGMA foreign_keys remained ON"
+                    .to_string(),
+            });
+        }
+
+        let rebuild_res = (|| -> Result<(), HarnessError> {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Exclusive)
+                .map_err(|e| map_sqlite_error(e, "begin_exclusive_v12"))?;
+            Self::apply_v12_columns(&tx)?;
+            tx.execute_batch(V12_MIGRATION_SQL)
+                .map_err(|e| map_sqlite_error(e, "execute_v12_sql"))?;
+
+            let fk_violation_count: usize = {
+                let mut stmt = tx
+                    .prepare("PRAGMA foreign_key_check;")
+                    .map_err(|e| map_sqlite_error(e, "prepare_fk_check_v12"))?;
+                let rows = stmt
+                    .query_map([], |r| r.get::<_, String>(0))
+                    .map_err(|e| map_sqlite_error(e, "run_fk_check_v12"))?;
+                rows.count()
+            };
+            if fk_violation_count > 0 {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "V12_MIGRATION_FK_CHECK_FAILED: {fk_violation_count} foreign key violation(s)"
+                    ),
+                });
+            }
+
+            tx.execute(
+                "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+                 VALUES (12, ?1, ?2, ?3)",
+                params![
+                    V12_MIGRATION_NAME,
+                    expected_sha,
+                    Utc::now().timestamp_millis()
+                ],
+            )
+            .map_err(|e| map_sqlite_error(e, "insert_v12_schema_migration"))?;
+
+            tx.commit()
+                .map_err(|e| map_sqlite_error(e, "commit_v12_migration"))?;
+            Ok(())
+        })();
+
+        let restore_res = conn.execute_batch("PRAGMA foreign_keys = ON;");
+        rebuild_res?;
+        restore_res.map_err(|e| map_sqlite_error(e, "restore_fk_on_v12"))?;
+
+        let fk_on: i64 = conn
+            .query_row("PRAGMA foreign_keys;", [], |r| r.get(0))
+            .map_err(|e| map_sqlite_error(e, "verify_fk_on_v12"))?;
+        if fk_on != 1 {
+            return Err(HarnessError::ValidationFailed {
+                reason:
+                    "V12_MIGRATION_POSTCONDITION_FAILED: PRAGMA foreign_keys did not restore to 1"
+                        .to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    fn apply_v13_migration_if_needed(
+        conn: &mut Connection,
+        db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v13_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 13",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v13_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V13]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+
+        let populated_rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM knowledge_cards", [], |r| r.get(0))
+            .unwrap_or(0);
+        if populated_rows > 0 {
+            Self::create_versioned_backup(conn, db_path, "v13")?;
+        }
+        if !conn.is_autocommit() {
+            return Err(HarnessError::ValidationFailed {
+                reason: "V13_MIGRATION_PRECONDITION_FAILED: connection must be in autocommit mode"
+                    .to_string(),
+            });
+        }
+        conn.execute_batch(
+            "PRAGMA foreign_keys = OFF;
+             PRAGMA legacy_alter_table = OFF;",
+        )
+        .map_err(|e| map_sqlite_error(e, "disable_fk_for_v13_rebuild"))?;
+        let fk_off: i64 = conn
+            .query_row("PRAGMA foreign_keys;", [], |r| r.get(0))
+            .map_err(|e| map_sqlite_error(e, "verify_fk_off_v13"))?;
+        if fk_off != 0 {
+            return Err(HarnessError::ValidationFailed {
+                reason: "V13_MIGRATION_PRECONDITION_FAILED: PRAGMA foreign_keys remained ON"
+                    .to_string(),
+            });
+        }
+        let tx_res = (|| -> Result<(), HarnessError> {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Exclusive)
+                .map_err(|e| map_sqlite_error(e, "begin_exclusive_v13"))?;
+            tx.execute_batch(V13_MIGRATION_SQL)
+                .map_err(|e| map_sqlite_error(e, "execute_v13_sql"))?;
+            let fk_violation_count: usize = {
+                let mut stmt = tx
+                    .prepare("PRAGMA foreign_key_check;")
+                    .map_err(|e| map_sqlite_error(e, "prepare_fk_check_v13"))?;
+                let rows = stmt
+                    .query_map([], |r| r.get::<_, String>(0))
+                    .map_err(|e| map_sqlite_error(e, "run_fk_check_v13"))?;
+                rows.count()
+            };
+            if fk_violation_count > 0 {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "V13_MIGRATION_FK_CHECK_FAILED: {fk_violation_count} foreign key violation(s)"
+                    ),
+                });
+            }
+            tx.execute(
+                "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+                 VALUES (13, ?1, ?2, ?3)",
+                params![
+                    V13_MIGRATION_NAME,
+                    expected_sha,
+                    Utc::now().timestamp_millis()
+                ],
+            )
+            .map_err(|e| map_sqlite_error(e, "insert_v13_schema_migration"))?;
+            tx.commit()
+                .map_err(|e| map_sqlite_error(e, "commit_v13_migration"))?;
+            Ok(())
+        })();
+        let restore_res = conn.execute_batch("PRAGMA foreign_keys = ON;");
+        tx_res?;
+        restore_res.map_err(|e| map_sqlite_error(e, "restore_fk_on_v13"))?;
+        let fk_on: i64 = conn
+            .query_row("PRAGMA foreign_keys;", [], |r| r.get(0))
+            .map_err(|e| map_sqlite_error(e, "verify_fk_on_v13"))?;
+        if fk_on != 1 {
+            return Err(HarnessError::ValidationFailed {
+                reason:
+                    "V13_MIGRATION_POSTCONDITION_FAILED: PRAGMA foreign_keys did not restore to 1"
+                        .to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    fn apply_v14_migration_if_needed(
+        conn: &mut Connection,
+        db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v14_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 14",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v14_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V14]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+        let populated_rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM knowledge_cards", [], |r| r.get(0))
+            .unwrap_or(0);
+        if populated_rows > 0 {
+            Self::create_versioned_backup(conn, db_path, "v14")?;
+        }
+
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v14"))?;
+        Self::apply_v14_columns(&tx)?;
+        tx.execute_batch(V14_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v14_sql"))?;
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (14, ?1, ?2, ?3)",
+            params![
+                V14_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
+        )
+        .map_err(|e| map_sqlite_error(e, "insert_v14_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v14_migration"))?;
         Ok(())
     }
 

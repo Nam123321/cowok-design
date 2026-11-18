@@ -62,7 +62,7 @@ const buildTabPillStyle = (isActive: boolean): React.CSSProperties => ({
   backgroundColor: isActive ? "var(--bg-selected)" : "transparent",
   color: isActive ? "var(--text-primary)" : "var(--text-muted)",
   border: "none",
-  borderBottom: isActive ? "2px solid var(--action-primary)" : "2px solid transparent",
+  borderBottom: isActive ? "2px solid var(--tab-indicator-active, var(--action-primary))" : "2px solid transparent",
   cursor: "pointer",
   userSelect: "none",
   whiteSpace: "nowrap",

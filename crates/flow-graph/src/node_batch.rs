@@ -47,7 +47,7 @@ pub(crate) fn batch_positions_in_tx(
         let px = normalize_coord(item.pos_x, "posX")?;
         let py = normalize_coord(item.pos_y, "posY")?;
         tx.execute(
-            "UPDATE flow_nodes SET pos_x = ?1, pos_y = ?2, layout_version = layout_version + 1, updated_at = ?3 \
+            "UPDATE flow_nodes SET pos_x = ?1, pos_y = ?2, layout_version = layout_version + 1, revision = revision + 1, updated_at = ?3 \
              WHERE id = ?4 AND tenant_id = ?5 AND project_id = ?6 AND layout_version = ?7",
             params![px, py, now_ms, item.node_id, tenant_id, project_id, item.expected_layout_version],
         )
@@ -56,7 +56,7 @@ pub(crate) fn batch_positions_in_tx(
 
     let next_lv = if bump_graph && !items.is_empty() {
         tx.execute(
-            "UPDATE flow_graphs SET layout_version = layout_version + 1, updated_at = ?1 WHERE id = ?2",
+            "UPDATE flow_graphs SET layout_version = layout_version + 1, revision = revision + 1, updated_at = ?1 WHERE id = ?2",
             params![now_ms, hdr.id],
         )
         .map_err(|e| FlowServiceError::from_harness(map_sqlite_error(e, "bump_batch_layout")))?;
@@ -114,7 +114,7 @@ pub(crate) fn delete_node_in_tx(
 
     let next_gv = if bump_graph {
         tx.execute(
-            "UPDATE flow_graphs SET version = version + 1, updated_at = ?1 WHERE id = ?2",
+            "UPDATE flow_graphs SET version = version + 1, revision = revision + 1, updated_at = ?1 WHERE id = ?2",
             params![Utc::now().timestamp_millis(), hdr.id],
         )
         .map_err(|e| FlowServiceError::from_harness(map_sqlite_error(e, "bump_del_gv")))?;

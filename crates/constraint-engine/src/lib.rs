@@ -679,6 +679,19 @@ impl AstLinter {
             }
             oxc_ast::ast::Expression::CallExpression(c) => {
                 Self::walk_expression(&c.callee, nodes, content);
+                let is_cn_or_clsx = match &c.callee {
+                    oxc_ast::ast::Expression::Identifier(id) => {
+                        matches!(id.name.as_str(), "cn" | "clsx")
+                    }
+                    _ => false,
+                };
+                if is_cn_or_clsx {
+                    for arg in &c.arguments {
+                        if let Some(expr) = arg.as_expression() {
+                            Self::extract_classes_from_expr(expr, &mut nodes.classes);
+                        }
+                    }
+                }
                 for arg in &c.arguments {
                     if let Some(expr) = arg.as_expression() {
                         Self::walk_expression(expr, nodes, content);
@@ -727,6 +740,19 @@ impl AstLinter {
             oxc_ast::ast::Expression::ChainExpression(ch) => match &ch.expression {
                 oxc_ast::ast::ChainElement::CallExpression(c) => {
                     Self::walk_expression(&c.callee, nodes, content);
+                    let is_cn_or_clsx = match &c.callee {
+                        oxc_ast::ast::Expression::Identifier(id) => {
+                            matches!(id.name.as_str(), "cn" | "clsx")
+                        }
+                        _ => false,
+                    };
+                    if is_cn_or_clsx {
+                        for arg in &c.arguments {
+                            if let Some(expr) = arg.as_expression() {
+                                Self::extract_classes_from_expr(expr, &mut nodes.classes);
+                            }
+                        }
+                    }
                     for arg in &c.arguments {
                         if let Some(expr) = arg.as_expression() {
                             Self::walk_expression(expr, nodes, content);
@@ -1069,7 +1095,11 @@ impl AstLinter {
                 if !tag_name.is_empty() {
                     props_collected.push((name.to_string(), a.name.span()));
                 }
-                if name == "className" || name == "class" {
+                let is_class_attr = name == "className"
+                    || name == "class"
+                    || name.ends_with("ClassName")
+                    || name.ends_with("Class");
+                if is_class_attr {
                     if let Some(ref val) = a.value {
                         match val {
                             oxc_ast::ast::JSXAttributeValue::StringLiteral(lit) => {
@@ -2204,5 +2234,52 @@ export const Card = () => (
         assert!(violations.iter().any(|v| v.message.contains("p-2")));
         assert!(violations.iter().any(|v| v.message.contains("hidden")));
         assert!(violations.iter().any(|v| v.message.contains("m-1")));
+    }
+
+    #[test]
+    fn test_ast_linter_extended_classname_attributes_and_cn_calls() {
+        let rules = vec![ActiveConstraint {
+            rule_code: "BAN_TAILWIND".to_string(),
+            severity: "BLOCKER".to_string(),
+            config_json: "{}".to_string(),
+        }];
+
+        // Test custom *ClassName and *Class attributes
+        let tsx_attrs = r#"
+            export const Card = () => (
+                <div containerClassName="flex flex-col" headerClass="p-4 bg-white" buttonClassName="rounded-md">
+                    <span badgeClass="inline-block">Text</span>
+                </div>
+            );
+        "#;
+        let violations = AstLinter::lint_source(tsx_attrs, &rules).expect("Linting should succeed");
+        assert!(violations.iter().any(|v| v.message.contains("flex")));
+        assert!(violations.iter().any(|v| v.message.contains("p-4")));
+        assert!(violations.iter().any(|v| v.message.contains("rounded-md")));
+        assert!(violations
+            .iter()
+            .any(|v| v.message.contains("inline-block")));
+
+        // Test standalone cn(...) and clsx(...) calls
+        let tsx_calls = r#"
+            import { cn } from "@/lib/utils";
+            import clsx from "clsx";
+            const classes = cn("flex items-center", active && "bg-red-500");
+            const other = clsx("grid gap-4", "text-sm");
+        "#;
+        let call_violations =
+            AstLinter::lint_source(tsx_calls, &rules).expect("Linting should succeed");
+        assert!(call_violations.iter().any(|v| v.message.contains("flex")));
+        assert!(call_violations
+            .iter()
+            .any(|v| v.message.contains("items-center")));
+        assert!(call_violations
+            .iter()
+            .any(|v| v.message.contains("bg-red-500")));
+        assert!(call_violations.iter().any(|v| v.message.contains("grid")));
+        assert!(call_violations.iter().any(|v| v.message.contains("gap-4")));
+        assert!(call_violations
+            .iter()
+            .any(|v| v.message.contains("text-sm")));
     }
 }

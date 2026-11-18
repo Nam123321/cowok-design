@@ -181,6 +181,15 @@ pub(crate) fn deploy_draft_in_tx(
             ),
         ));
     }
+    if let Some(exp_rev) = input.expected_revision {
+        if hdr.revision != exp_rev {
+            return Err(FlowServiceError::new(
+                409,
+                "STALE_REVISION",
+                format!("expectedRevision {} != actual {}", exp_rev, hdr.revision),
+            ));
+        }
+    }
 
     apply_draft_operations(tx, tenant_id, project_id, &hdr.id, input, now_ms)?;
     assert_current_graph_acyclic(tx, tenant_id, project_id)?;
@@ -192,7 +201,7 @@ pub(crate) fn deploy_draft_in_tx(
         hdr.layout_version + 1
     };
     tx.execute(
-        "UPDATE flow_graphs SET version = ?1, layout_version = ?2, updated_at = ?3 WHERE id = ?4",
+        "UPDATE flow_graphs SET version = ?1, layout_version = ?2, revision = revision + 1, updated_at = ?3 WHERE id = ?4",
         params![next_gv, next_lv, now_ms, hdr.id],
     )
     .map_err(|e| {
@@ -280,7 +289,11 @@ fn apply_draft_operations(
         )?;
     }
     for ct in &input.created_transitions {
-        insert_transition_in_tx(tx, tenant_id, project_id, ct, false, false)?;
+        let mut ct_clone = ct.clone();
+        if ct_clone.allow_confirmed_loopback.is_none() {
+            ct_clone.allow_confirmed_loopback = input.allow_confirmed_loopback;
+        }
+        insert_transition_in_tx(tx, tenant_id, project_id, &ct_clone, false, false)?;
     }
     for ut in &input.updated_transitions {
         if ut.patch.expected_version.is_none() {
@@ -290,12 +303,16 @@ fn apply_draft_operations(
                 "updatedTransitions requires expectedVersion",
             ));
         }
+        let mut patch_clone = ut.patch.clone();
+        if patch_clone.allow_confirmed_loopback.is_none() {
+            patch_clone.allow_confirmed_loopback = input.allow_confirmed_loopback;
+        }
         update_transition_in_tx(
             tx,
             tenant_id,
             project_id,
             &ut.transition_id,
-            &ut.patch,
+            &patch_clone,
             false,
             false,
         )?;
