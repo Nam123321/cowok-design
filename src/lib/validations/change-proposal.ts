@@ -31,6 +31,7 @@ export const ValidationCheckResultSchema = z.object({
 export const CreateProposalSchema = z.object({
   id: z.string().uuid().optional(),
   intentId: z.string().uuid().optional(),
+  sourceCommentId: z.string().min(1).optional(),
   nodeId: z.string().min(1).optional(),
   batchId: z.string().min(1).optional(),
   nodeIds: z.array(z.string().min(1)).optional(),
@@ -60,6 +61,7 @@ export const ChangeProposalResponseSchema = z.object({
   tenantId: z.string().min(1),
   projectId: z.string().min(1),
   intentId: z.string().uuid().nullable().optional(),
+  sourceCommentId: z.string().nullable().optional(),
   nodeId: z.string().nullable().optional(),
   batchId: z.string().nullable().optional(),
   compositeScopeKey: z.string().optional(),

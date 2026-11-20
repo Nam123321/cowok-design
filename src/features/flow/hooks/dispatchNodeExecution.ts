@@ -77,6 +77,7 @@ export interface DispatchExecutionParams {
   primaryNode: WorkbenchNode | null;
   selectedNodeIds: string[];
   prompt: string;
+  sourceCommentId?: string;
   coordinator: ReturnType<typeof useKeyedParallelCoordinator>;
   streamAbortRef?: React.MutableRefObject<AbortController | null>;
   onAppendMsg: (msg: FloatingChatMessage) => void;
@@ -109,7 +110,8 @@ export function ensureProjectSseStream(opts: {
   const { projectId, sessionId, streamAbortRef, onAppendMsg } = opts;
   const t: TranslateFn = opts.t ?? ((_k, fallback) => fallback);
   if (!UUID_RE.test(projectId)) return;
-  const existing = activeStreams.get(projectId);
+  const streamKey = `${projectId}::${sessionId || "session-1"}`;
+  const existing = activeStreams.get(streamKey);
   if (existing && !existing.controller.signal.aborted) {
     existing.sessionId = sessionId;
     existing.onAppendMsg = onAppendMsg;
@@ -119,7 +121,7 @@ export function ensureProjectSseStream(opts: {
   }
   const controller = new AbortController();
   const listener: ActiveSseListener = { controller, sessionId, onAppendMsg, t };
-  activeStreams.set(projectId, listener);
+  activeStreams.set(streamKey, listener);
   if (streamAbortRef) streamAbortRef.current = controller;
 
   void apiFlowExecution.streamJobEvents(projectId, {
@@ -137,14 +139,14 @@ export function ensureProjectSseStream(opts: {
         };
         if (listener.onAppendMsg) listener.onAppendMsg(msg);
         else sharedChatStore.appendMessage(toSessionChatKey(projectId, listener.sessionId), {
-          id: msg.id, sender: "agent", text: msg.content, timestamp: new Date().toLocaleTimeString(),
+          id: msg.id, sender: "agent", text: msg.content, timestamp: new Date(msg.timestamp).toISOString().slice(11, 16),
           createdAtMs: msg.timestamp, nodeId: ev.nodeId, jobId: ev.jobId, projectSeq: msg.projectSeq,
         });
       }
       if (events.some((ev) => ev.jobStatus)) void syncCoordinatorFromDaemon(projectId);
     },
   }).catch(() => { /* stream aborted or offline */ }).finally(() => {
-    if (activeStreams.get(projectId) === listener) activeStreams.delete(projectId);
+    if (activeStreams.get(streamKey) === listener) activeStreams.delete(streamKey);
   });
 }
 
@@ -160,6 +162,7 @@ async function synthesizeProposalAndCompleteJobs(
         prompt: params.prompt,
         nodeId: params.primaryNode?.id,
         nodeIds: params.selectedNodeIds,
+        sourceCommentId: params.sourceCommentId,
         screenKey: (params.primaryNode as { screenKey?: string } | null)?.screenKey || null,
       })
     );

@@ -6,8 +6,10 @@ import React from "react";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { KeyedParallelCoordinator } from "../store/keyed-parallel-coordinator";
 import { ContextualNodeFloatingChat } from "../components/ContextualNodeFloatingChat";
+import { AgentChatComposer } from "@/components/workbench/ChatPrimitivesBridge";
 import { SidebarSessionRow } from "@/pages/workbench/components/SidebarSessionRow";
 import { WorkbenchNode } from "../store/flow-workbench-store";
+import { sharedChatStore } from "../store/shared-chat-sync";
 
 describe("Story 04.3: Keyed Parallel Engine, Contextual Multi-Node Floating Chat v2 & 3-Level Sub-Sessions", () => {
   afterEach(() => {
@@ -246,6 +248,104 @@ describe("Story 04.3: Keyed Parallel Engine, Contextual Multi-Node Floating Chat
       expect(isDragValid(15, 15)).toBe(false);
       expect(isDragValid(16, 16)).toBe(true);
       expect(isDragValid(100, 200)).toBe(true);
+    });
+
+    it("ignores IME Enter (isComposing / keyCode 229) and rapid duplicate Enter so one message produces one send", () => {
+      const onSend = vi.fn();
+      render(
+        <AgentChatComposer
+          inputValue="scisdw"
+          onInputChange={vi.fn()}
+          onSend={onSend}
+          attachmentChips={['@[Comment #sec-biometric (440f): "test 123"]']}
+        />
+      );
+      const input = screen.getByTestId("chat-composer-textarea");
+      fireEvent.compositionStart(input);
+      fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+      expect(onSend).not.toHaveBeenCalled();
+      fireEvent.compositionEnd(input);
+
+      fireEvent.keyDown(input, { key: "Enter" });
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(onSend).toHaveBeenCalledTimes(1);
+    });
+
+    it("surfaces pinned comment attachments on Floating Chat Card when Left Chat is shortened even with zero selected nodes", () => {
+      const onRemove = vi.fn();
+      render(
+        <ContextualNodeFloatingChat
+          projectId="11111111-1111-4111-8111-111111111111"
+          sessionId="session-1"
+          selectedNodes={[]}
+          attachmentChips={['@[Comment #ff-slide-headline (1a2b): "Clarify title"]']}
+          onRemoveAttachmentChip={onRemove}
+          onDeselectNode={vi.fn()}
+          onClearSelection={vi.fn()}
+        />
+      );
+      const floatingWin = screen.getByTestId("contextual-node-floating-chat");
+      expect(floatingWin).toBeDefined();
+      expect(floatingWin.style.minHeight).toBe("220px");
+      expect(floatingWin.style.height).toBe("auto");
+      expect(screen.getByTestId("floating-chat-composer-wrapper").textContent).toContain("@[Comment #ff-slide-headline");
+    });
+
+    it("syncs draft text and full session messages 1-1 via sharedChatStore across Sidebar and Floating Chat", () => {
+      const scope = "11111111-1111-4111-8111-111111111111::session-sync-1";
+      sharedChatStore.clearAll();
+      sharedChatStore.appendMessage(scope, {
+        id: "m-sess-general",
+        sender: "human",
+        text: "Yêu cầu chung toàn phiên từ Sidebar",
+        timestamp: "15:30",
+        createdAtMs: 1700000000000,
+      });
+      sharedChatStore.setDraft(scope, "Nháp đang gõ dở từ Sidebar");
+
+      render(
+        <ContextualNodeFloatingChat
+          projectId="11111111-1111-4111-8111-111111111111"
+          sessionId="session-sync-1"
+          selectedNodes={[mockNodeA]}
+          defaultExpanded
+          onDeselectNode={vi.fn()}
+          onClearSelection={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText(/Yêu cầu chung toàn phiên từ Sidebar/)).toBeDefined();
+      const input = screen.getByTestId("floating-chat-composer-textarea") as HTMLTextAreaElement;
+      expect(input.value).toBe("Nháp đang gõ dở từ Sidebar");
+
+      fireEvent.change(input, { target: { value: "Cập nhật tiếp trên Floating Card" } });
+      expect(sharedChatStore.getDraft(scope)).toBe("Cập nhật tiếp trên Floating Card");
+    });
+
+    it("renders Fork-from-here action on non-greeting chat messages and copies history branch cleanly", () => {
+      const scopeA = "proj-fork::sess-main";
+      const scopeB = "proj-fork::sess-branch";
+      sharedChatStore.clearAll();
+      sharedChatStore.appendMessage(scopeA, { id: "m-1", sender: "human", text: "Thiết kế Checkout", timestamp: "15:50", createdAtMs: 100 });
+      sharedChatStore.appendMessage(scopeA, { id: "m-2", sender: "agent", text: "Đã tạo SCR-01", timestamp: "15:51", createdAtMs: 200 });
+      sharedChatStore.appendMessage(scopeA, { id: "m-3", sender: "human", text: "Đổi sang dark mode", timestamp: "15:52", createdAtMs: 300 });
+      sharedChatStore.copyBranchMessages(scopeA, scopeB, "m-2");
+
+      const branched = sharedChatStore.getMessages(scopeB);
+      expect(branched.map((m) => m.id)).toEqual(["m-1", "m-2"]);
+
+      render(
+        <ContextualNodeFloatingChat
+          projectId="proj-fork"
+          sessionId="sess-main"
+          selectedNodes={[mockNodeA]}
+          defaultExpanded
+          onDeselectNode={vi.fn()}
+          onClearSelection={vi.fn()}
+        />
+      );
+      expect(screen.getByTestId("chat-fork-msg-btn-m-1")).toBeDefined();
+      expect(screen.getByTestId("chat-fork-msg-btn-m-2")).toBeDefined();
     });
   });
 });

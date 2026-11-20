@@ -153,7 +153,7 @@ describe("Story 04.4 Coordinator, Floating Chat v2, Left-Open Scope Chips & 3-Le
     }
   });
 
-  it("renders Floating Chat v2 360x480..900x850 clamp, 42px Pill, and Queue HUD badges", () => {
+  it("renders Floating Chat v2 360x220..900x850 progressive clamp, 42px Pill, and Queue HUD badges", () => {
     const nodeA = makeNode("node-a", "SCR-A", "Checkout");
     const { container } = render(
       <div>
@@ -181,7 +181,7 @@ describe("Story 04.4 Coordinator, Floating Chat v2, Left-Open Scope Chips & 3-Le
     const win = screen.getByTestId("contextual-node-floating-chat");
     expect(win.style.minWidth).toBe("360px");
     expect(win.style.maxWidth).toBe("900px");
-    expect(win.style.minHeight).toBe("480px");
+    expect(win.style.minHeight).toBe("220px");
     expect(win.style.maxHeight).toContain("850px");
     expect(container.querySelector(".dag-node-interrupted-badge")).not.toBeNull();
   });

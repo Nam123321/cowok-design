@@ -15,6 +15,7 @@ export interface DaemonFolderPickerDialogProps {
   mode: "create" | "promote";
   projectId?: string;
   initialSlug?: string;
+  initialTab?: "managed" | "browse";
   onClose: () => void;
   onSelectForCreate?: (selectedPath: string | null, managedSlug: string) => void;
   onConfirmPromote?: (projectId: string, targetDirectory: string) => Promise<void>;

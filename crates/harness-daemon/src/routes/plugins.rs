@@ -686,7 +686,7 @@ fn ensure_editor_agent_or_human(
     principal: &FlowPrincipal,
     actor: &VerifiedActorContext,
 ) -> Result<(), Response> {
-    if principal.role == "viewer" {
+    if !matches!(principal.role.as_str(), "editor" | "admin") {
         return Err(err_resp(
             StatusCode::FORBIDDEN,
             "INSUFFICIENT_ROLE",

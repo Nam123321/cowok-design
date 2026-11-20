@@ -13,6 +13,7 @@ pub mod errors;
 pub mod lock;
 pub mod plugin_store;
 pub mod pool;
+pub mod presentation_repo;
 pub mod recovery;
 pub mod registry;
 pub mod sync;

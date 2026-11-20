@@ -143,8 +143,8 @@ async fn story_05_2_v10_schema_node_filtering_and_target_cascade() {
     let tmp = TempDir::new().expect("tempdir");
     let (state, router, tok) = setup_daemon(&tmp);
 
-    // Health endpoint reports schema_version == CURRENT_SCHEMA_VERSION (V14)
-    assert_eq!(CURRENT_SCHEMA_VERSION, 14);
+    // Health endpoint reports schema_version == CURRENT_SCHEMA_VERSION (V15)
+    assert_eq!(CURRENT_SCHEMA_VERSION, 15);
     let (st_h, health) = send_req(&router, "GET", "/api/v1/health", &tok, None).await;
     assert_eq!(st_h, StatusCode::OK);
     assert_eq!(health["schema_version"], CURRENT_SCHEMA_VERSION);
@@ -802,4 +802,105 @@ async fn story_05_2_tradeoff_badges_limits_and_decisions() {
     )
     .await;
     assert_eq!(st_cross, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn story_05_2_source_comment_id_auto_resolves_element_comment_with_i64_updated_at() {
+    let tmp = TempDir::new().expect("tempdir");
+    let (state, router, tok) = setup_daemon(&tmp);
+    let target_file = tmp.path().join("src/comment-fix.html");
+    fs::create_dir_all(target_file.parent().unwrap()).unwrap();
+    fs::write(&target_file, "<div id='cta'>Before</div>").unwrap();
+
+    let proj = create_project(&router, &tok, "comment-resolve-proj", Some(tmp.path())).await;
+    let proj_id = proj.id.to_string();
+    let (node_a, _) = seed_two_flow_nodes(&state, &proj_id);
+
+    // Seed an element comment for node_a
+    let (st_cm, cm_json) = send_req(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{proj_id}/flow/nodes/{node_a}/comments"),
+        &tok,
+        Some(json!({
+            "elementFfId": "cta",
+            "content": "Polish CTA contrast",
+            "author": "designer-1",
+            "domHash": "domhash1234",
+            "anchorKind": "html_element"
+        })),
+    )
+    .await;
+    assert_eq!(st_cm, StatusCode::CREATED, "comment: {cm_json}");
+    let cmt_id = cm_json["id"].as_str().unwrap().to_string();
+
+    let mut base_hashes = serde_json::Map::new();
+    base_hashes.insert(
+        "src/comment-fix.html".into(),
+        json!(format!(
+            "{:x}",
+            Sha256::digest(b"<div id='cta'>Before</div>")
+        )),
+    );
+    let (st_c, prop) = send_req(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{proj_id}/proposals"),
+        &tok,
+        Some(json!({
+            "title": "Fix CTA per comment",
+            "nodeId": node_a,
+            "sourceCommentId": cmt_id,
+            "contentMode": "full_file",
+            "baseFileHashes": base_hashes,
+            "files": [{
+                "path": "src/comment-fix.html",
+                "status": "modified",
+                "patch": "<div id='cta'>After</div>",
+                "additions": 1,
+                "deletions": 1
+            }]
+        })),
+    )
+    .await;
+    assert_eq!(st_c, StatusCode::CREATED, "prop: {prop}");
+    assert_eq!(prop["sourceCommentId"], cmt_id);
+    let prop_id = prop["id"].as_str().unwrap();
+
+    let (st_v, v_json) = send_req(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{proj_id}/proposals/{prop_id}/validate"),
+        &tok,
+        Some(json!({ "rebaseBaseHashes": true })),
+    )
+    .await;
+    assert_eq!(st_v, StatusCode::OK, "validate: {v_json}");
+
+    let (st_a, applied) = send_req(
+        &router,
+        "POST",
+        &format!("/api/v1/projects/{proj_id}/proposals/{prop_id}/apply"),
+        &tok,
+        Some(json!({ "force": false })),
+    )
+    .await;
+    assert_eq!(st_a, StatusCode::OK, "apply: {applied}");
+    assert_eq!(applied["status"], "applied");
+    assert_eq!(applied["sourceCommentId"], cmt_id);
+
+    // Listing comments via HTTP must succeed with integer updated_at and anchorStatus == resolved
+    let (st_list, list_json) = send_req(
+        &router,
+        "GET",
+        &format!("/api/v1/projects/{proj_id}/flow/nodes/{node_a}/comments"),
+        &tok,
+        None,
+    )
+    .await;
+    assert_eq!(st_list, StatusCode::OK, "list comments: {list_json}");
+    let items = list_json.as_array().expect("array");
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["id"], cmt_id);
+    assert_eq!(items[0]["anchorStatus"], "resolved");
 }

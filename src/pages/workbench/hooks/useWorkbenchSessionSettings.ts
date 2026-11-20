@@ -8,23 +8,28 @@ import {
   ProjectDtoSchema,
   type ProjectDto,
 } from "../../../lib/validations/harness-daemon";
-import { DEFAULT_FLOW_PROJECT_ID, type WorkbenchProject } from "../constants";
+import type { WorkbenchProject } from "../constants";
 import type { ChatSession } from "../types";
 import {
   readPinnedSessionIds,
+  readStandaloneSessions,
   writePinnedSessionIds,
+  writeStandaloneSessions,
 } from "./usePinnedSessionsStorage";
 import {
   collectFetchedProjectSessions,
   extractDaemonErrorMessage,
   mapDtoToWorkbenchProject,
   resolveValidatedActiveProjectId,
-  toManagedSlug,
   toPlaceholderTrashedDto,
   useProjectTrashAndBrowse,
   type WorkbenchToastState,
   writeActiveProjectHint,
 } from "./useProjectTrashAndBrowse";
+import {
+  useLaunchpadEventSync,
+  useProjectCreationActions,
+} from "./useWorkbenchProjectCreation";
 export {
   WORKBENCH_SETTINGS_STORAGE_KEY,
   loadPersistedSettings,
@@ -44,25 +49,6 @@ export function resolveTargetProjectId(projectId?: string | null): string | null
     if (stored && stored.trim().length > 0) return stored.trim();
   }
   return null;
-}
-
-function buildNewProjectObjects(input: {
-  projectName: string;
-  initialTitle: string;
-  provenance: "folder-backed" | "scratch";
-  justNowText: string;
-  localPath?: string;
-  managedSlug?: string;
-}): { newProj: WorkbenchProject; newSession: ChatSession; slug: string } {
-  const newProjId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : DEFAULT_FLOW_PROJECT_ID;
-  const newSessionId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `session-${Date.now()}`;
-  const slug = toManagedSlug(input.managedSlug || input.projectName);
-  const resolvedPath = input.localPath || (input.provenance === "scratch" ? `~/.cowok-design/projects/${slug}` : `~/CowokProjects/${slug}`);
-  return {
-    slug,
-    newProj: { id: newProjId, name: input.projectName, isExpanded: true, provenance: input.provenance, localPath: resolvedPath },
-    newSession: { id: newSessionId, title: input.initialTitle, projectId: newProjId, updatedAt: input.justNowText },
-  };
 }
 
 function isGenuineStandaloneSession(s: ChatSession): boolean {
@@ -126,7 +112,11 @@ function useSessionRenameDeleteActions(deps: SessionCrudDeps, notifyErr: (err: u
     if (!trimmed) return;
     const target = sessionsRef.current.find((s) => s.id === id);
     const prevTitle = target?.title;
-    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, title: trimmed } : s)));
+    setSessions((prev) => {
+      const next = prev.map((s) => (s.id === id ? { ...s, title: trimmed } : s));
+      if (!target?.projectId) writeStandaloneSessions(next);
+      return next;
+    });
     if (!target?.projectId) return;
     void apiHarnessDaemon.updateSession(target.projectId, id, { title: trimmed }).catch((err) => {
       if (prevTitle !== undefined) setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, title: prevTitle } : s)));
@@ -141,6 +131,7 @@ function useSessionRenameDeleteActions(deps: SessionCrudDeps, notifyErr: (err: u
     const remaining = prev.filter((s) => s.id !== id);
     setSessions(remaining);
     writePinnedSessionIds(remaining);
+    if (!target?.projectId) writeStandaloneSessions(remaining);
     if (prevAct === id && remaining.length > 0) setActiveSessionIdState(remaining[0].id);
     if (!target?.projectId) return;
     void apiHarnessDaemon.deleteSession(target.projectId, id).catch((err) => {
@@ -176,11 +167,6 @@ function useSessionCrudActions(deps: SessionCrudDeps) {
   const handleDeleteProject = useCallback((id: string) => executeProjectDelete(id, deps, notifyErr), [deps, notifyErr]);
 
   return { ...sessionActions, handleRenameProject, handleDeleteProject };
-}
-
-function resolveProjectLocationArg(location?: string | { localPath?: string; managedSlug?: string }) {
-  if (!location) return {};
-  return typeof location === "string" ? { localPath: location } : location;
 }
 
 interface InitialHydrationArgs {
@@ -241,139 +227,12 @@ function useInitialProjectHydration(args: InitialHydrationArgs) {
   }, []);
 }
 
-interface ProjectSyncDeps {
-  justNowText: string;
-  sessionsRef: React.MutableRefObject<ChatSession[]>;
-  activeSessionIdRef: React.MutableRefObject<string>;
-  activeProjectIdRef: React.MutableRefObject<string>;
-  setProjects: React.Dispatch<React.SetStateAction<WorkbenchProject[]>>;
-  setSessions: React.Dispatch<React.SetStateAction<ChatSession[]>>;
-  setActiveProjectId: React.Dispatch<React.SetStateAction<string>>;
-  setActiveSessionIdState: React.Dispatch<React.SetStateAction<string>>;
-  showToast: (toast: WorkbenchToastState) => void;
-  t: (k: string, fallback: string) => string;
-}
-
-function readEventErrorMessage(ev: Event, fallback: string): string {
-  const detail = (ev as CustomEvent<{ message?: unknown }>).detail;
-  return typeof detail?.message === "string" && detail.message.trim() ? detail.message : fallback;
-}
-
-function handleLaunchpadCreatedDto(ev: Event, deps: ProjectSyncDeps) {
-  const { justNowText, sessionsRef, activeSessionIdRef, activeProjectIdRef, setProjects, setSessions, setActiveProjectId, setActiveSessionIdState, showToast, t } = deps;
-  const parsed = ProjectDtoSchema.safeParse((ev as CustomEvent<unknown>).detail);
-  if (!parsed.success) return;
-  const dto = parsed.data;
-  const mapped = mapDtoToWorkbenchProject(dto);
-  setProjects((prev) => (prev.some((p) => p.id === dto.id) ? prev.map((p) => (p.id === dto.id ? mapped : p)) : [...prev, mapped]));
-  setActiveProjectId(dto.id);
-  if (!sessionsRef.current.some((s) => s.projectId === dto.id) && typeof crypto?.randomUUID === "function") {
-    const prevSnapshot = { sess: sessionsRef.current, actSess: activeSessionIdRef.current, actProj: activeProjectIdRef.current };
-    const sId = crypto.randomUUID();
-    const initialTitle = t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới");
-    setSessions((prev) => [{ id: sId, title: initialTitle, projectId: dto.id, updatedAt: justNowText }, ...prev]);
-    setActiveSessionIdState(sId);
-    void apiHarnessDaemon.createSession(dto.id, { id: sId, title: initialTitle }).catch((err) => {
-      setSessions(prevSnapshot.sess);
-      setActiveSessionIdState(prevSnapshot.actSess);
-      setActiveProjectId(prevSnapshot.actProj);
-      showToast({ kind: "warning", message: extractDaemonErrorMessage(err, t("workbench.daemonActionError", "Lỗi đồng bộ Daemon SQLite V7")) });
-    });
-  }
-  showToast({ kind: "success", message: `${t("workbench.projectCreatedToast", "Đã tạo dự án mới trong SQLite V7")}: ${dto.name}` });
-}
-
-function useLaunchpadEventSync(deps: ProjectSyncDeps) {
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const daemonErrFallback = deps.t("workbench.daemonActionError", "Lỗi đồng bộ Daemon SQLite V7");
-    const onProjectCreated = (ev: Event) => handleLaunchpadCreatedDto(ev, deps);
-    const onProjectError = (ev: Event) => {
-      const msg = readEventErrorMessage(ev, daemonErrFallback);
-      deps.showToast({ kind: "danger", message: deps.t("launchpad.createError", "Unable to create Launchpad project: {{message}}").replace("{{message}}", msg) });
-    };
-    const onFixtureError = (ev: Event) => {
-      const msg = readEventErrorMessage(ev, daemonErrFallback);
-      deps.showToast({ kind: "danger", message: deps.t("sampleData.saveError", "Unable to save sample fixture: {{message}}").replace("{{message}}", msg) });
-    };
-    window.addEventListener("cowok:project-created", onProjectCreated);
-    window.addEventListener("cowok:project-create-error", onProjectError);
-    window.addEventListener("cowok:sample-fixture-error", onFixtureError);
-    return () => {
-      window.removeEventListener("cowok:project-created", onProjectCreated);
-      window.removeEventListener("cowok:project-create-error", onProjectError);
-      window.removeEventListener("cowok:sample-fixture-error", onFixtureError);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deps.justNowText, deps.showToast, deps.t]);
-}
-
-function executeCreateNewProject(
-  input: { name: string; title: string; provenance: "folder-backed" | "scratch"; location?: string | { localPath?: string; managedSlug?: string } },
-  deps: ProjectSyncDeps,
-) {
-  const { justNowText, sessionsRef, activeSessionIdRef, setProjects, setSessions, setActiveProjectId, setActiveSessionIdState, showToast, t } = deps;
-  const prevSnapshot = { sess: sessionsRef.current, actSess: activeSessionIdRef.current };
-  const { localPath, managedSlug } = resolveProjectLocationArg(input.location);
-  const { newProj, newSession, slug } = buildNewProjectObjects({
-    projectName: input.name, initialTitle: input.title, provenance: input.provenance, justNowText, localPath, managedSlug,
-  });
-  const isManaged = input.provenance === "folder-backed" && (!localPath || localPath.endsWith(`/CowokProjects/${managedSlug || slug}`));
-  void apiHarnessDaemon.createProject({
-    id: newProj.id, slug, managed_slug: isManaged ? (managedSlug || slug) : undefined, name: newProj.name,
-    product_brief: `Created via workbench in ${input.provenance} mode`, workspace_root: input.provenance === "scratch" ? null : (localPath || null), provenance: input.provenance,
-  }).then((dto) => {
-    const mapped = mapDtoToWorkbenchProject(dto);
-    setProjects((prev) => (prev.some((p) => p.id === dto.id) ? prev.map((p) => (p.id === dto.id ? mapped : p)) : [...prev, mapped]));
-    setSessions((prev) => (prev.some((s) => s.id === newSession.id) ? prev : [newSession, ...prev]));
-    setActiveSessionIdState(newSession.id);
-    setActiveProjectId(dto.id);
-    showToast({ kind: "success", message: `${t("workbench.projectCreatedToast", "Đã tạo dự án mới trong SQLite V7")}: ${dto.name}` });
-    void apiHarnessDaemon.createSession(dto.id, { id: newSession.id, title: newSession.title }).catch((sessErr) => {
-      setSessions(prevSnapshot.sess);
-      setActiveSessionIdState(prevSnapshot.actSess);
-      showToast({ kind: "warning", message: extractDaemonErrorMessage(sessErr, t("workbench.daemonActionError", "Lỗi đồng bộ Daemon SQLite V7")) });
-    });
-  }).catch((err) => {
-    showToast({ kind: "danger", message: extractDaemonErrorMessage(err, t("workbench.daemonActionError", "Lỗi đồng bộ Daemon SQLite V7")) });
-  });
-}
-
-function useProjectCreationActions(deps: ProjectSyncDeps) {
-  const { justNowText, sessionsRef, activeSessionIdRef, activeProjectIdRef, setSessions, setActiveProjectId, setActiveSessionIdState, showToast, t } = deps;
-  const handleCreateInProject = useCallback((targetProjectId: string, title: string) => {
-    const prev = { sess: sessionsRef.current, actSess: activeSessionIdRef.current, actProj: activeProjectIdRef.current };
-    const sId = typeof crypto?.randomUUID === "function" ? crypto.randomUUID() : `session-${Date.now()}`;
-    setSessions((cur) => [{ id: sId, title, projectId: targetProjectId, updatedAt: justNowText }, ...cur]);
-    setActiveSessionIdState(sId);
-    setActiveProjectId(targetProjectId);
-    void apiHarnessDaemon.createSession(targetProjectId, { id: sId, title }).catch((err) => {
-      setSessions(prev.sess);
-      setActiveSessionIdState(prev.actSess);
-      setActiveProjectId(prev.actProj);
-      showToast({ kind: "danger", message: extractDaemonErrorMessage(err, t("workbench.daemonActionError", "Lỗi đồng bộ Daemon SQLite V7")) });
-    });
-  }, [activeProjectIdRef, activeSessionIdRef, justNowText, sessionsRef, setActiveProjectId, setActiveSessionIdState, setSessions, showToast, t]);
-
-  const handleCreateNewProject = useCallback((name: string, title: string, provenance: "folder-backed" | "scratch" = "folder-backed", location?: string | { localPath?: string; managedSlug?: string }) => {
-    executeCreateNewProject({ name, title, provenance, location }, deps);
-  }, [deps]);
-
-  const handleCreateStandalone = useCallback((title: string) => {
-    const sId = typeof crypto?.randomUUID === "function" ? crypto.randomUUID() : `session-${Date.now()}`;
-    setSessions((prev) => [{ id: sId, title, projectId: undefined, updatedAt: justNowText }, ...prev]);
-    setActiveSessionIdState(sId);
-  }, [justNowText, setActiveSessionIdState, setSessions]);
-
-  return { handleCreateInProject, handleCreateNewProject, handleCreateStandalone };
-}
-
 export function useWorkbenchProjectsAndSessions() {
   const { t, locale } = useTranslation();
   const { formatTime } = useFormatter({ locale });
   const justNowText = t("workbench.justNow", "Vừa xong");
   const [projects, setProjects] = useState<WorkbenchProject[]>([]);
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>(() => readStandaloneSessions());
   const [activeSessionId, setActiveSessionIdState] = useState("");
   const [activeProjectId, setActiveProjectIdState] = useState("");
   const [isNewConvoModalOpen, setIsNewConvoModalOpen] = useState(false);

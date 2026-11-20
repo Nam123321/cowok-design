@@ -225,10 +225,14 @@ export const ContextSliceInputSchema = z.object({
 });
 export type ContextSliceInput = z.infer<typeof ContextSliceInputSchema>;
 
+export const SessionEntryKindSchema = z.enum(["fe-dag", "presentation"]);
+export type SessionEntryKind = z.infer<typeof SessionEntryKindSchema>;
+
 export const ChatSessionDtoSchema = z.object({
   id: z.string().uuid(),
   project_id: z.string().uuid(),
   title: z.string(),
+  entry_kind: SessionEntryKindSchema.optional(),
   created_at: SafeJsIntegerSchema,
   updated_at: SafeJsIntegerSchema,
 });
@@ -237,6 +241,7 @@ export type ChatSessionDto = z.infer<typeof ChatSessionDtoSchema>;
 export const CreateChatSessionInputSchema = z.object({
   id: z.string().uuid().optional(),
   title: z.string().trim().min(1).max(200),
+  entry_kind: SessionEntryKindSchema.optional(),
 });
 export type CreateChatSessionInput = z.infer<typeof CreateChatSessionInputSchema>;
 

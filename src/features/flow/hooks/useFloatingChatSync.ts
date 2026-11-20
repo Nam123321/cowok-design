@@ -1,6 +1,6 @@
 // @story 04.4
 // @implements AC-01, AC-02, AC-03 (Floating Chat Sync, 8-Dir Resize Geometry & Shared Chat Bridge)
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { apiFlowExecution } from "@/api/flow-execution";
 import { globalKeyedParallelCoordinator, type NodeStatusSnapshot } from "../store/keyed-parallel-coordinator";
 import { sharedChatStore, toSessionChatKey } from "../store/shared-chat-sync";
@@ -8,12 +8,13 @@ import type { SdiClarificationCardData } from "@/components/workbench/ChatStream
 export { dispatchNodeExecutionToDaemon, dispatchSteerToDaemon, dispatchTransitionToDaemon } from "./dispatchNodeExecution";
 
 export const FLOATING_CHAT_BOUNDS = {
-  DEFAULT_WIDTH: 440,
+  DEFAULT_WIDTH: 360,
   MIN_WIDTH: 360,
   MAX_WIDTH: 900,
-  MIN_HEIGHT: 480,
+  MIN_HEIGHT: 220,
   MAX_HEIGHT: 850,
-  DEFAULT_BOTTOM: 20,
+  DEFAULT_BOTTOM: 16,
+  DEFAULT_LEFT: 16,
 } as const;
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -71,10 +72,10 @@ interface StoredFloatingGeometry {
   height?: number | null;
 }
 
-function readStoredFloatingGeometry(): StoredFloatingGeometry | null {
+function readStoredFloatingGeometry(storageKey: string): StoredFloatingGeometry | null {
   if (typeof window === "undefined") return null;
   try {
-    const saved = localStorage.getItem(FLOATING_CHAT_GEOMETRY_KEY);
+    const saved = localStorage.getItem(storageKey);
     return saved ? (JSON.parse(saved) as StoredFloatingGeometry) : null;
   } catch (err) {
     console.warn("[floating-chat] failed to read geometry from localStorage", err);
@@ -82,21 +83,21 @@ function readStoredFloatingGeometry(): StoredFloatingGeometry | null {
   }
 }
 
-function writeStoredFloatingGeometry(payload: StoredFloatingGeometry | null) {
+function writeStoredFloatingGeometry(storageKey: string, payload: StoredFloatingGeometry | null) {
   if (typeof window === "undefined") return;
   try {
     if (payload === null) {
-      localStorage.removeItem(FLOATING_CHAT_GEOMETRY_KEY);
+      localStorage.removeItem(storageKey);
     } else {
-      localStorage.setItem(FLOATING_CHAT_GEOMETRY_KEY, JSON.stringify(payload));
+      localStorage.setItem(storageKey, JSON.stringify(payload));
     }
   } catch (err) {
     console.warn("[floating-chat] failed to update geometry in localStorage", err);
   }
 }
 
-function resolveInitialAnchor(): { x: number; bottom: number } | null {
-  const parsed = readStoredFloatingGeometry();
+function resolveInitialAnchor(storageKey: string): { x: number; bottom: number } | null {
+  const parsed = readStoredFloatingGeometry(storageKey);
   if (!parsed || typeof parsed.x !== "number" || typeof parsed.bottom !== "number") return null;
   return {
     x: clampBound(parsed.x, 12, Math.max(12, window.innerWidth - 360)),
@@ -104,35 +105,41 @@ function resolveInitialAnchor(): { x: number; bottom: number } | null {
   };
 }
 
-function resolveInitialWidth(): number {
-  const parsed = readStoredFloatingGeometry();
+function resolveInitialWidth(storageKey: string): number {
+  const parsed = readStoredFloatingGeometry(storageKey);
   if (!parsed || typeof parsed.width !== "number") return FLOATING_CHAT_BOUNDS.DEFAULT_WIDTH;
   return clampBound(parsed.width, FLOATING_CHAT_BOUNDS.MIN_WIDTH, FLOATING_CHAT_BOUNDS.MAX_WIDTH);
 }
 
-function resolveInitialHeight(): number | null {
-  const parsed = readStoredFloatingGeometry();
+function resolveInitialHeight(storageKey: string): number | null {
+  const parsed = readStoredFloatingGeometry(storageKey);
   if (!parsed || typeof parsed.height !== "number") return null;
   const maxAllowed = Math.min(FLOATING_CHAT_BOUNDS.MAX_HEIGHT, window.innerHeight - 24);
   return clampBound(parsed.height, FLOATING_CHAT_BOUNDS.MIN_HEIGHT, maxAllowed);
 }
 
-export function useFloatingWindowGeometry(isCollapsed: boolean) {
-  const [anchor, setAnchor] = useState<{ x: number; bottom: number } | null>(resolveInitialAnchor);
-  const [width, setWidth] = useState<number>(resolveInitialWidth);
-  const [customHeight, setCustomHeight] = useState<number | null>(resolveInitialHeight);
+export function useFloatingWindowGeometry(
+  isCollapsed: boolean,
+  storageKey: string = FLOATING_CHAT_GEOMETRY_KEY,
+  defaultSide: "left" | "right" = "left"
+) {
+  const [anchor, setAnchor] = useState<{ x: number; bottom: number } | null>(() => resolveInitialAnchor(storageKey));
+  const [width, setWidth] = useState<number>(() => resolveInitialWidth(storageKey));
+  const [customHeight, setCustomHeight] = useState<number | null>(() => resolveInitialHeight(storageKey));
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ mouseX: 0, mouseY: 0, startX: 0, startBottom: FLOATING_CHAT_BOUNDS.DEFAULT_BOTTOM as number });
 
   useEffect(() => {
     if (anchor === null && typeof window !== "undefined") {
-      setAnchor({ x: Math.max(12, Math.round(window.innerWidth / 2 - width / 2)), bottom: FLOATING_CHAT_BOUNDS.DEFAULT_BOTTOM });
+      const maxX = Math.max(12, window.innerWidth - width - 12);
+      const defaultX = defaultSide === "right" ? Math.max(12, window.innerWidth - width - 24) : Math.min(FLOATING_CHAT_BOUNDS.DEFAULT_LEFT, maxX);
+      setAnchor({ x: defaultX, bottom: FLOATING_CHAT_BOUNDS.DEFAULT_BOTTOM });
     }
-  }, [anchor, width]);
+  }, [anchor, defaultSide, width]);
 
   useEffect(() => {
-    if (anchor) writeStoredFloatingGeometry({ x: anchor.x, bottom: anchor.bottom, width, height: customHeight });
-  }, [anchor, width, customHeight]);
+    if (anchor) writeStoredFloatingGeometry(storageKey, { x: anchor.x, bottom: anchor.bottom, width, height: customHeight });
+  }, [anchor, width, customHeight, storageKey]);
 
   useFloatingDragListeners({ isDragging, width, isCollapsed, dragStartRef, setAnchor, setIsDragging });
 
@@ -149,8 +156,10 @@ export function useFloatingWindowGeometry(isCollapsed: boolean) {
     if (typeof window === "undefined") return;
     setWidth(FLOATING_CHAT_BOUNDS.DEFAULT_WIDTH);
     setCustomHeight(null);
-    setAnchor({ x: Math.max(12, Math.round(window.innerWidth / 2 - FLOATING_CHAT_BOUNDS.DEFAULT_WIDTH / 2)), bottom: FLOATING_CHAT_BOUNDS.DEFAULT_BOTTOM });
-    writeStoredFloatingGeometry(null);
+    const maxX = Math.max(12, window.innerWidth - FLOATING_CHAT_BOUNDS.DEFAULT_WIDTH - 12);
+    const defaultX = defaultSide === "right" ? Math.max(12, window.innerWidth - FLOATING_CHAT_BOUNDS.DEFAULT_WIDTH - 24) : Math.min(FLOATING_CHAT_BOUNDS.DEFAULT_LEFT, maxX);
+    setAnchor({ x: defaultX, bottom: FLOATING_CHAT_BOUNDS.DEFAULT_BOTTOM });
+    writeStoredFloatingGeometry(storageKey, null);
   };
 
   return { anchor, setAnchor, width, setWidth, customHeight, setCustomHeight, isDragging, handleHeaderMouseDown, handleRedockToBottom };
@@ -205,17 +214,31 @@ export function startResizeDrag(
   window.addEventListener("mouseup", onMouseUp);
 }
 
-export function useFloatingSharedMessages(projectId: string, sessionId: string, selectedNodeIds: string[]): FloatingChatMessage[] {
+export function useFloatingDraftState(projectId: string, sessionId: string): [string, (val: string) => void] {
+  useSyncExternalStore(sharedChatStore.subscribe, sharedChatStore.getSnapshot, sharedChatStore.getSnapshot);
+  const scopeKey = toSessionChatKey(projectId, sessionId);
+  const draft = sharedChatStore.getDraft(scopeKey);
+  const setDraft = useCallback((val: string) => sharedChatStore.setDraft(scopeKey, val), [scopeKey]);
+  return [draft, setDraft];
+}
+
+export function useFloatingSharedMessages(projectId: string, sessionId: string, _selectedNodeIds: string[] = []): FloatingChatMessage[] {
   const snap = useSyncExternalStore(sharedChatStore.subscribe, sharedChatStore.getSnapshot, sharedChatStore.getSnapshot);
   const scopeKey = toSessionChatKey(projectId, sessionId);
-  const nodeKey = selectedNodeIds.join(",");
   return useMemo(() => {
-    const allow = new Set(selectedNodeIds);
     return sharedChatStore.getMessages(scopeKey)
-      .filter((m) => !m.nodeId || allow.size === 0 || allow.has(m.nodeId))
-      .map((m) => ({ id: m.id, nodeId: m.nodeId || "session", role: m.sender === "human" ? "user" : "assistant", content: m.text, timestamp: m.createdAtMs, projectSeq: m.projectSeq, fencingToken: m.fencingToken }));
+      .map((m) => ({
+        id: m.id,
+        nodeId: m.nodeId || "session",
+        role: m.sender === "human" ? "user" : "assistant",
+        content: m.text,
+        timestamp: m.createdAtMs,
+        projectSeq: m.projectSeq,
+        fencingToken: m.fencingToken,
+        sdiClarification: m.sdiClarification,
+      }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snap.version, scopeKey, nodeKey]);
+  }, [snap.version, scopeKey]);
 }
 
 export function useFloatingChatEffects(params: {
@@ -254,6 +277,6 @@ export function useFloatingChatEffects(params: {
 
   useEffect(() => {
     const ref = params.streamAbortRef;
-    return () => { ref.current?.abort(); };
-  }, [params.projectId, params.streamAbortRef]);
+    return () => { ref.current = null; };
+  }, [params.projectId, params.sessionId, params.streamAbortRef]);
 }

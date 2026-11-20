@@ -12,9 +12,15 @@ export interface ChatSession {
   id: string;
   title: string;
   projectId?: string;
+  entryKind?: "fe-dag" | "presentation";
   isPinned?: boolean;
   updatedAt: string;
   subSessions?: NodeSubSessionItem[];
+}
+
+export interface PostCreateProjectOptions {
+  openMaterialLaunchpad?: boolean;
+  githubRepoUrl?: string;
 }
 
 export interface PersistedWorkbenchSettings {

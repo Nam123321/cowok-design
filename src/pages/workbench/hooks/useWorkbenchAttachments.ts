@@ -1,10 +1,13 @@
 // @story 04.1, 04.3, 04.5
 // @implements AC-03 (3-Way Contextual Feedback & Attachment Tray)
 import { useState, useCallback, useEffect } from "react";
+import { StructuredCommentEnvelopeSchema } from "../../../lib/validations/element-comment";
 import { MIN_SELECTION_LENGTH } from "../constants";
 
 const MAX_QUOTE_LEN = 90;
 const QUOTE_SLICE_LEN = 87;
+const MAX_COMMENT_CHIP_LEN = 42;
+const COMMENT_CHIP_SLICE_LEN = 39;
 const TOOLTIP_RIGHT_MARGIN = 140;
 const TOOLTIP_MIN_X = 12;
 const TOOLTIP_OFFSET_X = 60;
@@ -45,9 +48,47 @@ function useWindowQuoteListener(setQuoteTooltip: React.Dispatch<React.SetStateAc
   }, [setQuoteTooltip]);
 }
 
-export function useWorkbenchAttachments() {
+export function useWorkbenchAttachments(projectId?: string) {
   const [attachmentChips, setAttachmentChips] = useState<string[]>([]);
+  const [attachmentSnippets, setAttachmentSnippets] = useState<Record<string, string>>({});
   const [quoteTooltip, setQuoteTooltip] = useState<QuoteTooltipState | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onStructuredComment = (ev: Event) => {
+      const raw = (ev as CustomEvent<unknown>).detail;
+      const parsed = StructuredCommentEnvelopeSchema.safeParse(raw);
+      if (!parsed.success) return;
+      const env = parsed.data;
+      if (env.projectId && projectId && env.projectId !== projectId) return;
+      const rawBody = env.commentBody.trim().replace(/\s+/g, " ");
+      const shortBody =
+        rawBody.length > MAX_COMMENT_CHIP_LEN ? `${rawBody.slice(0, COMMENT_CHIP_SLICE_LEN)}...` : rawBody;
+      const shortId = env.commentId.slice(-4);
+      const scope =
+        env.targetType === "spatial_region" && env.regionRect
+          ? `${Math.round(env.regionRect.width)}×${Math.round(env.regionRect.height)}`
+          : `#${env.elementFfId}`;
+      const chip = `@[Comment ${scope} (${shortId}): "${shortBody}"]`;
+      const payload = JSON.stringify({
+        kind: "STRUCTURED_COMMENT_ENVELOPE",
+        commentId: env.commentId,
+        targetType: env.targetType,
+        elementFfId: env.elementFfId,
+        coveredFfIds: env.coveredFfIds,
+        regionRect: env.regionRect,
+        slideUid: env.slideUid,
+        nodeId: env.nodeId,
+        domHash: env.domHash,
+        artifactSha256: env.artifactSha256,
+        commentBody: env.commentBody,
+      });
+      setAttachmentChips((prev) => (prev.includes(chip) ? prev : [...prev, chip]));
+      setAttachmentSnippets((prev) => ({ ...prev, [chip]: payload }));
+    };
+    window.addEventListener("cowok:structured-comment", onStructuredComment);
+    return () => window.removeEventListener("cowok:structured-comment", onStructuredComment);
+  }, [projectId]);
 
   const handleCommentOnNode = useCallback((nodeKeyOrChip: string) => {
     const trimmed = nodeKeyOrChip.trim();
@@ -58,6 +99,12 @@ export function useWorkbenchAttachments() {
 
   const handleRemoveAttachmentChip = useCallback((chip: string) => {
     setAttachmentChips((prev) => prev.filter((c) => c !== chip));
+    setAttachmentSnippets((prev) => {
+      if (!(chip in prev)) return prev;
+      const next = { ...prev };
+      delete next[chip];
+      return next;
+    });
   }, []);
 
   const handleAddQuoteChip = useCallback((rawText: string) => {
@@ -69,8 +116,46 @@ export function useWorkbenchAttachments() {
     setQuoteTooltip(null);
   }, []);
 
+  const handleAddFileChips = useCallback((fileNames: string[], snippetsByName?: Record<string, string>) => {
+    const cleanNames = fileNames.map((n) => n.trim()).filter(Boolean);
+    if (cleanNames.length === 0) return;
+    setAttachmentChips((prev) => {
+      const next = [...prev];
+      for (const name of cleanNames) {
+        const chip = name.startsWith("@[") ? name : `@[File: ${name}]`;
+        if (!next.includes(chip)) next.push(chip);
+      }
+      return next;
+    });
+    if (snippetsByName && Object.keys(snippetsByName).length > 0) {
+      setAttachmentSnippets((prev) => {
+        const next = { ...prev };
+        for (const [name, snippet] of Object.entries(snippetsByName)) {
+          const chip = name.startsWith("@[") ? name : `@[File: ${name}]`;
+          if (snippet) next[chip] = snippet;
+        }
+        return next;
+      });
+    }
+  }, []);
+
+  const handleClearAttachments = useCallback(() => {
+    setAttachmentChips([]);
+    setAttachmentSnippets({});
+  }, []);
+
   const handleDismissQuote = useCallback(() => setQuoteTooltip(null), []);
   useWindowQuoteListener(setQuoteTooltip);
 
-  return { attachmentChips, quoteTooltip, handleCommentOnNode, handleRemoveAttachmentChip, handleAddQuoteChip, handleDismissQuote };
+  return {
+    attachmentChips,
+    attachmentSnippets,
+    quoteTooltip,
+    handleCommentOnNode,
+    handleRemoveAttachmentChip,
+    handleAddQuoteChip,
+    handleAddFileChips,
+    handleClearAttachments,
+    handleDismissQuote,
+  };
 }

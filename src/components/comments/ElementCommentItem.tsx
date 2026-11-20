@@ -37,9 +37,9 @@ export const ElementCommentItem: React.FC<ElementCommentItemProps> = ({
         boxSizing: "border-box",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "6px", minWidth: 0 }}>
         <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{comment.author}</span>
-        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px", minWidth: 0, maxWidth: "100%" }}>
           {comment.anchorKind && (
             <span style={{ fontSize: "9.5px", padding: "1px 4px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
               {comment.anchorKind}
@@ -50,7 +50,7 @@ export const ElementCommentItem: React.FC<ElementCommentItemProps> = ({
               {t("comments.drawerCollapsedRect", "0×0 Drawer")}
             </span>
           )}
-          <span style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+          <span style={{ fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)", overflowWrap: "anywhere", wordBreak: "break-word" }}>
             {comment.elementFfId}
           </span>
         </div>

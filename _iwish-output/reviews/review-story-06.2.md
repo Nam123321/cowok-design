@@ -14,5 +14,11 @@
 - **Mitigation Verified:** Embedded into `AC-01..AC-06` (`[EDGE-CASE]` `AC-04..AC-06`) and Layers `L0..L10`, mapped to `Task 06.2.1..06.2.5`.
 - **Complexity Score (CS):** `6.5/10` (< 7 threshold).
 
-## 2. Final Verdict
+## 2. Formal-Verify Candidates
+- **Formal-verify candidates:**
+  1. `lol_html` + `html5ever` mXSS sanitizer & CSS token scrubber (`validate_and_scrub_css_tokens` + SVG allowlist) across nested HTML fragments and inline `style=""` attributes.
+  2. Two-tier `<16ms` `MessagePort` revision & `outboundQueue` state machine (`rev` monotonic fence + `postApplyHtml` queue prune + unmount recovery draft preservation).
+  3. SQLite WAL `commit_slide_slots_batch` atomic transaction + `.tmp`/`fsync`/atomic `rename()` rollback invariant.
+
+## 3. Final Verdict
 **VERDICT: PASS / APPROVED**

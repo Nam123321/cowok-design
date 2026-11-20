@@ -1,13 +1,14 @@
 {
   "schema_version": "1.0.0",
   "project_slug": "cowok-design",
-  "verified_state_sha": "b303bc44ac2a188cb96a1934447cbeca8dd5696a39f190ac1719afbd4475458a",
-  "generated_at": "2026-11-18T11:55:14.403125",
+  "verified_state_sha": "3f48429134a9a135734678af2e50c7267bf8acec52ea097ef047bfd8a89e039d",
+  "generated_at": "2026-11-20T19:04:11.698096",
   "maturity_baseline_epics": [
     "01",
     "03",
     "04",
     "05",
+    "06",
     "08"
   ],
   "waves": [
@@ -17,7 +18,7 @@
       "status": "active",
       "epics": [
         "02",
-        "06",
+        "07",
         "09"
       ],
       "sub_epic_slices": [],
@@ -36,7 +37,6 @@
       "wave_name": "Wave 2: Vertical Value Increment 2",
       "status": "pending",
       "epics": [
-        "07",
         "10"
       ],
       "sub_epic_slices": [],
@@ -92,18 +92,14 @@
       "02.1",
       "02.2",
       "02.3",
-      "06.1",
-      "06.2",
-      "06.3",
-      "06.4",
+      "07.1",
+      "07.2",
+      "07.3",
       "09.1",
       "09.2",
       "09.3"
     ],
     "wave_2": [
-      "07.1",
-      "07.2",
-      "07.3",
       "10.1",
       "10.2",
       "10.3"
@@ -134,12 +130,12 @@
     },
     {
       "slice_id": "P0.2",
-      "epic_id": "06",
-      "name": "Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench (Immediate P0 Anchor)",
+      "epic_id": "07",
+      "name": "17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter (Immediate P0 Anchor)",
       "story_ids": [
-        "06.1",
-        "06.2",
-        "06.3"
+        "07.1",
+        "07.2",
+        "07.3"
       ],
       "track": "Stream-2",
       "rationale": "Zero blocker risk anchor for Wave 1 unblocking downstream business workflows."
@@ -153,7 +149,7 @@
         "09.2",
         "09.3"
       ],
-      "track": "Stream-4",
+      "track": "Stream-3",
       "rationale": "Zero blocker risk anchor for Wave 1 unblocking downstream business workflows."
     }
   ],

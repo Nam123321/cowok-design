@@ -28,7 +28,7 @@
   "epic_readiness": "CONDITIONAL",
   "has_ui_stories": true,
   "story_creation_envelope": {
-    "max_phase": "INVESTIGATE",
+    "max_phase": "IMPLEMENT",
     "allowed_story_ids": [
       "06.1",
       "06.2",
@@ -162,7 +162,7 @@
     {
       "id": "epic-06-claims-validation",
       "path": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/claims-validation-evidence.json",
-      "sha256": "d44a11bd28847c39534bdb86a89dbf6c3c203639151114831716f464ef0f257d"
+      "sha256": "d183aea6e079a6f0cc785c7dc53dd99f316a73d7858ca5a7226b5c0745837a42"
     }
   ],
   "approval": {

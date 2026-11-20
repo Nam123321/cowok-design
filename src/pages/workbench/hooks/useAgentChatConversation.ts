@@ -1,10 +1,7 @@
 // @story 04.1, 04.4
 // @implements AC-02, AC-04 (Shared Left-Open Chat Conversation & Reactive V7 Node Sub-Sessions Sync)
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { apiChangeProposal } from "@/api/change-proposal";
 import { apiFlowExecution } from "@/api/flow-execution";
-import { apiSdiEngine } from "@/api/sdi-engine";
-import { buildUiChangeProposalInput, notifyProposalsChanged } from "@/features/proposals/utils/proposal-events";
 import { useFormatter } from "@/hooks/useFormatter";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { ChatMessage } from "@/components/workbench/ChatPrimitivesBridge";
@@ -13,7 +10,17 @@ import { useKeyedParallelCoordinator } from "@/features/flow/hooks/useKeyedParal
 import { globalKeyedParallelCoordinator } from "@/features/flow/store/keyed-parallel-coordinator";
 import { sharedChatStore, toSessionChatKey } from "@/features/flow/store/shared-chat-sync";
 import type { WorkbenchNode } from "@/features/flow/store/flow-workbench-store";
+import {
+  composePromptWithAttachments,
+  extractSourceCommentId,
+  forkConversationFromMessage,
+  selectSdiClarificationVariant,
+  sendSdiCompile,
+  type SendSdiCompileParams,
+} from "@/features/flow/utils/agent-chat-actions";
 import type { NodeSubSessionItem } from "../types";
+
+export { composePromptWithAttachments, forkConversationFromMessage, sendSdiCompile, type SendSdiCompileParams };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -26,114 +33,11 @@ function mapDaemonStatus(status?: string): NodeSubSessionItem["status"] {
   return "idle";
 }
 
-function buildCompiledIntentReply(
-  intent: {
-    intentType: string;
-    status: string;
-    ambiguityScore: number;
-    clarificationVariants?: Array<{ title: string }>;
-    targetScope: { screenKeys: string[] };
-  },
-  formatNumber: (n: number) => string,
-  t: (k: string, defVal?: string) => string
-): string {
-  const ambiguityPct = formatNumber(Math.round(intent.ambiguityScore * 100));
-  const variants = intent.clarificationVariants?.map((v) => v.title).join(" / ") || t("chat.selectOptionPrompt", "Vui lòng chọn phương án");
-  const scopeKeys = intent.targetScope.screenKeys.join(", ") || "project";
-  if (intent.status === "clarifying") {
-    return `${t("chat.clarifyPrefix", "Cần làm rõ yêu cầu")} (${intent.intentType}, ${t("chat.ambiguityLabel", "ambiguity")} ${ambiguityPct}%): ${variants}`;
-  }
-  return `${t("chat.compiledIntentPrefix", "Đã biên dịch intent")} ${intent.intentType} (${intent.status}) — ${t("chat.scopeLabel", "phạm vi")}: ${scopeKeys}.`;
-}
-
-function sendSdiCompile(params: {
-  projectId: string;
-  targetKey: string;
-  primaryNodeId?: string;
-  sentPrompt: string;
-  formatTime: (d: Date | number) => string;
-  formatNumber: (n: number) => string;
-  t: (k: string, f: string) => string;
-}) {
-  void apiSdiEngine
-    .compileIntent(params.projectId, { rawPrompt: params.sentPrompt, targetNodeId: params.primaryNodeId })
-    .then(async (intent) => {
-      const now = Date.now();
-      const sdiClarification =
-        intent.status === "clarifying" && intent.clarificationVariants?.length
-          ? {
-              intentId: intent.id,
-              projectId: params.projectId,
-              status: intent.status,
-              ambiguityScore: intent.ambiguityScore,
-              variants: intent.clarificationVariants,
-              selectedVariantId: intent.selectedVariantId ?? undefined,
-            }
-          : undefined;
-      sharedChatStore.appendMessage(params.targetKey, {
-        id: `msg-agent-${intent.id}`, sender: "agent", createdAtMs: now, timestamp: params.formatTime(now), nodeId: params.primaryNodeId,
-        text: buildCompiledIntentReply(intent, params.formatNumber, params.t),
-        sdiClarification,
-      });
-      if (UUID_RE.test(params.projectId)) {
-        try {
-          await apiChangeProposal.createProposal(
-            params.projectId,
-            buildUiChangeProposalInput({
-              prompt: params.sentPrompt,
-              nodeId: params.primaryNodeId,
-              screenKey: params.primaryNodeId ? undefined : "BATCH",
-            })
-          );
-          notifyProposalsChanged(params.projectId);
-        } catch {
-          /* ignore if offline or scratch */
-        }
-      }
-    })
-    .catch((err) => {
-      const now = Date.now();
-      const errText = err instanceof Error ? err.message : params.t("chat.daemonConnectError", "Không thể kết nối Rust daemon");
-      sharedChatStore.appendMessage(params.targetKey, {
-        id: `msg-err-${now}`, sender: "agent", createdAtMs: now, timestamp: params.formatTime(now), nodeId: params.primaryNodeId,
-        text: `${params.t("chat.daemonSyncError", "Lỗi đồng bộ SDI daemon")}: ${errText}`,
-      });
-    });
-}
-
-export function useAgentChatConversation(
-  attachmentChips: string[],
-  onSendMessage?: (text: string) => void,
-  projectId?: string,
-  activeSessionId?: string,
-  selectedNodes?: Array<{ id: string; screenKey: string; title: string }>
+function useChatReceiptSubscription(
+  projectId: string | undefined,
+  sessionKey: string,
+  formatTime: (v: number) => string
 ) {
-  const { t, locale } = useTranslation();
-  const { formatTime, formatNumber } = useFormatter({ locale });
-  const coordinator = useKeyedParallelCoordinator();
-  const snap = useSyncExternalStore(sharedChatStore.subscribe, sharedChatStore.getSnapshot, sharedChatStore.getSnapshot);
-  const sessionKey = toSessionChatKey(projectId, activeSessionId);
-  const initialGreeting: ChatMessage = useMemo(
-    () => ({
-      id: "msg-1", sender: "agent",
-      text: t("chat.welcomeGreeting", "Chào bạn! Tôi là cowok Agent. Tôi đã sẵn sàng đồng hành cùng bạn xây dựng hệ thống thiết kế và luồng người dùng 2D DAG. Bạn có thể kéo thả đỉnh trên đồ thị, kết nối các màn hình hoặc bôi đen chữ để Quote nhanh vào khung nhập liệu."),
-      timestamp: formatTime(new Date().setHours(10, 0, 0, 0)),
-    }),
-    [t, formatTime]
-  );
-  const [draftBySession, setDraftBySession] = useState<Record<string, string>>({});
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const shared = sharedChatStore.getMessages(sessionKey);
-  const messages = useMemo(
-    () => [initialGreeting, ...shared.map((m) => ({ id: m.id, sender: m.sender, text: m.text, timestamp: m.timestamp, sdiClarification: m.sdiClarification }))],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [initialGreeting, snap.version, sessionKey]
-  );
-  const inputValue = draftBySession[sessionKey] ?? "";
-  const setInputValue = (val: string) => setDraftBySession((prev) => ({ ...prev, [sessionKey]: val }));
-  useEffect(() => { messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" }); }, [messages, sessionKey]);
   useEffect(() => {
     const onReceipt = (ev: Event) => {
       const detail = (ev as CustomEvent<{ projectId?: string; text?: string }>).detail;
@@ -150,56 +54,92 @@ export function useAgentChatConversation(
     window.addEventListener("cowok:chat-receipt", onReceipt);
     return () => window.removeEventListener("cowok:chat-receipt", onReceipt);
   }, [formatTime, projectId, sessionKey]);
+}
 
-  const handleSelectSdiVariant = async (intentId: string, pid: string, variantId: string) => {
-    try {
-      const updated = await apiSdiEngine.selectClarification(pid, { intentId, selectedVariantId: variantId });
-      sharedChatStore.resolveSdiClarification(sessionKey, intentId, variantId, updated.status === "executed" ? "executed" : "ready");
-      const picked = updated.clarificationVariants?.find((v) => v.id === variantId)?.title || variantId;
-      const ts = Date.now();
-      sharedChatStore.appendMessage(sessionKey, {
-        id: `clarified-${intentId}-${variantId}`,
-        sender: "agent",
-        text: `${t("sdi.variantConfirmedPrefix", "Đã chọn phương án")} "${picked}" — ${t("sdi.variantUnlockedSuffix", "intent đã sẵn sàng (ready) và mở khóa thực thi.")}`,
-        timestamp: formatTime(ts),
-        createdAtMs: ts,
-      });
-      notifyProposalsChanged(pid);
-    } catch {
-      /* keep current clarifying state if offline */
-    }
-  };
+export interface UseAgentChatConversationOpts {
+  attachmentChips: string[];
+  onSendMessage?: (text: string) => void;
+  projectId?: string;
+  activeSessionId?: string;
+  selectedNodes?: Array<{ id: string; screenKey: string; title: string }>;
+  attachmentSnippets?: Record<string, string>;
+  onClearAttachments?: () => void;
+}
 
-  const handleScrollMessages = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 60);
-  };
+const CHAT_SEND_DEDUP_MS = 350;
+const SCROLL_BOTTOM_THRESHOLD_PX = 60;
+const RANDOM_ID_RADIX = 36;
+const GREETING_HOUR = 10;
+
+function dispatchConversationTurn(opts: {
+  sessionKey: string;
+  inputValue: string;
+  conv: UseAgentChatConversationOpts;
+  lastSendRef: React.MutableRefObject<{ at: number; displayMessage: string } | null>;
+  clearInput: () => void;
+  coordinator: ReturnType<typeof useKeyedParallelCoordinator>;
+  t: (k: string, f: string) => string;
+  formatTime: (v: number) => string;
+  formatNumber: (n: number) => string;
+}) {
+  const { sessionKey, inputValue, conv, lastSendRef, clearInput, coordinator, t, formatTime, formatNumber } = opts;
+  if (!inputValue.trim() && conv.attachmentChips.length === 0) return;
+  const { displayMessage, compiledPrompt } = composePromptWithAttachments(inputValue, conv.attachmentChips, conv.attachmentSnippets, t("chat.attachedFallback", "Đính kèm"));
+  const sourceCommentId = extractSourceCommentId(conv.attachmentChips, conv.attachmentSnippets);
+  const now = Date.now();
+  if (lastSendRef.current && now - lastSendRef.current.at < CHAT_SEND_DEDUP_MS && lastSendRef.current.displayMessage === displayMessage) return;
+  lastSendRef.current = { at: now, displayMessage };
+  const msgSuffix = Math.random().toString(RANDOM_ID_RADIX).slice(2, 6);
+  const primaryNode = conv.selectedNodes?.[0] ?? null;
+  sharedChatStore.appendMessage(sessionKey, { id: `msg-${now}-${msgSuffix}`, sender: "human", text: displayMessage, timestamp: formatTime(now), createdAtMs: now, nodeId: primaryNode?.id });
+  conv.onSendMessage?.(compiledPrompt);
+  conv.onClearAttachments?.();
+  clearInput();
+  if (!conv.projectId) {
+    sharedChatStore.appendMessage(sessionKey, { id: `msg-standalone-${now}`, sender: "agent", text: `${t("workbench.standaloneChatAck", "Đã ghi nhận trao đổi trong phiên độc lập")}: ${displayMessage}`, timestamp: formatTime(now), createdAtMs: now });
+    return;
+  }
+  if (primaryNode && conv.selectedNodes && conv.selectedNodes.length > 0 && UUID_RE.test(conv.projectId)) {
+    void dispatchNodeExecutionToDaemon({
+      projectId: conv.projectId, sessionId: conv.activeSessionId || "session-1", primaryNode: primaryNode as unknown as WorkbenchNode,
+      selectedNodeIds: conv.selectedNodes.map((n) => n.id), prompt: compiledPrompt, sourceCommentId, coordinator, t, formatNumber,
+      onAppendMsg: (m) => sharedChatStore.appendMessage(sessionKey, { id: m.id, sender: m.role === "user" ? "human" : "agent", text: m.content, timestamp: formatTime(m.timestamp), createdAtMs: m.timestamp, nodeId: m.nodeId, projectSeq: m.projectSeq, fencingToken: m.fencingToken, sdiClarification: m.sdiClarification }),
+    });
+    return;
+  }
+  sendSdiCompile({ projectId: conv.projectId, targetKey: sessionKey, primaryNodeId: primaryNode?.id, sourceCommentId, sentPrompt: compiledPrompt, formatTime, formatNumber, t });
+}
+
+export function useAgentChatConversation(opts: UseAgentChatConversationOpts) {
+  const { t, locale } = useTranslation();
+  const { formatTime, formatNumber } = useFormatter({ locale });
+  const coordinator = useKeyedParallelCoordinator();
+  const snap = useSyncExternalStore(sharedChatStore.subscribe, sharedChatStore.getSnapshot, sharedChatStore.getSnapshot);
+  const sessionKey = toSessionChatKey(opts.projectId, opts.activeSessionId);
+  const initialGreeting = useMemo<ChatMessage>(() => ({
+    id: "msg-1", sender: "agent",
+    text: t("chat.welcomeGreeting", "Chào bạn! Tôi là cowok Agent. Tôi đã sẵn sàng đồng hành cùng bạn xây dựng hệ thống thiết kế và luồng người dùng 2D DAG. Bạn có thể kéo thả đỉnh trên đồ thị, kết nối các màn hình hoặc bôi đen chữ để Quote nhanh vào khung nhập liệu."),
+    timestamp: formatTime(new Date().setHours(GREETING_HOUR, 0, 0, 0)),
+  }), [t, formatTime]);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastSendRef = useRef<{ at: number; displayMessage: string } | null>(null);
+  const shared = sharedChatStore.getMessages(sessionKey);
+  const messages = useMemo(() => [initialGreeting, ...shared.map((m) => ({ id: m.id, sender: m.sender, text: m.text, timestamp: m.timestamp, sdiClarification: m.sdiClarification }))], [initialGreeting, snap.version, sessionKey]);
+  const inputValue = sharedChatStore.getDraft(sessionKey);
+  const setInputValue = (val: string) => sharedChatStore.setDraft(sessionKey, val);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" }); }, [messages, sessionKey]);
+  useChatReceiptSubscription(opts.projectId, sessionKey, formatTime);
+
+  const handleSelectSdiVariant = (intentId: string, pid: string, variantId: string) =>
+    selectSdiClarificationVariant({ sessionKey, intentId, pid, variantId, formatTime, t });
+
+  const handleScrollMessages = (e: React.UIEvent<HTMLDivElement>) => setShowScrollBottom(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight > SCROLL_BOTTOM_THRESHOLD_PX);
   const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" }); setShowScrollBottom(false); };
+  const handleSend = () => dispatchConversationTurn({ sessionKey, inputValue, conv: opts, lastSendRef, clearInput: () => setInputValue(""), coordinator, t, formatTime, formatNumber });
+  const handleForkFromMessage = (msg: ChatMessage) => forkConversationFromMessage({ projectId: opts.projectId, sourceSessionId: opts.activeSessionId, messageId: msg.id });
 
-  const handleSend = () => {
-    if (!inputValue.trim() && attachmentChips.length === 0) return;
-    const sentPrompt = inputValue.trim() || attachmentChips.join(", ") || t("chat.attachedFallback", "Đính kèm");
-    const now = Date.now();
-    const primaryNode = selectedNodes?.[0] ?? null;
-    sharedChatStore.appendMessage(sessionKey, { id: `msg-${now}`, sender: "human", text: inputValue || sentPrompt, timestamp: formatTime(now), createdAtMs: now, nodeId: primaryNode?.id });
-    onSendMessage?.(inputValue);
-    setDraftBySession((prev) => ({ ...prev, [sessionKey]: "" }));
-    if (!projectId) return;
-    if (primaryNode && selectedNodes && selectedNodes.length > 0 && UUID_RE.test(projectId)) {
-      void dispatchNodeExecutionToDaemon({
-        projectId, sessionId: activeSessionId || "session-1", primaryNode: primaryNode as unknown as WorkbenchNode,
-        selectedNodeIds: selectedNodes.map((n) => n.id), prompt: sentPrompt, coordinator, t, formatNumber,
-        onAppendMsg: (m) => sharedChatStore.appendMessage(sessionKey, {
-          id: m.id, sender: m.role === "user" ? "human" : "agent", text: m.content, timestamp: formatTime(m.timestamp),
-          createdAtMs: m.timestamp, nodeId: m.nodeId, projectSeq: m.projectSeq, fencingToken: m.fencingToken,
-          sdiClarification: m.sdiClarification,
-        }),
-      });
-      return;
-    }
-    sendSdiCompile({ projectId, targetKey: sessionKey, primaryNodeId: primaryNode?.id, sentPrompt, formatTime, formatNumber, t });
-  };
-  return { messages, inputValue, setInputValue, showScrollBottom, messagesEndRef, handleScrollMessages, scrollToBottom, handleSend, handleSelectSdiVariant };
+  return { messages, inputValue, setInputValue, showScrollBottom, messagesEndRef, handleScrollMessages, scrollToBottom, handleSend, handleSelectSdiVariant, handleForkFromMessage };
 }
 
 export function useV7NodeSubSessions(projectId?: string, activeSessionId?: string) {

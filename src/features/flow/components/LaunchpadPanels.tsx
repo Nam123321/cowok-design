@@ -1,5 +1,5 @@
-// @story 05.1
-// @implements 4-Path Launchpad Panel Subcomponents
+// @story 05.1, 06.1
+// @implements AC-06 (4-Path Launchpad Panel Subcomponents — Full 9-Locale Formatting Guardian)
 import React from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "../../../hooks/useTranslation";
@@ -16,13 +16,58 @@ const STROKE_WIDTH_MONO = 1.85;
 const FONT_WEIGHT_SEMIBOLD = 600;
 const FONT_WEIGHT_MEDIUM = 500;
 const MAX_CLIPBOARD_SNIPPET_LEN = 8000;
+const TEXT_DESIGN_EXT_RE = /\.(svg|json|html|htm|css|txt|md)$/i;
 
 export const TEMPLATE_PRESETS = [
-  { id: "tpl-fintech", title: "FinTech Multi-Sig Treasury", category: "Security & Payments", badge: "Option 5 Flow", screens: TEMPLATE_COUNT_FINTECH, description: "Multi-signature escrow approval with WebAuthn Passkey biometrics and audit trail." },
-  { id: "tpl-ecommerce", title: "E-Commerce Checkout & Subscriptions", category: "Commerce", badge: "4-SubState", screens: TEMPLATE_COUNT_ECOMMERCE, description: "Cart reconciliation, address selector, payment intent confirmation, and receipt flow." },
-  { id: "tpl-saas-rbac", title: "SaaS Multi-Tenant Workspace & RBAC", category: "Enterprise", badge: "PBAC Guard", screens: TEMPLATE_COUNT_SAAS, description: "Workspace onboarding, team invitation, role assignment, and organization settings." },
-  { id: "tpl-slide-deck", title: "Interactive Slide Deck & Pitch Studio", category: "Presentation", badge: "16:9 Studio", screens: TEMPLATE_COUNT_DECK, description: "Phase walkthrough slides with interactive live data charts and presenter notes." },
-];
+  {
+    id: "tpl-fintech",
+    titleKey: "launchpad.tplFintechTitle",
+    titleFallback: "FinTech Multi-Sig Treasury",
+    categoryKey: "launchpad.tplFintechCat",
+    categoryFallback: "Security & Payments",
+    badgeKey: "launchpad.tplFintechBadge",
+    badgeFallback: "Option 5 Flow",
+    screens: TEMPLATE_COUNT_FINTECH,
+    descKey: "launchpad.tplFintechDesc",
+    descFallback: "Multi-signature escrow approval with WebAuthn Passkey biometrics and audit trail.",
+  },
+  {
+    id: "tpl-ecommerce",
+    titleKey: "launchpad.tplEcommerceTitle",
+    titleFallback: "E-Commerce Checkout & Subscriptions",
+    categoryKey: "launchpad.tplEcommerceCat",
+    categoryFallback: "Commerce",
+    badgeKey: "launchpad.tplEcommerceBadge",
+    badgeFallback: "4-SubState",
+    screens: TEMPLATE_COUNT_ECOMMERCE,
+    descKey: "launchpad.tplEcommerceDesc",
+    descFallback: "Cart reconciliation, address selector, payment intent confirmation, and receipt flow.",
+  },
+  {
+    id: "tpl-saas-rbac",
+    titleKey: "launchpad.tplSaasTitle",
+    titleFallback: "SaaS Multi-Tenant Workspace & RBAC",
+    categoryKey: "launchpad.tplSaasCat",
+    categoryFallback: "Enterprise",
+    badgeKey: "launchpad.tplSaasBadge",
+    badgeFallback: "PBAC Guard",
+    screens: TEMPLATE_COUNT_SAAS,
+    descKey: "launchpad.tplSaasDesc",
+    descFallback: "Workspace onboarding, team invitation, role assignment, and organization settings.",
+  },
+  {
+    id: "tpl-slide-deck",
+    titleKey: "launchpad.tplDeckTitle",
+    titleFallback: "Interactive Slide Deck & Pitch Studio",
+    categoryKey: "launchpad.tplDeckCat",
+    categoryFallback: "Presentation",
+    badgeKey: "launchpad.tplDeckBadge",
+    badgeFallback: "16:9 Studio",
+    screens: TEMPLATE_COUNT_DECK,
+    descKey: "launchpad.tplDeckDesc",
+    descFallback: "Phase walkthrough slides with interactive live data charts and presenter notes.",
+  },
+] as const;
 
 const FIELD_STYLE: React.CSSProperties = {
   width: "100%",
@@ -47,6 +92,12 @@ export const LaunchpadPrdPanel: React.FC<{
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || typeof FileReader === "undefined") return;
+    if (!/\.(md|txt|json)$/i.test(file.name)) {
+      const marker = `[File: ${file.name}]`;
+      if (onSelectFile) onSelectFile(file.name, marker);
+      else onChangeText(marker);
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const content = typeof reader.result === "string" ? reader.result : "";
@@ -68,7 +119,7 @@ export const LaunchpadPrdPanel: React.FC<{
       <button type="button" data-testid="launchpad-load-sample-prd-btn" onClick={onLoadSamplePrd} style={{ alignSelf: "flex-start", padding: "4px 10px", fontSize: "10.5px", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-secondary)", cursor: "pointer" }}>
         {t("launchpad.loadSamplePrdBtn", "Load Sample PRD")}
       </button>
-      <textarea data-testid="launchpad-prd-textarea" rows={PRD_ROWS} placeholder="Dán nội dung Product Requirements Document hoặc prompt khởi tạo luồng vào đây..." value={prdText} onChange={(e) => onChangeText(e.target.value)} style={{ ...FIELD_STYLE, resize: "vertical" }} />
+      <textarea data-testid="launchpad-prd-textarea" rows={PRD_ROWS} placeholder={t("launchpad.prdPlaceholder", "Dán nội dung Product Requirements Document hoặc prompt khởi tạo luồng vào đây...")} value={prdText} onChange={(e) => onChangeText(e.target.value)} style={{ ...FIELD_STYLE, resize: "vertical" }} />
     </div>
   );
 };
@@ -87,11 +138,11 @@ export const LaunchpadTemplatesPanel: React.FC<{
           return (
             <div key={tpl.id} data-testid={`launchpad-tpl-${tpl.id}`} onClick={() => onSelectTemplate(tpl.id)} style={{ padding: "12px", borderRadius: "var(--radius-md)", border: isSelected ? "2px solid var(--action-primary)" : "1px solid var(--border-default)", backgroundColor: isSelected ? "var(--bg-selected)" : "var(--bg-canvas)", cursor: "pointer" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "10px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--action-primary)" }}>{tpl.category}</span>
-                <span style={{ fontSize: "8.5px", fontFamily: "var(--font-mono)", padding: "1px 5px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-subtle)", color: "var(--text-muted)" }}>{tpl.badge}</span>
+                <span style={{ fontSize: "10px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--action-primary)" }}>{t(tpl.categoryKey, tpl.categoryFallback)}</span>
+                <span style={{ fontSize: "8.5px", fontFamily: "var(--font-mono)", padding: "1px 5px", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-subtle)", color: "var(--text-muted)" }}>{t(tpl.badgeKey, tpl.badgeFallback)}</span>
               </div>
-              <div style={{ fontSize: "12px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--text-primary)", margin: "4px 0" }}>{tpl.title}</div>
-              <div style={{ fontSize: "10.5px", color: "var(--text-muted)", lineHeight: "1.4" }}>{tpl.description}</div>
+              <div style={{ fontSize: "12px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--text-primary)", margin: "4px 0" }}>{t(tpl.titleKey, tpl.titleFallback)}</div>
+              <div style={{ fontSize: "10.5px", color: "var(--text-muted)", lineHeight: "1.4" }}>{t(tpl.descKey, tpl.descFallback)}</div>
             </div>
           );
         })}
@@ -111,10 +162,14 @@ export const LaunchpadDesignPanel: React.FC<{
   const { t } = useTranslation();
   const handleDesignFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || typeof FileReader === "undefined") return;
+    if (!file) return;
+    if (!TEXT_DESIGN_EXT_RE.test(file.name) || typeof FileReader === "undefined") {
+      onChangeClipboard(`[File: ${file.name}]`);
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
-      const content = typeof reader.result === "string" ? reader.result : `file:${file.name}`;
+      const content = typeof reader.result === "string" ? reader.result : `[File: ${file.name}]`;
       onChangeClipboard(content.slice(0, MAX_CLIPBOARD_SNIPPET_LEN));
     };
     reader.readAsText(file);
@@ -123,8 +178,8 @@ export const LaunchpadDesignPanel: React.FC<{
     <div data-testid="launchpad-panel-design" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{t("launchpad.designDesc", "Nhập URL file Figma, nạp file .fig hoặc dán vector clipboard SVG/HTML:")}</div>
       <input data-testid="launchpad-design-file-input" type="file" accept=".fig,.svg,.json,.png" onChange={handleDesignFile} style={{ fontSize: "11px", color: "var(--text-secondary)" }} />
-      <input data-testid="launchpad-figma-url-input" type="text" placeholder="https://www.figma.com/design/... hoặc dán token" value={designUrl} onChange={(e) => onChangeUrl(e.target.value)} style={FIELD_STYLE} />
-      <textarea data-testid="launchpad-clipboard-textarea" rows={CLIPBOARD_ROWS} placeholder="Dán clipboard mã nguồn SVG / HTML khung wireframe..." value={clipboardSnippet} onChange={(e) => onChangeClipboard(e.target.value)} style={{ ...FIELD_STYLE, resize: "vertical" }} />
+      <input data-testid="launchpad-figma-url-input" type="text" placeholder={t("launchpad.figmaUrlPlaceholder", "https://www.figma.com/design/... hoặc dán token")} value={designUrl} onChange={(e) => onChangeUrl(e.target.value)} style={FIELD_STYLE} />
+      <textarea data-testid="launchpad-clipboard-textarea" rows={CLIPBOARD_ROWS} placeholder={t("launchpad.clipboardPlaceholder", "Dán clipboard mã nguồn SVG / HTML khung wireframe...")} value={clipboardSnippet} onChange={(e) => onChangeClipboard(e.target.value)} style={{ ...FIELD_STYLE, resize: "vertical" }} />
       <button type="button" data-testid="launchpad-extract-tokens-btn" onClick={onExtractTokens} style={{ alignSelf: "flex-start", padding: "6px 12px", fontSize: "11px", fontWeight: FONT_WEIGHT_SEMIBOLD, borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}>
         <BrandIcon name="cpu" size={ICON_SIZE_SM} strokeWidth={STROKE_WIDTH_MONO} color="currentColor" />
         <span>{t("launchpad.extractTokensBtn", "Deterministic Offline Token Extraction")}</span>
@@ -144,7 +199,7 @@ export const LaunchpadGitPanel: React.FC<{
   return (
     <div data-testid="launchpad-panel-git" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{t("launchpad.gitDesc", "Quét mã nguồn repository hiện có để sinh luồng màn hình tự động:")}</div>
-      <input data-testid="launchpad-git-url-input" type="text" placeholder="https://github.com/org/repo.git hoặc đường dẫn cục bộ" value={gitRepoUrl} onChange={(e) => onChangeUrl(e.target.value)} style={FIELD_STYLE} />
+      <input data-testid="launchpad-git-url-input" type="text" placeholder={t("launchpad.gitUrlPlaceholder", "https://github.com/org/repo.git hoặc đường dẫn cục bộ")} value={gitRepoUrl} onChange={(e) => onChangeUrl(e.target.value)} style={FIELD_STYLE} />
       <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
         <span style={{ fontSize: "11px", fontWeight: FONT_WEIGHT_MEDIUM, color: "var(--text-muted)" }}>{t("launchpad.gitBranchLabel", "Branch:")}</span>
         <input data-testid="launchpad-git-branch-input" type="text" value={gitBranch} onChange={(e) => onChangeBranch(e.target.value)} style={{ ...FIELD_STYLE, width: "140px", padding: "4px 8px" }} />

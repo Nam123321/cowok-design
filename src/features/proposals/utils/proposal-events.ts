@@ -34,6 +34,7 @@ export function buildUiChangeProposalInput(opts: {
   nodeId?: string | null;
   nodeIds?: string[];
   screenKey?: string | null;
+  sourceCommentId?: string;
   updatedHtml?: string;
   previousHtml?: string;
 }): CreateProposalInput {
@@ -53,6 +54,7 @@ export function buildUiChangeProposalInput(opts: {
   return {
     title: `${scopeLabel}: ${titleSuffix}`,
     description: `Synthesized UI proposal for ${scopeLabel}: ${cleanPrompt}`,
+    sourceCommentId: opts.sourceCommentId || undefined,
     nodeId: opts.nodeId || undefined,
     nodeIds: resolveProposalNodeIds(opts.nodeId, opts.nodeIds),
     contentMode: "full_file",

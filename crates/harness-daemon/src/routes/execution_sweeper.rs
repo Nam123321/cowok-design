@@ -82,6 +82,7 @@ fn mark_jobs_interrupted_tx(
                 r.get::<_, String>(3)?,
                 r.get::<_, String>(4)?,
                 r.get::<_, i64>(5)?,
+                r.get::<_, Option<String>>(6)?,
             ))
         })?;
         for r in rows {
@@ -90,10 +91,23 @@ fn mark_jobs_interrupted_tx(
     }
     let mut interrupted_jobs = Vec::new();
     let mut notify_projects = Vec::new();
-    for (jid, tid, pid, nid, scope, fence) in targets {
+    for (jid, tid, pid, nid, scope, fence, lease_owner) in targets {
         let next_fence = fence + 1;
-        let payload =
-            serde_json::json!({ "reason": reason_code, "fencingToken": next_fence }).to_string();
+        let is_copilot_timeout = reason_code == "LEASE_EXPIRED"
+            && lease_owner
+                .as_deref()
+                .is_some_and(|owner| owner.starts_with("slide-copilot:"));
+        let effective_reason = if is_copilot_timeout {
+            "E_COPILOT_LEASE_TIMEOUT"
+        } else {
+            reason_code
+        };
+        let payload = serde_json::json!({
+            "reason": effective_reason,
+            "fencingToken": next_fence,
+            "copilotLeaseExpired": is_copilot_timeout,
+        })
+        .to_string();
         let updated = tx.execute(
             "UPDATE node_execution_jobs SET status = 'INTERRUPTED', fencing_token = ?1, stale_after_timestamp = NULL, error_json = COALESCE(error_json, ?2), updated_at = ?3 WHERE id = ?4 AND fencing_token = ?5 AND composite_scope_key = ?6",
             params![next_fence, payload, now_ms, jid, fence, scope],
@@ -119,8 +133,15 @@ fn mark_jobs_interrupted_tx(
         interrupted_jobs.push((pid.clone(), jid));
         notify_projects.push(pid);
     }
-    if !live_nonce.is_empty() {
-        for (_, pid) in promote_next_queued_tx(&tx, live_nonce, now_ms)? {
+    let effective_nonce = if !live_nonce.is_empty() {
+        live_nonce
+    } else if reason_code == "LEASE_EXPIRED" {
+        "sweeper-lease-promote"
+    } else {
+        ""
+    };
+    if !effective_nonce.is_empty() {
+        for (_, pid) in promote_next_queued_tx(&tx, effective_nonce, now_ms)? {
             notify_projects.push(pid);
         }
     }
@@ -210,7 +231,7 @@ pub async fn reap_orphan_jobs_with_workers(
     workspace_root: Option<&Path>,
     live_nonce: &str,
 ) -> Result<usize, HarnessError> {
-    let sql = "SELECT id, tenant_id, project_id, node_id, composite_scope_key, fencing_token FROM node_execution_jobs WHERE status IN ('RUNNING', 'PAUSED') AND daemon_nonce != ?1";
+    let sql = "SELECT id, tenant_id, project_id, node_id, composite_scope_key, fencing_token, lease_owner FROM node_execution_jobs WHERE status IN ('RUNNING', 'PAUSED') AND daemon_nonce != ?1";
     let outcome = run_reap_query(
         pool,
         "reap_orphan_jobs_on_startup",
@@ -253,7 +274,7 @@ pub async fn sweep_expired_leases_with_workers(
     live_nonce: &str,
     sse_tx: &broadcast::Sender<String>,
 ) -> Result<usize, HarnessError> {
-    let sql = "SELECT id, tenant_id, project_id, node_id, composite_scope_key, fencing_token FROM node_execution_jobs WHERE status = 'RUNNING' AND stale_after_timestamp IS NOT NULL AND stale_after_timestamp < ?1";
+    let sql = "SELECT id, tenant_id, project_id, node_id, composite_scope_key, fencing_token, lease_owner FROM node_execution_jobs WHERE status = 'RUNNING' AND stale_after_timestamp IS NOT NULL AND stale_after_timestamp < ?1";
     let outcome = run_reap_query(
         pool,
         "sweep_expired_leases",

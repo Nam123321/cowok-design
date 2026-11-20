@@ -1,6 +1,7 @@
 // @story 05.2
 import { useCallback, useEffect, useState } from "react";
 import { apiChangeProposal } from "../../../api/change-proposal";
+import { apiElementComment } from "../../../api/element-comment";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { HarnessDaemonApiError } from "../../../api/harness-daemon-transport";
 import type { ChangeProposalResponse, DecideTradeoffInput } from "../../../lib/validations/change-proposal";
@@ -76,11 +77,18 @@ function useDesignerTalkToggleHotkey(
   }, [isInlineCodeOpen, isModalOpen, setIsDesignerTalkOpen]);
 }
 
+export interface ProposalReceiptToastState {
+  tone: "success" | "danger";
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}
+
 interface ProposalGateActionsDeps {
   projectId: string | undefined;
   setProposals: React.Dispatch<React.SetStateAction<ChangeProposalResponse[]>>;
   setErrorBanner: React.Dispatch<React.SetStateAction<ProposalGateErrorBanner | null>>;
-  setReceiptToast: React.Dispatch<React.SetStateAction<{ tone: "success" | "danger"; message: string } | null>>;
+  setReceiptToast: React.Dispatch<React.SetStateAction<ProposalReceiptToastState | null>>;
   refreshProposals: () => Promise<void>;
 }
 
@@ -113,7 +121,32 @@ function useProposalGateActions(deps: ProposalGateActionsDeps) {
       void refreshProposals();
       const applyMsg = t("proposals.appliedToast", "ChangeProposal applied atomically.");
       const receiptLabel = t("proposals.turnReceiptPrefix", "Turn Snapshot Receipt");
-      setReceiptToast({ tone: "success", message: applyMsg });
+      const linkedCommentId = updated.sourceCommentId;
+      let undoCommentAction: Pick<ProposalReceiptToastState, "actionLabel" | "onAction"> = {};
+      if (linkedCommentId) {
+        const targetNodeId = updated.nodeId || updated.nodeIds?.[0];
+        if (targetNodeId) {
+          void apiElementComment.resolveComment(projectId, targetNodeId, linkedCommentId).catch(() => undefined);
+          undoCommentAction = {
+            actionLabel: t("proposals.reopenCommentUndo", "Undo"),
+            onAction: () => {
+              void apiElementComment
+                .updateComment(projectId, targetNodeId, linkedCommentId, { anchorStatus: "active" })
+                .then(() => {
+                  window.dispatchEvent(new CustomEvent("cowok:comment-reopened", {
+                    detail: { projectId, nodeId: targetNodeId, commentId: linkedCommentId },
+                  }));
+                  setReceiptToast(null);
+                })
+                .catch(() => undefined);
+            },
+          };
+        }
+        window.dispatchEvent(new CustomEvent("cowok:comment-resolved", {
+          detail: { projectId, nodeId: targetNodeId ?? null, commentId: linkedCommentId },
+        }));
+      }
+      setReceiptToast({ tone: "success", message: applyMsg, ...undoCommentAction });
       window.dispatchEvent(new CustomEvent("cowok:chat-receipt", {
         detail: { projectId, text: `${receiptLabel}: ${updated.title} — ${applyMsg}` },
       }));
@@ -223,7 +256,7 @@ async function executeQuickDraftCreation(deps: {
   opts: NodeProposalControllerOptions;
   t: (key: string, fallback: string) => string;
   setSelectedProposalId: React.Dispatch<React.SetStateAction<string | null>>;
-  setReceiptToast: React.Dispatch<React.SetStateAction<{ tone: "success" | "danger"; message: string } | null>>;
+  setReceiptToast: React.Dispatch<React.SetStateAction<ProposalReceiptToastState | null>>;
 }) {
   const { opts, t, setSelectedProposalId, setReceiptToast } = deps;
   if (!opts.projectId) return;
@@ -251,7 +284,7 @@ export function useNodeProposalController(opts: NodeProposalControllerOptions) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isDesignerTalkOpen, setIsDesignerTalkOpen] = useState(false);
   const [errorBanner, setErrorBanner] = useState<ProposalGateErrorBanner | null>(null);
-  const [receiptToast, setReceiptToast] = useState<{ tone: "success" | "danger"; message: string } | null>(null);
+  const [receiptToast, setReceiptToast] = useState<ProposalReceiptToastState | null>(null);
 
   const activeProposal = proposals.find((p) => p.id === selectedProposalId) ?? proposals[0] ?? null;
   useDesignerTalkToggleHotkey(Boolean(opts.isModalOpen || opts.disabled), opts.isInlineCodeOpen, setIsDesignerTalkOpen);

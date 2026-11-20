@@ -1,6 +1,7 @@
 // @story 05.3
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiVersionSnapshot } from "../../../api/version-snapshot";
+import { emitSessionForked } from "../../flow/store/shared-chat-sync";
 import type { ExportInitialSection, PrSubmissionError } from "../components/ExportBundleModal";
 import {
   ProjectIntegrationsStatusSchema,
@@ -179,35 +180,79 @@ function useExportActionsState(projectId: string | undefined, snapshotsCount: nu
   return { isExportOpen, setIsExportOpen, exportInitialSection, exportMetadata, prResult, prError, handoffResult, handoffError, handleOpenExport, handleDownloadZip, handleCreatePR, handleOpenIde };
 }
 
-function useTurnReceiptsState(projectId: string | undefined, refreshData: () => Promise<void>, onPreviewStateChange?: (turn: ChatArtifactSnapshotResponse | null) => void) {
+function dispatchTurnForkNavigation(
+  projectId: string,
+  turn: ChatArtifactSnapshotResponse,
+  res: { forkedSessionId: string; forkedFromMessageId: string; detachedNodeIds: string[]; copiedMessagesCount: number },
+  onAfterFork?: () => void
+) {
+  const parsedTs = typeof turn.createdAt === "number" ? turn.createdAt : Date.parse(String(turn.createdAt));
+  onAfterFork?.();
+  emitSessionForked({
+    projectId,
+    sourceSessionId: turn.sessionId,
+    forkedSessionId: res.forkedSessionId,
+    cutoffMessageId: res.forkedFromMessageId,
+    cutoffCreatedAtMs: Number.isFinite(parsedTs) ? parsedTs : undefined,
+    detachedNodeIds: res.detachedNodeIds,
+    copiedMessagesCount: res.copiedMessagesCount,
+  });
+}
+
+function emitSnapshotEvent(name: "cowok:project-state-invalidated" | "cowok:session-fork-error", detail: Record<string, unknown>): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(name, { detail }));
+}
+
+async function runRevertSnapshotPass(projectId: string, snapId: string, restoreMissingNodes: boolean, refreshData: () => Promise<void>): Promise<void> {
+  await apiVersionSnapshot.revertSnapshot(projectId, snapId, { restoreMissingNodes });
+  await refreshData();
+  emitSnapshotEvent("cowok:project-state-invalidated", { projectId, reason: "revert" });
+}
+
+function useTurnReceiptsState(
+  projectId: string | undefined,
+  refreshData: () => Promise<void>,
+  onPreviewStateChange?: (turn: ChatArtifactSnapshotResponse | null) => void,
+  onAfterFork?: () => void
+) {
   const [activePreviewTurn, setActivePreviewTurn] = useState<ChatArtifactSnapshotResponse | null>(null);
   const [forkedSessionByTurnId, setForkedSessionByTurnId] = useState<Record<string, { sessionId: string; detachedNodeIds: string[] }>>({});
   const [turnRevertTarget, setTurnRevertTarget] = useState<VersionSnapshotResponse | null>(null);
   const [turnRestoreMissingNodes, setTurnRestoreMissingNodes] = useState(false);
   const [isTurnReverting, setIsTurnReverting] = useState(false);
-
+  const forkBusyRef = useRef(false);
   const handlePreviewTurn = (turn: ChatArtifactSnapshotResponse) => {
     const next = activePreviewTurn?.id === turn.id ? null : turn;
     setActivePreviewTurn(next);
     onPreviewStateChange?.(next);
   };
   const handleForkTurn = async (turn: ChatArtifactSnapshotResponse) => {
-    if (!projectId) return;
-    const res = await apiVersionSnapshot.forkSessionFromTurn(projectId, turn.id, { includeNodeScope: true });
-    setForkedSessionByTurnId((prev) => ({ ...prev, [turn.id]: { sessionId: res.forkedSessionId, detachedNodeIds: res.detachedNodeIds } }));
+    if (!projectId || forkBusyRef.current) return;
+    forkBusyRef.current = true;
+    try {
+      const res = await apiVersionSnapshot.forkSessionFromTurn(projectId, turn.id, { includeNodeScope: true });
+      setForkedSessionByTurnId((prev) => ({ ...prev, [turn.id]: { sessionId: res.forkedSessionId, detachedNodeIds: res.detachedNodeIds } }));
+      if (activePreviewTurn?.id === turn.id) { setActivePreviewTurn(null); onPreviewStateChange?.(null); }
+      dispatchTurnForkNavigation(projectId, turn, res, onAfterFork);
+    } catch (err) {
+      emitSnapshotEvent("cowok:session-fork-error", { message: err instanceof Error ? err.message : "Unable to fork from snapshot" });
+    } finally { forkBusyRef.current = false; }
   };
   const handleUndoTurn = async (turn: ChatArtifactSnapshotResponse) => {
     if (!projectId) return;
-    try { await apiVersionSnapshot.revertSnapshot(projectId, turn.id, { restoreMissingNodes: false }); await refreshData(); }
-    catch (err) { if (isDeletedNodeConflictError(err)) { setTurnRevertTarget(buildFallbackTurnSnapshot(turn)); setTurnRestoreMissingNodes(false); } }
+    try { await runRevertSnapshotPass(projectId, turn.id, false, refreshData); }
+    catch (err) {
+      if (isDeletedNodeConflictError(err)) { setTurnRevertTarget(buildFallbackTurnSnapshot(turn)); setTurnRestoreMissingNodes(false); }
+      else emitSnapshotEvent("cowok:session-fork-error", { message: err instanceof Error ? err.message : "Revert snapshot failed" });
+    }
   };
   const handleConfirmTurnRevert = async () => {
     if (!projectId || !turnRevertTarget) return;
     setIsTurnReverting(true);
-    try { await apiVersionSnapshot.revertSnapshot(projectId, turnRevertTarget.id, { restoreMissingNodes: turnRestoreMissingNodes }); setTurnRevertTarget(null); await refreshData(); }
+    try { await runRevertSnapshotPass(projectId, turnRevertTarget.id, turnRestoreMissingNodes, refreshData); setTurnRevertTarget(null); }
+    catch (err) { emitSnapshotEvent("cowok:session-fork-error", { message: err instanceof Error ? err.message : "Revert snapshot failed" }); }
     finally { setIsTurnReverting(false); }
   };
-
   return { activePreviewTurn, forkedSessionByTurnId, turnRevertTarget, setTurnRevertTarget, turnRestoreMissingNodes, setTurnRestoreMissingNodes, isTurnReverting, handlePreviewTurn, handleForkTurn, handleUndoTurn, handleConfirmTurnRevert };
 }
 
@@ -219,7 +264,7 @@ export function useSnapshotWorkspaceController(
   const lists = useSnapshotListsState(projectId);
   const integrations = useIntegrationsState(projectId);
   const exp = useExportActionsState(projectId, lists.snapshots.length, integrations.refreshIntegrations);
-  const turn = useTurnReceiptsState(projectId, lists.refreshData, onPreviewStateChange);
+  const turn = useTurnReceiptsState(projectId, lists.refreshData, onPreviewStateChange, () => setIsDrawerOpen(false));
 
   useEffect(() => {
     if (isDrawerOpen) void lists.refreshData();
@@ -227,12 +272,18 @@ export function useSnapshotWorkspaceController(
 
   const createManualCheckpoint = useCallback(async () => {
     if (!projectId) return;
-    await apiVersionSnapshot.createSnapshot(projectId, {
-      label: "Manual Workspace Checkpoint",
-      trigger: "manual",
-      files: [],
-    });
-    await lists.refreshData();
+    try {
+      await apiVersionSnapshot.createSnapshot(projectId, {
+        label: "Manual Workspace Checkpoint",
+        trigger: "manual",
+        files: [],
+      });
+      await lists.refreshData();
+    } catch (err) {
+      emitSnapshotEvent("cowok:session-fork-error", {
+        message: err instanceof Error ? err.message : "Unable to create workspace checkpoint",
+      });
+    }
   }, [lists, projectId]);
 
   return { ...lists, ...integrations, isDrawerOpen, setIsDrawerOpen, createManualCheckpoint, exp, turn };

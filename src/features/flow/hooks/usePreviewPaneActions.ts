@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiElementComment } from "../../../api/element-comment";
 import { apiScreenFixture } from "../../../api/screen-fixture";
 import { HarnessDaemonApiError } from "../../../api/harness-daemon-transport";
-import type { ElementCommentResponse } from "../../../lib/validations/element-comment";
+import type { AnchorKind, CommentRegionRect, ElementCommentResponse } from "../../../lib/validations/element-comment";
 import { normalizeFixtureRef, type FixtureVariant, type ViewportPreset } from "../../../lib/validations/screen-fixture";
 import type { ElementRectBox } from "./useSandboxedIframeBridge";
 
@@ -12,12 +12,20 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const DOM_HASH_LEN = 8;
 const HTTP_CONFLICT = 409;
 
-function buildLocalComment(p: { projectId?: string; nodeId?: string | null; elementFfId: string; content: string; sha256: string }): ElementCommentResponse {
+function buildLocalComment(p: {
+  projectId?: string;
+  nodeId?: string | null;
+  elementFfId: string;
+  content: string;
+  sha256: string;
+  domHash?: string;
+  anchorKind?: AnchorKind;
+}): ElementCommentResponse {
   const now = new Date().toISOString();
   return {
     id: `local-${Date.now()}`, tenantId: "local-default", projectId: p.projectId || "local", nodeId: p.nodeId || "node-1",
-    elementFfId: p.elementFfId, author: "Designer", content: p.content, domHash: p.sha256.slice(0, DOM_HASH_LEN),
-    artifactSha256: p.sha256, anchorKind: "html_element", anchorStatus: "active", createdAt: now, updatedAt: now,
+    elementFfId: p.elementFfId, author: "Designer", content: p.content, domHash: p.domHash || p.sha256.slice(0, DOM_HASH_LEN),
+    artifactSha256: p.sha256, anchorKind: p.anchorKind ?? "html_element", anchorStatus: "active", createdAt: now, updatedAt: now,
   };
 }
 
@@ -73,6 +81,13 @@ function useInitialNodePreviewSync(params: {
   }, [canPersist, projectId, selectedNodeId, setComments, setFixturesByVariant, setToastState]);
 }
 
+export interface CreateSpatialCommentOptions {
+  anchorKind?: AnchorKind;
+  domHash?: string;
+  regionRect?: CommentRegionRect;
+  coveredFfIds?: string[];
+}
+
 function useCreateCommentAction(args: {
   canPersist: boolean;
   isReadOnly?: boolean;
@@ -83,26 +98,61 @@ function useCreateCommentAction(args: {
   setToastState: React.Dispatch<React.SetStateAction<CommentToastState | null>>;
 }) {
   const { canPersist, isReadOnly, projectId, selectedNodeId, artifactSha256, setComments, setToastState } = args;
-  return useCallback(async (content: string, elementFfId: string): Promise<boolean> => {
-    if (isReadOnly) return false;
-    if (!canPersist || !projectId || !selectedNodeId) {
-      setComments((prev) => [...prev, buildLocalComment({ projectId, nodeId: selectedNodeId, elementFfId, content, sha256: artifactSha256 })]);
-      setToastState(null);
-      return true;
-    }
-    try {
-      const created = await apiElementComment.createComment(projectId, selectedNodeId, {
-        elementFfId, author: "Designer", content, domHash: artifactSha256.slice(0, DOM_HASH_LEN), artifactSha256, anchorKind: "html_element",
-      });
-      setComments((prev) => [...prev, created]);
-      setToastState(null);
-      return true;
-    } catch (err) {
-      if (isStaleMappingErr(err)) setToastState({ message: err.message || "409 STALE_MAPPING", tone: "warning" });
-      else if (err instanceof Error) setToastState({ message: err.message, tone: "danger" });
-      return false;
-    }
-  }, [artifactSha256, canPersist, isReadOnly, projectId, selectedNodeId, setComments, setToastState]);
+  const createWithMeta = useCallback(
+    async (
+      content: string,
+      elementFfId: string,
+      meta?: CreateSpatialCommentOptions
+    ): Promise<ElementCommentResponse | null> => {
+      if (isReadOnly) return null;
+      const anchorKind: AnchorKind = meta?.anchorKind ?? "html_element";
+      const resolvedDomHash = meta?.domHash || artifactSha256.slice(0, DOM_HASH_LEN);
+      if (!canPersist || !projectId || !selectedNodeId) {
+        const local = buildLocalComment({
+          projectId,
+          nodeId: selectedNodeId,
+          elementFfId,
+          content,
+          sha256: artifactSha256,
+          domHash: resolvedDomHash,
+          anchorKind,
+        });
+        setComments((prev) => [...prev, local]);
+        setToastState(null);
+        return local;
+      }
+      try {
+        const created = await apiElementComment.createComment(projectId, selectedNodeId, {
+          elementFfId,
+          author: "Designer",
+          content,
+          domHash: resolvedDomHash,
+          artifactSha256,
+          anchorKind,
+          regionRect: meta?.regionRect,
+          coveredFfIds: meta?.coveredFfIds,
+        });
+        setComments((prev) => [...prev, created]);
+        setToastState(null);
+        return created;
+      } catch (err) {
+        if (isStaleMappingErr(err)) setToastState({ message: err.message || "409 STALE_MAPPING", tone: "warning" });
+        else if (err instanceof Error) setToastState({ message: err.message, tone: "danger" });
+        return null;
+      }
+    },
+    [artifactSha256, canPersist, isReadOnly, projectId, selectedNodeId, setComments, setToastState]
+  );
+
+  const handleAddComment = useCallback(
+    async (content: string, elementFfId: string): Promise<boolean> => {
+      const created = await createWithMeta(content, elementFfId);
+      return Boolean(created);
+    },
+    [createWithMeta]
+  );
+
+  return { handleAddComment, handleCreateSpatialComment: createWithMeta };
 }
 
 function useResolveCommentAction(args: {
@@ -183,7 +233,37 @@ export function usePreviewPaneActions(params: {
   const canPersist = Boolean(projectId && UUID_RE.test(projectId) && selectedNodeId);
 
   useInitialNodePreviewSync({ canPersist, projectId, selectedNodeId, setComments, setFixturesByVariant, setToastState, onSelectSubState });
-  const handleAddComment = useCreateCommentAction({ canPersist, isReadOnly, projectId, selectedNodeId, artifactSha256: params.artifactSha256, setComments, setToastState });
+  useEffect(() => {
+    const onResolved = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ commentId?: string }>).detail;
+      if (!detail?.commentId) return;
+      setComments((prev) =>
+        prev.map((c) => (c.id === detail.commentId ? { ...c, anchorStatus: "resolved" } : c))
+      );
+    };
+    const onReopened = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ commentId?: string }>).detail;
+      if (!detail?.commentId) return;
+      setComments((prev) =>
+        prev.map((c) => (c.id === detail.commentId ? { ...c, anchorStatus: "active" } : c))
+      );
+    };
+    window.addEventListener("cowok:comment-resolved", onResolved);
+    window.addEventListener("cowok:comment-reopened", onReopened);
+    return () => {
+      window.removeEventListener("cowok:comment-resolved", onResolved);
+      window.removeEventListener("cowok:comment-reopened", onReopened);
+    };
+  }, []);
+  const { handleAddComment, handleCreateSpatialComment } = useCreateCommentAction({
+    canPersist,
+    isReadOnly,
+    projectId,
+    selectedNodeId,
+    artifactSha256: params.artifactSha256,
+    setComments,
+    setToastState,
+  });
   const handleResolveComment = useResolveCommentAction({ canPersist, isReadOnly, projectId, selectedNodeId, setComments, setToastState });
   const handleReanchorComment = useReanchorCommentAction({ canPersist, isReadOnly, projectId, selectedNodeId, artifactSha256: params.artifactSha256, prefillFfId, setComments, setToastState });
 
@@ -219,5 +299,5 @@ export function usePreviewPaneActions(params: {
   const setStaleToastMessage = useCallback((msg: string | null) => {
     setToastState(msg ? { message: msg, tone: "warning" } : null);
   }, []);
-  return { comments, setComments, prefillFfId, setPrefillFfId, staleToastMessage, toastTone: toastState?.tone ?? "warning", setStaleToastMessage, collapsedCommentIds, handleSelectFixtureVariant, handlePersistViewport, handleAddComment, handleResolveComment, handleReanchorComment };
+  return { comments, setComments, prefillFfId, setPrefillFfId, staleToastMessage, toastTone: toastState?.tone ?? "warning", setStaleToastMessage, collapsedCommentIds, handleSelectFixtureVariant, handlePersistViewport, handleAddComment, handleCreateSpatialComment, handleResolveComment, handleReanchorComment };
 }

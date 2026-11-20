@@ -110,7 +110,7 @@ describe("Story 05.1: Frontend Sandbox Hardening, IframeKeepAlivePool & Option 5
       expect(csp).toContain("form-action 'none'");
 
       const wrapped = wrapUserHtmlSrcDoc("<div>Secure</div>", { scriptNonce: nonce });
-      expect(wrapped).toContain(`content="default-src 'none'; base-uri 'none'; connect-src 'none'; form-action 'none'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; script-src 'nonce-${nonce}';"`);
+      expect(wrapped).toContain(`content="default-src 'none'; base-uri 'none'; connect-src 'none'; form-action 'none'; style-src 'nonce-${nonce}'; img-src data: blob:; font-src data:; script-src 'nonce-${nonce}';"`);
       expect(wrapped).toContain(`nonce="${nonce}"`);
     });
 
@@ -271,7 +271,7 @@ describe("Story 05.1: Frontend Sandbox Hardening, IframeKeepAlivePool & Option 5
       );
 
       expect(screen.getByTestId("ambiguity-execution-lock")).toBeTruthy();
-      expect(screen.getByTestId("ambiguity-execution-lock").textContent).toContain("0.65");
+      expect(screen.getByTestId("ambiguity-execution-lock").textContent).toMatch(/0[.,]65/);
     });
   });
 

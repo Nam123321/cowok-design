@@ -674,6 +674,7 @@ model ChangeProposal {
   baseFileHashesJson   String   @default("{}") @map("base_file_hashes_json")
   visualDiffJson       String   @default("{}") @map("visual_diff_json")
   gateReceiptId        String?  @map("gate_receipt_id")
+  sourceCommentId      String?  @map("source_comment_id")
   title                String   @default("")
   description          String   @default("")
   filesJson            String   @default("[]") @map("files_json")
@@ -792,32 +793,42 @@ model GithubPullRequest {
 }
 
 // ============================================================================
-// Bounded Context: presentation-deck (Epic-08)
+// Bounded Context: presentation-deck (Epic-06 V1/V12)
 // ============================================================================
 
 model PresentationDeck {
-  id             String  @id @default(uuid())
-  projectId      String  @map("project_id")
-  title          String
-  themePreset    String  @default("DEFAULT") @map("theme_preset")
-  slidesCount    Int     @default(0) @map("slides_count")
-  lastExportedAt BigInt? @map("last_exported_at")
-  updatedAt      BigInt  @map("updated_at")
+  id                  String  @id @default(uuid())
+  projectId           String  @map("project_id")
+  title               String
+  themePreset         String  @default("DEFAULT") @map("theme_preset")
+  aspectRatio         String  @default("16:9") @map("aspect_ratio")
+  deckProtocolVersion Int     @default(1) @map("deck_protocol_version")
+  deckMode            String  @default("multi-page") @map("deck_mode")
+  slidesCount         Int     @default(0) @map("slides_count")
+  revision            Int     @default(0)
+  lastExportedAt      BigInt? @map("last_exported_at")
+  updatedAt           BigInt  @map("updated_at")
 
   slides DeckSlide[]
 
   @@index([projectId])
+  @@index([projectId, revision], map: "idx_presentation_decks_project_rev")
   @@map("presentation_decks")
 }
 
 model DeckSlide {
-  id            String @id @default(uuid())
-  deckId        String @map("deck_id")
-  slideIndex    Int    @map("slide_index")
-  layoutKind    String @default("STANDARD") @map("layout_kind")
-  htmlPath      String @map("html_path")
-  contentSha256 String @map("content_sha256")
-  updatedAt     BigInt @map("updated_at")
+  id            String  @id @default(uuid())
+  deckId        String  @map("deck_id")
+  slideUid      String? @unique(map: "deck_slides_slide_uid_key") @map("slide_uid")
+  slideIndex    Int     @map("slide_index")
+  layoutKind    String  @default("STANDARD") @map("layout_kind")
+  htmlPath      String  @map("html_path")
+  contentSha256 String  @map("content_sha256")
+  speakerNotes  String  @default("") @map("speaker_notes")
+  narrativeArc  String  @default("") @map("narrative_arc")
+  eyebrowTag    String  @default("") @map("eyebrow_tag")
+  revision      Int     @default(0)
+  updatedAt     BigInt  @map("updated_at")
 
   deck         PresentationDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
   wordingSlots WordingSlot[]
@@ -827,12 +838,17 @@ model DeckSlide {
 }
 
 model WordingSlot {
-  id        String @id @default(uuid())
-  slideId   String @map("slide_id")
-  ffId      String @map("ff_id")
-  slotLabel String @map("slot_label")
-  textValue String @map("text_value")
-  updatedAt BigInt @map("updated_at")
+  id             String @id @default(uuid())
+  slideId        String @map("slide_id")
+  ffId           String @map("ff_id")
+  slotLabel      String @map("slot_label")
+  slotKind       String @default("text") @map("slot_kind")
+  textValue      String @map("text_value")
+  chartsJson     String @default("[]") @map("charts_json")
+  safeStylesJson String @default("{}") @map("safe_styles_json")
+  updatedBy      String @default("human") @map("updated_by")
+  astRevision    Int    @default(0) @map("ast_revision")
+  updatedAt      BigInt @map("updated_at")
 
   slide DeckSlide @relation(fields: [slideId], references: [id], onDelete: Cascade)
 

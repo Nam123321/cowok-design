@@ -16,6 +16,12 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 libc = "0.2"
+ts-rs = { workspace = true, optional = true }
+
+[features]
+default = ["ts"]
+ts = ["dep:ts-rs"]
 
 [dev-dependencies]
 tempfile = { workspace = true }
+ts-rs = { workspace = true }

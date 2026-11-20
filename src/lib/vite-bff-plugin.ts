@@ -137,8 +137,9 @@ function isSpaHtmlNavigation(req: IncomingMessage, pathname: string): boolean {
   if (method !== "GET" || pathname.startsWith("/api/") || pathname.startsWith("/@") || pathname.startsWith("/src/")) {
     return false;
   }
+  const isPresenterRoute = /^\/presenter\/[A-Za-z0-9_.:%-]+\/?$/.test(pathname);
   const hasAssetExt = /\.[a-z0-9]{1,8}$/i.test(pathname) && pathname !== "/index.html";
-  if (hasAssetExt) return false;
+  if (hasAssetExt && !isPresenterRoute) return false;
   const accept = String(req.headers.accept || "");
   if (accept && !accept.includes("text/html") && !accept.includes("*/*")) return false;
   const fetchMode = String(req.headers["sec-fetch-mode"] || "").trim().toLowerCase();

@@ -143,7 +143,8 @@ function isOriginAllowed(origin: string, hostHeader: string, boundPort: number |
 /** Verifies loopback Host, Sec-Fetch-Site, Origin, session token expiry, and viewer write restrictions. */
 export function verifyStrictLoopback(
   req: Request,
-  fallbackUrl: URL
+  fallbackUrl: URL,
+  opts?: { allowViewerReadOnlyPost?: boolean }
 ): { ok: true; session: LoopbackSessionRecord; sessionToken: string } | { ok: false; response: Response } {
   const boundPort = getBoundBffPort();
   const hostHeader = req.headers.get("host") || fallbackUrl.host;
@@ -162,7 +163,12 @@ export function verifyStrictLoopback(
     if (session) sessionRegistry.delete(token);
     return { ok: false, response: jsonResp(HTTP_UNAUTHORIZED, { code: "UNAUTHENTICATED", error: "UNAUTHENTICATED" }) };
   }
-  if (session.role === "viewer" && req.method !== "GET" && req.method !== "HEAD") {
+  const isViewerWriteBlocked =
+    session.role === "viewer" &&
+    req.method !== "GET" &&
+    req.method !== "HEAD" &&
+    !(opts?.allowViewerReadOnlyPost && req.method === "POST");
+  if (isViewerWriteBlocked) {
     return { ok: false, response: jsonResp(HTTP_FORBIDDEN, { code: "INSUFFICIENT_ROLE", error: "INSUFFICIENT_ROLE" }) };
   }
   return { ok: true, session, sessionToken: token };

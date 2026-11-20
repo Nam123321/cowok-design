@@ -1,10 +1,16 @@
-// @story 04.1, 04.2
-// @implements AC-01, AC-02, AC-04
+// @story 04.1, 04.2, 06.1
+// @implements AC-01, AC-02, AC-04, AC-06 (PA-A Dual-Intent + 3-Tab Form Fields)
 import React from "react";
-import { BrandIcon } from "../../../components/ui/BrandIcon";
+import { CowokSelect } from "../../../components/ui/CowokSelect";
 import { useTranslation } from "../../../hooks/useTranslation";
-import { ProjectProvenance, WorkbenchProject } from "../constants";
-import { MANAGED_SLUG_REGEX } from "../hooks/useProjectTrashAndBrowse";
+import type { WorkbenchProject } from "../constants";
+import { EditableAliasField } from "./EditableAliasField";
+import { EntryKindOptionCards } from "./EntryKindOptionCards";
+import {
+  NewProjectSourceSection,
+  type GitHubConnectionState,
+  type ProjectSourceType,
+} from "./NewProjectSourceSection";
 
 export interface NewConversationFormFieldsProps {
   mode: "project" | "new-project" | "standalone";
@@ -12,189 +18,110 @@ export interface NewConversationFormFieldsProps {
   activeProjectId?: string;
   selectedProjectId: string;
   onSelectProjectId: (id: string) => void;
+  sourceType: ProjectSourceType | null;
+  onChangeSourceType: (val: ProjectSourceType | null) => void;
   newProjectName: string;
   onChangeNewProjectName: (val: string) => void;
   managedSlug: string;
-  onChangeManagedSlug: (val: string) => void;
-  provenance: ProjectProvenance;
-  onChangeProvenance: (val: ProjectProvenance) => void;
   localFolderPath: string;
-  onChangeLocalFolderPath: (val: string) => void;
+  githubRepoUrl: string;
+  onChangeGithubRepoUrl: (val: string) => void;
+  githubState: GitHubConnectionState;
+  onConnectGitHub: () => void;
   sessionTitle: string;
   onChangeSessionTitle: (val: string) => void;
-  onBrowseFolder: () => void;
-  onOpenLaunchpad?: () => void;
+  entryKind: "fe-dag" | "presentation";
+  onChangeEntryKind: (val: "fe-dag" | "presentation") => void;
+  onBrowseFolder: (preferredTab: "managed" | "browse") => void;
 }
 
-const INPUT_STYLE: React.CSSProperties = {
-  width: "100%", height: "34px", padding: "0 10px", fontSize: "12px", borderRadius: "var(--radius-xs)",
-  backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", border: "1px solid var(--border-default)", boxSizing: "border-box",
-};
+const SEMIBOLD_WEIGHT = 600;
 
 const LABEL_STYLE: React.CSSProperties = {
-  display: "block", fontSize: "11.5px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "6px",
+  display: "block",
+  fontSize: "11.5px",
+  fontWeight: SEMIBOLD_WEIGHT,
+  color: "var(--text-secondary)",
+  marginBottom: "6px",
 };
 
-const cardOptionStyle = (active: boolean): React.CSSProperties => ({
-  padding: "8px 10px", borderRadius: "var(--radius-xs)", textAlign: "left", cursor: "pointer",
-  border: active ? "1.5px solid var(--action-primary)" : "1px solid var(--border-default)",
-  backgroundColor: active ? "var(--bg-selected)" : "var(--bg-workspace)", color: "var(--text-primary)",
-});
-
-const ProvenanceSelector: React.FC<{
-  provenance: ProjectProvenance;
-  onChangeProvenance: (val: ProjectProvenance) => void;
-}> = ({ provenance, onChangeProvenance }) => {
+const CurrentProjectDropdownSection: React.FC<{
+  projects: WorkbenchProject[];
+  selectedProjectId: string;
+  onSelectProjectId: (id: string) => void;
+}> = ({ projects, selectedProjectId, onSelectProjectId }) => {
   const { t } = useTranslation();
+  const fieldLabel = t("workbench.currentProjectLabel", "Dự án hiện tại (Chia sẻ chung DESIGN.md & tokens.css)");
   return (
     <div>
-      <label style={LABEL_STYLE}>{t("workbench.provenanceLabel", "Kiến trúc Lưu trữ Dự án (Hybrid Project Boundary — Section 9.3)")}</label>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-        <button type="button" onClick={() => onChangeProvenance("folder-backed")} style={cardOptionStyle(provenance === "folder-backed")}>
-          <div style={{ fontSize: "11.5px", fontWeight: 600, marginBottom: "2px", display: "flex", alignItems: "center", gap: "5px" }}>
-            <BrandIcon name="folder-git" size={12} color="var(--human-accent)" />
-            <span>{t("workbench.folderBackedTitle", "Folder-Backed (In-Place)")}</span>
-          </div>
-          <div style={{ fontSize: "10px", color: "var(--text-muted)", lineHeight: "1.35" }}>
-            {t("workbench.folderBackedDesc", 'Ghi trực tiếp vào thư mục Git cục bộ (writeback: "in-place")')}
-          </div>
-        </button>
-        <button type="button" onClick={() => onChangeProvenance("scratch")} style={cardOptionStyle(provenance === "scratch")}>
-          <div style={{ fontSize: "11.5px", fontWeight: 600, marginBottom: "2px", display: "flex", alignItems: "center", gap: "5px" }}>
-            <BrandIcon name="ai-agent" size={14} color="var(--agent-accent)" />
-            <span>{t("workbench.managedScratchTitle", "Managed Scratch")}</span>
-          </div>
-          <div style={{ fontSize: "10px", color: "var(--text-muted)", lineHeight: "1.35" }}>
-            {t("workbench.managedScratchDesc", "Khởi tạo nhanh tại ~/.cowok-design/projects/ (hỗ trợ Link Git sau)")}
-          </div>
-        </button>
-      </div>
-    </div>
-  );
-};
-
-const ManagedSlugField: React.FC<{
-  managedSlug: string;
-  onChangeManagedSlug: (val: string) => void;
-}> = ({ managedSlug, onChangeManagedSlug }) => {
-  const { t } = useTranslation();
-  const isValid = MANAGED_SLUG_REGEX.test(managedSlug.trim());
-  return (
-    <div>
-      <label htmlFor="newConvoManagedSlugInput" style={{ ...LABEL_STYLE, fontSize: "11px", marginBottom: "4px" }}>
-        {t("workbench.managedSlugLabel", "Slug Workspace (~/CowokProjects/<slug>)")}
+      <label htmlFor="newConvoProjectSelect" style={LABEL_STYLE}>
+        {fieldLabel}
       </label>
-      <input
-        id="newConvoManagedSlugInput"
-        type="text"
-        value={managedSlug}
-        onChange={(e) => onChangeManagedSlug(e.target.value)}
-        className="cowok-input"
-        style={{ ...INPUT_STYLE, height: "32px", fontFamily: "var(--font-mono)" }}
+      <CowokSelect
+        id="newConvoProjectSelect"
+        testId="project-selector-dropdown"
+        ariaLabel={fieldLabel}
+        value={selectedProjectId}
+        onChange={onSelectProjectId}
+        options={projects.map((proj) => ({ value: proj.id, label: proj.name }))}
       />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginTop: "4px" }}>
-        <span style={{ fontSize: "10.5px", color: isValid ? "var(--text-muted)" : "var(--state-danger)" }}>
-          {isValid
-            ? t("workbench.managedSlugHint", "Chỉ gồm chữ thường a-z, số 0-9, '-' hoặc '_' (tối đa 63 ký tự)")
-            : t("workbench.invalidSlugError", "Slug không hợp lệ. Phải khớp ^[a-z0-9][a-z0-9_-]{0,62}$")}
-        </span>
-        <span className="ff-metric-line">{`~/CowokProjects/${managedSlug.trim() || "..."}`}</span>
-      </div>
     </div>
   );
 };
-
-const FolderPathPicker: React.FC<{
-  localFolderPath: string;
-  onChangeLocalFolderPath: (val: string) => void;
-  onBrowseFolder: () => void;
-}> = ({ localFolderPath, onChangeLocalFolderPath, onBrowseFolder }) => {
-  const { t } = useTranslation();
-  return (
-    <div>
-      <label style={{ ...LABEL_STYLE, fontSize: "11px", fontWeight: 500, color: "var(--text-muted)", marginBottom: "4px" }}>
-        {t("workbench.localGitPathLabel", "Đường dẫn thư mục dự án cục bộ (Local Folder / Git Repo)")}
-      </label>
-      <div style={{ display: "flex", gap: "6px" }}>
-        <input
-          type="text"
-          value={localFolderPath}
-          placeholder={t("workbench.noLocalPathSelected", "Dùng mặc định 1-Click ~/CowokProjects/<slug> hoặc chọn qua Daemon FS")}
-          onChange={(e) => onChangeLocalFolderPath(e.target.value)}
-          className="cowok-input"
-          style={{ ...INPUT_STYLE, flex: 1, height: "32px", fontSize: "11.5px", fontFamily: "var(--font-mono)" }}
-        />
-        <button
-          type="button"
-          onClick={onBrowseFolder}
-          data-testid="open-daemon-fs-picker-btn"
-          className="cowok-btn cowok-btn-secondary"
-          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 10px", height: "32px", fontSize: "11.5px", fontWeight: 500, borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-surface)", color: "var(--text-primary)", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}
-        >
-          <BrandIcon name="folder-git" size={13} color="var(--human-accent)" />
-          <span>{t("workbench.browseDaemonFsBtn", "Chọn qua Daemon FS")}</span>
-        </button>
-      </div>
-    </div>
-  );
-};
-
-function getTitlePlaceholder(
-  mode: "project" | "new-project" | "standalone",
-  t: (k: string, fallback: string) => string
-): string {
-  if (mode === "project") return t("workbench.sessionPlaceholderProject", "Ví dụ: Thiết kế Luồng Checkout & 3DS...");
-  if (mode === "new-project") return t("workbench.sessionPlaceholderNewProject", "Ví dụ: Khởi tạo kiến trúc Userflow & Tokens...");
-  return t("workbench.sessionPlaceholderStandalone", "Ví dụ: Khảo sát ý tưởng UI nhanh (Không gắn dự án)...");
-}
 
 export const NewConversationFormFields: React.FC<NewConversationFormFieldsProps> = (p) => {
   const { t } = useTranslation();
-  const titlePlaceholder = getTitlePlaceholder(p.mode, t);
-
   return (
     <>
+      <EntryKindOptionCards
+        selectedKind={p.entryKind}
+        onSelect={p.onChangeEntryKind}
+        testIdPrefix="new-convo-entry"
+        label={t("workbench.entryKindLabel", "1. Chọn loại không gian làm việc")}
+      />
+
       {p.mode === "project" && (
-        <div>
-          <label style={LABEL_STYLE}>{t("workbench.selectProjectLabel", "Chọn Dự án (Chia sẻ DESIGN.md, tokens.css & đồ thị 2D DAG)")}</label>
-          <select value={p.selectedProjectId} onChange={(e) => p.onSelectProjectId(e.target.value)} className="cowok-input" style={INPUT_STYLE}>
-            {p.projects.map((proj) => (
-              <option key={proj.id} value={proj.id}>
-                {proj.name} ({proj.provenance === "scratch" ? t("workbench.provenanceScratch", "Scratch Managed") : t("workbench.provenanceGit", "Git Folder In-Place")}) {proj.id === p.activeProjectId ? `• ${t("workbench.currentlyOpen", "Đang mở")}` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
+        <CurrentProjectDropdownSection
+          projects={p.projects}
+          selectedProjectId={p.selectedProjectId}
+          onSelectProjectId={p.onSelectProjectId}
+        />
       )}
+
       {p.mode === "new-project" && (
-        <>
-          <div>
-            <label style={LABEL_STYLE}>{t("workbench.newProjectNameLabel", "Tên Dự án Mới")}</label>
-            <input type="text" value={p.newProjectName} onChange={(e) => p.onChangeNewProjectName(e.target.value)} placeholder={t("workbench.newProjectPlaceholder", "Ví dụ: E-Commerce Checkout V2")} required className="cowok-input" style={INPUT_STYLE} />
-          </div>
-          <ManagedSlugField managedSlug={p.managedSlug} onChangeManagedSlug={p.onChangeManagedSlug} />
-          <ProvenanceSelector provenance={p.provenance} onChangeProvenance={p.onChangeProvenance} />
-          {p.provenance === "folder-backed" && (
-            <FolderPathPicker localFolderPath={p.localFolderPath} onChangeLocalFolderPath={p.onChangeLocalFolderPath} onBrowseFolder={p.onBrowseFolder} />
-          )}
-          {p.onOpenLaunchpad && (
-            <button
-              type="button"
-              data-testid="open-4path-launchpad-btn"
-              onClick={p.onOpenLaunchpad}
-              className="cowok-btn cowok-btn-secondary"
-              style={{ width: "100%", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: "11.5px", fontWeight: 600, borderRadius: "var(--radius-xs)", border: "1px dashed var(--action-primary)", backgroundColor: "var(--bg-selected)", color: "var(--action-primary)", cursor: "pointer" }}
-            >
-              <BrandIcon name="layers" size={13} color="currentColor" />
-              <span>{t("launchpad.openHubFromNewProject", "Hoặc mở Hub 4 Lối Vào (PRD / Template / Design URL / Git)")}</span>
-            </button>
-          )}
-        </>
+        <NewProjectSourceSection
+          sourceType={p.sourceType}
+          onChangeSourceType={p.onChangeSourceType}
+          localFolderPath={p.localFolderPath}
+          githubRepoUrl={p.githubRepoUrl}
+          onChangeGithubRepoUrl={p.onChangeGithubRepoUrl}
+          managedSlug={p.managedSlug}
+          newProjectName={p.newProjectName}
+          onChangeNewProjectName={p.onChangeNewProjectName}
+          sessionTitle={p.sessionTitle}
+          onChangeSessionTitle={p.onChangeSessionTitle}
+          githubState={p.githubState}
+          onConnectGitHub={p.onConnectGitHub}
+          onBrowseFolder={p.onBrowseFolder}
+        />
       )}
-      <div>
-        <label style={LABEL_STYLE}>{t("workbench.sessionTitleLabel", "Tiêu đề Phiên Hội thoại")}</label>
-        <input type="text" value={p.sessionTitle} onChange={(e) => p.onChangeSessionTitle(e.target.value)} placeholder={titlePlaceholder} className="cowok-input" style={INPUT_STYLE} />
-      </div>
+
+      {(p.mode === "project" || p.mode === "standalone") && (
+        <EditableAliasField
+          label={t("workbench.sessionAliasLabel", "Tên Session Chat (Mặc định: Tên dự án + STT)")}
+          value={p.sessionTitle}
+          inputId="newConvoSessionTitleInput"
+          inputTestId="new-convo-session-title-input"
+          editBtnTestId="rename-session-alias-btn"
+          displayTestId="new-convo-session-alias-display"
+          helperText={
+            p.mode === "standalone"
+              ? t("workbench.helperStandalone", "Phiên chat độc lập sẽ đặt trong nhóm Conversations và không gắn vào dự án nào.")
+              : t("workbench.sessionAliasHint", "Tên alias dễ đọc trong dự án, có thể đổi bất cứ lúc nào.")
+          }
+          onChange={p.onChangeSessionTitle}
+        />
+      )}
     </>
   );
 };

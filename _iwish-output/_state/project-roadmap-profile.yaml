@@ -6,9 +6,9 @@ archetypes:
 layout_mode: hierarchical
 discovery_tier_used: 'Tier 2: Physical Bounded Context Clustering'
 max_parallel_tracks: 5
-target_roadmap_path: /Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/3.
+target_roadmap_path: /Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3.
   Development/development-roadmap.md
-lock_file_path: /Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/_state/roadmap-lock.json
+lock_file_path: /Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/_state/roadmap-lock.json
 domain_invariants: []
 track_definitions:
 - track_id: Stream-1

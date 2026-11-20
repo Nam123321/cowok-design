@@ -13,6 +13,7 @@ use crate::routes::{map_error_to_response, DaemonAppState, HttpErrorBody};
 
 pub const MAX_GLOBAL_ACTIVE_SLOTS: i64 = 4;
 pub const LEASE_TTL_MS: i64 = 15_000;
+pub const SLIDE_COPILOT_LEASE_TTL_MS: i64 = 60_000;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -283,6 +284,8 @@ pub fn fetch_job_meta(
     Ok((tok, status, nid, scope, nonce))
 }
 
+type QueuedSlotRow = (String, String, String, String, String, i64, Option<String>);
+
 pub fn promote_next_queued_tx(
     tx: &rusqlite::Transaction<'_>,
     daemon_nonce: &str,
@@ -290,31 +293,64 @@ pub fn promote_next_queued_tx(
 ) -> Result<Vec<(String, String)>, rusqlite::Error> {
     let mut promoted = Vec::new();
     loop {
-        let active: i64 = tx.query_row(
-            "SELECT COUNT(*) FROM node_execution_jobs WHERE status IN ('RUNNING', 'PAUSED')",
-            [],
-            |r| r.get(0),
-        )?;
-        if active >= MAX_GLOBAL_ACTIVE_SLOTS {
-            break;
-        }
-        let next: Option<(String, String, String, String, String, i64)> = tx.query_row(
-            "SELECT q.id, q.tenant_id, q.project_id, q.node_id, q.composite_scope_key, q.fencing_token FROM node_execution_jobs q WHERE q.status = 'QUEUED' AND NOT EXISTS (SELECT 1 FROM node_execution_jobs a WHERE a.composite_scope_key = q.composite_scope_key AND a.status IN ('RUNNING', 'PAUSED')) ORDER BY q.created_at ASC, q.id ASC LIMIT 1",
-            [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)),
+        let next: Option<QueuedSlotRow> = tx.query_row(
+            "SELECT q.id, q.tenant_id, q.project_id, q.node_id, q.composite_scope_key, q.fencing_token, q.lease_owner
+             FROM node_execution_jobs q
+             WHERE q.status = 'QUEUED'
+               AND (
+                 SELECT COUNT(*) FROM node_execution_jobs g
+                 WHERE g.tenant_id = q.tenant_id
+                   AND g.status IN ('RUNNING', 'PAUSED')
+                   AND (g.stale_after_timestamp IS NULL OR g.stale_after_timestamp >= ?1)
+               ) < ?2
+               AND NOT EXISTS (
+                 SELECT 1 FROM node_execution_jobs a
+                 WHERE a.tenant_id = q.tenant_id
+                   AND (a.composite_scope_key = q.composite_scope_key
+                        OR (q.lease_owner LIKE 'slide-copilot:%' AND a.lease_owner = q.lease_owner))
+                   AND a.status IN ('RUNNING', 'PAUSED')
+               )
+               AND NOT (
+                 q.lease_owner LIKE 'slide-copilot:%'
+                 AND (
+                   SELECT COUNT(DISTINCT s.node_id) FROM node_execution_jobs s
+                   WHERE s.tenant_id = q.tenant_id
+                     AND s.status IN ('RUNNING', 'PAUSED')
+                     AND s.lease_owner LIKE 'slide-copilot:%'
+                     AND s.node_id LIKE 'SLD-%'
+                     AND (s.stale_after_timestamp IS NULL OR s.stale_after_timestamp >= ?1)
+                 ) >= ?2
+               )
+             ORDER BY q.created_at ASC, q.rowid ASC, q.id ASC LIMIT 1",
+            params![now_ms, MAX_GLOBAL_ACTIVE_SLOTS],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)),
         ).optional()?;
-        let Some((jid, tid, pid, nid, scope, fence)) = next else {
+        let Some((jid, tid, pid, nid, scope, fence, lease_owner)) = next else {
             break;
         };
+        let is_slide_copilot = lease_owner
+            .as_deref()
+            .is_some_and(|l| l.starts_with("slide-copilot:"));
+        let ttl_ms = if is_slide_copilot {
+            SLIDE_COPILOT_LEASE_TTL_MS
+        } else {
+            LEASE_TTL_MS
+        };
+        let expires_at = now_ms + ttl_ms;
         let next_fence = fence + 1;
         let rows = tx.execute(
-            "UPDATE node_execution_jobs SET status = 'RUNNING', daemon_nonce = ?1, fencing_token = ?2, started_at = COALESCE(started_at, ?3), stale_after_timestamp = ?4, updated_at = ?3 WHERE id = ?5 AND fencing_token = ?6 AND composite_scope_key = ?7 AND status = 'QUEUED'",
-            params![daemon_nonce, next_fence, now_ms, now_ms + LEASE_TTL_MS, jid, fence, scope],
+            "UPDATE node_execution_jobs SET status = 'RUNNING', daemon_nonce = ?1, fencing_token = ?2, started_at = COALESCE(started_at, ?3), stale_after_timestamp = ?4, updated_at = ?3 WHERE id = ?5 AND tenant_id = ?8 AND fencing_token = ?6 AND composite_scope_key = ?7 AND status = 'QUEUED'",
+            params![daemon_nonce, next_fence, now_ms, expires_at, jid, fence, scope, tid],
         )?;
         if rows == 0 {
             break;
         }
-        let payload =
-            serde_json::json!({ "promoted": true, "fencingToken": next_fence }).to_string();
+        let payload = serde_json::json!({
+            "promoted": true,
+            "fencingToken": next_fence,
+            "leaseExpiresAtMs": expires_at,
+        })
+        .to_string();
         append_event_tx(
             tx,
             &NewEventParams {

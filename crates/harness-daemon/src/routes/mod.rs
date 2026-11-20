@@ -19,6 +19,11 @@ pub mod legacy_specs;
 pub mod legacy_workbench_v6;
 pub mod plugins;
 pub mod plugins_cron;
+pub mod presentation;
+pub mod presentation_cms_routes;
+pub mod presentation_copilot;
+pub mod presentation_presenter;
+pub mod presentation_storage;
 pub mod project_trash;
 
 use std::sync::Arc;
@@ -131,6 +136,30 @@ async fn handle_health(State(state): State<DaemonAppState>) -> Json<HealthRespon
 /// `/api/v1/auth/local-session`, and the scoped Dual-Ingress `/api/v1/projects/:id/flow/*` router.
 pub fn build_router(state: DaemonAppState) -> Router {
     let _ = ensure_ac06_tables(&state.registry);
+    let active_paths_opt = state.registry.pool().connection().ok().and_then(|conn| {
+        spec_registry::presentation_repo::list_active_slide_html_paths(&conn).ok()
+    });
+    let (active_paths, sweep_unreferenced) = match active_paths_opt {
+        Some(paths) => (paths, true),
+        None => (std::collections::HashSet::new(), false),
+    };
+    let mut sweep_roots = vec![state.registry.pool().workspace_root().to_path_buf()];
+    if let Ok(conn) = state.registry.pool().connection() {
+        if let Ok(project_roots) =
+            spec_registry::presentation_repo::list_all_project_workspace_roots(&conn)
+        {
+            for r in project_roots {
+                let pb = std::path::PathBuf::from(r);
+                if !sweep_roots.contains(&pb) {
+                    sweep_roots.push(pb);
+                }
+            }
+        }
+    }
+    for root in &sweep_roots {
+        let _ =
+            presentation::sweep_orphan_slide_artifacts(root, &active_paths, 60, sweep_unreferenced);
+    }
     let flow_router = build_flow_subrouter(state.clone());
     let protected_legacy_router = legacy_router::build_protected_legacy_router(state.clone());
     let cors_state = state.clone();

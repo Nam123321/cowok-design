@@ -33,6 +33,7 @@ allow = [
     "OpenSSL",
     "Zlib",
     "CDLA-Permissive-2.0",
+    "MPL-2.0",
 ]
 
 [licenses.private]

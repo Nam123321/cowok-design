@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { useFormatter } from "../../../hooks/useFormatter";
 import { useTranslation } from "../../../hooks/useTranslation";
+import { CowokToast } from "../../../components/ui/CowokToast";
 import type { ChangeProposalResponse, FileDiffItem } from "../../../lib/validations/change-proposal";
 import { computeProposalDiffStats, formatVisualDiffMetrics } from "../utils/diff-engine";
 import { CowokDesignDiffViewer } from "./CowokDesignDiffViewer";
@@ -27,7 +28,7 @@ interface DrawerProps {
   onRebaseAndValidate?: (proposalId: string) => void;
   onComputeVisualDiff?: (proposalId: string) => void;
   errorBanner?: ProposalGateErrorBanner | null;
-  receiptToast?: { tone: "success" | "danger"; message: string } | null;
+  receiptToast?: { tone: "success" | "danger"; message: string; actionLabel?: string; onAction?: () => void } | null;
   onDismissToast?: () => void;
   isRevalidating?: boolean;
   isComputingDiff?: boolean;
@@ -153,13 +154,14 @@ const EmptyProposalDrawerBody: React.FC<{
   onCreateQuickProposal?: () => void;
   onOpenInlineEditor?: () => void;
 }> = ({ onClose, onCreateQuickProposal, onOpenInlineEditor }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
   return (
     <aside className="cp-drawer" role="complementary" aria-label={t("proposals.drawerTitle", "ChangeProposals")} data-testid="change-proposal-drawer">
       <div className="cp-drawer-body">
         <div className="cp-drawer-header">
           <div className="cp-drawer-title-wrap">
-            <h3 className="cp-drawer-title">{t("proposals.drawerTitle", "ChangeProposals")} (0)</h3>
+            <h3 className="cp-drawer-title">{t("proposals.drawerTitle", "ChangeProposals")} ({formatNumber(0)})</h3>
             <p className="cp-drawer-desc">{t("proposals.emptyDesc", "Send a design prompt in Chat, edit HTML directly, or create a draft ChangeProposal for the active scope.")}</p>
           </div>
           <button type="button" onClick={onClose} aria-label={t("common.close", "Close")} className="cp-icon-close-btn">✕</button>
@@ -191,12 +193,14 @@ const ProposalListSelector: React.FC<{
   activeId: string;
   onSelect?: (id: string) => void;
 }> = ({ proposals, activeId, onSelect }) => {
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
   if (!proposals || proposals.length <= 1 || !onSelect) return null;
   return (
     <div className="cp-tabs" style={{ flexWrap: "wrap", gap: "4px" }}>
       {proposals.map((item, idx) => (
         <button key={item.id} type="button" className={`cp-tab${item.id === activeId ? " cp-tab--active" : ""}`} data-testid={`proposal-select-${idx}`} onClick={() => onSelect(item.id)}>
-          #{idx + 1} · {item.status}
+          #{formatNumber(idx + 1)} · {t(`proposals.status.${item.status.toLowerCase()}`, item.status)}
         </button>
       ))}
     </div>
@@ -213,10 +217,16 @@ export const ChangeProposalDrawer: React.FC<DrawerProps> = ({
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   const toastNode = receiptToast ? (
-    <div className={`cp-toast cp-toast--${receiptToast.tone}`} role="status" data-testid="proposal-receipt-toast">
-      <span>{receiptToast.message}</span>
-      {onDismissToast && <button type="button" className="cp-icon-close-btn" aria-label={t("common.close", "Close")} onClick={onDismissToast}>✕</button>}
-    </div>
+    <CowokToast
+      tone={receiptToast.tone}
+      message={receiptToast.message}
+      actionLabel={receiptToast.actionLabel}
+      onAction={receiptToast.onAction}
+      actionTestId="proposal-reopen-comment-btn"
+      onDismiss={onDismissToast}
+      testId="proposal-receipt-toast"
+      bottomOffset="raised"
+    />
   ) : null;
 
   if (!isOpen) return toastNode;

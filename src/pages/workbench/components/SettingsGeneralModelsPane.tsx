@@ -1,6 +1,7 @@
 // @story 04.1, 04.2
 // @implements AC-04 (Settings Models Pane with Live BYOK Verifier, Storage Mode & Permissions)
 import React, { useEffect, useState } from "react";
+import { CowokSelect } from "../../../components/ui/CowokSelect";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { useDoctorProvidersUsage } from "../../../hooks/useDoctorProvidersUsage";
 import { apiWorkbenchSettings } from "../../../api/workbench-settings";
@@ -111,30 +112,17 @@ const GeneralAppearanceSection: React.FC<
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-        <label style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-secondary)" }}>
+        <label htmlFor="settings-locale-select" style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-secondary)" }}>
           {t("settings.localeLabel", "Ngôn ngữ")}
         </label>
-        <select
+        <CowokSelect
           id="settings-locale-select"
+          testId="settings-locale-select"
+          ariaLabel={t("settings.localeLabel", "Ngôn ngữ")}
           value={p.currentLocale}
-          onChange={(e) => p.onLocaleChange(e.target.value)}
-          className="cowok-input"
-          style={{
-            padding: "6px 10px",
-            fontSize: "12px",
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-xs)",
-            backgroundColor: "var(--bg-workspace)",
-            color: "var(--text-primary)",
-            height: "34px",
-          }}
-        >
-          {SUPPORTED_LOCALES.map((loc) => (
-            <option key={loc.code} value={loc.code}>
-              {loc.label}
-            </option>
-          ))}
-        </select>
+          onChange={p.onLocaleChange}
+          options={SUPPORTED_LOCALES.map((loc) => ({ value: loc.code, label: loc.label }))}
+        />
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
         <label style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-secondary)" }}>

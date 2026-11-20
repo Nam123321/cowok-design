@@ -17,6 +17,7 @@ import { z } from "zod";
 import * as commentsRoute from "../app/api/projects/[id]/flow/nodes/[nodeId]/comments/route";
 import * as fixturesRoute from "../app/api/projects/[id]/flow/nodes/[nodeId]/fixtures/route";
 import * as flowEnqueueRoute from "../app/api/projects/[id]/flow/jobs/enqueue/route";
+import * as flowStreamRoute from "../app/api/projects/[id]/flow/jobs/stream/route";
 import * as flowSteerRoute from "../app/api/projects/[id]/flow/jobs/steer/route";
 import * as flowPauseRoute from "../app/api/projects/[id]/flow/jobs/pause/route";
 import * as flowResumeRoute from "../app/api/projects/[id]/flow/jobs/resume/route";
@@ -57,13 +58,13 @@ export function forwardGuardedDaemon<B = unknown>(
       forwardToDaemonFlow({
         method: req.method,
         daemonPath,
-        rawQuery: new URL(req.url).search.slice(1),
+        rawQuery: new URL(req.url || "/", "http://127.0.0.1").search.slice(1),
         body,
         inboundHeaders: req.headers,
         principal: {
           tenantId: ctx.tenantId || "local-default",
           userId: ctx.userId || "local-operator",
-          role: ctx.role || (req.method === "GET" ? "viewer" : "editor"),
+          role: ctx.role || "viewer",
         },
         correlationId: ctx.correlationId,
         bffSessionToken: ctx.bffSessionToken,
@@ -121,7 +122,7 @@ export const FLOW_AND_WORKBENCH_ROUTES: RouteEntry[] = [
   proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/fixtures\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/nodes/${safeEncodeSegment(m[2])}/fixtures/${safeEncodeSegment(m[3])}`, UpdateScreenFixtureSchema),
   proxyRoute("PATCH", /^\/api\/projects\/([^/]+)\/flow\/nodes\/([^/]+)\/viewport$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/nodes/${safeEncodeSegment(m[2])}/viewport`, ViewportPatchSchema),
   proxyRoute("POST", /^\/api\/projects\/([^/]+)\/flow\/jobs\/events$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/jobs/events`, PostJobEventV2InputSchema),
-  proxyRoute("GET", /^\/api\/projects\/([^/]+)\/flow\/jobs\/stream$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/flow/jobs/stream`),
+  { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/flow\/jobs\/stream$/, extractParams: idOnly, resolveHandler: () => flowStreamRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/jobs\/enqueue$/, extractParams: idOnly, resolveHandler: () => flowEnqueueRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/jobs\/steer$/, extractParams: idOnly, resolveHandler: () => flowSteerRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/flow\/jobs\/pause$/, extractParams: idOnly, resolveHandler: () => flowPauseRoute.POST },

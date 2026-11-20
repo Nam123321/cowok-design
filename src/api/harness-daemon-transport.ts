@@ -51,9 +51,18 @@ async function parseErrorResponse(res: Response): Promise<HarnessDaemonApiError>
   let code = "HTTP_ERROR";
   let message = `Request failed with HTTP ${res.status}`;
   try {
-    const errBody = (await res.json()) as { code?: string; error?: string; message?: string };
-    code = errBody.code || errBody.error || code;
-    message = errBody.message || message;
+    const errBody = (await res.json()) as {
+      code?: string;
+      message?: string;
+      error?: string | { code?: string; message?: string };
+    };
+    if (errBody.error && typeof errBody.error === "object") {
+      code = errBody.error.code || errBody.code || code;
+      message = errBody.error.message || errBody.message || message;
+    } else {
+      code = errBody.code || (typeof errBody.error === "string" ? errBody.error : undefined) || code;
+      message = errBody.message || message;
+    }
   } catch {
     // Preserve status-based fallback when response is not valid JSON
   }

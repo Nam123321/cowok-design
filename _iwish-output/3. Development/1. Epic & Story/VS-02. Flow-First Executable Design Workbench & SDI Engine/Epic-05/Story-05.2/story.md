@@ -53,6 +53,7 @@ consumes_apis: []
 - **AC-05 (Per-Node Independent Apply/Reject & Visual Pixel Diff — cowok-design-diff):** Hỗ trợ duyệt, Apply hoặc Reject ChangeProposal độc lập trên từng Node (hoặc duyệt cả lô Batch); tích hợp động cơ so khớp thị giác chống nhiễu khử răng cưa (pixelmatch + SSIM + changed_bbox) hiển thị trực tiếp ảnh Trước/Sau.
 - **AC-06 ("Designer Talk" Anchored Trade-Off Badges — Phím tắt T):** Bắt buộc Agent ghi lại tối đa 12 quyết định đánh đổi qua `design_note` (có phương án loại bỏ `instead` + neo `data-ff-id`); nhấn phím `T` hiển thị các huy hiệu có nút Agree / Disagree (áp dụng phương án `instead`) / Ask / Skip.
 - **AC-07 ([EDGE-CASE] Unverified Gate Claim Guard & Pure CSS Cleanup — EC-PROPOSAL-002):** Chặn tuyệt đối trường hợp Agent tự nhận đã qua cổng kiểm định (`Unverified Gate Claim Guard` — Daemon Rust đối chiếu biên nhận chạy Linter thật); và thanh tẩy 100% class Tailwind trong `src/features/proposals/**` sang `tokens.css`.
+- **AC-08 ([EDGE-CASE] Structured Comment-to-Proposal Linkage & Auto-Resolve — EC-E04-10 / EC-E05-04):** Mọi `ChangeProposal` được Agent sinh ra từ **Structured Comment Envelope** (`CommentPodPopover`) PHẢI mang trường `sourceCommentId` (liên kết tới bản ghi `element_comments` trên SQLite); khi user bấm **Apply** thành công và vượt qua toàn bộ cổng kiểm định, hệ thống tự động chuyển trạng thái ghim `element_comments` tương ứng sang `resolved` (hiển thị biên nhận `Toast [5.12]` kèm nút `Hoàn tác` / mở lại comment) để khép kín vòng phản hồi mà không bỏ sót hoặc nhầm ngữ cảnh giữa nhiều comment.
 
 ## 4. Tasks
 - [x] **Task 05.2.1**: Thiết kế và cài đặt mô-đun cốt lõi cho ChangeProposal Diff và Validation Gate (thỏa mãn `AC-01`).
@@ -62,6 +63,7 @@ consumes_apis: []
 - [x] **Task 05.2.5**: Xây dựng cơ chế duyệt Proposal độc lập theo từng Node và động cơ so khớp thị giác `cowok-design-diff` (thỏa mãn `AC-05`).
 - [x] **Task 05.2.6**: Cài đặt giao diện huy hiệu Designer Talk đánh đổi (phím T) hỗ trợ kích hoạt phương án `instead` (thỏa mãn `AC-06`).
 - [x] **Task 05.2.7**: Cài đặt chốt chặn `EC-PROPOSAL-002` (`AC-07` Unverified Gate Claim Guard) và thanh tẩy 100% Tailwind trong `src/features/proposals/**` (thỏa mãn `AC-07`).
+- [x] **Task 05.2.8**: Mở rộng schema `ChangeProposal` hỗ trợ `sourceCommentId` (optional) và tự động `resolve` ghim `element_comments` liên kết khi Proposal được Apply thành công (thỏa mãn `AC-08`).
 
 ## 5. AC-to-Task Traceability Matrix
 | AC ID | Description | Mapped Implementation Tasks | Verification Method | Status |
@@ -73,6 +75,7 @@ consumes_apis: []
 | **AC-05** | Per-Node Apply/Reject & cowok-design-diff | `Task 05.2.5` | Pixelmatch & Node Isolation Test | completed |
 | **AC-06** | Designer Talk Anchored Badges (T) | `Task 05.2.6` | Trade-Off Interaction Test | completed |
 | **AC-07** | [EDGE-CASE] Unverified Claim Guard & Tailwind Clean (`EC-PROPOSAL-002`) | `Task 05.2.7` | Gate Claim Check & Clean Code Test | completed |
+| **AC-08** | [EDGE-CASE] Structured Comment-to-Proposal Linkage & Auto-Resolve (`EC-E04-10`) | `Task 05.2.8` | Integration & E2E Proposal-Comment Lifecycle Test | completed |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** ["05.1"]
@@ -107,3 +110,4 @@ consumes_apis: []
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 05.2 đồng bộ với PRD v2.0 | cowok Orchestrator |
 | 2026-11-08 | 2.0.0 | Bổ sung AC-04 Explicit Confirmation Gate | cowok Orchestrator |
 | 2026-11-12 | 3.0.0 | [refactor-story] Nâng cấp thành Vertical Slice Per-Node Proposal, cowok-design-diff (pixelmatch + SSIM), Designer Talk (T), Unverified Gate Claim Guard & Pure CSS Cleanup theo Master Plan | /refactor-story |
+| 2026-11-19 | 3.1.0 | Bổ sung AC-08 (`sourceCommentId` linkage -> tự động resolve ghim `element_comments` khi Apply Proposal, đồng bộ `EC-E04-10` & `EC-E05-04`) | Antigravity |

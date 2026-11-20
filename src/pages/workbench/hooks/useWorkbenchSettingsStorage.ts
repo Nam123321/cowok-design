@@ -1,42 +1,17 @@
 // @story 04.1, 04.2
 // @implements AC-03
 import { useCallback, useEffect, useState } from "react";
-import { getGlobalLocale, setGlobalLocale } from "../../../hooks/useTranslation";
+import {
+  getGlobalLocale,
+  loadPersistedSettings,
+  savePersistedSettings,
+  setGlobalLocale,
+  WORKBENCH_SETTINGS_STORAGE_KEY,
+} from "../../../utils/workbench-settings-storage";
 import type { ThemeMode } from "../components/WorkbenchTopNav";
 import type { PersistedWorkbenchSettings } from "../types";
 
-export const WORKBENCH_SETTINGS_STORAGE_KEY = "cowok:workbench:settings";
-
-export function loadPersistedSettings(): Partial<PersistedWorkbenchSettings> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(WORKBENCH_SETTINGS_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Partial<PersistedWorkbenchSettings>) : {};
-  } catch {
-    return {};
-  }
-}
-
-export function savePersistedSettings(patch: Partial<PersistedWorkbenchSettings>): void {
-  if (typeof window === "undefined") return;
-  try {
-    const prev = loadPersistedSettings();
-    const defaultByos =
-      (typeof import.meta !== "undefined" && import.meta.env?.VITE_DEFAULT_BYOS_ENDPOINT) || "";
-    const safeNext: Partial<PersistedWorkbenchSettings> = {
-      theme: patch.theme ?? prev.theme ?? "warm",
-      locale: patch.locale ?? prev.locale ?? "vi",
-      fontSize: patch.fontSize ?? prev.fontSize ?? "13px",
-      defaultModel: patch.defaultModel ?? prev.defaultModel ?? "cowok-swarm",
-      byosEndpoint: patch.byosEndpoint ?? prev.byosEndpoint ?? defaultByos,
-      autoContextSlice: patch.autoContextSlice ?? prev.autoContextSlice ?? true,
-    };
-    window.localStorage.setItem(WORKBENCH_SETTINGS_STORAGE_KEY, JSON.stringify(safeNext));
-    window.dispatchEvent(new CustomEvent("cowok:settings-changed", { detail: safeNext }));
-  } catch {
-    // Storage restricted in test sandbox
-  }
-}
+export { WORKBENCH_SETTINGS_STORAGE_KEY, loadPersistedSettings, savePersistedSettings };
 
 export function useWorkbenchSettings() {
   const initial = loadPersistedSettings();
