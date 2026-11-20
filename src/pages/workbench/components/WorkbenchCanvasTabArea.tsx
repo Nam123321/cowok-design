@@ -31,19 +31,47 @@ const GraphErrorToast: React.FC<{ message: string; onClose: () => void }> = ({ m
 
 const FloatingChatOverlay: React.FC<{
   visible: boolean;
+  activeTabId: string;
   projectId: string;
   sessionId: string;
   state: FlowWorkbenchState;
   store: ReturnType<typeof createNewFlowWorkbenchStore>;
+  attachmentChips?: string[];
+  attachmentSnippets?: Record<string, string>;
+  onRemoveAttachmentChip?: (chip: string) => void;
+  onAttachFiles?: (fileNames: string[], snippetsByName?: Record<string, string>) => void;
+  onClearAttachments?: () => void;
   onOpenLeftChat?: () => void;
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
-}> = ({ visible, projectId, sessionId, state, store, onOpenLeftChat, onOpenSettings }) => {
-  const selectedNodes = state.nodes.filter((n) => n.id === state.selectedNodeId || Boolean(state.selectedNodeIds?.includes(n.id)));
-  if (!visible || selectedNodes.length === 0) return null;
+}> = ({
+  visible,
+  activeTabId,
+  projectId,
+  sessionId,
+  state,
+  store,
+  attachmentChips = [],
+  attachmentSnippets,
+  onRemoveAttachmentChip,
+  onAttachFiles,
+  onClearAttachments,
+  onOpenLeftChat,
+  onOpenSettings,
+}) => {
+  const isDeckFocus = activeTabId.includes("slide") || activeTabId.includes("deck");
+  const selectedNodes = isDeckFocus ? [] : state.nodes.filter((n) => n.id === state.selectedNodeId || Boolean(state.selectedNodeIds?.includes(n.id)));
+  if (!visible || (selectedNodes.length === 0 && attachmentChips.length === 0)) return null;
   return (
     <ContextualNodeFloatingChat
       projectId={projectId} sessionId={sessionId} selectedNodes={selectedNodes}
-      onDeselectNode={(id) => store.selectNode(id, true)} onClearSelection={() => store.selectNode(null)}
+      attachmentChips={attachmentChips} attachmentSnippets={attachmentSnippets}
+      onRemoveAttachmentChip={onRemoveAttachmentChip} onAttachFiles={onAttachFiles}
+      onClearAttachments={onClearAttachments}
+      onDeselectNode={(id) => store.selectNode(id, true)}
+      onClearSelection={() => {
+        if (selectedNodes.length > 0) store.selectNode(null);
+        else onClearAttachments?.();
+      }}
       onOpenLeftChat={onOpenLeftChat} onOpenSettings={onOpenSettings}
       onFocusNode={(id) => {
         const target = state.nodes.find((n) => n.id === id);
@@ -58,20 +86,29 @@ export interface WorkbenchCanvasTabAreaProps {
   store: ReturnType<typeof createNewFlowWorkbenchStore>;
   activeTabId: string;
   projectId?: string;
+  chatProjectId?: string;
   sessionId?: string;
+  sessionEntryKind?: "fe-dag" | "presentation";
   onTabChange: (id: string, format: CanvasTabItem["format"]) => void;
   graphHandlers: ReturnType<typeof useWorkbenchGraphHandlers>;
   onCommentOnNode: (nodeKey: string) => void;
   onAddQuoteChip?: (text: string) => void;
   onOpenLeftChat?: () => void;
   isLeftChatCollapsed?: boolean;
+  attachmentChips?: string[];
+  attachmentSnippets?: Record<string, string>;
+  onRemoveAttachmentChip?: (chip: string) => void;
+  onAttachFiles?: (fileNames: string[], snippetsByName?: Record<string, string>) => void;
+  onClearAttachments?: () => void;
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
   proposalController?: ReturnType<typeof useNodeProposalController>;
 }
 
 export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = ({
-  state, store, activeTabId, projectId = DEFAULT_FLOW_PROJECT_ID, sessionId = "session-1",
-  onTabChange, graphHandlers, onCommentOnNode, onAddQuoteChip, onOpenLeftChat, isLeftChatCollapsed = false, onOpenSettings, proposalController,
+  state, store, activeTabId, projectId = DEFAULT_FLOW_PROJECT_ID, chatProjectId, sessionId = "session-1", sessionEntryKind,
+  onTabChange, graphHandlers, onCommentOnNode, onAddQuoteChip, onOpenLeftChat, isLeftChatCollapsed = false,
+  attachmentChips, attachmentSnippets, onRemoveAttachmentChip, onAttachFiles, onClearAttachments,
+  onOpenSettings, proposalController,
 }) => {
   const { t } = useTranslation();
   const [isDeploying, setIsDeploying] = useState(false);
@@ -79,13 +116,27 @@ export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = ({
   const orphanCount = findOrphanNodes(state.nodes.map((n) => ({ id: n.id })), state.transitions.map((tr) => ({ source: tr.sourceNodeId, target: tr.targetNodeId }))).length;
 
   return (
-    <main style={{ flex: 1, minWidth: "550px", height: "100%", overflow: "hidden", position: "relative", backgroundColor: "var(--bg-canvas)" }}>
-      <CompanionCanvasTab projectId={projectId} activeTabId={activeTabId} onTabChange={onTabChange} selectedNodeId={state.selectedNodeId} onSelectNode={(id) => store.selectNode(id, false)} nodes={state.nodes} isDraftDirty={state.isDraftDirty} orphanCount={orphanCount} conflictState={state.conflictState} onResolveConflict={(c) => { void store.resolveConflict(c); }} onDeployDraft={() => { void handleDeployDraft(); }} onDiscardDraft={() => store.discardDraft()} onAttachRegionToChat={onCommentOnNode} onQuoteText={onAddQuoteChip} onSelectNodeSubState={(nid, sub) => store.setNodeSubState(nid, sub)} proposalController={proposalController}>
+    <main style={{ flex: 1, minWidth: 0, height: "100%", overflow: "hidden", position: "relative", backgroundColor: "var(--bg-canvas)" }}>
+      <CompanionCanvasTab projectId={projectId} sessionId={sessionId} sessionEntryKind={sessionEntryKind} activeTabId={activeTabId} onTabChange={onTabChange} selectedNodeId={state.selectedNodeId} onSelectNode={(id) => store.selectNode(id, false)} nodes={state.nodes} isDraftDirty={state.isDraftDirty} orphanCount={orphanCount} conflictState={state.conflictState} canUndo={(state.undoStack?.length || 0) > 0} canRedo={(state.redoStack?.length || 0) > 0} onUndo={() => store.undo()} onRedo={() => store.redo()} onResolveConflict={(c) => { void store.resolveConflict(c); }} onDeployDraft={() => { void handleDeployDraft(); }} onDiscardDraft={() => store.discardDraft()} onAttachRegionToChat={onCommentOnNode} onQuoteText={onAddQuoteChip} onSelectNodeSubState={(nid, sub) => store.setNodeSubState(nid, sub)} proposalController={proposalController}>
         <ErrorBoundary fallbackTitle={t("errors.dagCanvasRender", "Lỗi hiển thị Canvas 2D DAG")} onReset={() => store.discardDraft()}>
           <DagCanvas2D state={state} projectId={projectId} sessionId={sessionId} onUpdatePosition={graphHandlers.handleUpdatePosition} onSetViewport={graphHandlers.handleSetViewport} onSelectNode={(id, multi) => store.selectNode(id, multi)} onSelectTransition={(id) => store.selectTransition(id)} onAddNode={graphHandlers.handleAddNode} onAutoLayout={() => store.autoLayoutNodes()} onSelectSubState={(id, sub) => store.setNodeSubState(id, sub)} onDuplicateNode={(id) => store.duplicateNode(id)} onRenameNode={(id, title) => store.renameNode(id, title)} onDeleteNode={(id) => store.deleteNode(id)} onAddTransition={graphHandlers.handleAddTransition} onUpdateTransition={(id, u) => store.updateTransition(id, u)} onReverseTransition={graphHandlers.handleReverseTransition} onDeleteTransition={(id) => store.deleteTransition(id)} onUpdateNodeNote={(id, note) => store.updateNodeNote(id, note)} onToggleMinimap={() => store.toggleMinimap()} onUndo={() => store.undo()} onRedo={() => store.redo()} onCommentOnNode={onCommentOnNode} />
         </ErrorBoundary>
       </CompanionCanvasTab>
-      <FloatingChatOverlay visible={isLeftChatCollapsed} projectId={projectId} sessionId={sessionId} state={state} store={store} onOpenLeftChat={onOpenLeftChat} onOpenSettings={onOpenSettings} />
+      <FloatingChatOverlay
+        visible={isLeftChatCollapsed}
+        activeTabId={activeTabId}
+        projectId={chatProjectId ?? ""}
+        sessionId={sessionId}
+        state={state}
+        store={store}
+        attachmentChips={attachmentChips}
+        attachmentSnippets={attachmentSnippets}
+        onRemoveAttachmentChip={onRemoveAttachmentChip}
+        onAttachFiles={onAttachFiles}
+        onClearAttachments={onClearAttachments}
+        onOpenLeftChat={onOpenLeftChat}
+        onOpenSettings={onOpenSettings}
+      />
       {graphHandlers.graphError && <GraphErrorToast message={graphHandlers.graphError} onClose={graphHandlers.clearGraphError} />}
     </main>
   );

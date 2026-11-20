@@ -159,6 +159,8 @@ pub struct CreateProposalRequest {
     pub base_file_hashes: Option<BTreeMap<String, String>>,
     #[serde(default)]
     pub tradeoffs: Option<Vec<CreateTradeoffInput>>,
+    #[serde(default)]
+    pub source_comment_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -231,6 +233,8 @@ pub struct ChangeProposalDto {
     pub visual_diff: Option<VisualDiffResultDto>,
     #[serde(default)]
     pub tradeoffs: Vec<ProposalTradeoffDto>,
+    #[serde(default)]
+    pub source_comment_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1145,6 +1149,7 @@ fn map_proposal_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ChangeProposalD
     let base_file_hashes_json: String = row.get(16)?;
     let visual_diff_json: String = row.get(17)?;
     let gate_receipt_id: Option<String> = row.get(18)?;
+    let source_comment_id: Option<String> = row.get(19)?;
 
     let visual_diff: Option<VisualDiffResultDto> = if visual_diff_json.trim().is_empty()
         || visual_diff_json.trim() == "{}"
@@ -1182,6 +1187,7 @@ fn map_proposal_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ChangeProposalD
         gate_receipt: None,
         visual_diff,
         tradeoffs: Vec::new(),
+        source_comment_id,
     })
 }
 
@@ -1327,7 +1333,7 @@ const PROPOSAL_SELECT_COLS: &str =
     "id, project_id, tenant_id, intent_id, title, description, files_json,
     validation_status, validation_checks_json, status, created_at, updated_at,
     node_id, batch_id, composite_scope_key, content_mode, base_file_hashes_json,
-    visual_diff_json, gate_receipt_id";
+    visual_diff_json, gate_receipt_id, source_comment_id";
 
 fn load_proposal_by_id(
     conn: &rusqlite::Connection,
@@ -2320,6 +2326,13 @@ pub(super) async fn handle_create_proposal(
             .map(|f| f.path.clone())
             .unwrap_or_else(|| "proposal".to_string());
 
+        let source_comment_id = req
+            .source_comment_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
+
         retry_on_busy("insert_change_proposal", || {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
             tx.execute(
@@ -2328,8 +2341,8 @@ pub(super) async fn handle_create_proposal(
                     title, description, files_json, validation_status,
                     validation_checks_json, status, node_id, batch_id,
                     composite_scope_key, content_mode, base_file_hashes_json,
-                    visual_diff_json, gate_receipt_id, created_at, updated_at
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, '{}', ?18, ?19, ?20)",
+                    visual_diff_json, gate_receipt_id, source_comment_id, created_at, updated_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, '{}', ?18, ?19, ?20, ?21)",
                 params![
                     proposal_id.to_string(),
                     project_id.to_string(),
@@ -2349,6 +2362,7 @@ pub(super) async fn handle_create_proposal(
                     content_mode,
                     base_hashes_json,
                     gate_receipt_id,
+                    source_comment_id,
                     now,
                     now,
                 ],
@@ -2425,6 +2439,7 @@ pub(super) async fn handle_create_proposal(
             gate_receipt,
             visual_diff: None,
             tradeoffs: tradeoffs_out,
+            source_comment_id,
         })
     })
     .await
@@ -2917,6 +2932,17 @@ pub(super) async fn handle_apply_proposal(
                  WHERE id = ?2 AND project_id = ?3 AND tenant_id = ?4",
                 params![now, proposal_id.to_string(), project_id.to_string(), tenant_id],
             )?;
+            if let Some(ref cid) = proposal.source_comment_id {
+                let trimmed = cid.trim();
+                if !trimmed.is_empty() {
+                    let comment_now_ms = chrono::Utc::now().timestamp_millis();
+                    tx.execute(
+                        "UPDATE element_comments SET anchor_status = 'resolved', updated_at = ?1
+                         WHERE id = ?2 AND tenant_id = ?3 AND project_id = ?4",
+                        params![comment_now_ms, trimmed, tenant_id, project_id.to_string()],
+                    )?;
+                }
+            }
             mark_conflicting_proposals_stale_tx(
                 &tx,
                 project_id,

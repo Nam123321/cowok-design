@@ -9,11 +9,20 @@ export type AnchorStatus = z.infer<typeof AnchorStatusSchema>;
 
 export const AnchorKindSchema = z.enum([
   "html_element",
+  "spatial_region",
   "marquee_box",
   "node_card",
   "text_quote",
 ]);
 export type AnchorKind = z.infer<typeof AnchorKindSchema>;
+
+export const CommentRegionRectSchema = z.object({
+  left: z.number().finite(),
+  top: z.number().finite(),
+  width: z.number().finite().nonnegative(),
+  height: z.number().finite().nonnegative(),
+});
+export type CommentRegionRect = z.infer<typeof CommentRegionRectSchema>;
 
 export const CreateElementCommentSchema = z.object({
   elementFfId: z.string().min(1),
@@ -22,10 +31,28 @@ export const CreateElementCommentSchema = z.object({
   domHash: z.string().min(1),
   artifactSha256: z.string().default(""),
   anchorKind: AnchorKindSchema.default("html_element"),
+  regionRect: CommentRegionRectSchema.optional(),
+  coveredFfIds: z.array(z.string().min(1)).optional(),
   expectedArtifactSha256: z.string().optional(),
   expectedDomHash: z.string().optional(),
 });
 export type CreateElementCommentInput = z.input<typeof CreateElementCommentSchema>;
+
+export const StructuredCommentEnvelopeSchema = z.object({
+  commentId: z.string().min(1),
+  projectId: z.string().optional(),
+  nodeId: z.string().optional(),
+  slideUid: z.string().optional(),
+  targetType: z.enum(["html_element", "spatial_region"]),
+  elementFfId: z.string().min(1),
+  coveredFfIds: z.array(z.string().min(1)).default([]),
+  regionRect: CommentRegionRectSchema.optional(),
+  domHash: z.string().default(""),
+  artifactSha256: z.string().default(""),
+  commentBody: z.string().min(1).max(MAX_COMMENT_LENGTH),
+  targetLabel: z.string().optional(),
+});
+export type StructuredCommentEnvelope = z.infer<typeof StructuredCommentEnvelopeSchema>;
 
 export const UpdateElementCommentSchema = z.object({
   content: z.string().min(1).max(MAX_COMMENT_LENGTH).optional(),

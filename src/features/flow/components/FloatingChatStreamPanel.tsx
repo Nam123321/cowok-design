@@ -80,6 +80,8 @@ export interface FloatingChatStreamPanelProps {
   onToggleSteer: () => void;
   onSteerDraftChange: (value: string) => void;
   onSteerSubmit: () => void;
+  onForkFromMessage?: (msg: ChatMessage) => void;
+  onSelectSdiVariant?: (intentId: string, pid: string, variantId: string) => void;
 }
 
 const ScopeChipStrip: React.FC<{
@@ -113,13 +115,27 @@ const ScopeChipStrip: React.FC<{
   );
 };
 
+function resolveEmptyHintTarget(opts: {
+  selectedCount: number;
+  isMulti: boolean;
+  primaryTitle?: string;
+  formatNumber: (n: number) => string;
+  t: (k: string, f: string) => string;
+}): string {
+  if (opts.selectedCount === 0) return opts.t("floatingChat.commentBatchFallback", "các nhận xét đã ghim");
+  if (opts.isMulti) return `${opts.formatNumber(opts.selectedCount)} ${opts.t("floatingChat.screensUnit", "màn hình")}`;
+  return opts.primaryTitle || opts.t("floatingChat.singleScreenFallback", "màn hình");
+}
+
 const MessageHistoryList: React.FC<{
   messages: FloatingChatMessage[];
   isMulti: boolean;
   selectedCount: number;
   primaryTitle?: string;
   historyEndRef: React.RefObject<HTMLDivElement | null>;
-}> = ({ messages, isMulti, selectedCount, primaryTitle, historyEndRef }) => {
+  onForkFromMessage?: (msg: ChatMessage) => void;
+  onSelectSdiVariant?: (intentId: string, pid: string, variantId: string) => void;
+}> = ({ messages, isMulti, selectedCount, primaryTitle, historyEndRef, onForkFromMessage, onSelectSdiVariant }) => {
   const { t, locale } = useTranslation();
   const { formatTime, formatNumber } = useFormatter({ locale });
   if (messages.length === 0) {
@@ -127,7 +143,8 @@ const MessageHistoryList: React.FC<{
       <div className="fc-history" style={{ flex: 1, padding: "12px", display: "flex", alignItems: "flex-start", gap: "6px", backgroundColor: "var(--bg-canvas)", fontSize: "11.5px", color: "var(--text-muted)" }}>
         <BrandIcon name="ai-agent" size={14} color="var(--agent-accent)" />
         <span>
-          {t("floatingChat.emptyHint", "Nhập yêu cầu cho")} {isMulti ? `${formatNumber(selectedCount)} ${t("floatingChat.screensUnit", "màn hình")}` : primaryTitle || t("floatingChat.singleScreenFallback", "màn hình")}
+          {t("floatingChat.emptyHint", "Nhập yêu cầu cho")}{" "}
+          {resolveEmptyHintTarget({ selectedCount, isMulti, primaryTitle, formatNumber, t })}
         </span>
       </div>
     );
@@ -136,8 +153,14 @@ const MessageHistoryList: React.FC<{
     <div className="fc-history" style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px", display: "flex", flexDirection: "column", gap: "10px", backgroundColor: "var(--bg-canvas)" }}>
       {messages.map((m) => {
         const text = m.role === "assistant" ? formatStructuredPayload(m.content, t) : m.content;
-        const mapped: ChatMessage = { id: m.id, sender: m.role === "user" ? "human" : "agent", text, timestamp: formatTime(m.timestamp) };
-        return <ChatStreamItem key={m.id} msg={mapped} />;
+        const mapped: ChatMessage = {
+          id: m.id,
+          sender: m.role === "user" ? "human" : "agent",
+          text,
+          timestamp: formatTime(m.timestamp),
+          sdiClarification: m.sdiClarification,
+        };
+        return <ChatStreamItem key={m.id} msg={mapped} onSelectSdiVariant={onSelectSdiVariant} onForkFromMessage={onForkFromMessage} />;
       })}
       <div ref={historyEndRef} />
     </div>
@@ -217,8 +240,10 @@ export const FloatingChatStreamPanel: React.FC<FloatingChatStreamPanelProps> = (
   const showJobBar = (props.isRunning || props.isQueued || props.isPaused || props.isInterrupted) && Boolean(props.activeJobId);
   return (
     <>
-      <ScopeChipStrip projectId={props.projectId} sessionId={props.sessionId} selectedNodes={props.selectedNodes} onDeselectNode={props.onDeselectNode} onFocusNode={props.onFocusNode} />
-      <MessageHistoryList messages={props.messages} isMulti={props.isMulti} selectedCount={props.selectedNodes.length} primaryTitle={props.primaryNode?.title} historyEndRef={props.historyEndRef} />
+      {props.selectedNodes.length > 0 && (
+        <ScopeChipStrip projectId={props.projectId} sessionId={props.sessionId} selectedNodes={props.selectedNodes} onDeselectNode={props.onDeselectNode} onFocusNode={props.onFocusNode} />
+      )}
+      <MessageHistoryList messages={props.messages} isMulti={props.isMulti} selectedCount={props.selectedNodes.length} primaryTitle={props.primaryNode?.title} historyEndRef={props.historyEndRef} onForkFromMessage={props.onForkFromMessage} onSelectSdiVariant={props.onSelectSdiVariant} />
       {showJobBar && props.activeJobId && (
         <JobControlBar
           activeJobId={props.activeJobId} isPaused={props.isPaused} isInterrupted={props.isInterrupted}

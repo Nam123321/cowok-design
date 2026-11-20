@@ -1202,7 +1202,10 @@ fn verify_anti_idor_with_caller_inner(
     Ok((project_registry, canon_project_root, is_superadmin))
 }
 
-fn read_verified_project_token(existing_canon_root: &std::path::Path, candidate: &str) -> bool {
+pub(crate) fn read_verified_project_token(
+    existing_canon_root: &std::path::Path,
+    candidate: &str,
+) -> bool {
     #[cfg(unix)]
     {
         use std::ffi::CString;

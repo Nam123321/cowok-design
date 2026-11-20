@@ -109,10 +109,43 @@ pub fn map_error_to_response(err: HarnessError) -> Response {
 // AC-06: Hybrid Project Boundary & 1 Project : N Chat Sessions & Path Token
 // ============================================================================
 
+fn default_session_entry_kind() -> String {
+    "fe-dag".to_string()
+}
+
+fn normalize_session_entry_kind(raw: Option<&str>) -> Result<String, HarnessError> {
+    match raw.map(str::trim) {
+        None | Some("") | Some("fe-dag") => Ok("fe-dag".to_string()),
+        Some("presentation") => Ok("presentation".to_string()),
+        Some(other) => Err(HarnessError::ValidationFailed {
+            reason: format!("INVALID_ENTRY_KIND: unsupported session entry_kind '{other}'"),
+        }),
+    }
+}
+
 pub fn ensure_ac06_tables(registry: &SpecRegistry) -> Result<(), HarnessError> {
     // Schema is centrally managed in V2 migration in crates/spec-registry (AC-10 / F-04).
-    // Verify pool connection is operational:
-    let _conn = registry.pool().connection()?;
+    // Apply idempotent additive column guard for entry_kind and recover stale PROMOTING locks:
+    let conn = registry.pool().connection()?;
+    let has_entry_kind: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('chat_sessions') WHERE name = 'entry_kind'",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| spec_registry::map_sqlite_error(e, "check_chat_sessions_entry_kind"))?;
+    if has_entry_kind == 0 {
+        conn.execute(
+            "ALTER TABLE chat_sessions ADD COLUMN entry_kind TEXT NOT NULL DEFAULT 'fe-dag'",
+            [],
+        )
+        .map_err(|e| spec_registry::map_sqlite_error(e, "add_chat_sessions_entry_kind"))?;
+    }
+    let stale_cutoff_ms = Utc::now().timestamp_millis().saturating_sub(60_000);
+    let _ = conn.execute(
+        "UPDATE projects SET status = 'ACTIVE', updated_at = ?1 WHERE status = 'PROMOTING' AND updated_at < ?2",
+        params![Utc::now().timestamp_millis(), stale_cutoff_ms],
+    );
     Ok(())
 }
 
@@ -142,6 +175,8 @@ pub struct ChatSessionDto {
     pub id: Uuid,
     pub project_id: Uuid,
     pub title: String,
+    #[serde(default = "default_session_entry_kind")]
+    pub entry_kind: String,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -150,6 +185,8 @@ pub struct ChatSessionDto {
 pub struct CreateChatSessionRequest {
     pub id: Option<Uuid>,
     pub title: String,
+    #[serde(default)]
+    pub entry_kind: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -732,7 +769,13 @@ pub(super) async fn handle_promote_scratch(
         "promoted_at": now_ms,
         "promoted_from": current_ws.display().to_string(),
     });
-    let bytes = serde_json::to_vec_pretty(&boundary_meta).unwrap_or_default();
+    let bytes = serde_json::to_vec_pretty(&boundary_meta).map_err(|e| {
+        rollback_copied_files(&copied_files, false);
+        rollback_promote_intent(&mut conn, now_ms);
+        map_error_to_response(HarnessError::ValidationFailed {
+            reason: format!("PROMOTE_METADATA_SERIALIZE_FAILED: {e}"),
+        })
+    })?;
     if let Err(e) = super::fs_jail::write_file_in_dir_fd(
         &cowok_fd,
         std::ffi::OsStr::new("project.json"),
@@ -828,8 +871,10 @@ pub(super) async fn handle_list_chat_sessions(
         .map_err(map_error_to_response)?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, project_id, title, created_at, updated_at
-             FROM chat_sessions WHERE project_id = ?1 ORDER BY updated_at DESC",
+            "SELECT id, project_id, title, entry_kind, created_at, updated_at
+             FROM chat_sessions
+             WHERE project_id = ?1 AND id NOT LIKE 'audit-sess-%' AND length(id) = 36
+             ORDER BY updated_at DESC",
         )
         .map_err(|e| {
             map_error_to_response(HarnessError::ValidationFailed {
@@ -837,17 +882,33 @@ pub(super) async fn handle_list_chat_sessions(
             })
         })?;
 
-    let sessions = stmt
+    let sessions: Vec<ChatSessionDto> = stmt
         .query_map(params![project_id.to_string()], |row| {
             let id_str: String = row.get(0)?;
             let pid_str: String = row.get(1)?;
             let title: String = row.get(2)?;
-            let cr: i64 = row.get(3)?;
-            let up: i64 = row.get(4)?;
+            let entry_kind: String = row.get(3)?;
+            let cr: i64 = row.get(4)?;
+            let up: i64 = row.get(5)?;
+            let id = Uuid::parse_str(&id_str).map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    0,
+                    rusqlite::types::Type::Text,
+                    Box::new(e),
+                )
+            })?;
+            let pid = Uuid::parse_str(&pid_str).map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    1,
+                    rusqlite::types::Type::Text,
+                    Box::new(e),
+                )
+            })?;
             Ok(ChatSessionDto {
-                id: Uuid::parse_str(&id_str).unwrap_or_else(|_| Uuid::new_v4()),
-                project_id: Uuid::parse_str(&pid_str).unwrap_or(project_id),
+                id,
+                project_id: pid,
                 title,
+                entry_kind,
                 created_at: cr,
                 updated_at: up,
             })
@@ -857,8 +918,12 @@ pub(super) async fn handle_list_chat_sessions(
                 reason: format!("QUERY_SESSIONS_FAILED: {e}"),
             })
         })?
-        .filter_map(Result::ok)
-        .collect();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| {
+            map_error_to_response(HarnessError::ValidationFailed {
+                reason: format!("ROW_DECODE_SESSIONS_FAILED: {e}"),
+            })
+        })?;
 
     Ok(Json(sessions))
 }
@@ -880,6 +945,8 @@ pub(super) async fn handle_create_chat_session(
             reason: "SESSION_TITLE_EMPTY: Chat session title must not be empty".to_string(),
         }));
     }
+    let entry_kind =
+        normalize_session_entry_kind(req.entry_kind.as_deref()).map_err(map_error_to_response)?;
 
     let _ = ensure_ac06_tables(&state.registry);
     let session_id = req.id.unwrap_or_else(Uuid::new_v4);
@@ -893,12 +960,13 @@ pub(super) async fn handle_create_chat_session(
     retry_on_busy("create_chat_session_tx", || {
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         tx.execute(
-            "INSERT INTO chat_sessions (id, project_id, title, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO chat_sessions (id, project_id, title, entry_kind, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![
                 session_id.to_string(),
                 project_id.to_string(),
                 title,
+                entry_kind,
                 now_ms,
                 now_ms
             ],
@@ -912,7 +980,8 @@ pub(super) async fn handle_create_chat_session(
         Json(ChatSessionDto {
             id: session_id,
             project_id,
-            title: req.title.trim().to_string(),
+            title,
+            entry_kind,
             created_at: now_ms,
             updated_at: now_ms,
         }),
@@ -944,19 +1013,21 @@ pub(super) async fn handle_get_chat_session(
 
     let session = conn
         .query_row(
-            "SELECT id, project_id, title, created_at, updated_at
+            "SELECT id, project_id, title, entry_kind, created_at, updated_at
              FROM chat_sessions WHERE id = ?1 AND project_id = ?2",
             params![session_id.to_string(), project_id.to_string()],
             |row| {
                 let id_str: String = row.get(0)?;
                 let pid_str: String = row.get(1)?;
                 let title: String = row.get(2)?;
-                let cr: i64 = row.get(3)?;
-                let up: i64 = row.get(4)?;
+                let entry_kind: String = row.get(3)?;
+                let cr: i64 = row.get(4)?;
+                let up: i64 = row.get(5)?;
                 Ok(ChatSessionDto {
                     id: Uuid::parse_str(&id_str).unwrap_or(session_id),
                     project_id: Uuid::parse_str(&pid_str).unwrap_or(project_id),
                     title,
+                    entry_kind,
                     created_at: cr,
                     updated_at: up,
                 })
@@ -1026,18 +1097,20 @@ pub(super) async fn handle_update_chat_session(
         }));
     }
 
-    let created_at: i64 = conn
-        .query_row(
-            "SELECT created_at FROM chat_sessions WHERE id = ?1",
-            params![session_id.to_string()],
-            |r| r.get(0),
+    let (created_at, entry_kind): (i64, String) = retry_on_busy("load_updated_session", || {
+        conn.query_row(
+            "SELECT created_at, entry_kind FROM chat_sessions WHERE id = ?1 AND project_id = ?2",
+            params![session_id.to_string(), project_id.to_string()],
+            |r| Ok((r.get(0)?, r.get(1)?)),
         )
-        .unwrap_or(now_ms);
+    })
+    .map_err(map_error_to_response)?;
 
     Ok(Json(ChatSessionDto {
         id: session_id,
         project_id,
         title,
+        entry_kind,
         created_at,
         updated_at: now_ms,
     }))

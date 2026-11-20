@@ -1,6 +1,6 @@
 // @story-04.1, 04.5
 // @implements AC-01, AC-03
-import React, { createContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useState, useEffect, useCallback, useRef } from "react";
 import { DEFAULT_TABS, INITIAL_SLIDES, SlidePhaseItem, createCanvasTabByKind } from "../components/companion-canvas-data";
 import type { CanvasTabItem } from "../components/CompanionCanvasTab";
 import type { FixtureVariant, ViewportPreset } from "../../../lib/validations/screen-fixture";
@@ -85,36 +85,95 @@ function useEditorBufferState() {
   return { isInlineCodeOpen, setIsInlineCodeOpen, inlineCodeText, setInlineCodeText, htmlCodeText, setHtmlCodeText, baselineHtmlText, setBaselineHtmlText, dirtyBuffer, showDirtyGuardPrompt, setShowDirtyGuardPrompt, customHtmlByTarget, setCustomHtmlForTarget };
 }
 
-export function useDualPaneViewportState(activeTab: CanvasTabItem) {
-  const [structureLens, setStructureLens] = useState<"userflow" | "slide-cms">("userflow");
+import type { StageWorkstreamMode } from "../utils/stage-capability";
+
+export function useDualPaneViewportState(activeTab: CanvasTabItem, sessionKey?: string, sessionEntryKind?: StageWorkstreamMode) {
+  const [structureLens, setStructureLens] = useState<"userflow" | "slide-cms">(
+    sessionEntryKind === "presentation" || activeTab.format === "slide-cms" ? "slide-cms" : "userflow"
+  );
+  const prevLensRef = useRef<"userflow" | "slide-cms">(structureLens);
   const [leftPanePercent, setLeftPanePercent] = useState<number>(DEFAULT_LEFT_PANE_PCT);
   const [isDraggingInternalSplit, setIsDraggingInternalSplit] = useState(false);
   const [isLeftStructureHidden, setIsLeftStructureHidden] = useState(false);
   const [isRightPreviewHidden, setIsRightPreviewHidden] = useState(false);
   const [pointerMode, setPointerMode] = useState<"interact" | "click-dom" | "drag-box">("interact");
   const [viewportPreset, setViewportPreset] = useState<ViewportPreset>("desktop-1440");
-  const [aspectRatio, setAspectRatio] = useState<"auto" | "16-9" | "16-10">("auto");
+  const [aspectRatio, setAspectRatio] = useState<"auto" | "16-9" | "16-10">(
+    structureLens === "slide-cms" ? "16-9" : "auto"
+  );
+  const [zoomMode, setZoomMode] = useState<"fit" | "pan-100">("fit");
   const [isPresenting, setIsPresenting] = useState(false);
   const [highlightedRegionId, setHighlightedRegionId] = useState<string>("sec-biometric");
   const [slides, setSlides] = useState<SlidePhaseItem[]>(INITIAL_SLIDES);
-  const [activeSlideIndex, setActiveSlideIndex] = useState<number>(0);
+  const [activeSlideUid, setActiveSlideUid] = useState<string>(INITIAL_SLIDES[0]?.id ?? "");
+  const activeSlideIndex = Math.max(0, slides.findIndex((s) => s.id === activeSlideUid));
+  const setActiveSlideIndex = useCallback(
+    (next: number | ((prev: number) => number)) => {
+      setActiveSlideUid((currUid) => {
+        const currIdx = Math.max(0, slides.findIndex((s) => s.id === currUid));
+        const targetIdx = typeof next === "function" ? next(currIdx) : next;
+        const clamped = Math.max(0, Math.min(slides.length - 1, targetIdx));
+        return slides[clamped]?.id ?? currUid;
+      });
+    },
+    [slides]
+  );
   const [isCmsDrawerOpen, setIsCmsDrawerOpen] = useState<boolean>(false);
   const [activeSubState, setActiveSubState] = useState<FixtureVariant>("DEFAULT");
   const editor = useEditorBufferState();
 
-  useInspectHotkeyShortcut(setPointerMode);
+  const isSlideStudioActive = structureLens === "slide-cms" && activeTab.format === "slide-cms";
   useEffect(() => {
+    const prev = prevLensRef.current;
+    if (prev !== structureLens) {
+      prevLensRef.current = structureLens;
+      setIsPresenting(false);
+    }
+  }, [structureLens]);
+
+  const wasSlideStudioActiveRef = useRef(isSlideStudioActive);
+  useEffect(() => {
+    const wasActive = wasSlideStudioActiveRef.current;
+    wasSlideStudioActiveRef.current = isSlideStudioActive;
+    if (isSlideStudioActive && !wasActive) {
+      setAspectRatio("16-9");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("cowok:slide-studio-entered"));
+      }
+    } else if (!isSlideStudioActive && wasActive) {
+      setAspectRatio("auto");
+    }
+  }, [isSlideStudioActive]);
+
+  useInspectHotkeyShortcut(setPointerMode);
+  const lastSyncContextRef = useRef({ tabId: activeTab.id, sessionKey: sessionKey || "", entryKind: sessionEntryKind });
+  useEffect(() => {
+    const prev = lastSyncContextRef.current;
+    const nextKey = sessionKey || "";
+    const tabChanged = prev.tabId !== activeTab.id;
+    const entryKindChanged = prev.entryKind !== sessionEntryKind;
+    const switchedBetweenSessions = Boolean(prev.sessionKey) && prev.sessionKey !== nextKey;
+    lastSyncContextRef.current = { tabId: activeTab.id, sessionKey: nextKey, entryKind: sessionEntryKind };
+    if (!tabChanged && !entryKindChanged && !switchedBetweenSessions) return;
+    if (tabChanged) {
+      if (activeTab.format === "slide-cms" || activeTab.defaultLens === "slide-cms") { setStructureLens("slide-cms"); setAspectRatio("16-9"); setIsPresenting(false); return; }
+      if (activeTab.format === "dag" || activeTab.defaultLens === "userflow") { setStructureLens("userflow"); setAspectRatio("auto"); setIsPresenting(false); return; }
+    }
+    if (entryKindChanged) {
+      if (sessionEntryKind === "presentation") { setStructureLens("slide-cms"); setAspectRatio("16-9"); setIsPresenting(false); return; }
+      if (sessionEntryKind === "fe-dag") { setStructureLens("userflow"); setAspectRatio("auto"); setIsPresenting(false); return; }
+    }
     if (activeTab.format === "slide-cms" || activeTab.defaultLens === "slide-cms") { setStructureLens("slide-cms"); setAspectRatio("16-9"); }
     else if (activeTab.format === "dag" || activeTab.defaultLens === "userflow") { setStructureLens("userflow"); setAspectRatio("auto"); }
-  }, [activeTab.id, activeTab.format, activeTab.defaultLens]);
+  }, [activeTab.id, activeTab.format, activeTab.defaultLens, sessionKey, sessionEntryKind]);
 
   return {
     structureLens, setStructureLens, leftPanePercent, setLeftPanePercent,
     isDraggingInternalSplit, setIsDraggingInternalSplit, isLeftStructureHidden, setIsLeftStructureHidden,
     isRightPreviewHidden, setIsRightPreviewHidden, pointerMode, setPointerMode,
-    viewportPreset, setViewportPreset, aspectRatio, setAspectRatio, isPresenting, setIsPresenting,
+    viewportPreset, setViewportPreset, aspectRatio, setAspectRatio, zoomMode, setZoomMode, isPresenting, setIsPresenting,
     highlightedRegionId, setHighlightedRegionId, slides, setSlides,
-    activeSlideIndex, setActiveSlideIndex, isCmsDrawerOpen, setIsCmsDrawerOpen,
+    activeSlideUid, setActiveSlideUid, activeSlideIndex, setActiveSlideIndex, isCmsDrawerOpen, setIsCmsDrawerOpen,
     activeSubState, setActiveSubState, ...editor,
   };
 }

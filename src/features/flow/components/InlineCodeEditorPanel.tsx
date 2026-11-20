@@ -77,7 +77,7 @@ export const InlineCodeEditorPanel: React.FC<InlineCodeEditorPanelProps> = (p) =
         </div>
       )}
       {p.errorMsg && (
-        <div role="alert" data-testid="inline-html-error" style={{ padding: "6px 12px", backgroundColor: "var(--bg-subtle)", borderBottom: "1px solid var(--state-error)", color: "var(--state-error)", fontSize: "11px", fontFamily: "var(--font-mono)" }}>
+        <div role="alert" data-testid="inline-html-error" style={{ padding: "6px 12px", backgroundColor: "var(--state-danger-soft)", borderBottom: "1px solid var(--state-danger)", color: "var(--state-danger)", fontSize: "11px", fontFamily: "var(--font-mono)" }}>
           {p.errorMsg}
         </div>
       )}

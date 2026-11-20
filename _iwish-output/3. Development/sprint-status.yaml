@@ -47,10 +47,11 @@ start_date: '2026-07-24'
 # ==================================================
 
 # Epic 06: Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench
-"Epic 06 - Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench": planned
-"Story 06.1 - Khung trình chiếu 16:9 HTML Slide Engine (1920x1080) & 8 Layout Templates chuẩn Dự án": refactored
-"Story 06.2 - Giao diện Dual-Pane Human CMS Texting Editor đồng bộ <16ms qua data-ff-id": refactored
-"Story 06.3 - Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen Mode": refactored
+"Epic 06 - Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench": completed
+"Story 06.1 - Khung trình chiếu HTML Slide Engine (`16:9`/`16:10`/`Auto`), 8 Layout Templates, `V12` Schema Foundation & `HostRuntimeContract`": completed
+"Story 06.2 - Dual-Pane Slide-Over CMS Workbench (`inert`-Guarded), Two-Tier `<16ms` Non-Reloading Sync, `lol_html` + `html5ever` mXSS & Crash Recovery": completed
+"Story 06.3 - Contextual Slide Copilot (`KeyedParallelCoordinator` Lease) & Offline CSP-B 2D Live Interactive Charts": completed
+"Story 06.4 - Dual-Screen Presenter Mode, Out-of-Band `BroadcastChannel` Security, Pace Timer & Fallback Modes": completed
 
 # Epic 07: 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter
 "Epic 07 - 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter": planned

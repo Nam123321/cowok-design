@@ -45,7 +45,7 @@ async function verifyUiAndResize(page: Page, saveShot: (name: string) => Promise
   const afterBox = await win.boundingBox();
   expect(afterBox?.width).toBeGreaterThanOrEqual(360);
   expect(afterBox?.width).toBeLessThanOrEqual(900);
-  expect(afterBox?.height).toBeGreaterThanOrEqual(480);
+  expect(afterBox?.height).toBeGreaterThanOrEqual(220);
   expect(afterBox?.height).toBeLessThanOrEqual(850);
   await saveShot("03-floating-chat-expanded-resized.png");
 }

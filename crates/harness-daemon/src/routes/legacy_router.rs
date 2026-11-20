@@ -34,6 +34,7 @@ use crate::routes::legacy_specs::{
     handle_list_projects, handle_list_specs, handle_put_spec, handle_synthesize_specs,
     handle_update_project,
 };
+use crate::routes::presentation::presentation_routes;
 use crate::routes::project_trash::handle_restore_project;
 use crate::routes::DaemonAppState;
 
@@ -224,6 +225,7 @@ pub(crate) fn build_protected_legacy_router(state: DaemonAppState) -> Router<Dae
         .merge(legacy_sdi_proposal_routes())
         .merge(legacy_snapshot_session_routes())
         .merge(integration_routes())
+        .merge(presentation_routes())
         .route_layer(middleware::from_fn_with_state(
             state,
             legacy_project_auth_middleware,

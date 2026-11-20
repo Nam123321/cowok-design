@@ -46,6 +46,7 @@ pub struct DaemonServer {
     lock_info: DaemonLockInfo,
     lock_path: PathBuf,
     router: Router,
+    app_state: DaemonAppState,
     active_workers: crate::routes::execution_reaper::ActiveWorkerRegistry,
     sse_tx: tokio::sync::broadcast::Sender<String>,
     pool: SqlitePool,
@@ -68,16 +69,22 @@ impl DaemonServer {
             DaemonAppState::with_auth(registry, lock_info.host.clone(), lock_info.port, auth);
         let active_workers = state.active_workers.clone();
         let sse_tx = state.sse_tx.clone();
+        let app_state = state.clone();
         let router = build_router(state);
         Ok(Self {
             listener,
             lock_info,
             lock_path,
             router,
+            app_state,
             active_workers,
             sse_tx,
             pool,
         })
+    }
+
+    pub fn app_state(&self) -> DaemonAppState {
+        self.app_state.clone()
     }
 
     pub fn active_workers(&self) -> crate::routes::execution_reaper::ActiveWorkerRegistry {
@@ -785,7 +792,19 @@ pub async fn serve_daemon_with_config(config: DaemonConfig) -> Result<(), Harnes
         }
     });
 
+    let copilot_state = server.app_state();
+    let copilot_worker_handle = tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_millis(250));
+        loop {
+            ticker.tick().await;
+            let _ =
+                crate::routes::presentation_copilot::run_pending_slide_copilot_jobs(&copilot_state)
+                    .await;
+        }
+    });
+
     let serve_result = server.serve().await;
+    copilot_worker_handle.abort();
     watcher_handle.abort();
     sweeper_handle.abort();
     serve_result

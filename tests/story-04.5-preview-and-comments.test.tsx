@@ -230,12 +230,30 @@ describe("Story 04.5: State-Hydrated Live Preview, Option CSP-B CSPRNG Bridge & 
       const postMessage = vi.fn();
       Object.defineProperty(iframe, "contentWindow", { value: { postMessage }, configurable: true });
       fireEvent.load(iframe);
-      const initPayload = postMessage.mock.calls[0][0] as { epoch: number; bootSecret: string };
+      const initPayload = postMessage.mock.calls[0][0] as {
+        epoch: number;
+        bootSecret: string;
+        channelSecret: string;
+        artifactSha256: string;
+      };
+      handlerRef.fn?.({
+        data: {
+          type: "PORT_ACK",
+          epoch: initPayload.epoch,
+          bootSecretAck: initPayload.bootSecret,
+          channelSecret: initPayload.channelSecret,
+          artifactSha256: initPayload.artifactSha256,
+          domAnchorHash: "mock-dom-hash",
+          seq: 1,
+        },
+      } as MessageEvent);
       handlerRef.fn?.({
         data: {
           type: "TEXT_QUOTE",
           epoch: initPayload.epoch,
           bootSecretAck: initPayload.bootSecret,
+          channelSecret: initPayload.channelSecret,
+          seq: 2,
           text: "Ký & Giải ngân Ngay",
         },
       } as MessageEvent);

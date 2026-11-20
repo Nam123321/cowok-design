@@ -124,4 +124,13 @@ export type EnqueueNodeJobsResponse = z.infer<typeof EnqueueNodeJobsResponseSche
 export type NodeSessionsResponse = z.infer<typeof NodeSessionsResponseSchema>;
 export type MarkNodeSessionReadInput = z.infer<typeof MarkNodeSessionReadInputSchema>;
 export type MarkNodeSessionReadResponse = z.infer<typeof MarkNodeSessionReadResponseSchema>;
+export const StreamJobEventsQuerySchema = z
+  .object({
+    jobId: z.string().min(1).optional(),
+    nodeId: z.string().min(1).optional(),
+    afterSeq: z.coerce.number().int().nonnegative().optional(),
+  })
+  .strict();
+
+export type StreamJobEventsQuery = z.infer<typeof StreamJobEventsQuerySchema>;
 export { ExecutionEventDtoSchema };

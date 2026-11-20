@@ -131,6 +131,16 @@ pub fn v14_migration_checksum() -> String {
     cached_migration_sha256(&CACHE, V14_MIGRATION_SQL)
 }
 
+pub const V15_MIGRATION_SQL: &str =
+    include_str!("../migrations/V15__epic06_presentation_cms_and_charts.sql");
+pub const V15_MIGRATION_NAME: &str = "V15__epic06_presentation_cms_and_charts.sql";
+const LEGACY_EPIC06_V12_SHA256: &str =
+    "7b8d9c63dec95c85ff0239728c6670da1cedfbcde82adbae29c6b1c2d7718b9d";
+
+pub fn v15_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V15_MIGRATION_SQL)
+}
 /// Configuration for the embedded SQLite WAL connection pool.
 #[derive(Debug, Clone)]
 pub struct SqliteWalConfig {
@@ -386,12 +396,14 @@ impl SqlitePool {
             Self::apply_v7_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v8_migration_if_needed(&mut conn, &config.db_path)?;
             Self::reconcile_legacy_epic08_v9_to_v11_slots(&mut conn, &config.db_path)?;
+            Self::reconcile_legacy_epic06_v12_slot(&mut conn, &config.db_path)?;
             Self::apply_v9_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v10_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v11_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v12_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v13_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v14_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v15_migration_if_needed(&mut conn, &config.db_path)?;
         }
         harden_sqlite_files(&config.db_path)?;
 
@@ -985,6 +997,44 @@ impl SqlitePool {
         )
     }
 
+    fn apply_v15_columns(tx: &Connection) -> Result<(), HarnessError> {
+        for (table, cols) in [
+            (
+                "presentation_decks",
+                &[
+                    ("aspect_ratio", "TEXT NOT NULL DEFAULT '16:9'"),
+                    ("deck_protocol_version", "INTEGER NOT NULL DEFAULT 1"),
+                    ("deck_mode", "TEXT NOT NULL DEFAULT 'multi-page'"),
+                    ("revision", "INTEGER NOT NULL DEFAULT 0"),
+                ][..],
+            ),
+            (
+                "deck_slides",
+                &[
+                    ("slide_uid", "TEXT"),
+                    ("speaker_notes", "TEXT NOT NULL DEFAULT ''"),
+                    ("narrative_arc", "TEXT NOT NULL DEFAULT ''"),
+                    ("eyebrow_tag", "TEXT NOT NULL DEFAULT ''"),
+                    ("revision", "INTEGER NOT NULL DEFAULT 0"),
+                ][..],
+            ),
+            (
+                "wording_slots",
+                &[
+                    ("slot_kind", "TEXT NOT NULL DEFAULT 'text'"),
+                    ("charts_json", "TEXT NOT NULL DEFAULT '[]'"),
+                    ("safe_styles_json", "TEXT NOT NULL DEFAULT '{}'"),
+                    ("updated_by", "TEXT NOT NULL DEFAULT 'human'"),
+                    ("ast_revision", "INTEGER NOT NULL DEFAULT 0"),
+                ][..],
+            ),
+            ("change_proposals", &[("source_comment_id", "TEXT")][..]),
+        ] {
+            Self::ensure_columns_idempotent(tx, table, cols)?;
+        }
+        Ok(())
+    }
+
     fn cached_genesis_db_bytes(parent_dir: &Path) -> Result<&'static [u8], HarnessError> {
         static GENESIS_BYTES: OnceLock<Vec<u8>> = OnceLock::new();
         static GENESIS_INIT_LOCK: OnceLock<std::sync::Mutex<()>> = OnceLock::new();
@@ -1110,6 +1160,10 @@ impl SqlitePool {
         Self::apply_v14_columns(&tx)?;
         tx.execute_batch(V14_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "genesis_v14"))?;
+        Self::apply_v15_columns(&tx)?;
+        crate::presentation_repo::backfill_missing_slide_uids(&tx)?;
+        tx.execute_batch(V15_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v15"))?;
 
         let now = Utc::now().timestamp_millis();
         for (version, name, sha) in [
@@ -1125,6 +1179,7 @@ impl SqlitePool {
             (12i64, V12_MIGRATION_NAME, v12_migration_checksum()),
             (13i64, V13_MIGRATION_NAME, v13_migration_checksum()),
             (14i64, V14_MIGRATION_NAME, v14_migration_checksum()),
+            (15i64, V15_MIGRATION_NAME, v15_migration_checksum()),
         ] {
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
@@ -1481,6 +1536,60 @@ impl SqlitePool {
         }
         tx.commit()
             .map_err(|e| map_sqlite_error(e, "commit_legacy_epic08_rekey"))?;
+        Ok(())
+    }
+
+    fn reconcile_legacy_epic06_v12_slot(
+        conn: &mut Connection,
+        db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let legacy_name = "V12__epic06_presentation_cms_and_charts.sql";
+        let row: Option<(i64, String)> = conn
+            .query_row(
+                "SELECT version, checksum_sha256 FROM schema_migrations WHERE name = ?1",
+                params![legacy_name],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_legacy_epic06_migration_slot"))?;
+        let Some((old_ver, actual_sha)) = row else {
+            return Ok(());
+        };
+        if actual_sha != LEGACY_EPIC06_V12_SHA256 {
+            return Err(HarnessError::ValidationFailed {
+                reason: format!(
+                    "MIGRATION_CHECKSUM_MISMATCH [{legacy_name}]: expected {LEGACY_EPIC06_V12_SHA256}, found {actual_sha}"
+                ),
+            });
+        }
+        let occupant: Option<String> = conn
+            .query_row(
+                "SELECT name FROM schema_migrations WHERE version = 15",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "check_target_v15_migration_slot"))?;
+        if let Some(occ_name) = occupant {
+            if occ_name != V15_MIGRATION_NAME {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "LEGACY_MIGRATION_REKEY_CONFLICT: version 15 already occupied by {occ_name}"
+                    ),
+                });
+            }
+        }
+        Self::create_versioned_backup(conn, db_path, "pre-epic06-rekey")?;
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_legacy_epic06_rekey"))?;
+        tx.execute(
+            "UPDATE schema_migrations SET version = 15, name = ?1, checksum_sha256 = ?2 WHERE version = ?3 AND name = ?4",
+            params![V15_MIGRATION_NAME, v15_migration_checksum(), old_ver, legacy_name],
+        )
+        .map_err(|e| map_sqlite_error(e, "update_legacy_epic06_slot"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_legacy_epic06_rekey"))?;
         Ok(())
     }
 
@@ -2010,6 +2119,54 @@ impl SqlitePool {
         .map_err(|e| map_sqlite_error(e, "insert_v14_schema_migration"))?;
         tx.commit()
             .map_err(|e| map_sqlite_error(e, "commit_v14_migration"))?;
+        Ok(())
+    }
+
+    fn apply_v15_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v15_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 15",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v15_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V15]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            Self::apply_v15_columns(conn)?;
+            return Ok(());
+        }
+
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v15"))?;
+        Self::apply_v15_columns(&tx)?;
+        crate::presentation_repo::backfill_missing_slide_uids(&tx)?;
+        tx.execute_batch(V15_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v15_sql"))?;
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (15, ?1, ?2, ?3)",
+            params![
+                V15_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
+        )
+        .map_err(|e| map_sqlite_error(e, "insert_v15_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v15_migration"))?;
         Ok(())
     }
 

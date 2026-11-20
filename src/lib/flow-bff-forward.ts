@@ -23,8 +23,12 @@ export function forwardFlowProjectRequest<T = unknown>(opts: ForwardFlowProjectO
     principal: {
       tenantId: ctx.tenantId || "local-default",
       userId: ctx.userId || "local-operator",
-      role: ctx.role || "editor",
+      role: ctx.role || "viewer",
     },
     correlationId: ctx.correlationId,
+    bffSessionToken: ctx.bffSessionToken,
+    isHumanWorkbench: ctx.isHumanWorkbench,
+    humanSessionToken: ctx.humanSessionToken,
+    signal: req.signal,
   });
 }

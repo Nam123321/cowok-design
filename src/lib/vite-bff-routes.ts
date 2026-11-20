@@ -61,6 +61,18 @@ import * as diffProposalRoute from "../app/api/projects/[id]/proposals/[proposal
 import * as decideTradeoffRoute from "../app/api/projects/[id]/proposals/[proposalId]/tradeoffs/[tradeoffId]/decide/route";
 import * as sdiIntentRoute from "../app/api/projects/[id]/sdi/intent/route";
 import * as sdiClarificationRoute from "../app/api/projects/[id]/sdi/clarification/route";
+import * as decksRoute from "../app/api/projects/[id]/decks/route";
+import * as deckReorderRoute from "../app/api/projects/[id]/decks/[deckId]/slides/reorder/route";
+import * as deckDuplicateRoute from "../app/api/projects/[id]/decks/[deckId]/slides/[slideUid]/duplicate/route";
+import * as deckSlideSlotsRoute from "../app/api/projects/[id]/decks/[deckId]/slides/[slideUid]/slots/route";
+import * as deckSlideSlotsBatchRoute from "../app/api/projects/[id]/decks/[deckId]/slides/[slideUid]/slots/batch/route";
+import * as deckSlideApplyHtmlRoute from "../app/api/projects/[id]/decks/[deckId]/slides/[slideUid]/apply-html/route";
+import * as deckSlideCopilotRoute from "../app/api/projects/[id]/decks/[deckId]/slides/[slideUid]/copilot/route";
+import * as deckSlideCopilotDispatchRoute from "../app/api/projects/[id]/decks/[deckId]/slides/[slideUid]/copilot/dispatch/route";
+import * as deckSlideCopilotCancelRoute from "../app/api/projects/[id]/decks/[deckId]/slides/[slideUid]/copilot/cancel/route";
+import * as deckSlideChartsValidateRoute from "../app/api/projects/[id]/decks/[deckId]/slides/[slideUid]/charts/validate/route";
+import * as deckPresenterHandshakeDirectRoute from "../app/api/decks/[deckId]/presenter/handshake/route";
+import * as deckPresenterHandshakeProjectRoute from "../app/api/projects/[id]/decks/[deckId]/presenter/handshake/route";
 
 export type { RouteFn };
 const MAX_PROJECT_NAME_LEN = 160;
@@ -153,6 +165,19 @@ const ROUTE_TABLE: RouteEntry[] = [
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/sdi\/intent\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent/${safeEncodeSegment(m[2])}`),
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/sdi\/clarification$/, extractParams: idOnly, resolveHandler: () => sdiClarificationRoute.POST },
   ...PLUGIN_ECOSYSTEM_ROUTES,
+  { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.GET },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.POST },
+  { method: "PUT", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/reorder$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]) }), resolveHandler: () => deckReorderRoute.PUT },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/([^/]+)\/duplicate$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]), slideUid: safeDecodeSegment(m[3]) }), resolveHandler: () => deckDuplicateRoute.POST },
+  { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/([^/]+)\/slots$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]), slideUid: safeDecodeSegment(m[3]) }), resolveHandler: () => deckSlideSlotsRoute.GET },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/([^/]+)\/slots\/batch$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]), slideUid: safeDecodeSegment(m[3]) }), resolveHandler: () => deckSlideSlotsBatchRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/([^/]+)\/apply-html$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]), slideUid: safeDecodeSegment(m[3]) }), resolveHandler: () => deckSlideApplyHtmlRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/([^/]+)\/copilot$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]), slideUid: safeDecodeSegment(m[3]) }), resolveHandler: () => deckSlideCopilotRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/([^/]+)\/copilot\/dispatch$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]), slideUid: safeDecodeSegment(m[3]) }), resolveHandler: () => deckSlideCopilotDispatchRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/([^/]+)\/copilot\/cancel$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]), slideUid: safeDecodeSegment(m[3]) }), resolveHandler: () => deckSlideCopilotCancelRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/([^/]+)\/charts\/validate$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]), slideUid: safeDecodeSegment(m[3]) }), resolveHandler: () => deckSlideChartsValidateRoute.POST },
+  { method: "POST", pattern: /^\/api\/decks\/([^/]+)\/presenter\/handshake$/, extractParams: (m) => ({ deckId: safeDecodeSegment(m[1]) }), resolveHandler: () => deckPresenterHandshakeDirectRoute.POST },
+  { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/presenter\/handshake$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]) }), resolveHandler: () => deckPresenterHandshakeProjectRoute.POST },
   ...FLOW_AND_WORKBENCH_ROUTES,
 ];
 

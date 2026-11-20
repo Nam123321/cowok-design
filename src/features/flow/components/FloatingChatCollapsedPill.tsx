@@ -15,6 +15,7 @@ export interface FloatingChatCollapsedPillProps {
   isDragging: boolean;
   isMulti: boolean;
   selectedCount: number;
+  attachmentCount?: number;
   primaryNode: WorkbenchNode | null;
   primaryNodeStatus: { status: NodeJobStatus; queuePosition: number; jobId?: string } | null;
   showReviewSummary: boolean;
@@ -140,13 +141,20 @@ const PillStatusBadge: React.FC<{
 const PillNodeBadge: React.FC<{
   isMulti: boolean;
   selectedCount: number;
+  attachmentCount?: number;
   primaryNode: WorkbenchNode | null;
   primaryNodeStatus: { status: NodeJobStatus; queuePosition: number; jobId?: string } | null;
   onExpand: () => void;
-}> = ({ isMulti, selectedCount, primaryNode, primaryNodeStatus, onExpand }) => {
+}> = ({ isMulti, selectedCount, attachmentCount = 0, primaryNode, primaryNodeStatus, onExpand }) => {
   const { t, locale } = useTranslation();
   const { formatNumber } = useFormatter({ locale });
   const openTitle = t("floatingChat.openContextChat", "Mở khung chat ngữ cảnh");
+  const badgeText =
+    selectedCount === 0
+      ? `${formatNumber(attachmentCount)} ${t("floatingChat.commentsUnit", "Nhận xét")}`
+      : isMulti
+        ? `${formatNumber(selectedCount)} ${t("floatingChat.nodesUnit", "Nodes")}`
+        : primaryNode?.screenKey;
   return (
     <button
       type="button" data-testid="floating-chat-open-trigger" onClick={onExpand} title={openTitle}
@@ -154,7 +162,7 @@ const PillNodeBadge: React.FC<{
     >
       <BrandIcon name="crosshair" size={13} color="var(--action-primary)" />
       <span style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-primary)" }}>
-        {isMulti ? `${formatNumber(selectedCount)} ${t("floatingChat.nodesUnit", "Nodes")}` : primaryNode?.screenKey}
+        {badgeText}
       </span>
       <span style={{ fontSize: "11px", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "4px" }}>
         <BrandIcon name="message-square" size={11} color="var(--text-secondary)" />
@@ -173,6 +181,7 @@ export const FloatingChatCollapsedPill: React.FC<FloatingChatCollapsedPillProps>
   isDragging,
   isMulti,
   selectedCount,
+  attachmentCount = 0,
   primaryNode,
   primaryNodeStatus,
   showReviewSummary,
@@ -196,7 +205,7 @@ export const FloatingChatCollapsedPill: React.FC<FloatingChatCollapsedPillProps>
       }}
       onMouseDown={onHeaderMouseDown}
     >
-      <PillNodeBadge isMulti={isMulti} selectedCount={selectedCount} primaryNode={primaryNode} primaryNodeStatus={primaryNodeStatus} onExpand={onExpand} />
+      <PillNodeBadge isMulti={isMulti} selectedCount={selectedCount} attachmentCount={attachmentCount} primaryNode={primaryNode} primaryNodeStatus={primaryNodeStatus} onExpand={onExpand} />
       <button type="button" onClick={onToggleReviewSummary} style={PILL_ACTION_BTN_STYLE}>
         {t("floatingChat.reviewSummaryBtn", "Review Summary")}
       </button>

@@ -10,13 +10,15 @@ export interface UseDaemonPickerStateProps {
   isOpen: boolean;
   mode: "create" | "promote";
   initialSlug?: string;
+  initialTab?: "managed" | "browse";
 }
 
 export function useDaemonPickerState(props: UseDaemonPickerStateProps) {
   const { t } = useTranslation();
   const tRef = useRef(t);
   tRef.current = t;
-  const [activeTab, setActiveTab] = useState<"managed" | "browse">(props.mode === "promote" ? "browse" : "managed");
+  const resolvedDefaultTab = props.initialTab ?? (props.mode === "promote" ? "browse" : "managed");
+  const [activeTab, setActiveTab] = useState<"managed" | "browse">(resolvedDefaultTab);
   const [slugInput, setSlugInput] = useState(toManagedSlug(props.initialSlug || "cowok-project"));
   const [browseData, setBrowseData] = useState<FsBrowseResponse | null>(null);
   const [selectedPath, setSelectedPath] = useState("");
@@ -46,12 +48,12 @@ export function useDaemonPickerState(props: UseDaemonPickerStateProps) {
     }
     setErrorMsg(null);
     setSlugInput(toManagedSlug(props.initialSlug || "cowok-project"));
-    setActiveTab(props.mode === "promote" ? "browse" : "managed");
+    setActiveTab(resolvedDefaultTab);
     if (!loadedForOpenRef.current) {
       loadedForOpenRef.current = true;
       void loadDirectory(undefined);
     }
-  }, [props.isOpen, props.initialSlug, props.mode, loadDirectory]);
+  }, [props.isOpen, props.initialSlug, props.mode, resolvedDefaultTab, loadDirectory]);
 
   return {
     activeTab, setActiveTab, slugInput, setSlugInput, browseData,

@@ -35,7 +35,7 @@ export interface MainSidebarProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onToggleProjectFolder?: (projectId: string) => void;
-  onCreateSessionInProject?: (projectId: string) => void;
+  onCreateSessionInProject?: (projectId: string, title?: string, entryKind?: "fe-dag" | "presentation") => void;
   onTogglePinSession?: (sessionId: string) => void;
   onRenameSession?: (sessionId: string, newTitle: string) => void;
   onDeleteSession?: (sessionId: string) => void;

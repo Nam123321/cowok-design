@@ -124,7 +124,7 @@ export function mapDtoToWorkbenchProject(dto: ProjectDto): WorkbenchProject {
 
 export type SettledProjectSessions = PromiseSettledResult<{
   projId: string;
-  sessList: { id: string; title: string; project_id?: string | null; updated_at?: number | null }[];
+  sessList: { id: string; title: string; entry_kind?: "fe-dag" | "presentation" | null; project_id?: string | null; updated_at?: number | null }[];
 }>;
 
 export function collectFetchedProjectSessions(settled: SettledProjectSessions[], formatTime: (v: number) => string) {
@@ -134,7 +134,11 @@ export function collectFetchedProjectSessions(settled: SettledProjectSessions[],
   for (const item of settled) {
     if (item.status !== "fulfilled" || !Array.isArray(item.value.sessList) || item.value.sessList.length === 0) continue;
     const mappedForProj: ChatSession[] = item.value.sessList.map((s) => ({
-      id: s.id, title: s.title, projectId: s.project_id || item.value.projId, updatedAt: formatTime(s.updated_at || Date.now()),
+      id: s.id,
+      title: s.title,
+      projectId: s.project_id || item.value.projId,
+      entryKind: s.entry_kind === "presentation" ? "presentation" : "fe-dag",
+      updatedAt: formatTime(s.updated_at || Date.now()),
     }));
     fetchedByProject.set(item.value.projId, mappedForProj);
     for (const sess of mappedForProj) {

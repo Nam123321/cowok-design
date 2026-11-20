@@ -12,6 +12,7 @@ path = "src/main.rs"
 domain = { path = "../domain" }
 spec-registry = { path = "../spec-registry" }
 constraint-engine = { path = "../constraint-engine" }
+presentation-cms = { path = "../presentation-cms" }
 flow-graph = { path = "../flow-graph" }
 plugin-host = { path = "../plugin-host" }
 axum = "0.7"

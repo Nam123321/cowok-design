@@ -103,11 +103,11 @@ pub fn resolve_role(headers: &HeaderMap, token_opt: Option<&str>) -> String {
 /// Enforces that mutating operations require at least editor (or admin) role.
 /// Rejects `viewer` role with 403 FORBIDDEN.
 pub fn require_editor_role(principal: &FlowPrincipal) -> Result<(), Response> {
-    if principal.role == "viewer" {
+    if !matches!(principal.role.as_str(), "editor" | "admin") {
         return Err(auth_err_resp(
             StatusCode::FORBIDDEN,
             "INSUFFICIENT_ROLE",
-            "Viewer role cannot mutate resources; editor role required",
+            "Viewer or unknown role cannot mutate resources; editor role required",
         ));
     }
     Ok(())
@@ -447,7 +447,7 @@ impl DaemonAuthState {
 
     pub fn record_nonce_once(&self, nonce: &str) -> bool {
         {
-            let mut set = self.nonce_set.lock().expect("nonce_set");
+            let mut set = self.nonce_set.lock().unwrap_or_else(|e| e.into_inner());
             if set.contains(nonce) {
                 return false;
             }
@@ -472,7 +472,7 @@ impl DaemonAuthState {
                     return false;
                 }
             }
-            let mut order = self.nonce_order.lock().expect("nonce_order");
+            let mut order = self.nonce_order.lock().unwrap_or_else(|e| e.into_inner());
             if order.len() >= NONCE_LRU_CAPACITY {
                 if let Some(evicted) = order.pop_front() {
                     set.remove(&evicted);
@@ -517,7 +517,7 @@ impl DaemonAuthState {
                 );
             }
         }
-        let mut sessions = self.sessions.lock().expect("sessions");
+        let mut sessions = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
         sessions.retain(|_, entry| entry.expires_at >= now);
         while sessions.len() >= max_capacity.max(1) {
             let Some(oldest_key) = sessions
@@ -544,16 +544,17 @@ impl DaemonAuthState {
             return None;
         }
         let now = Utc::now().timestamp();
-        {
-            let mut sessions = self.sessions.lock().expect("sessions");
+        let cached = {
+            let mut sessions = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
             match sessions.get(trimmed).cloned() {
-                Some(entry) if entry.expires_at >= now => return Some(entry.principal),
+                Some(entry) if entry.expires_at >= now => Some(entry.principal),
                 Some(_) => {
                     sessions.remove(trimmed);
+                    None
                 }
-                None => {}
+                None => None,
             }
-        }
+        };
         if let Some(ref pool) = self.pool {
             if let Ok(conn) = pool.connection() {
                 let token_hash = sha256_hex_token(trimmed);
@@ -574,7 +575,7 @@ impl DaemonAuthState {
                         user_id,
                         role,
                     };
-                    let mut sessions = self.sessions.lock().expect("sessions");
+                    let mut sessions = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
                     sessions.insert(
                         trimmed.to_string(),
                         SessionEntry {
@@ -584,9 +585,16 @@ impl DaemonAuthState {
                     );
                     return Some(principal);
                 }
+                if cached.is_some() {
+                    let mut sessions = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
+                    sessions.remove(trimmed);
+                }
+                return None;
             }
+            // Fail closed if database revocation check cannot run while DB pool is configured
+            return None;
         }
-        None
+        cached
     }
 
     pub fn issue_human_workbench_session(
@@ -617,7 +625,10 @@ impl DaemonAuthState {
                 );
             }
         }
-        let mut sessions = self.human_sessions.lock().expect("human_sessions");
+        let mut sessions = self
+            .human_sessions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         sessions.retain(|_, entry| entry.expires_at >= now);
         while sessions.len() >= MAX_SESSIONS_CAPACITY {
             let Some(oldest) = sessions
@@ -645,16 +656,20 @@ impl DaemonAuthState {
             return None;
         }
         let now = Utc::now().timestamp();
-        {
-            let mut sessions = self.human_sessions.lock().expect("human_sessions");
+        let cached = {
+            let mut sessions = self
+                .human_sessions
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
             match sessions.get(trimmed).cloned() {
-                Some(entry) if entry.expires_at >= now => return Some(entry.principal),
+                Some(entry) if entry.expires_at >= now => Some(entry.principal),
                 Some(_) => {
                     sessions.remove(trimmed);
+                    None
                 }
-                None => {}
+                None => None,
             }
-        }
+        };
         if let Some(ref pool) = self.pool {
             if let Ok(conn) = pool.connection() {
                 let token_hash = sha256_hex_token(trimmed);
@@ -676,7 +691,10 @@ impl DaemonAuthState {
                         user_id,
                         role,
                     };
-                    let mut sessions = self.human_sessions.lock().expect("human_sessions");
+                    let mut sessions = self
+                        .human_sessions
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner());
                     sessions.insert(
                         trimmed.to_string(),
                         SessionEntry {
@@ -686,13 +704,26 @@ impl DaemonAuthState {
                     );
                     return Some(principal);
                 }
+                if cached.is_some() {
+                    let mut sessions = self
+                        .human_sessions
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner());
+                    sessions.remove(trimmed);
+                }
+                return None;
             }
+            // Fail closed if DB revocation check cannot run while DB pool is configured.
+            return None;
         }
-        None
+        cached
     }
 
     pub fn active_session_count(&self) -> usize {
-        self.sessions.lock().expect("sessions").len()
+        self.sessions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .len()
     }
 }
 
@@ -1219,9 +1250,21 @@ pub async fn legacy_project_auth_middleware(
     {
         match verify_hmac_v2(&auth, &parts.method, &parts.uri, &parts.headers, &raw_bytes) {
             Ok(mut principal) => {
-                let role = resolve_role(&parts.headers, None);
-                if role == "viewer" {
-                    principal.role = "viewer".to_string();
+                // Honor explicit header downgrade to viewer/editor while preserving HMAC-verified admin
+                if let Some(hdr_role) = parts
+                    .headers
+                    .get("x-cowok-role")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.trim().to_ascii_lowercase())
+                {
+                    if hdr_role == "viewer" {
+                        principal.role = "viewer".to_string();
+                    } else if hdr_role == "editor" && principal.role == "admin" {
+                        principal.role = "editor".to_string();
+                    } else if hdr_role != "editor" && hdr_role != "admin" {
+                        // Fail closed on unknown x-cowok-role header values.
+                        principal.role = "viewer".to_string();
+                    }
                 }
                 Some(VerifiedLegacyIngress {
                     principal,
@@ -1296,7 +1339,9 @@ pub async fn legacy_project_auth_middleware(
     };
 
     if let Some(ref caller) = verified {
-        if parts.method != Method::GET && parts.method != Method::HEAD {
+        let is_readonly_post =
+            parts.method == Method::POST && is_anchored_readonly_post_path(parts.uri.path());
+        if parts.method != Method::GET && parts.method != Method::HEAD && !is_readonly_post {
             if let Err(resp) = require_editor_role(&caller.principal) {
                 return resp;
             }
@@ -1340,6 +1385,43 @@ pub async fn legacy_project_auth_middleware(
         rebuilt.extensions_mut().insert(caller);
     }
     next.run(rebuilt).await
+}
+
+fn is_anchored_readonly_post_path(path: &str) -> bool {
+    let Some(rest) = path.strip_prefix('/') else {
+        return false;
+    };
+    let segs: Vec<&str> = rest.split('/').collect();
+    if segs.iter().any(|s| s.is_empty() || *s == "." || *s == "..") {
+        return false;
+    }
+    matches!(
+        segs.as_slice(),
+        ["api", "v1", "decks", _, "slides", _, "charts", "validate"]
+            | [
+                "api",
+                "v1",
+                "projects",
+                _,
+                "decks",
+                _,
+                "slides",
+                _,
+                "charts",
+                "validate"
+            ]
+            | ["api", "v1", "decks", _, "presenter", "handshake"]
+            | [
+                "api",
+                "v1",
+                "projects",
+                _,
+                "decks",
+                _,
+                "presenter",
+                "handshake"
+            ]
+    )
 }
 
 #[cfg(test)]

@@ -179,6 +179,30 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  // Mirror pool.rs apply_v15_columns idempotent column guards prior to V15 index creation
+  db.exec(`
+    ALTER TABLE presentation_decks ADD COLUMN aspect_ratio TEXT NOT NULL DEFAULT '16:9';
+    ALTER TABLE presentation_decks ADD COLUMN deck_protocol_version INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE presentation_decks ADD COLUMN deck_mode TEXT NOT NULL DEFAULT 'multi-page';
+    ALTER TABLE presentation_decks ADD COLUMN revision INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE deck_slides ADD COLUMN slide_uid TEXT;
+    ALTER TABLE deck_slides ADD COLUMN speaker_notes TEXT NOT NULL DEFAULT '';
+    ALTER TABLE deck_slides ADD COLUMN narrative_arc TEXT NOT NULL DEFAULT '';
+    ALTER TABLE deck_slides ADD COLUMN eyebrow_tag TEXT NOT NULL DEFAULT '';
+    ALTER TABLE deck_slides ADD COLUMN revision INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE wording_slots ADD COLUMN slot_kind TEXT NOT NULL DEFAULT 'text';
+    ALTER TABLE wording_slots ADD COLUMN charts_json TEXT NOT NULL DEFAULT '[]';
+    ALTER TABLE wording_slots ADD COLUMN safe_styles_json TEXT NOT NULL DEFAULT '{}';
+    ALTER TABLE wording_slots ADD COLUMN updated_by TEXT NOT NULL DEFAULT 'human';
+    ALTER TABLE wording_slots ADD COLUMN ast_revision INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE change_proposals ADD COLUMN source_comment_id TEXT;
+  `);
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V15__epic06_presentation_cms_and_charts.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
@@ -213,7 +237,7 @@ function parsePrismaModelColumns(schemaText: string, modelName: string): string[
   return cols.sort();
 }
 
-describe("P1 Persistence Contract & SQLite WAL V1-V14 Mirror Verification (ADR-091)", () => {
+describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-091)", () => {
   const schemaPath = path.resolve(__dirname, "schema.prisma");
   const migrationsDir = path.resolve(__dirname, "../crates/spec-registry/migrations");
 
@@ -241,7 +265,7 @@ describe("P1 Persistence Contract & SQLite WAL V1-V14 Mirror Verification (ADR-0
     expect(mappedTables).toHaveLength(49);
   });
 
-  it("UT-DB-02: executes V1-V9 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V15 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 
@@ -450,5 +474,34 @@ describe("P1 Persistence Contract & SQLite WAL V1-V14 Mirror Verification (ADR-0
     db.prepare(
       "INSERT INTO skill_plugins (id, tenant_id, project_id, plugin_slug, version, lifecycle_state, source_type, source_repo_url, updated_at) VALUES ('sp-4', 'tenant-b', 'p-084', 'tokens-skill', '1.0.0', 'ACTIVE', 'local', 'https://github.com/org/repo', ?)"
     ).run(now);
+  });
+
+  it("UT-DB-07: verifies Story 06.1 / 05.2 V15 additive columns, slide_uid unique index, and Prisma parity", () => {
+    const db = openMigratedMemoryDb();
+    const schemaContent = fs.readFileSync(schemaPath, "utf-8");
+
+    for (const [table, cols] of [
+      ["presentation_decks", ["aspect_ratio", "deck_protocol_version", "deck_mode", "revision"]],
+      ["deck_slides", ["slide_uid", "speaker_notes", "narrative_arc", "eyebrow_tag", "revision"]],
+      ["wording_slots", ["slot_kind", "charts_json", "safe_styles_json", "updated_by", "ast_revision"]],
+      ["change_proposals", ["source_comment_id"]],
+    ] as const) {
+      const tableCols = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(
+        (r) => r.name
+      );
+      for (const col of cols) {
+        expect(tableCols).toContain(col);
+        if (col.includes("_")) {
+          expect(schemaContent).toContain(`@map("${col}")`);
+        }
+      }
+    }
+
+    const idxNames = (
+      db
+        .prepare("SELECT name FROM sqlite_master WHERE type='index'")
+        .all() as { name: string }[]
+    ).map((r) => r.name);
+    expect(idxNames).toContain("deck_slides_slide_uid_key");
   });
 });

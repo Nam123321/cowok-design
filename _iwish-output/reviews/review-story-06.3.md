@@ -1,14 +1,19 @@
 # Edge Case Guardian & Adversarial Review Report — Story 06.3
 
-- **Story:** Story 06.3 — Contextual Slide Copilot Chat, Biểu đồ Động (Live Charts) & Presenter Screen Mode
+- **Story:** Story 06.3 — Contextual Slide Copilot (`KeyedParallelCoordinator` Lease) & Offline CSP-B 2D Live Interactive Charts
 - **Epic:** Epic 06 (Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench)
-- **Reviewer:** Review Agent (Edge Case Guardian Skill)
-- **Verdict:** APPROVED (PASS)
+- **Reviewer:** Review Agent (Edge Case Guardian Skill — Stage 3A Plan Audit)
+- **Risk Tier:** `3`
+- **Verdict:** APPROVED FOR STAGE 3A PLANNING (`PROVEN_SAFE` CANDIDATE)
 
-## 1. FMEA & Boundary Evaluation
-- **Identified Edge Case:** Khi cập nhật số liệu biểu đồ qua Copilot, tự động kiểm tra tổng phần trăm và tính hợp lệ của chuỗi dữ liệu JSON.
-- **Mitigation Verified:** Embedded into `[EDGE-CASE]` Acceptance Criterion `AC-03` and mapped to `Task 06.3.3`.
-- **Complexity Score (CS):** `4/10` (< 7 threshold — No story split required).
+## 1. 13-Pillar FMEA & Boundary Evaluation
+- **Identified Edge Cases (`EC-06-08`, `EC-06-09`, `EC-06-11`, `EC-06-13`, `EC-E04-10`, `EC-E05-04`):**
+  1. **Offline CSP-B 2D Charts (`AC-01`):** Support strictly 7 2D interactive kinds (`pie`, `donut`, `100_stacked`, `bar`, `line`, `area`, `funnel`) with `3D widget` deferred out of Epic 06. Rendered offline under `default-src 'none'; connect-src 'none'; script-src 'nonce-...'` via `document.createElementNS` SVG primitives (zero external CDN URLs, zero `innerHTML`, zero `allow-same-origin`), preserving `[data-ff-id]` geometry (`CHART_RENDER_ACK` -> `CommentPinOverlay [CMP-09]`) and synchronized `aria-label` + `DataTableView [5.21]`.
+  2. **Chart-Type-Aware Validator & Numeric DoS Caps (`AC-03`, `EC-06-08`, `EC-06-13`):** Rust (`crates/presentation-cms/src/charts_2d.rs`, `#[serde(deny_unknown_fields)]`) and Zod (`src/lib/validations/presentation-charts.ts`, `.strict()`) enforce `|sum - 100.0| <= 0.05` and non-negative values strictly on `pie`, `donut`, `100_stacked`, `funnel` while permitting signed negative values in `[-1e6, 1e6]` on `bar`, `line`, `area`. Universal DoS limits reject `NaN`/`Infinity`, `|val| > 1e6`, `> 12` series, `> 200` points/series, `> 2000` SVG primitives, `> 120` char labels, and `> 65536` bytes `charts_json` (`422` with `E_CHART_SUM_NOT_100`, `E_CHART_NEGATIVE_PROPORTIONAL`, `E_CHART_DOS_LIMIT`). Validation failure fails closed, preserving last valid chart DOM and SQLite row with inline `E2` retry card (`[data-testid="chart-validation-retry"]`).
+  3. **Synchronous Pre-Flush, `60s` TTL Lease & Per-Slide FIFO (`AC-02`, `AC-04`, `EC-06-09`):** `useSlideCopilotController` flushes pending `200ms` debounced CMS edits (`flushAllPendingNow()`) before calling `POST .../copilot/dispatch` with `(expectedRevision, preFlushedSha256)`. Daemon `BEGIN IMMEDIATE` verifies pre-flush equality (`409 E_PREFLUSH_CONFLICT`), scopes `composite_scope_key = "{projectId}::{sessionId}::{deckId}::{slideUid}"`, allows concurrent execution across distinct `slide_uid` items up to `MAX_GLOBAL_ACTIVE_SLOTS = 4` while enforcing per-`slide_uid` FIFO, acquires a `60_000ms` TTL lease (`lease_owner = "slide-copilot:{deckId}:{slideUid}"`), rejects conflicting human writes with `409 E_COPILOT_LEASE_HELD`, and deterministically releases on `COMPLETED`, `CANCELLED` (`expectedFencingToken`), SSE drop, or `execution_sweeper.rs` `60s` expiry (`INTERRUPTED` + `E_COPILOT_LEASE_TIMEOUT`).
+  4. **Structured Comment Envelope & Atomic Single-Frame Undo (`AC-02`, `EC-E04-10`, `EC-E05-04`):** `StageSpatialActionPill` hides `Link to DAG` on `structureLens === "slide-cms"`; `CommentPodPopover` **`Gửi cho Agent (⌘↵)`** dispatches typed `StructuredCommentEnvelope` (`commentId`, `slideUid`, `elementFfId`, `regionRect?`, `domHash`, `artifactSha256`, `commentBody`) into `FloatingSlideCopilot`. Completed Copilot writes commit `updated_by = 'copilot'`, auto-resolve linked `element_comments` pins (`anchor_status = 'resolved'`), and push 1 atomic Undo frame deduplicated by `jobId`.
+  5. **FSD / Colocation & Wave 06.3+06.4 Modularity:** New Chart and Copilot modules live in isolated files (`charts_2d.rs`, `presentation_copilot.rs`, `presentation-charts.ts`, `src/api/presentation-charts.ts`, `OfflineChart2DRenderer.tsx`, `FloatingSlideCopilot.tsx`, `useSlideCopilotController.ts`) with zero cross-feature or `features -> pages` imports and zero `useEffect` in pure UI components.
+- **Formal-verify candidates:** `SlideCopilotLease` state machine (`UNLOCKED -> PRE_FLUSHING -> LEASE_ACTIVE (60s TTL) / QUEUED_FIFO -> UNLOCKED`) and fencing-token CAS transition (addressed in Plan Section 4 & FMEA Mitigations #4–#7; TLA+ spec optional if Stage 3A formal hook runs).
 
 ## 2. Final Verdict
 **VERDICT: PASS / APPROVED**

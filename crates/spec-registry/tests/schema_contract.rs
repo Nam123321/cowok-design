@@ -524,6 +524,7 @@ fn tc_05_3_01_v11_migration_adds_snapshot_fork_handoff_columns_and_indexes() {
         (12i64, spec_registry::pool::v12_migration_checksum()),
         (13i64, spec_registry::pool::v13_migration_checksum()),
         (14i64, spec_registry::pool::v14_migration_checksum()),
+        (15i64, spec_registry::pool::v15_migration_checksum()),
     ] {
         let sha: String = conn
             .query_row(

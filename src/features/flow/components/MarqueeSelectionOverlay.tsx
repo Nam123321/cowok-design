@@ -1,12 +1,14 @@
-// @story 04.1, 04.5
-// @implements AC-03 (Spatial Marquee >= 16x16px Selection Overlay)
-import React, { useState } from "react";
+// @story 04.1, 04.5, 05.1
+// @implements AC-03, AC-10 (Single-Component Hit + 60/120fps rAF Marquee >= 16x16px Multi-Element Intersection)
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { useFormatter } from "../../../hooks/useFormatter";
 import { SpatialMarqueeSelectionSchema } from "../../../lib/validations/flow-workbench";
+import type { SpatialTargetSelection } from "../utils/sandbox-bridge-protocol";
 
 export const MIN_MARQUEE_PX = 16;
 const CLICK_MAX_DELTA_PX = 6;
+const FALLBACK_CLICK_BOX_PX = 36;
 
 interface ElementRectEntry {
   left: number;
@@ -15,7 +17,7 @@ interface ElementRectEntry {
   height: number;
 }
 
-function findDeepestElementAtPoint(
+export function findDeepestElementAtPoint(
   x: number,
   y: number,
   elementRects?: Record<string, ElementRectEntry>
@@ -36,109 +38,186 @@ function findDeepestElementAtPoint(
   return bestId;
 }
 
+export function findIntersectingElementIds(
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+  elementRects?: Record<string, ElementRectEntry>
+): string[] {
+  if (!elementRects) return [];
+  const right = left + width;
+  const bottom = top + height;
+  const matches: Array<{ id: string; top: number; left: number }> = [];
+  for (const [id, r] of Object.entries(elementRects)) {
+    if (r.width <= 0 || r.height <= 0) continue;
+    const intersects = left < r.left + r.width && right > r.left && top < r.top + r.height && bottom > r.top;
+    if (intersects) matches.push({ id, top: r.top, left: r.left });
+  }
+  matches.sort((a, b) => (a.top - b.top) || (a.left - b.left));
+  return matches.map((m) => m.id);
+}
+
 export const MarqueeSelectionOverlay: React.FC<{
   nodeLabel?: string;
   elementRects?: Record<string, ElementRectEntry>;
   onRegionClick: (regionId: string, label: string, ffId?: string) => void;
-}> = ({ nodeLabel = "SCR", elementRects, onRegionClick }) => {
-  const { locale } = useTranslation();
+  onSpatialTargetSelect?: (target: SpatialTargetSelection) => void;
+}> = ({ nodeLabel = "SCR", elementRects, onRegionClick, onSpatialTargetSelect }) => {
+  const { t, locale } = useTranslation();
   const { formatNumber } = useFormatter({ locale });
-  const [marquee, setMarquee] = useState({
-    isDragging: false,
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef({
+    active: false,
     startX: 0,
     startY: 0,
     currentX: 0,
     currentY: 0,
+    rafId: 0,
   });
+  const boxRef = useRef<HTMLDivElement>(null);
+  const sizeBadgeRef = useRef<HTMLSpanElement>(null);
 
-  const left = Math.min(marquee.startX, marquee.currentX);
-  const top = Math.min(marquee.startY, marquee.currentY);
-  const w = Math.abs(marquee.currentX - marquee.startX);
-  const h = Math.abs(marquee.currentY - marquee.startY);
+  useEffect(() => {
+    return () => {
+      if (dragRef.current.rafId) cancelAnimationFrame(dragRef.current.rafId);
+    };
+  }, []);
+
+  const paintDragBoxDom = () => {
+    const d = dragRef.current;
+    const box = boxRef.current;
+    if (!box) return;
+    const left = Math.min(d.startX, d.currentX);
+    const top = Math.min(d.startY, d.currentY);
+    const w = Math.abs(d.currentX - d.startX);
+    const h = Math.abs(d.currentY - d.startY);
+    box.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+    box.style.width = `${w}px`;
+    box.style.height = `${h}px`;
+    if (sizeBadgeRef.current) {
+      sizeBadgeRef.current.textContent = `${formatNumber(Math.round(w))} × ${formatNumber(Math.round(h))} ${t("spatial.unitPx", "px")}`;
+    }
+  };
 
   return (
     <div
       className="marquee-drag-overlay"
       data-testid="marquee-drag-overlay"
       style={{ position: "absolute", inset: 0, zIndex: 20, cursor: "crosshair", userSelect: "none" }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        const bounds = e.currentTarget.getBoundingClientRect();
+        const x = Math.round(e.clientX - bounds.left);
+        const y = Math.round(e.clientY - bounds.top);
+        const hitId = findDeepestElementAtPoint(x, y, elementRects) || Object.keys(elementRects || {})[0] || "sec-header";
+        const hitRect = elementRects?.[hitId] ?? { left: x, top: y, width: FALLBACK_CLICK_BOX_PX, height: FALLBACK_CLICK_BOX_PX };
+        const label = `@[Element ${nodeLabel} • #${hitId}]`;
+        onSpatialTargetSelect?.({
+          targetType: "html_element",
+          triggerSource: "interact-contextmenu",
+          selector: `[data-ff-id="${hitId}"]`,
+          label,
+          elementFfId: hitId,
+          coveredFfIds: [hitId],
+          rect: hitRect,
+        });
+      }}
       onMouseDown={(e) => {
+        if (e.button !== 0) return;
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        setMarquee({ isDragging: true, startX: x, startY: y, currentX: x, currentY: y });
+        dragRef.current.active = true;
+        dragRef.current.startX = x;
+        dragRef.current.startY = y;
+        dragRef.current.currentX = x;
+        dragRef.current.currentY = y;
+        setIsDragging(true);
+        requestAnimationFrame(paintDragBoxDom);
       }}
       onMouseMove={(e) => {
-        if (!marquee.isDragging) return;
+        if (!dragRef.current.active) return;
         const rect = e.currentTarget.getBoundingClientRect();
-        setMarquee((prev) => ({
-          ...prev,
-          currentX: e.clientX - rect.left,
-          currentY: e.clientY - rect.top,
-        }));
+        dragRef.current.currentX = e.clientX - rect.left;
+        dragRef.current.currentY = e.clientY - rect.top;
+        if (!dragRef.current.rafId) {
+          dragRef.current.rafId = requestAnimationFrame(() => {
+            dragRef.current.rafId = 0;
+            paintDragBoxDom();
+          });
+        }
       }}
       onMouseUp={(e) => {
-        if (!marquee.isDragging) return;
+        if (!dragRef.current.active) return;
+        if (dragRef.current.rafId) {
+          cancelAnimationFrame(dragRef.current.rafId);
+          dragRef.current.rafId = 0;
+        }
         const rect = e.currentTarget.getBoundingClientRect();
-        const rw = Math.round(Math.abs(e.clientX - rect.left - marquee.startX));
-        const rh = Math.round(Math.abs(e.clientY - rect.top - marquee.startY));
-        const rLeft = Math.round(Math.min(marquee.startX, e.clientX - rect.left));
-        const rTop = Math.round(Math.min(marquee.startY, e.clientY - rect.top));
-        setMarquee((prev) => ({ ...prev, isDragging: false }));
+        const endX = e.clientX - rect.left;
+        const endY = e.clientY - rect.top;
+        const rw = Math.round(Math.abs(endX - dragRef.current.startX));
+        const rh = Math.round(Math.abs(endY - dragRef.current.startY));
+        const rLeft = Math.round(Math.min(dragRef.current.startX, endX));
+        const rTop = Math.round(Math.min(dragRef.current.startY, endY));
+        dragRef.current.active = false;
+        setIsDragging(false);
+
+        const modifiers = { altKey: e.altKey, shiftKey: e.shiftKey, metaKey: e.metaKey, ctrlKey: e.ctrlKey };
         if (rw < CLICK_MAX_DELTA_PX && rh < CLICK_MAX_DELTA_PX) {
-          const hitId = findDeepestElementAtPoint(rLeft, rTop, elementRects) || "sec-header";
-          onRegionClick(
-            `[data-ff-id="${hitId}"]`,
-            `@[Element ${nodeLabel} • #${hitId}]`,
-            hitId
-          );
+          const hitId = findDeepestElementAtPoint(rLeft, rTop, elementRects) || Object.keys(elementRects || {})[0] || "sec-header";
+          const hitRect = elementRects?.[hitId] ?? { left: rLeft, top: rTop, width: FALLBACK_CLICK_BOX_PX, height: FALLBACK_CLICK_BOX_PX };
+          const label = `@[Element ${nodeLabel} • #${hitId}]`;
+          if (onSpatialTargetSelect) {
+            onSpatialTargetSelect({
+              targetType: "html_element",
+              triggerSource: "select-click",
+              selector: `[data-ff-id="${hitId}"]`,
+              label,
+              elementFfId: hitId,
+              coveredFfIds: [hitId],
+              rect: hitRect,
+              modifiers,
+            });
+          } else {
+            onRegionClick(`[data-ff-id="${hitId}"]`, label, hitId);
+          }
           return;
         }
+
+        const coveredFfIds = findIntersectingElementIds(rLeft, rTop, rw, rh, elementRects);
+        const elementFfIds = coveredFfIds.length > 0 ? coveredFfIds : [`box-${rLeft}-${rTop}`];
         const valid = SpatialMarqueeSelectionSchema.safeParse({
           x: rLeft,
           y: rTop,
           width: rw,
           height: rh,
-          elementFfIds: [`box-${rLeft}-${rTop}`],
+          elementFfIds,
         });
         if (valid.success) {
-          onRegionClick(
-            `box-${rLeft}-${rTop}-${rw}x${rh}`,
-            `@[Region ${formatNumber(rw)}×${formatNumber(rh)}px @ (${rLeft},${rTop})]`
-          );
+          const regionSelector = `box-${rLeft}-${rTop}-${rw}x${rh}`;
+          const label = `@[Region ${formatNumber(rw)}×${formatNumber(rh)}px @ (${formatNumber(rLeft)},${formatNumber(rTop)})]`;
+          if (onSpatialTargetSelect) {
+            onSpatialTargetSelect({
+              targetType: "spatial_region",
+              triggerSource: "select-marquee",
+              selector: regionSelector,
+              label,
+              elementFfId: coveredFfIds[0] || regionSelector,
+              coveredFfIds,
+              rect: { left: rLeft, top: rTop, width: rw, height: rh },
+              modifiers,
+            });
+          } else {
+            onRegionClick(regionSelector, label);
+          }
         }
       }}
     >
-      {marquee.isDragging && (
-        <div
-          style={{
-            position: "absolute",
-            left: `${left}px`,
-            top: `${top}px`,
-            width: `${w}px`,
-            height: `${h}px`,
-            border: "1.5px dashed var(--action-primary)",
-            backgroundColor: "var(--marquee-fill)",
-            pointerEvents: "none",
-            boxSizing: "border-box",
-          }}
-        >
-          <span
-            style={{
-              position: "absolute",
-              bottom: "-20px",
-              right: 0,
-              fontSize: "10px",
-              fontFamily: "var(--font-mono)",
-              backgroundColor: "var(--bg-elevated)",
-              border: "1px solid var(--border-default)",
-              padding: "1px 5px",
-              borderRadius: "var(--radius-xs)",
-              color: "var(--text-primary)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {formatNumber(Math.round(w))} × {formatNumber(Math.round(h))} px
-          </span>
+      {isDragging && (
+        <div ref={boxRef} className="ff-marquee-drag-box">
+          <span ref={sizeBadgeRef} className="ff-marquee-drag-badge" />
         </div>
       )}
     </div>

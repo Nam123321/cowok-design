@@ -1,82 +1,54 @@
 // @story 04.1, 04.5, 05.1
 // @implements AC-01, AC-02, AC-03, AC-04 (IframeKeepAlivePool LRU-5 Live Preview Pane + 3-Way Comments)
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BrandIcon } from "../../../components/ui/BrandIcon";
+import { WalkthroughFloatingBar } from "./WalkthroughFloatingBar";
 import type { ExportInitialSection } from "../../snapshots/components/ExportBundleModal";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { useFormatter } from "../../../hooks/useFormatter";
 import type { CanvasTabItem } from "./CompanionCanvasTab";
 import type { ScreenPreviewData, SlidePhaseItem } from "./companion-canvas-data";
 import { HtmlPreviewToolbar } from "./HtmlPreviewToolbar";
+import type { HtmlToolbarCmsActions } from "./HtmlPreviewCmsActions";
+import { CmsStageRecoveryPopup, type CmsStageRecoveryProps } from "./CmsStageRecoveryPopup";
 import { InlineCodeEditorPanel } from "./InlineCodeEditorPanel";
-import { MarqueeSelectionOverlay } from "./MarqueeSelectionOverlay";
-import { CommentPinMarker } from "../../../components/comments/CommentPinMarker";
+import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { ElementCommentThread } from "../../../components/comments/ElementCommentThread";
-import type { ElementCommentResponse } from "../../../lib/validations/element-comment";
 import {
-  buildPreviewDocumentHtml,
-  IFRAME_SANDBOX_PERMISSIONS,
+  PreviewDeviceFrame,
+  SLIDE_STAGE_BASE_WIDTH_PX,
+  SLIDE_STAGE_DEFAULT_WIDTH_PX,
+  SLIDE_STAGE_GUTTER_PX,
+  SLIDE_STAGE_MIN_FIT_WIDTH_PX,
+  SLIDE_STAGE_MIN_SCALE,
+} from "./CompanionPreviewDeviceFrame";
+import type { ElementCommentResponse } from "../../../lib/validations/element-comment";
+import type { IframeToHostDeckMessage, WordingSlotDto } from "../../../lib/validations/presentation";
+import {
   validateUserHtmlPayload,
   wrapUserHtmlSrcDoc,
 } from "../utils/html-sandbox-wrapper";
-import {
-  useSandboxedIframeBridge,
-  type ElementRectBox,
-  type IframeKeepAliveSlot,
-} from "../hooks/useSandboxedIframeBridge";
+import { useSandboxedIframeBridge, type SpatialTargetSelection } from "../hooks/useSandboxedIframeBridge";
+import { useStageSpatialController } from "../hooks/useStageSpatialController";
+import { StageSpatialOverlaysLayer } from "./StageSpatialOverlaysLayer";
+import type { PostPatchByFfIdFn } from "../hooks/useCmsSlideEditorController";
 import { usePreviewPaneActions } from "../hooks/usePreviewPaneActions";
+import { useRawPreviewHtml, useSampleFixtureSyncEffect } from "../hooks/usePreviewFixtureHtml";
+import {
+  buildSlideWalkthroughLabel,
+  resolveStageMode,
+  STAGE_CAPABILITY_BY_MODE,
+} from "../utils/stage-capability";
 import {
   normalizeFixtureRef,
-  normalizeViewportPreset,
   type FixtureVariant,
   type ViewportPreset,
 } from "../../../lib/validations/screen-fixture";
 
-const PIN_EDGE_PADDING_PX = 4;
-const PIN_OFFSET_PX = 14;
-const PIN_Z_INDEX = 15;
-const WALKTHROUGH_BAR_Z_INDEX = 25;
-const WALKTHROUGH_ICON_SIZE = 11;
-const FONT_WEIGHT_SEMIBOLD = 600;
-const VIEWPORT_WIDTHS: Record<ViewportPreset, string> = {
-  "mobile-390": "375px",
-  "tablet-768": "620px",
-  "desktop-1440": "100%",
-};
-const ASPECT_RATIO_VALUES: Record<"auto" | "16-9" | "16-10", string | undefined> = {
-  auto: undefined,
-  "16-9": "16 / 9",
-  "16-10": "16 / 10",
-};
-const PREVIEW_HOST_TOKEN_KEYS = [
-  "--bg-canvas",
-  "--bg-surface",
-  "--text-primary",
-  "--text-secondary",
-  "--text-muted",
-  "--border-default",
-  "--action-primary",
-  "--text-on-action",
-  "--human-accent",
-  "--state-success",
-  "--font-sans",
-] as const;
 const INVALID_HTML_MSG_MAP: Record<"empty" | "too_large" | "invalid_html", { key: string; fallback: string }> = {
   empty: { key: "canvas.invalidHtmlEmpty", fallback: "HTML cannot be empty." },
   too_large: { key: "canvas.invalidHtmlTooLarge", fallback: "HTML payload exceeds 1 MB limit." },
   invalid_html: { key: "canvas.invalidHtmlFormat", fallback: "Please enter valid HTML markup before applying." },
 };
-
-function readHostThemeCssVars(): Record<string, string> | undefined {
-  if (typeof window === "undefined" || typeof document === "undefined" || !document.documentElement) return undefined;
-  const styles = window.getComputedStyle(document.documentElement);
-  const resolved: Record<string, string> = {};
-  for (const key of PREVIEW_HOST_TOKEN_KEYS) {
-    const val = styles.getPropertyValue(key).trim();
-    if (val) resolved[key] = val;
-  }
-  return Object.keys(resolved).length > 0 ? resolved : undefined;
-}
 
 export interface CompanionLiveHtmlRightPaneProps {
   projectId?: string;
@@ -102,6 +74,8 @@ export interface CompanionLiveHtmlRightPaneProps {
   onSetViewportPreset: (vp: ViewportPreset) => void;
   aspectRatio: "auto" | "16-9" | "16-10";
   onSetAspectRatio: (ar: "auto" | "16-9" | "16-10") => void;
+  zoomMode?: "fit" | "pan-100";
+  onSetZoomMode?: (mode: "fit" | "pan-100") => void;
   isPresenting: boolean;
   onTogglePresenting: () => void;
   isLeftStructureHidden: boolean;
@@ -110,7 +84,7 @@ export interface CompanionLiveHtmlRightPaneProps {
   onRegionClick: (regionId: string, label: string) => void;
   onQuoteText?: (text: string) => void;
   customRawHtml?: string;
-  onApplyHtml?: (html: string) => void;
+  onApplyHtml?: (html: string) => void | string | null | Promise<void | string | null>;
   onHoverCta?: (ffId: string, hovered: boolean) => void;
   isSampleDataOpen?: boolean;
   onToggleSampleData?: () => void;
@@ -124,207 +98,41 @@ export interface CompanionLiveHtmlRightPaneProps {
   onWalkthroughPrev?: () => void;
   onWalkthroughNext?: () => void;
   onExitWalkthrough?: () => void;
+  deckAutoPlay?: boolean;
+  onToggleDeckAutoPlay?: () => void;
+  onDeckPrev?: () => void;
+  onDeckNext?: () => void;
+  onExitPresent?: () => void;
+  slidesCount?: number;
+  activeSlideIndex?: number;
   snapshotsCount?: number;
   onOpenVersionHistory?: () => void;
   onOpenExportSection?: (section: ExportInitialSection) => void;
   versionMenuNode?: React.ReactNode;
   isReadOnly?: boolean;
-}
-
-const PreviewIframeLayer: React.FC<{
-  title: string;
-  poolSlots?: IframeKeepAliveSlot[];
-  activeSlotId?: string;
-  wrappedSrcDoc: string;
-  iframeRef: React.RefObject<HTMLIFrameElement | null>;
-  onLoad: () => void;
-  onSlotLoad?: (slotId: string, el: HTMLIFrameElement | null) => void;
-}> = ({ title, poolSlots, activeSlotId, wrappedSrcDoc, iframeRef, onLoad, onSlotLoad }) => {
-  if (!poolSlots || poolSlots.length === 0) {
-    return (
-      <iframe
-        ref={iframeRef} title={title} data-testid="sandboxed-html-iframe"
-        sandbox={IFRAME_SANDBOX_PERMISSIONS} referrerPolicy="no-referrer"
-        srcDoc={wrappedSrcDoc} onLoad={onLoad}
-        style={{ width: "100%", height: "100%", minHeight: "320px", border: "none", backgroundColor: "var(--bg-surface)" }}
-      />
-    );
-  }
-  return (
-    <>
-      {poolSlots.map((slot) => {
-        const isActive = slot.slotId === activeSlotId;
-        return (
-          <iframe
-            key={slot.slotId} ref={slot.iframeRef} title={title}
-            data-testid={isActive ? "sandboxed-html-iframe" : `sandboxed-html-iframe-cached-${slot.nodeId}`}
-            sandbox={IFRAME_SANDBOX_PERMISSIONS} referrerPolicy="no-referrer"
-            srcDoc={slot.wrappedSrcDoc} onLoad={(e) => onSlotLoad?.(slot.slotId, e.currentTarget)}
-            style={{
-              width: "100%", height: "100%", minHeight: "320px", border: "none", backgroundColor: "var(--bg-surface)",
-              visibility: isActive ? "visible" : "hidden", pointerEvents: isActive ? "auto" : "none",
-              position: isActive ? "relative" : "absolute", left: 0, top: 0,
-            }}
-          />
-        );
-      })}
-    </>
-  );
-};
-
-const PreviewCommentPinsLayer: React.FC<{
-  visiblePins: ElementCommentResponse[];
-  elementRects: Record<string, ElementRectBox>;
-  onOpenComments: () => void;
-}> = ({ visiblePins, elementRects, onOpenComments }) => (
-  <>
-    {visiblePins.map((c, idx) => {
-      const rect = elementRects[c.elementFfId];
-      if (!rect) return null;
-      return (
-        <div key={c.id} style={{ position: "absolute", left: `${Math.max(PIN_EDGE_PADDING_PX, rect.left + rect.width - PIN_OFFSET_PX)}px`, top: `${Math.max(PIN_EDGE_PADDING_PX, rect.top)}px`, zIndex: PIN_Z_INDEX }}>
-          <CommentPinMarker index={idx + 1} anchorStatus={c.anchorStatus} elementFfId={c.elementFfId} onClick={onOpenComments} />
-        </div>
-      );
-    })}
-  </>
-);
-
-const PreviewDeviceFrame: React.FC<{
-  routeBadge: string; viewportPreset: ViewportPreset | "desktop" | "tablet" | "mobile";
-  activeSubState: FixtureVariant; aspectRatio: "auto" | "16-9" | "16-10";
-  isPortVerified: boolean; wrappedSrcDoc: string; iframeRef: React.RefObject<HTMLIFrameElement | null>;
-  onLoad: () => void; pointerMode: "interact" | "click-dom" | "drag-box";
-  visiblePins: ElementCommentResponse[]; elementRects: Record<string, ElementRectBox>;
-  poolSlots?: IframeKeepAliveSlot[]; activeSlotId?: string;
-  onSlotLoad?: (slotId: string, el: HTMLIFrameElement | null) => void;
-  onOpenComments: () => void; onRegionClick: (regionId: string, label: string) => void;
-}> = (p) => {
-  const { t } = useTranslation();
-  const vpLabel = normalizeViewportPreset(p.viewportPreset).toUpperCase();
-  const statusTag = p.isPortVerified ? "CSPRNG_VERIFIED" : "STRICT_OFFLINE";
-
-  return (
-    <div className="live-html-frame" data-quotable="true" data-project-preview="true" style={{ position: "relative", width: VIEWPORT_WIDTHS[normalizeViewportPreset(p.viewportPreset)], maxWidth: "820px", minHeight: "360px", flex: 1, aspectRatio: ASPECT_RATIO_VALUES[p.aspectRatio], backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-sm)", overflow: "hidden", display: "flex", flexDirection: "column", transition: "width 0.18s ease" }}>
-      <div style={{ height: "28px", padding: "0 12px", backgroundColor: "var(--bg-workspace)", borderBottom: "1px solid var(--border-default)", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: "var(--font-mono)", fontSize: "10px", color: "var(--text-muted)" }}>
-        <span>{p.routeBadge}</span>
-        <span data-testid="bridge-status-pill">{`${vpLabel} • ${p.activeSubState} • ${statusTag}`}</span>
-      </div>
-      <div style={{ position: "relative", flex: 1, width: "100%", height: "100%", minHeight: "320px" }}>
-        <PreviewIframeLayer title={t("canvas.sandboxIframeTitle", "Sandboxed Live HTML Preview")} poolSlots={p.poolSlots} activeSlotId={p.activeSlotId} wrappedSrcDoc={p.wrappedSrcDoc} iframeRef={p.iframeRef} onLoad={p.onLoad} onSlotLoad={p.onSlotLoad} />
-        <PreviewCommentPinsLayer visiblePins={p.visiblePins} elementRects={p.elementRects} onOpenComments={p.onOpenComments} />
-        {(p.pointerMode === "click-dom" || p.pointerMode === "drag-box") && (
-          <MarqueeSelectionOverlay nodeLabel={p.routeBadge} elementRects={p.elementRects} onRegionClick={p.onRegionClick} />
-        )}
-      </div>
-    </div>
-  );
-};
-
-function useRawPreviewHtml(
-  props: CompanionLiveHtmlRightPaneProps,
-  activeSubState: FixtureVariant,
-  effectiveCustomHtml?: string
-): string {
-  const { t, locale } = useTranslation();
-  const { formatCurrency } = useFormatter({ locale });
-  return useMemo(() => {
-    if (effectiveCustomHtml) return effectiveCustomHtml;
-    const rawAmount = props.structureLens === "slide-cms" ? (props.activeSlide?.kpi1 ?? "$0") : (props.activeScreenData?.amount ?? "$0");
-    const formattedAmount = typeof rawAmount === "number" ? formatCurrency(rawAmount, "USD") : rawAmount;
-    const fallbackScreenData: ScreenPreviewData = props.activeScreenData || {
-      eyebrow: t("canvas.fallbackEyebrow", "SCREEN"),
-      headline: t("canvas.fallbackHeadline", "Screen State"),
-      subtitle: t("canvas.fallbackSubtitle", "Preview"),
-      statusText: t("canvas.fallbackStatus", "Ready"),
-      latency: "12ms",
-      actionTitle: t("canvas.fallbackActionTitle", "Action"),
-      ctaLabel: t("canvas.fallbackCtaLabel", "Open"),
-    };
-    return buildPreviewDocumentHtml({
-      structureLens: props.structureLens,
-      activeSlide: props.activeSlide,
-      activeScreenData: fallbackScreenData,
-      formattedAmount,
-      subState: activeSubState,
-      cssVars: readHostThemeCssVars(),
-      labels: {
-        lang: locale,
-        kpi1Label: t("canvas.previewKpiLimitLabel", "Transaction Limit"),
-        kpi2Label: t("canvas.previewKpiSecurityLabel", "Security Status"),
-        kpi3Label: t("canvas.previewKpiLatencyLabel", "Response Time"),
-        actionHint: t("canvas.previewFallbackHint", "Auto-synced live HTML preview from current graph state."),
-      },
-    });
-  }, [activeSubState, effectiveCustomHtml, formatCurrency, locale, props.activeScreenData, props.activeSlide, props.structureLens, t]);
-}
-
-const WalkthroughFloatingBar: React.FC<{
-  stepLabel: string;
-  autoPlay?: boolean;
-  viewMode?: "dual" | "full";
-  onPrev?: () => void;
-  onToggleAuto?: () => void;
-  onNext?: () => void;
-  onSetViewMode?: (m: "dual" | "full") => void;
-  onExit?: () => void;
-}> = ({ stepLabel, autoPlay, viewMode, onPrev, onToggleAuto, onNext, onSetViewMode, onExit }) => {
-  const { t } = useTranslation();
-  const mode = viewMode ?? "dual";
-  return (
-    <div data-testid="walkthrough-floating-bar" style={{ position: "absolute", bottom: "14px", left: "50%", transform: "translateX(-50%)", zIndex: WALKTHROUGH_BAR_Z_INDEX, display: "inline-flex", alignItems: "center", gap: "6px", padding: "5px 10px", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-pill)", boxShadow: "var(--shadow-lg)", whiteSpace: "nowrap" }}>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: "10.5px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--action-primary)" }}>{stepLabel}</span>
-      <button type="button" data-testid="walkthrough-prev-btn" onClick={onPrev} title={t("canvas.walkthroughPrev", "Màn hình trước")} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-        <BrandIcon name="arrow-left" size={WALKTHROUGH_ICON_SIZE} color="currentColor" />
-      </button>
-      <button type="button" data-testid="walkthrough-auto-toggle" onClick={onToggleAuto} title={autoPlay ? t("canvas.pauseWalkthrough", "Tạm dừng tự động") : t("canvas.resumeWalkthrough", "Chạy tự động")} style={{ width: "26px", height: "26px", borderRadius: "50%", border: "none", backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-        <BrandIcon name={autoPlay ? "pause" : "play"} size={WALKTHROUGH_ICON_SIZE} color="currentColor" />
-      </button>
-      <button type="button" data-testid="walkthrough-next-btn" onClick={onNext} title={t("canvas.walkthroughNext", "Màn hình tiếp theo")} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-        <BrandIcon name="chevron-right" size={WALKTHROUGH_ICON_SIZE} color="currentColor" />
-      </button>
-      <div style={{ display: "inline-flex", backgroundColor: "var(--bg-workspace)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-pill)", padding: "2px", gap: "2px" }}>
-        <button type="button" data-testid="walkthrough-mode-dual" onClick={() => onSetViewMode?.("dual")} style={{ height: "22px", padding: "0 8px", borderRadius: "var(--radius-pill)", border: "none", fontSize: "10.5px", fontWeight: FONT_WEIGHT_SEMIBOLD, cursor: "pointer", backgroundColor: mode === "dual" ? "var(--bg-selected)" : "transparent", color: mode === "dual" ? "var(--action-primary)" : "var(--text-secondary)" }}>
-          {t("canvas.walkthroughDualMode", "Dual Screen")}
-        </button>
-        <button type="button" data-testid="walkthrough-mode-full" onClick={() => onSetViewMode?.("full")} style={{ height: "22px", padding: "0 8px", borderRadius: "var(--radius-pill)", border: "none", fontSize: "10.5px", fontWeight: FONT_WEIGHT_SEMIBOLD, cursor: "pointer", backgroundColor: mode === "full" ? "var(--bg-selected)" : "transparent", color: mode === "full" ? "var(--action-primary)" : "var(--text-secondary)" }}>
-          {t("canvas.walkthroughFullMode", "Toàn bộ thiết kế")}
-        </button>
-      </div>
-      <button type="button" data-testid="walkthrough-exit-btn" onClick={onExit} title={t("canvas.exitWalkthrough", "Thoát Walkthrough (Esc)")} style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid var(--border-default)", backgroundColor: "transparent", color: "var(--text-secondary)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-        <BrandIcon name="close" size={WALKTHROUGH_ICON_SIZE} color="currentColor" />
-      </button>
-    </div>
-  );
-};
-
-function useSampleFixtureSyncEffect(opts: {
-  projectId?: string;
-  selectedNodeId?: string | null;
-  postFixtureHydrate: (variant: FixtureVariant, fixtureJson?: string) => void;
-  setLocalSubState: (v: FixtureVariant) => void;
-  onSelectSubState?: (v: FixtureVariant) => void;
-}) {
-  const { projectId, selectedNodeId, postFixtureHydrate, setLocalSubState, onSelectSubState } = opts;
-  const hydrateRef = useRef(postFixtureHydrate);
-  hydrateRef.current = postFixtureHydrate;
-  const selectRef = useRef(onSelectSubState);
-  selectRef.current = onSelectSubState;
-
-  useEffect(() => {
-    const onSampleFixture = (ev: Event) => {
-      const detail = (ev as CustomEvent<{ projectId?: string; nodeId?: string; variant?: FixtureVariant; fixtureJson?: string }>).detail;
-      if (!detail?.fixtureJson) return;
-      if (detail.projectId && projectId && detail.projectId !== projectId) return;
-      if (detail.nodeId && selectedNodeId && detail.nodeId !== selectedNodeId) return;
-      const nextVar = detail.variant || "DEFAULT";
-      setLocalSubState(nextVar);
-      selectRef.current?.(nextVar);
-      hydrateRef.current(nextVar, detail.fixtureJson);
-    };
-    window.addEventListener("cowok:sample-fixture-applied", onSampleFixture);
-    return () => window.removeEventListener("cowok:sample-fixture-applied", onSampleFixture);
-  }, [projectId, selectedNodeId, setLocalSubState]);
+  onRegisterDeckKeyNav?: (fn: ((dir: "prev" | "next" | "goto", targetIndex?: number) => void) | null) => void;
+  onChangeSlideIndex?: (index: number) => void;
+  onRegisterPatchByFfId?: (fn: PostPatchByFfIdFn | null) => void;
+  onDeckTelemetryEvent?: (msg: IframeToHostDeckMessage) => void;
+  pinnedSlideIds?: string[];
+  overflowAlertPx?: number;
+  cmsActions?: HtmlToolbarCmsActions;
+  cmsRecovery?: CmsStageRecoveryProps;
+  cmsSlots?: WordingSlotDto[];
+  cmsSyncState?: string;
+  onCmsInlineFieldEdit?: (ffId: string, nextValue: string, previousValue: string) => void;
+  onCmsComposingChange?: (composing: boolean) => void;
+  onOpenRegionCmsEdit?: (coveredFfIds: string[]) => void;
+  onLinkToDag?: () => void;
+  isLeftDagFocused?: boolean;
+  onRegisterRender2DChart?: (fn: ReturnType<typeof useSandboxedIframeBridge>["postRender2DChart"] | null) => void;
+  floatingCopilotNode?: React.ReactNode;
+  copilotToastNode?: React.ReactNode;
+  isPresenterActive?: boolean;
+  onOpenPresenter?: () => void;
+  blackoutMode?: "none" | "black" | "white";
+  onRegisterDeckBlackout?: (fn: ((mode: "none" | "black" | "white") => void) | null) => void;
+  presenterToastNode?: React.ReactNode;
 }
 
 function usePaneInlineApplyHandler(deps: {
@@ -343,27 +151,126 @@ function usePaneInlineApplyHandler(deps: {
       return;
     }
     setHtmlEditorError(null);
-    postApplyHtml(props.inlineCodeText);
-    if (props.onApplyHtml) props.onApplyHtml(props.inlineCodeText);
-    else { setLocalCustomRawHtml(props.inlineCodeText); props.onToggleInlineCode(); }
+    if (!props.onApplyHtml) {
+      postApplyHtml(props.inlineCodeText);
+      setLocalCustomRawHtml(props.inlineCodeText);
+      props.onToggleInlineCode();
+      return;
+    }
+    void Promise.resolve(props.onApplyHtml(props.inlineCodeText)).then((applied) => {
+      if (applied === null) {
+        setHtmlEditorError(t("presentation.error.mxssBlocked", "HTML blocked by server mXSS / CSS security sanitizer."));
+        return;
+      }
+      postApplyHtml(typeof applied === "string" ? applied : props.inlineCodeText);
+    });
   }, [postApplyHtml, props, setHtmlEditorError, setLocalCustomRawHtml, t]);
 }
+
+const COMMENTS_DRAWER_BASE: React.CSSProperties = {
+  backgroundColor: "var(--bg-surface)",
+  border: "1px solid var(--border-default)",
+  borderRadius: "var(--radius-md)",
+  padding: "12px",
+  overflowY: "auto",
+  display: "flex",
+  flexDirection: "column",
+  gap: "8px",
+};
+
+const COMMENTS_DRAWER_OVERLAY_STYLE: React.CSSProperties = {
+  ...COMMENTS_DRAWER_BASE,
+  position: "absolute",
+  top: "10px",
+  right: "10px",
+  bottom: "10px",
+  width: "min(280px, calc(100% - 20px))",
+  zIndex: 24,
+  boxShadow: "var(--shadow-lg)",
+};
+
+const COMMENTS_DRAWER_SIDE_STYLE: React.CSSProperties = { ...COMMENTS_DRAWER_BASE, width: "280px", flexShrink: 0 };
 
 const CommentsDrawerAside: React.FC<{
   nodeId: string;
   actions: ReturnType<typeof usePreviewPaneActions>;
-}> = ({ nodeId, actions }) => (
-  <aside data-testid="comments-right-drawer" style={{ width: "280px", flexShrink: 0, backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", padding: "12px", overflowY: "auto" }}>
-    <ElementCommentThread
-      nodeId={nodeId} comments={actions.comments} prefillFfId={actions.prefillFfId}
-      collapsedCommentIds={actions.collapsedCommentIds} staleToastMessage={actions.staleToastMessage}
-      toastTone={actions.toastTone} onDismissStaleToast={() => actions.setStaleToastMessage(null)}
-      onAddComment={(c, ffId) => actions.handleAddComment(c, ffId)}
-      onResolveComment={(id) => { void actions.handleResolveComment(id); }}
-      onReanchorComment={(id) => { void actions.handleReanchorComment(id); }}
+  overlayMode?: boolean;
+  onClose?: () => void;
+}> = ({ nodeId, actions, overlayMode = false, onClose }) => {
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
+  return (
+    <aside data-testid="comments-right-drawer" style={overlayMode ? COMMENTS_DRAWER_OVERLAY_STYLE : COMMENTS_DRAWER_SIDE_STYLE}>
+      {onClose && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+          <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-primary)" }}>{t("spatial.commentsDrawerTitle", "Pinned Comments")} ({formatNumber(actions.comments.length)})</span>
+          <button type="button" className="ff-spatial-pill-close" data-testid="comments-drawer-close-btn" aria-label={t("common.close", "Đóng")} onClick={onClose} style={{ width: "22px", height: "22px" }}><BrandIcon name="close" size={11} color="currentColor" /></button>
+        </div>
+      )}
+      <ElementCommentThread nodeId={nodeId} comments={actions.comments} prefillFfId={actions.prefillFfId} collapsedCommentIds={actions.collapsedCommentIds} staleToastMessage={actions.staleToastMessage} toastTone={actions.toastTone} onDismissStaleToast={() => actions.setStaleToastMessage(null)} onAddComment={(c, ffId) => actions.handleAddComment(c, ffId)} onResolveComment={(id) => { void actions.handleResolveComment(id); }} onReanchorComment={(id) => { void actions.handleReanchorComment(id); }} />
+    </aside>
+  );
+};
+
+function useObservedContainerSize(
+  ref: React.RefObject<HTMLDivElement | null>,
+  fallbackWidth: number,
+  fallbackHeight = 640
+): { width: number; height: number } {
+  const [size, setSize] = useState({ width: fallbackWidth, height: fallbackHeight });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const sync = () => {
+      const nextW = el.clientWidth > 0 ? el.clientWidth : fallbackWidth;
+      const nextH = el.clientHeight > 0 ? el.clientHeight : fallbackHeight;
+      setSize((prev) => (prev.width === nextW && prev.height === nextH ? prev : { width: nextW, height: nextH }));
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fallbackHeight, fallbackWidth, ref]);
+  return size;
+}
+
+function computeSlideStageScale(
+  structureLens: "userflow" | "slide-cms",
+  zoomMode: "fit" | "pan-100",
+  stageWidth: number
+): number {
+  if (structureLens !== "slide-cms") return 1;
+  if (zoomMode === "pan-100") return 1;
+  const usable = Math.max(stageWidth - SLIDE_STAGE_GUTTER_PX, SLIDE_STAGE_MIN_FIT_WIDTH_PX);
+  return Math.max(SLIDE_STAGE_MIN_SCALE, Math.min(1, usable / SLIDE_STAGE_BASE_WIDTH_PX));
+}
+
+function buildViewportSpatialOverlay(opts: {
+  props: CompanionLiveHtmlRightPaneProps;
+  spatial: ReturnType<typeof useStageSpatialController>;
+  overlayStageWidth: number;
+  overlayStageHeight: number;
+}) {
+  const { props, spatial, overlayStageWidth, overlayStageHeight } = opts;
+  const openDrawer = spatial.activeTarget
+    ? () => { props.onOpenRegionCmsEdit?.([spatial.activeTarget!.elementFfId]); spatial.closeSpatialOverlay(); }
+    : undefined;
+  const jumpInline = !props.isReadOnly
+    ? () => { spatial.closeSpatialOverlay(); props.onToggleInlineCode(); }
+    : undefined;
+  return (
+    <StageSpatialOverlaysLayer
+      activeTarget={spatial.activeTarget} activeTool={spatial.activeTool} structureLens={props.structureLens}
+      isLeftStructureHidden={props.isLeftStructureHidden} isLeftDagFocusedOnNode={spatial.isLeftDagFocusedOnNode}
+      isReadOnly={props.isReadOnly} stageWidth={overlayStageWidth} stageHeight={overlayStageHeight}
+      cmsSlots={props.cmsSlots} cmsSyncState={props.cmsSyncState} activeSlideHeadline={props.activeSlide.headline}
+      activeSlideSubtitle={props.activeSlide.subtitle} isSubmittingComment={spatial.isSubmittingComment}
+      onSelectAction={spatial.handleSelectAction} onSubmitComment={spatial.handleSubmitComment}
+      onInlineLiveChange={spatial.handleInlineLiveChange} onInlineComposingChange={props.onCmsComposingChange}
+      onOpenFullCmsDrawer={openDrawer} onJumpToInlineHtml={jumpInline} onClose={spatial.closeSpatialOverlay}
     />
-  </aside>
-);
+  );
+}
 
 const PaneStageViewportBody: React.FC<{
   props: CompanionLiveHtmlRightPaneProps;
@@ -378,31 +285,35 @@ const PaneStageViewportBody: React.FC<{
   isCommentsDrawerOpen: boolean;
   setIsCommentsDrawerOpen: (v: boolean) => void;
   actions: ReturnType<typeof usePreviewPaneActions>;
-}> = ({ props, activeSubState, htmlEditorError, setHtmlEditorError, handleApplyInlineHtml, routeBadge, bridge, wrappedSrcDoc, visiblePins, isCommentsDrawerOpen, setIsCommentsDrawerOpen, actions }) => (
-  <div style={{ flex: 1, overflow: "auto", padding: "14px", backgroundColor: "var(--bg-subtle)", display: "flex", gap: "12px", justifyContent: "center" }}>
-    {props.isInlineCodeOpen ? (
-      <InlineCodeEditorPanel
-        activeTab={props.activeTab} inlineCodeText={props.inlineCodeText}
-        dirtyBuffer={Boolean(props.dirtyBuffer)} showDirtyGuardPrompt={Boolean(props.showDirtyGuardPrompt)}
-        errorMsg={htmlEditorError}
-        onChangeInlineCode={(val) => { if (htmlEditorError) setHtmlEditorError(null); props.onChangeInlineCode(val); }}
-        onApplyHtml={handleApplyInlineHtml} onConfirmDiscardDirty={props.onConfirmDiscardDirty} onCancelCloseEditor={props.onCancelCloseEditor}
-      />
-    ) : (
-      <PreviewDeviceFrame
-        routeBadge={routeBadge} viewportPreset={props.viewportPreset} activeSubState={activeSubState}
-        aspectRatio={props.aspectRatio} isPortVerified={bridge.isPortVerified} wrappedSrcDoc={bridge.wrappedSrcDoc || wrappedSrcDoc}
-        iframeRef={bridge.iframeRef} onLoad={bridge.handleIframeLoad} poolSlots={bridge.poolSlots}
-        activeSlotId={bridge.activeSlotId} onSlotLoad={bridge.handleSlotIframeLoad} pointerMode={props.pointerMode}
-        visiblePins={visiblePins} elementRects={bridge.elementRects}
-        onOpenComments={() => setIsCommentsDrawerOpen(true)} onRegionClick={props.onRegionClick}
-      />
-    )}
-    {isCommentsDrawerOpen && !props.isInlineCodeOpen && (
-      <CommentsDrawerAside nodeId={props.selectedNodeId || "SCR-02"} actions={actions} />
-    )}
-  </div>
-);
+  spatial: ReturnType<typeof useStageSpatialController>;
+}> = ({ props, activeSubState, htmlEditorError, setHtmlEditorError, handleApplyInlineHtml, routeBadge, bridge, wrappedSrcDoc, visiblePins, isCommentsDrawerOpen, setIsCommentsDrawerOpen, actions, spatial }) => {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const previewCanvasRef = useRef<HTMLDivElement>(null);
+  const { width: stageWidth, height: stageHeight } = useObservedContainerSize(viewportRef, SLIDE_STAGE_DEFAULT_WIDTH_PX);
+  const { width: observedPreviewW, height: observedPreviewH } = useObservedContainerSize(previewCanvasRef, isCommentsDrawerOpen ? Math.max(240, stageWidth - 292) : stageWidth, stageHeight);
+  const overlayStageWidth = isCommentsDrawerOpen ? Math.min(observedPreviewW || stageWidth, Math.max(220, stageWidth - 292)) : observedPreviewW || stageWidth;
+  const overlayStageHeight = observedPreviewH || stageHeight;
+  const zoomMode = props.zoomMode ?? "fit";
+  const isSlideLens = props.structureLens === "slide-cms";
+  const slideScale = computeSlideStageScale(props.structureLens, zoomMode, overlayStageWidth);
+  const canvasWrapperStyle: React.CSSProperties = isSlideLens
+    ? { margin: "auto", display: "flex", justifyContent: zoomMode === "pan-100" ? "flex-start" : "center", alignItems: "center", minWidth: 0, width: zoomMode === "pan-100" ? `${SLIDE_STAGE_BASE_WIDTH_PX}px` : "100%", flex: 1 }
+    : { flex: 1, minWidth: 0, display: "flex", justifyContent: "center" };
+  return (
+    <div ref={viewportRef} className={isSlideLens ? "deck-zoom-viewport" : undefined} style={{ position: "relative", flex: 1, overflow: "auto", padding: "14px", backgroundColor: "var(--bg-subtle)", display: "flex", gap: "12px", justifyContent: isSlideLens ? "flex-start" : "center", alignItems: isSlideLens ? "flex-start" : "stretch" }}>
+      {props.isInlineCodeOpen ? (
+        <InlineCodeEditorPanel activeTab={props.activeTab} inlineCodeText={props.inlineCodeText} dirtyBuffer={Boolean(props.dirtyBuffer)} showDirtyGuardPrompt={Boolean(props.showDirtyGuardPrompt)} errorMsg={htmlEditorError} onChangeInlineCode={(val) => { if (htmlEditorError) setHtmlEditorError(null); props.onChangeInlineCode(val); }} onApplyHtml={handleApplyInlineHtml} onConfirmDiscardDirty={props.onConfirmDiscardDirty} onCancelCloseEditor={props.onCancelCloseEditor} />
+      ) : (
+        <div ref={previewCanvasRef} className={isSlideLens ? "deck-zoom-canvas" : undefined} style={canvasWrapperStyle}>
+          <PreviewDeviceFrame routeBadge={routeBadge} viewportPreset={props.viewportPreset} structureLens={props.structureLens} zoomMode={zoomMode} slideScale={slideScale} activeSubState={activeSubState} aspectRatio={props.aspectRatio} isPortVerified={bridge.isPortVerified} protocolError={bridge.protocolError} wrappedSrcDoc={bridge.wrappedSrcDoc || wrappedSrcDoc} iframeRef={bridge.iframeRef} onLoad={bridge.handleIframeLoad} poolSlots={bridge.poolSlots} activeSlotId={bridge.activeSlotId} onSlotLoad={bridge.handleSlotIframeLoad} pointerMode={props.pointerMode} visiblePins={visiblePins} elementRects={bridge.elementRects} onOpenComments={() => setIsCommentsDrawerOpen(true)} onRegionClick={props.onRegionClick} onSpatialTargetSelect={spatial.handleSpatialTargetSelect} spatialOverlayNode={buildViewportSpatialOverlay({ props, spatial, overlayStageWidth, overlayStageHeight })} />
+        </div>
+      )}
+      {isCommentsDrawerOpen && !props.isInlineCodeOpen && (
+        <CommentsDrawerAside nodeId={props.selectedNodeId || props.activeSlide.id} actions={actions} overlayMode={stageWidth > 0 && stageWidth < 660} onClose={() => setIsCommentsDrawerOpen(false)} />
+      )}
+    </div>
+  );
+};
 
 function useLocalizedSubStateLabels(t: (key: string, fallback: string) => string) {
   return useMemo(
@@ -418,8 +329,112 @@ function useLocalizedSubStateLabels(t: (key: string, fallback: string) => string
   );
 }
 
+function useDeckProtocolCallback(onChangeSlideIndex?: (index: number) => void) {
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
+  const [deckWarning, setDeckWarning] = useState<string | null>(null);
+  const deckSlideCountRef = useRef<number>(0);
+  const lastReportedSlideIdxRef = useRef<number | null>(null);
+  const handleDeckProtocolEvent = useCallback(
+    (msg: IframeToHostDeckMessage) => {
+      if (msg.type === "DECK_PROTOCOL_INIT") {
+        deckSlideCountRef.current = msg.slideCount;
+        lastReportedSlideIdxRef.current = null;
+        setDeckWarning(null);
+      } else if (msg.type === "SLIDE_CHANGE") {
+        setDeckWarning(null);
+        // Only let iframe SLIDE_CHANGE steer host slide selection when the iframe itself holds > 1 .slide elements and index changed.
+        if (deckSlideCountRef.current > 1 && lastReportedSlideIdxRef.current !== msg.slideIndex) {
+          lastReportedSlideIdxRef.current = msg.slideIndex;
+          onChangeSlideIndex?.(msg.slideIndex);
+        }
+      } else if (msg.type === "SLIDE_OVERFLOW_WARN") {
+        const overflowPx = typeof msg.overflowPx === "number" ? msg.overflowPx : Math.max(0, Math.round(msg.scrollHeight - msg.clientHeight));
+        if (overflowPx <= 0 || msg.scrollHeight <= msg.clientHeight) {
+          setDeckWarning(null);
+        } else {
+          setDeckWarning(
+            `${t("presentation.slideOverflowWarning", "Slide tràn khung hiển thị")}: #${formatNumber(msg.slideIndex + 1)} (${formatNumber(msg.scrollHeight)}px > ${formatNumber(msg.clientHeight)}px)`
+          );
+        }
+      }
+    },
+    [formatNumber, onChangeSlideIndex, t]
+  );
+  return { deckWarning, deckSlideCountRef, handleDeckProtocolEvent };
+}
+
+function usePaneCommentsAndBridgeSync(
+  props: CompanionLiveHtmlRightPaneProps,
+  bridge: ReturnType<typeof useSandboxedIframeBridge>,
+  onSelectSubState: (v: FixtureVariant) => void,
+  deckSlideCountRef: React.MutableRefObject<number>
+) {
+  useEffect(() => {
+    const guardedPostKeyNav = (dir: "prev" | "next" | "goto", targetIndex?: number) => {
+      if (deckSlideCountRef.current > 1) {
+        bridge.postDeckKeyNav(dir, targetIndex);
+      }
+    };
+    props.onRegisterDeckKeyNav?.(guardedPostKeyNav);
+    return () => props.onRegisterDeckKeyNav?.(null);
+  }, [bridge.postDeckKeyNav, deckSlideCountRef, props.onRegisterDeckKeyNav]);
+
+  useEffect(() => {
+    props.onRegisterPatchByFfId?.(bridge.postPatchByFfId);
+    return () => props.onRegisterPatchByFfId?.(null);
+  }, [bridge.postPatchByFfId, props.onRegisterPatchByFfId]);
+
+  useEffect(() => {
+    props.onRegisterRender2DChart?.(bridge.postRender2DChart);
+    return () => props.onRegisterRender2DChart?.(null);
+  }, [bridge.postRender2DChart, props.onRegisterRender2DChart]);
+
+  useEffect(() => {
+    props.onRegisterDeckBlackout?.(bridge.postDeckBlackout);
+    return () => props.onRegisterDeckBlackout?.(null);
+  }, [bridge.postDeckBlackout, props.onRegisterDeckBlackout]);
+
+  const actions = usePreviewPaneActions({
+    projectId: props.projectId, selectedNodeId: props.selectedNodeId, artifactSha256: bridge.artifactSha256,
+    elementRects: bridge.elementRects, postFixtureHydrate: bridge.postFixtureHydrate,
+    onSetViewportPreset: props.onSetViewportPreset, onSelectSubState, isReadOnly: props.isReadOnly,
+  });
+  const nodeBadgeKey = props.selectedNodeKey || props.selectedNodeId || props.activeSlide.code.split(" ")[0];
+  const routeBadge = `${props.activeTab.title}#${props.structureLens === "userflow" ? nodeBadgeKey : props.activeSlide.code.split(" ")[0]}`;
+  const visiblePins = actions.comments.filter((c) => Boolean(bridge.elementRects[c.elementFfId]?.width && bridge.elementRects[c.elementFfId]?.height));
+  return { actions, nodeBadgeKey, routeBadge, visiblePins };
+}
+
+function usePaneSpatialAndApply(opts: {
+  props: CompanionLiveHtmlRightPaneProps;
+  bridge: ReturnType<typeof useSandboxedIframeBridge>;
+  actions: ReturnType<typeof usePreviewPaneActions>;
+  setHtmlEditorError: (err: string | null) => void;
+  setLocalCustomRawHtml: (h: string) => void;
+  rawHtml: string;
+  subStateLabels: ReturnType<typeof useLocalizedSubStateLabels>;
+  t: (k: string, f: string) => string;
+}) {
+  const { props, bridge, actions, t } = opts;
+  const spatial = useStageSpatialController({
+    projectId: props.projectId, selectedNodeId: props.selectedNodeId, activeSlideId: props.activeSlide.id,
+    structureLens: props.structureLens, pointerMode: props.pointerMode, isLeftStructureHidden: props.isLeftStructureHidden,
+    isLeftDagFocused: props.isLeftDagFocused, isReadOnly: props.isReadOnly, artifactSha256: bridge.artifactSha256,
+    actions, postPatchByFfId: bridge.postPatchByFfId, onCmsInlineFieldEdit: props.onCmsInlineFieldEdit,
+    onOpenRegionCmsEdit: props.onOpenRegionCmsEdit, onLinkToDag: props.onLinkToDag,
+    onHighlightRegion: (selector) => props.onRegionClick(selector, selector),
+  });
+  const handleApplyInlineHtml = usePaneInlineApplyHandler({ props, postApplyHtml: bridge.postApplyHtml, setHtmlEditorError: opts.setHtmlEditorError, setLocalCustomRawHtml: opts.setLocalCustomRawHtml, t });
+  const wrappedSrcDoc = useMemo(() => {
+    if (bridge.poolSlots.length > 0) return "";
+    return wrapUserHtmlSrcDoc(opts.rawHtml, { epoch: bridge.epoch, bootSecret: bridge.bootSecret, artifactSha256: bridge.artifactSha256, subStateLabels: opts.subStateLabels });
+  }, [bridge.artifactSha256, bridge.bootSecret, bridge.epoch, bridge.poolSlots.length, opts.rawHtml, opts.subStateLabels]);
+  return { spatial, handleApplyInlineHtml, wrappedSrcDoc };
+}
+
 function useLiveHtmlPaneController(props: CompanionLiveHtmlRightPaneProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [localCustomRawHtml, setLocalCustomRawHtml] = useState<string | undefined>(undefined);
   const [localSubState, setLocalSubState] = useState<FixtureVariant>("DEFAULT");
   const [htmlEditorError, setHtmlEditorError] = useState<string | null>(null);
@@ -430,77 +445,127 @@ function useLiveHtmlPaneController(props: CompanionLiveHtmlRightPaneProps) {
   const rawHtml = useRawPreviewHtml(props, activeSubState, effectiveCustomHtml);
   const subStateLabels = useLocalizedSubStateLabels(t);
   const actionsRef = useRef<ReturnType<typeof usePreviewPaneActions> | null>(null);
+  const spatialSelectRef = useRef<((target: SpatialTargetSelection) => void) | null>(null);
+  const { deckWarning, deckSlideCountRef, handleDeckProtocolEvent } = useDeckProtocolCallback(props.onChangeSlideIndex);
+  const combinedDeckProtocolEvent = useCallback((msg: IframeToHostDeckMessage) => {
+    handleDeckProtocolEvent(msg);
+    props.onDeckTelemetryEvent?.(msg);
+  }, [handleDeckProtocolEvent, props.onDeckTelemetryEvent]);
+  const committedSlideCacheKey = props.structureLens === "slide-cms" ? props.activeSlide.id : props.customRawHtml ? undefined : `app-live::${props.activeTab.id}::${props.selectedNodeId || "default"}::${activeSubState}::${locale}`;
 
   const bridge = useSandboxedIframeBridge({
-    projectId: props.projectId, activeTabId: props.activeTab.id, selectedNodeId: props.selectedNodeId,
-    selectedNodeKey: props.selectedNodeKey, structureLens: props.structureLens, activeSlideId: props.activeSlide.id,
-    activeSubState, effectiveCustomHtml, rawHtml, subStateLabels, onQuoteText: props.onQuoteText,
-    onRegionClick: (selector, label, ffId) => {
-      if (ffId) actionsRef.current?.setPrefillFfId(ffId);
-      props.onRegionClick(selector, label);
-    },
+    projectId: props.projectId, activeTabId: props.activeTab.id, selectedNodeId: props.selectedNodeId, selectedNodeKey: props.selectedNodeKey,
+    structureLens: props.structureLens, activeSlideId: props.activeSlide.id, activeSubState, effectiveCustomHtml, rawHtml, subStateLabels,
+    onQuoteText: props.onQuoteText, committedSlideCacheKey, pinnedSlideIds: props.pinnedSlideIds, onDeckProtocolEvent: combinedDeckProtocolEvent,
+    onRegionClick: (selector, label, ffId) => { if (ffId) actionsRef.current?.setPrefillFfId(ffId); props.onRegionClick(selector, label); },
+    onSpatialTargetSelect: (target) => spatialSelectRef.current?.(target),
   });
-
-  const handleSelectSubState = useCallback((v: FixtureVariant) => {
-    setLocalSubState(v);
-    bridge.postFixtureHydrate(v);
-    props.onSelectSubState?.(v);
-  }, [bridge, props]);
-
-  const actions = usePreviewPaneActions({
-    projectId: props.projectId, selectedNodeId: props.selectedNodeId, artifactSha256: bridge.artifactSha256,
-    elementRects: bridge.elementRects, postFixtureHydrate: bridge.postFixtureHydrate,
-    onSetViewportPreset: props.onSetViewportPreset, onSelectSubState: handleSelectSubState, isReadOnly: props.isReadOnly,
-  });
+  const handleSelectSubState = useCallback((v: FixtureVariant) => { setLocalSubState(v); bridge.postFixtureHydrate(v); props.onSelectSubState?.(v); }, [bridge, props]);
+  const { actions, nodeBadgeKey, routeBadge, visiblePins } = usePaneCommentsAndBridgeSync(props, bridge, handleSelectSubState, deckSlideCountRef);
   actionsRef.current = actions;
-
-  const handleApplyInlineHtml = usePaneInlineApplyHandler({ props, postApplyHtml: bridge.postApplyHtml, setHtmlEditorError, setLocalCustomRawHtml, t });
+  const { spatial, handleApplyInlineHtml, wrappedSrcDoc } = usePaneSpatialAndApply({ props, bridge, actions, setHtmlEditorError, setLocalCustomRawHtml, rawHtml, subStateLabels, t });
+  spatialSelectRef.current = spatial.handleSpatialTargetSelect;
   useSampleFixtureSyncEffect({ projectId: props.projectId, selectedNodeId: props.selectedNodeId, postFixtureHydrate: bridge.postFixtureHydrate, setLocalSubState, onSelectSubState: props.onSelectSubState });
 
-  const wrappedSrcDoc = useMemo(
-    () => wrapUserHtmlSrcDoc(rawHtml, { epoch: bridge.epoch, bootSecret: bridge.bootSecret, artifactSha256: bridge.artifactSha256, subStateLabels }),
-    [bridge.artifactSha256, bridge.bootSecret, bridge.epoch, rawHtml, subStateLabels]
-  );
-
-  const nodeBadgeKey = props.selectedNodeKey || props.selectedNodeId || "SCR-02";
-  const routeBadge = `${props.activeTab.title}#${props.structureLens === "userflow" ? nodeBadgeKey : props.activeSlide.code.split(" ")[0]}`;
-  const visiblePins = actions.comments.filter((c) => {
-    const r = bridge.elementRects[c.elementFfId];
-    return Boolean(r && r.width > 0 && r.height > 0);
-  });
-
-  return { t, activeSubState, htmlEditorError, setHtmlEditorError, isCommentsDrawerOpen, setIsCommentsDrawerOpen, bridge, actions, handleApplyInlineHtml, wrappedSrcDoc, nodeBadgeKey, routeBadge, visiblePins };
+  return { t, locale, activeSubState, htmlEditorError, setHtmlEditorError, isCommentsDrawerOpen, setIsCommentsDrawerOpen, bridge: { ...bridge, protocolError: bridge.protocolError || deckWarning }, actions, spatial, handleApplyInlineHtml, wrappedSrcDoc, nodeBadgeKey, routeBadge, visiblePins };
 }
+
+function buildWalkthroughBarProps(
+  props: CompanionLiveHtmlRightPaneProps,
+  nodeBadgeKey: string,
+  formatNumber: (v: number) => string
+) {
+  const stageMode = resolveStageMode(props.structureLens);
+  const isPresentation = stageMode === "presentation" && Boolean(props.isPresenting);
+  const showBar = Boolean(props.isWalkthroughActive || isPresentation);
+  const slideBadgeId = props.activeSlide?.code?.split("•")[0]?.trim() || props.activeSlide?.id;
+  const presentationLabel = buildSlideWalkthroughLabel({
+    slideId: slideBadgeId,
+    activeIndex: props.activeSlideIndex ?? 0,
+    totalSlides: props.slidesCount ?? 1,
+    formatNumber,
+  });
+  return {
+    showBar,
+    stepLabel: isPresentation ? presentationLabel : (props.walkthroughStepLabel || nodeBadgeKey),
+    autoPlay: isPresentation ? props.deckAutoPlay : props.walkthroughAutoPlay,
+    showViewModeToggle: STAGE_CAPABILITY_BY_MODE[stageMode].showDualScreenToggle,
+    onPrev: isPresentation ? props.onDeckPrev : props.onWalkthroughPrev,
+    onToggleAuto: isPresentation ? props.onToggleDeckAutoPlay : props.onToggleWalkthroughAutoPlay,
+    onNext: isPresentation ? props.onDeckNext : props.onWalkthroughNext,
+    onExit: isPresentation ? (props.onExitPresent ?? props.onTogglePresenting) : props.onExitWalkthrough,
+  };
+}
+
+const StageOverflowAndWalkthroughOverlay: React.FC<{
+  props: CompanionLiveHtmlRightPaneProps;
+  nodeBadgeKey: string;
+  locale: string;
+  t: (k: string, d: string) => string;
+}> = ({ props, nodeBadgeKey, locale, t }) => {
+  const { formatNumber } = useFormatter({ locale });
+  const bar = buildWalkthroughBarProps(props, nodeBadgeKey, formatNumber);
+  return (
+    <>
+      {typeof props.overflowAlertPx === "number" && props.overflowAlertPx > 0 && (
+        <div data-testid="stage-e3-overflow-guide" className="ff-stage-e3-overflow-guide">
+          {`${t("presentation.cms.e3Overflow", "Tràn khung 16:9 (E3)")}: +${formatNumber(props.overflowAlertPx)}px`}
+        </div>
+      )}
+      {bar.showBar && (
+        <WalkthroughFloatingBar
+          stepLabel={bar.stepLabel} autoPlay={bar.autoPlay} viewMode={props.walkthroughViewMode}
+          showViewModeToggle={bar.showViewModeToggle} onPrev={bar.onPrev} onToggleAuto={bar.onToggleAuto}
+          onNext={bar.onNext} onSetViewMode={props.onSetWalkthroughViewMode} onExit={bar.onExit}
+        />
+      )}
+    </>
+  );
+};
 
 export const CompanionLiveHtmlRightPane: React.FC<CompanionLiveHtmlRightPaneProps> = (props) => {
   const c = useLiveHtmlPaneController(props);
   return (
-    <div className="canvas-live-html-right-pane" aria-label={c.t("canvas.liveHtmlPane", "Live HTML Preview Sandbox")} style={{ flex: 1, minWidth: "480px", height: "100%", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-surface)", overflow: "hidden", position: "relative" }}>
+    <div id="htmlSubPane" className="canvas-live-html-right-pane" aria-label={c.t("canvas.liveHtmlPane", "Live HTML Preview Sandbox")} style={{ flex: 1, minWidth: 0, height: "100%", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-surface)", overflow: "hidden", position: "relative" }}>
       <HtmlPreviewToolbar
+        structureLens={props.structureLens}
         pointerMode={props.pointerMode} onSetPointerMode={props.onSetPointerMode} activeSubState={c.activeSubState}
         onSelectSubState={(v) => { void c.actions.handleSelectFixtureVariant(v); }} isInlineCodeOpen={props.isInlineCodeOpen}
         dirtyBuffer={props.dirtyBuffer} onToggleInlineCode={props.onToggleInlineCode} viewportPreset={props.viewportPreset}
         onSetViewportPreset={(vp) => { void c.actions.handlePersistViewport(vp); }} aspectRatio={props.aspectRatio}
-        onSetAspectRatio={props.onSetAspectRatio} isPresenting={props.isPresenting} onTogglePresenting={props.onTogglePresenting}
+        onSetAspectRatio={props.onSetAspectRatio} zoomMode={props.zoomMode} onSetZoomMode={props.onSetZoomMode}
+        isPresenting={props.isPresenting} onTogglePresenting={props.onTogglePresenting}
         isLeftStructureHidden={props.isLeftStructureHidden} onToggleLeftStructureHidden={props.onToggleLeftStructureHidden}
         isCommentsDrawerOpen={c.isCommentsDrawerOpen} commentCount={c.actions.comments.length}
         onToggleCommentsDrawer={() => c.setIsCommentsDrawerOpen((v) => !v)} isSampleDataOpen={props.isSampleDataOpen}
         onToggleSampleData={props.onToggleSampleData} isWalkthroughActive={props.isWalkthroughActive}
         onToggleWalkthrough={props.onToggleWalkthrough} snapshotsCount={props.snapshotsCount}
         onOpenVersionHistory={props.onOpenVersionHistory} onOpenExportSection={props.onOpenExportSection} isReadOnly={props.isReadOnly}
+        cmsActions={props.cmsActions}
+        isPresenterActive={props.isPresenterActive}
+        onOpenPresenter={props.onOpenPresenter}
       />
-      <PaneStageViewportBody
-        props={props} activeSubState={c.activeSubState} htmlEditorError={c.htmlEditorError} setHtmlEditorError={c.setHtmlEditorError}
-        handleApplyInlineHtml={c.handleApplyInlineHtml} routeBadge={c.routeBadge} bridge={c.bridge} wrappedSrcDoc={c.wrappedSrcDoc}
-        visiblePins={c.visiblePins} isCommentsDrawerOpen={c.isCommentsDrawerOpen} setIsCommentsDrawerOpen={c.setIsCommentsDrawerOpen} actions={c.actions}
-      />
-      {props.isWalkthroughActive && (
-        <WalkthroughFloatingBar
-          stepLabel={props.walkthroughStepLabel || c.nodeBadgeKey} autoPlay={props.walkthroughAutoPlay}
-          viewMode={props.walkthroughViewMode} onPrev={props.onWalkthroughPrev} onToggleAuto={props.onToggleWalkthroughAutoPlay}
-          onNext={props.onWalkthroughNext} onSetViewMode={props.onSetWalkthroughViewMode} onExit={props.onExitWalkthrough}
+      <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
+        <PaneStageViewportBody
+          props={props} activeSubState={c.activeSubState} htmlEditorError={c.htmlEditorError} setHtmlEditorError={c.setHtmlEditorError}
+          handleApplyInlineHtml={c.handleApplyInlineHtml} routeBadge={c.routeBadge} bridge={c.bridge} wrappedSrcDoc={c.wrappedSrcDoc}
+          visiblePins={c.visiblePins} isCommentsDrawerOpen={c.isCommentsDrawerOpen} setIsCommentsDrawerOpen={c.setIsCommentsDrawerOpen} actions={c.actions} spatial={c.spatial}
         />
-      )}
+        {props.blackoutMode && props.blackoutMode !== "none" && (
+          <div
+            role="status"
+            aria-live="assertive"
+            data-testid="audience-blackout-overlay"
+            data-mode={props.blackoutMode}
+            className={`ff-audience-blackout ff-audience-blackout--${props.blackoutMode}`}
+          />
+        )}
+        {props.cmsRecovery && <CmsStageRecoveryPopup {...props.cmsRecovery} />}
+        <StageOverflowAndWalkthroughOverlay props={props} nodeBadgeKey={c.nodeBadgeKey} locale={c.locale} t={c.t} />
+        {props.copilotToastNode}
+        {props.presenterToastNode}
+        {props.floatingCopilotNode}
+      </div>
     </div>
   );
 };

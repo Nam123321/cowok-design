@@ -92,19 +92,36 @@ async function applyRemoteSnapshotOrSeed(
   }
 }
 
+function useProjectStateInvalidationTick(resolvedProjectId: string, hydratedProjectRef: React.MutableRefObject<string | null>): number {
+  const [invalidateTick, setInvalidateTick] = useState(0);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onInvalidated = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ projectId?: string }>).detail;
+      if (detail?.projectId && detail.projectId !== resolvedProjectId) return;
+      hydratedProjectRef.current = null;
+      setInvalidateTick((n) => n + 1);
+    };
+    window.addEventListener("cowok:project-state-invalidated", onInvalidated);
+    return () => window.removeEventListener("cowok:project-state-invalidated", onInvalidated);
+  }, [hydratedProjectRef, resolvedProjectId]);
+  return invalidateTick;
+}
+
 function useRemoteProjectHydration(
   resolvedProjectId: string,
   store: ReturnType<typeof createNewFlowWorkbenchStore>
 ): boolean {
   const hydratedProjectRef = useRef<string | null>(null);
   const [isFlowHydrated, setIsFlowHydrated] = useState(false);
+  const invalidateTick = useProjectStateInvalidationTick(resolvedProjectId, hydratedProjectRef);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof fetch !== "function") {
       setIsFlowHydrated(true);
       return;
     }
-    if (hydratedProjectRef.current === resolvedProjectId) {
+    if (hydratedProjectRef.current === resolvedProjectId && invalidateTick === 0) {
       setIsFlowHydrated(true);
       return;
     }
@@ -120,7 +137,6 @@ function useRemoteProjectHydration(
         if (!cancelled) setIsFlowHydrated(true);
       })
       .catch(() => {
-        // Keep hydratedProjectRef unset when cancelled; mark attempted on non-cancelled offline fallback
         if (!cancelled) {
           hydratedProjectRef.current = resolvedProjectId;
           setIsFlowHydrated(true);
@@ -129,23 +145,47 @@ function useRemoteProjectHydration(
     return () => {
       cancelled = true;
     };
-  }, [resolvedProjectId, store]);
+  }, [invalidateTick, resolvedProjectId, store]);
 
   return isFlowHydrated;
 }
 
 function useResponsiveSidebarCollapse(): [boolean, () => void] {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const isSidebarRef = useRef(isSidebarCollapsed);
+  isSidebarRef.current = isSidebarCollapsed;
+  const wasOpenBeforeInlineRef = useRef(false);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const handleResize = () => {
-      if (window.innerWidth < 1024) setIsSidebarCollapsed(true);
+      if (window.innerWidth < 1024) {
+        wasOpenBeforeInlineRef.current = false;
+        setIsSidebarCollapsed(true);
+      }
+    };
+    const handleInlineFallback = (ev: Event) => {
+      const open = Boolean((ev as CustomEvent<{ open?: boolean }>).detail?.open);
+      if (open && !isSidebarRef.current) {
+        wasOpenBeforeInlineRef.current = true;
+        setIsSidebarCollapsed(true);
+      } else if (!open && wasOpenBeforeInlineRef.current) {
+        wasOpenBeforeInlineRef.current = false;
+        if (window.innerWidth >= 1024) setIsSidebarCollapsed(false);
+      }
     };
     handleResize();
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    window.addEventListener("cowok:presenter-inline-fallback", handleInlineFallback);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("cowok:presenter-inline-fallback", handleInlineFallback);
+    };
   }, []);
-  const toggleSidebar = useCallback(() => setIsSidebarCollapsed((prev) => !prev), []);
+  const toggleSidebar = useCallback(() => {
+    wasOpenBeforeInlineRef.current = false;
+    setIsSidebarCollapsed((prev) => !prev);
+  }, []);
   return [isSidebarCollapsed, toggleSidebar];
 }
 
@@ -162,7 +202,7 @@ export function useWorkbenchShellState(
   const settings = useWorkbenchSettings();
   const sessionManager = useWorkbenchProjectsAndSessions();
   const splitter = useWorkbenchSplitter();
-  const attachments = useWorkbenchAttachments();
+  const attachments = useWorkbenchAttachments(sessionManager.activeProjectId || initialProjectId);
   const graphHandlers = useWorkbenchGraphHandlers(store, state.nodes.length);
   const [isSidebarCollapsed, toggleSidebar] = useResponsiveSidebarCollapse();
   const [activeTabId, setActiveTabId] = useState("tab-userflow");

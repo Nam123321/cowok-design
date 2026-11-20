@@ -12,6 +12,7 @@ import { useWorkbenchShellState } from "./hooks/useWorkbenchShellState";
 import { DEFAULT_FLOW_PROJECT_ID, DEFAULT_INITIAL_NODES, DEFAULT_INITIAL_TRANSITIONS } from "./constants";
 import { useTranslation } from "../../hooks/useTranslation";
 import { apiWorkbenchSettings } from "../../api/workbench-settings";
+import { CowokToast } from "../../components/ui/CowokToast";
 
 export type { ThemeMode };
 
@@ -65,7 +66,7 @@ const WorkbenchConnectedBody: React.FC<{
       currentLocale={settings.currentLocale} themeMode={settings.themeMode} onThemeChange={settings.setThemeMode}
       isSidebarCollapsed={shell.isSidebarCollapsed} onToggleSidebar={shell.toggleSidebar}
       onToggleProjectFolder={sm.toggleProjectFolder}
-      onCreateSessionInProject={(id) => sm.handleCreateInProject(id, defaultSessionTitle)}
+      onCreateSessionInProject={(id, customTitle, entryKind) => sm.handleCreateInProject(id, customTitle || defaultSessionTitle, entryKind)}
       onTogglePinSession={sm.handleTogglePinSession} onRenameSession={sm.handleRenameSession}
       onDeleteSession={sm.handleDeleteSession} onRenameProject={sm.handleRenameProject}
       onDeleteProject={sm.handleDeleteProject}
@@ -91,29 +92,18 @@ const WorkbenchToastBar: React.FC<{
   onDismiss: () => void;
 }> = ({ kind, message, undoProjectId, testId, onUndo, onDismiss }) => {
   const { t } = useTranslation();
+  const hasUndo = Boolean(undoProjectId && onUndo);
   return (
-    <div role="alert" data-testid={testId} className={`ff-toast ff-toast-${kind}`}>
-      <span>{message}</span>
-      {undoProjectId && onUndo && (
-        <button
-          type="button"
-          onClick={() => onUndo(undoProjectId)}
-          data-testid="toast-undo-restore-btn"
-          className="cowok-btn cowok-btn-secondary"
-          style={{ fontSize: "11px", padding: "2px 8px", flexShrink: 0 }}
-        >
-          {t("workbench.undoRestoreBtn", "Hoàn tác")}
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={onDismiss}
-        aria-label={t("common.close", "Đóng")}
-        style={{ border: "none", background: "transparent", color: "currentColor", cursor: "pointer" }}
-      >
-        ✕
-      </button>
-    </div>
+    <CowokToast
+      tone={kind}
+      message={message}
+      testId={testId}
+      actionLabel={hasUndo ? t("workbench.undoRestoreBtn", "Hoàn tác") : undefined}
+      actionTestId={hasUndo ? "toast-undo-restore-btn" : undefined}
+      onAction={hasUndo && undoProjectId && onUndo ? () => onUndo(undoProjectId) : undefined}
+      onDismiss={onDismiss}
+      durationMs={hasUndo ? 0 : 5000}
+    />
   );
 };
 
@@ -131,6 +121,7 @@ const WorkbenchModalsAndToasts: React.FC<{
       <NewConversationModal
         isOpen={sessionManager.isNewConvoModalOpen} onClose={() => sessionManager.setIsNewConvoModalOpen(false)}
         projects={sessionManager.projects} activeProjectId={sessionManager.activeProjectId}
+        existingSessions={sessionManager.sessions}
         onCreateInProject={sessionManager.handleCreateInProject} onCreateNewProject={sessionManager.handleCreateNewProject}
         onCreateStandalone={sessionManager.handleCreateStandalone}
       />

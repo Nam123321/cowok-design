@@ -1,10 +1,10 @@
 // @story 04.4
 // @implements AC-02 (FSD Layer Bridge: Shared Chat Stream & Composer Primitives in components/)
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import { BrandIcon } from "@/components/ui/BrandIcon";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useSyncedDefaultModel } from "@/hooks/useDoctorProvidersUsage";
-import { loadPersistedSettings, savePersistedSettings } from "@/pages/workbench/hooks/useWorkbenchSettingsStorage";
+import { loadPersistedSettings, savePersistedSettings } from "@/utils/workbench-settings-storage";
 import { AVAILABLE_CHAT_MODELS, ChatStreamItem, type ChatMessage } from "./ChatStreamPrimitives";
 import { ModelPickerQuotaPopover } from "./ModelPickerQuotaPopover";
 
@@ -17,16 +17,24 @@ export interface AgentChatComposerProps {
   attachmentChips: string[];
   onRemoveAttachmentChip?: (chip: string) => void;
   onAttachClick?: () => void;
+  onAttachFiles?: (fileNames: string[], snippetsByName?: Record<string, string>) => void;
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
   placeholder?: string;
   testIdPrefix?: string;
   compact?: boolean;
 }
 
+const COMPOSER_MIN_HEIGHT_PX = 38;
+const COMPOSER_MAX_HEIGHT_PX = 144;
+const ICON_PLUS_SIZE = 13;
+const ICON_SEND_SIZE = 12;
+const MAX_TEXT_SNIPPET_CHARS = 8000;
+const TEXT_READABLE_EXT_RE = /\.(md|txt|html|htm|css|json|svg|ts|tsx|js|jsx|yaml|yml)$/i;
+
 const TEXTAREA_STYLE: React.CSSProperties = {
   width: "100%",
-  minHeight: "38px",
-  maxHeight: "144px",
+  minHeight: `${COMPOSER_MIN_HEIGHT_PX}px`,
+  maxHeight: `${COMPOSER_MAX_HEIGHT_PX}px`,
   border: "none",
   background: "transparent",
   outline: "none",
@@ -42,7 +50,24 @@ const TEXTAREA_STYLE: React.CSSProperties = {
 function syncTextareaHeight(el: HTMLTextAreaElement | null): void {
   if (!el) return;
   el.style.height = "auto";
-  el.style.height = `${Math.min(Math.max(el.scrollHeight, 38), 144)}px`;
+  el.style.height = `${Math.min(Math.max(el.scrollHeight, COMPOSER_MIN_HEIGHT_PX), COMPOSER_MAX_HEIGHT_PX)}px`;
+}
+
+async function readSelectedChatFiles(files: File[]): Promise<{ names: string[]; snippets: Record<string, string> }> {
+  const names = files.map((file) => file.name);
+  const snippets: Record<string, string> = {};
+  await Promise.all(
+    files.map(async (file) => {
+      if (!TEXT_READABLE_EXT_RE.test(file.name) || typeof file.text !== "function") return;
+      try {
+        const text = await file.text();
+        if (text.trim()) snippets[file.name] = text.slice(0, MAX_TEXT_SNIPPET_CHARS);
+      } catch {
+        // Ignore unreadable text slice cleanly while preserving filename chip
+      }
+    })
+  );
+  return { names, snippets };
 }
 
 const AttachmentChipList: React.FC<{
@@ -54,7 +79,7 @@ const AttachmentChipList: React.FC<{
   return (
     <div id="chatAttachmentTray" style={{ display: "flex", gap: "5px", flexWrap: "wrap", paddingBottom: "4px" }}>
       {chips.map((chip, idx) => (
-        <span key={idx} className="cowok-badge cowok-badge-mono" style={{ fontSize: "10px", padding: "2px 7px", borderRadius: "var(--radius-pill)", display: "inline-flex", alignItems: "center", gap: "5px", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)" }}>
+        <span key={idx} data-testid={`attachment-chip-${idx}`} className="cowok-badge cowok-badge-mono" style={{ fontSize: "10px", padding: "2px 7px", borderRadius: "var(--radius-pill)", display: "inline-flex", alignItems: "center", gap: "5px", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)" }}>
           <span>{chip}</span>
           {onRemove && (
             <button type="button" onClick={() => onRemove(chip)} aria-label={t("workbench.deleteItem", "Xóa")} style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0, fontSize: "11px", lineHeight: 1, color: "var(--text-muted)" }}>×</button>
@@ -80,8 +105,8 @@ const ComposerFooterBar: React.FC<{
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "2px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "6px", position: "relative" }}>
-        <button type="button" onClick={onAttachClick} title={attachLabel} aria-label={attachLabel} className="cowok-btn-ghost" style={{ width: "24px", height: "24px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-subtle)", color: "var(--text-secondary)", cursor: "pointer" }}>
-          <BrandIcon name="plus" size={13} color="currentColor" />
+        <button type="button" data-testid="chat-composer-attach-btn" onClick={onAttachClick} title={attachLabel} aria-label={attachLabel} className="cowok-btn-ghost" style={{ width: "24px", height: "24px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-subtle)", color: "var(--text-secondary)", cursor: "pointer" }}>
+          <BrandIcon name="plus" size={ICON_PLUS_SIZE} color="currentColor" />
         </button>
         <ModelPickerQuotaPopover
           selectedModel={selectedModel}
@@ -93,47 +118,83 @@ const ComposerFooterBar: React.FC<{
         />
       </div>
       <button type="button" onClick={onSend} disabled={isSendDisabled} title={sendLabel} aria-label={sendLabel} data-testid="chat-composer-send-btn" className="cowok-btn-primary" style={{ width: "28px", height: "28px", minWidth: "28px", padding: 0, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", backgroundColor: isSendDisabled ? "var(--bg-subtle)" : "var(--action-primary)", color: isSendDisabled ? "var(--text-muted)" : "var(--action-primary-fg)", border: "none", cursor: isSendDisabled ? "not-allowed" : "pointer", transition: "all var(--duration-fast)" }}>
-        <BrandIcon name="send" size={12} color="currentColor" />
+        <BrandIcon name="send" size={ICON_SEND_SIZE} color="currentColor" />
       </button>
     </div>
   );
 };
 
+const COMPOSER_SEND_DEDUP_MS = 250;
+const IME_COMPOSITION_KEYCODE = 229;
+
+function ComposerTextareaField(opts: {
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  prefix: string;
+  inputValue: string;
+  placeholder: string;
+  isComposingRef: React.MutableRefObject<boolean>;
+  onInputChange: (val: string) => void;
+  onSend: () => void;
+}) {
+  const { textareaRef, prefix, inputValue, placeholder, isComposingRef, onInputChange, onSend } = opts;
+  return (
+    <textarea
+      ref={textareaRef}
+      data-testid={`${prefix}-textarea`}
+      value={inputValue}
+      onCompositionStart={() => { isComposingRef.current = true; }}
+      onCompositionEnd={() => { isComposingRef.current = false; }}
+      onChange={(e) => { onInputChange(e.target.value); syncTextareaHeight(e.currentTarget); }}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" || e.shiftKey) return;
+        if (e.nativeEvent.isComposing || e.keyCode === IME_COMPOSITION_KEYCODE || isComposingRef.current || e.repeat) return;
+        e.preventDefault();
+        onSend();
+      }}
+      placeholder={placeholder}
+      rows={1}
+      style={TEXTAREA_STYLE}
+    />
+  );
+}
+
 export const AgentChatComposer: React.FC<AgentChatComposerProps> = (props) => {
   const { t } = useTranslation();
-  const [selectedModel, setSelectedModel] = useSyncedDefaultModel(
-    AVAILABLE_CHAT_MODELS[0],
-    loadPersistedSettings,
-    AVAILABLE_CHAT_MODELS
-  );
+  const [selectedModel, setSelectedModel] = useSyncedDefaultModel(AVAILABLE_CHAT_MODELS[0], loadPersistedSettings, AVAILABLE_CHAT_MODELS);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isComposingRef = useRef(false);
+  const lastSendAtRef = useRef(0);
   const isSendDisabled = !props.inputValue.trim() && props.attachmentChips.length === 0;
-  const placeholder =
-    props.placeholder ||
-    t("chat.composerPlaceholder", "Hỏi cowok Agent hoặc gõ lệnh... (Shift+Enter để xuống dòng, bôi đen chữ để Quote)");
+  const placeholder = props.placeholder || t("chat.composerPlaceholder", "Hỏi cowok Agent hoặc gõ lệnh... (Shift+Enter để xuống dòng, bôi đen chữ để Quote)");
   const prefix = props.testIdPrefix || "chat-composer";
-  const wrapperPadding = props.compact ? "6px 10px 10px 10px" : "8px 12px 12px 12px";
 
   const handleSend = () => {
+    const now = Date.now();
+    if (now - lastSendAtRef.current < COMPOSER_SEND_DEDUP_MS) return;
+    lastSendAtRef.current = now;
     props.onSend();
-    if (textareaRef.current) textareaRef.current.style.height = "38px";
+    if (textareaRef.current) textareaRef.current.style.height = `${COMPOSER_MIN_HEIGHT_PX}px`;
+  };
+  const handleAttachButtonClick = () => {
+    if (props.onAttachFiles && fileInputRef.current) fileInputRef.current.click();
+    else props.onAttachClick?.();
+  };
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = "";
+    if (selected.length > 0 && props.onAttachFiles) {
+      void readSelectedChatFiles(selected).then(({ names, snippets }) => props.onAttachFiles?.(names, snippets));
+    }
   };
 
   return (
-    <div data-testid={`${prefix}-wrapper`} style={{ padding: wrapperPadding, backgroundColor: "var(--bg-canvas)", borderTop: "none" }}>
+    <div data-testid={`${prefix}-wrapper`} style={{ padding: props.compact ? "6px 10px 10px 10px" : "8px 12px 12px 12px", backgroundColor: "var(--bg-canvas)", borderTop: "none" }}>
+      <input ref={fileInputRef} type="file" multiple data-testid={`${prefix}-file-input`} accept=".md,.txt,.pdf,.html,.htm,.css,.json,.png,.jpg,.jpeg,.webp,.svg" onChange={handleFileInputChange} style={{ display: "none" }} />
       <div className="chat-composer-capsule" style={{ backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", padding: "8px 10px", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column", gap: "6px" }}>
         <AttachmentChipList chips={props.attachmentChips} onRemove={props.onRemoveAttachmentChip} />
-        <textarea
-          ref={textareaRef}
-          data-testid={`${prefix}-textarea`}
-          value={props.inputValue}
-          onChange={(e) => { props.onInputChange(e.target.value); syncTextareaHeight(e.currentTarget); }}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-          placeholder={placeholder}
-          rows={1}
-          style={TEXTAREA_STYLE}
-        />
-        <ComposerFooterBar selectedModel={selectedModel} onSelectModel={setSelectedModel} isSendDisabled={isSendDisabled} onSend={handleSend} onAttachClick={props.onAttachClick} onOpenSettings={props.onOpenSettings} />
+        <ComposerTextareaField textareaRef={textareaRef} prefix={prefix} inputValue={props.inputValue} placeholder={placeholder} isComposingRef={isComposingRef} onInputChange={props.onInputChange} onSend={handleSend} />
+        <ComposerFooterBar selectedModel={selectedModel} onSelectModel={setSelectedModel} isSendDisabled={isSendDisabled} onSend={handleSend} onAttachClick={handleAttachButtonClick} onOpenSettings={props.onOpenSettings} />
       </div>
     </div>
   );

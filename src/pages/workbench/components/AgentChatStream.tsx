@@ -13,6 +13,7 @@ interface AgentChatStreamProps {
   onScrollToBottom: () => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
   onSelectSdiVariant?: (intentId: string, projectId: string, variantId: string) => void;
+  onForkFromMessage?: (msg: ChatMessage) => void;
 }
 
 const STREAM_CONTAINER_STYLE: React.CSSProperties = {
@@ -34,13 +35,14 @@ export const AgentChatStream: React.FC<AgentChatStreamProps> = ({
   onScrollToBottom,
   messagesEndRef,
   onSelectSdiVariant,
+  onForkFromMessage,
 }) => {
   const { t } = useTranslation();
   const scrollLabel = t("chat.scrollToBottom", "Cuộn xuống cuối trang");
 
   return (
     <div onScroll={onScrollMessages} className="chat-message-stream" data-testid="chat-message-stream" style={STREAM_CONTAINER_STYLE}>
-      {messages.map((msg) => <ChatStreamItem key={msg.id} msg={msg} onSelectSdiVariant={onSelectSdiVariant} />)}
+      {messages.map((msg) => <ChatStreamItem key={msg.id} msg={msg} onSelectSdiVariant={onSelectSdiVariant} onForkFromMessage={onForkFromMessage} />)}
       {showScrollBottom && (
         <button type="button" data-testid="chat-scroll-bottom-btn" onClick={onScrollToBottom} title={scrollLabel} aria-label={scrollLabel} style={SCROLL_BTN_STYLE}>
           <BrandIcon name="arrow-down" size={13} color="currentColor" />

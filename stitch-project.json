@@ -1,7 +1,7 @@
 {
   "projectId": "9168334019814804214",
   "projectName": "projects/9168334019814804214",
-  "title": "cowok-design — Master Design System",
+  "title": "cowok-design \u2014 Master Design System",
   "designSystem": "assets/8dea0cc19e8c48d193f6550232507a0f",
   "screens": {
     "LAY-01-Flow-First-Studio": {
@@ -61,11 +61,29 @@
     "STORY-05-1-Workbench": {
       "screenId": "72703936cd3e4d37b8e4c0c1046ac276",
       "screenName": "projects/9168334019814804214/screens/72703936cd3e4d37b8e4c0c1046ac276",
-      "title": "Story 05.1 Workbench — Cowok-Design (PAT-01 Three-Zone & Option 5 Storyboard Spine)",
+      "title": "Story 05.1 Workbench \u2014 Cowok-Design (PAT-01 Three-Zone & Option 5 Storyboard Spine)",
       "screenshot": "projects/9168334019814804214/files/83543a7aedef4b1faad94f307b42db23",
       "htmlCode": "projects/9168334019814804214/files/c98a35cd6f284ac596b45fb6a5564860",
       "localScreenshot": "_iwish-output/mockups/mockup-story-05.1-workbench.png",
       "localHtml": "_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-05/Story-05.1/preview.html"
+    },
+    "STORY-06-1-Workbench": {
+      "screenId": "46d726c5e2b4414091b4fc4db3411b60",
+      "screenName": "projects/9168334019814804214/screens/46d726c5e2b4414091b4fc4db3411b60",
+      "title": "Story 06.1 Workbench \u2014 Cowok-Design (Dual-Pane Slide Studio LAY-05)",
+      "screenshot": "projects/9168334019814804214/files/453672a1b23a4bac89544f08c4e3a790",
+      "htmlCode": "projects/9168334019814804214/files/3388dca31fca4ea4b1641b725c92f5f3",
+      "localScreenshot": "_iwish-output/mockups/mockup-story-06.1-workbench.png",
+      "localHtml": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-06/Story-06.1/html-preview-story-06.1.html"
+    },
+    "STORY-06-2-Workbench": {
+      "screenId": "6a90a7abb4dd4e0c864df1df427494c0",
+      "screenName": "projects/9168334019814804214/screens/6a90a7abb4dd4e0c864df1df427494c0",
+      "title": "Story 06.2 Workbench \u2014 Cowok-Design (Dual-Pane Presentation CMS Slide-Over Drawer CMP-10 & CMP-11)",
+      "screenshot": "projects/9168334019814804214/files/90a1783e294b4409b34551cf4a9e9fd2",
+      "htmlCode": "projects/9168334019814804214/files/9ac70841aba04a8282813bc1ce9875b8",
+      "localScreenshot": "_iwish-output/mockups/mockup-story-06.2-workbench.png",
+      "localHtml": "_iwish-output/adhoc-workspace/scratch/stitch-mockup-story-06.2.html"
     }
   }
 }

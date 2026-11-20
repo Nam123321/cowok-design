@@ -33,7 +33,7 @@ export interface WorkbenchBodyLayoutProps {
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   onToggleProjectFolder: (projId: string) => void;
-  onCreateSessionInProject?: (projId: string) => void;
+  onCreateSessionInProject?: (projId: string, title?: string, entryKind?: "fe-dag" | "presentation") => void;
   onTogglePinSession?: (sessionId: string) => void;
   onRenameSession?: (sessionId: string, newTitle: string) => void;
   onDeleteSession?: (sessionId: string) => void;
@@ -50,42 +50,62 @@ export interface WorkbenchBodyLayoutProps {
   store: ReturnType<typeof createNewFlowWorkbenchStore>;
 }
 
-export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
-  const { t } = useTranslation();
-  const resolvedProjectId = p.projectId || DEFAULT_FLOW_PROJECT_ID;
+const VIEWPORT_FOCUS_OFFSET_X = 300;
+const VIEWPORT_FOCUS_OFFSET_Y = 200;
+const QUOTE_PILL_Z_INDEX = 100;
+const FONT_WEIGHT_SEMIBOLD = 600;
 
+function useWorkbenchBodyController(p: WorkbenchBodyLayoutProps) {
+  const resolvedProjectId = p.projectId || DEFAULT_FLOW_PROJECT_ID;
+  const focusNode = (nodeId: string) => {
+    const target = p.state.nodes.find((n) => n.id === nodeId);
+    if (target) p.store.setViewport({ panX: -target.posX + VIEWPORT_FOCUS_OFFSET_X, panY: -target.posY + VIEWPORT_FOCUS_OFFSET_Y, zoom: 1 });
+  };
   const handleSelectNodeSubSession = (compositeKey: string, projId: string, sessId: string, nodeId: string) => {
     p.onSelectSession(sessId);
     p.store.selectNode(nodeId);
     sharedChatStore.markScopeCleared(compositeKey);
     if (UUID_RE.test(projId)) {
-      void apiFlowExecution
-        .markNodeSessionRead(projId, { sessionId: sessId, nodeId })
-        .then(() => sharedChatStore.bumpSubSessionsVersion())
-        .catch(() => { /* ignore when offline */ });
+      void apiFlowExecution.markNodeSessionRead(projId, { sessionId: sessId, nodeId }).then(() => sharedChatStore.bumpSubSessionsVersion()).catch(() => {});
     }
-    const target = p.state.nodes.find((n) => n.id === nodeId);
-    if (target) {
-      p.store.setViewport({ panX: -target.posX + 300, panY: -target.posY + 200, zoom: 1 });
-    }
+    focusNode(nodeId);
   };
-
-  const activeSubSessionKey = p.state.selectedNodeId
-    ? `${resolvedProjectId}::${p.activeSessionId}::${p.state.selectedNodeId}`
-    : null;
-
-  const selectedScopeNodes = p.state.nodes.filter(
-    (n) => n.id === p.state.selectedNodeId || (p.state.selectedNodeIds && p.state.selectedNodeIds.includes(n.id))
-  );
+  const selectedScopeNodes = p.state.nodes.filter((n) => n.id === p.state.selectedNodeId || (p.state.selectedNodeIds && p.state.selectedNodeIds.includes(n.id)));
   const primaryNode = selectedScopeNodes.find((n) => n.id === p.state.selectedNodeId) || selectedScopeNodes[0] || null;
   const proposalCtrl = useNodeProposalController({
-    projectId: resolvedProjectId,
-    selectedNodeId: p.state.selectedNodeId,
-    selectedNodeKey: primaryNode?.screenKey || null,
-    isModalOpen: Boolean(p.isModalOpen),
-    isInlineCodeOpen: false,
+    projectId: resolvedProjectId, selectedNodeId: p.state.selectedNodeId,
+    selectedNodeKey: primaryNode?.screenKey || null, isModalOpen: Boolean(p.isModalOpen), isInlineCodeOpen: false,
   });
+  const isChatShortened = p.splitter.isChatShortened;
+  const toggleShortenChat = p.splitter.handleToggleShortenChat;
+  React.useEffect(() => {
+    const onSlideStudioEntered = () => { if (!isChatShortened) toggleShortenChat(); };
+    window.addEventListener("cowok:slide-studio-entered", onSlideStudioEntered);
+    return () => window.removeEventListener("cowok:slide-studio-entered", onSlideStudioEntered);
+  }, [isChatShortened, toggleShortenChat]);
+  return { resolvedProjectId, focusNode, handleSelectNodeSubSession, selectedScopeNodes, primaryNode, proposalCtrl };
+}
 
+const QuoteFloatingPill: React.FC<{ quoteTooltip: WorkbenchBodyLayoutProps["attachments"]["quoteTooltip"]; onQuote: (text: string) => void }> = ({ quoteTooltip, onQuote }) => {
+  const { t } = useTranslation();
+  if (!quoteTooltip?.visible) return null;
+  return (
+    <div
+      className="quote-floating-pill" data-testid="quote-floating-pill"
+      onClick={() => onQuote(quoteTooltip.text)}
+      style={{ position: "fixed", left: `${quoteTooltip.x}px`, top: `${quoteTooltip.y}px`, zIndex: QUOTE_PILL_Z_INDEX, display: "flex", alignItems: "center", gap: "4px", padding: "4px 10px", borderRadius: "var(--radius-pill)", backgroundColor: "var(--bg-elevated)", border: "1px solid var(--action-primary)", boxShadow: "var(--shadow-lg)", color: "var(--text-primary)", fontSize: "11px", fontWeight: FONT_WEIGHT_SEMIBOLD, cursor: "pointer", userSelect: "none" }}
+    >
+      <span>{t("chat.quoteToChat", "Quote vào Chat")}</span>
+    </div>
+  );
+};
+
+export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
+  const { t } = useTranslation();
+  const { resolvedProjectId, focusNode, handleSelectNodeSubSession, selectedScopeNodes, primaryNode, proposalCtrl } = useWorkbenchBodyController(p);
+  const activeSubSessionKey = p.state.selectedNodeId ? `${resolvedProjectId}::${p.activeSessionId}::${p.state.selectedNodeId}` : null;
+  const activeSession = p.sessions.find((s) => s.id === p.activeSessionId);
+  const chatProjectId = activeSession && !activeSession.projectId ? undefined : resolvedProjectId;
   return (
     <div className="workbench-body-layout" aria-label={t("workbench.appName", "cowok-design")} style={{ display: "flex", flex: 1, overflowX: "auto", overflowY: "hidden", position: "relative", scrollBehavior: "smooth", width: "100%", height: "100%" }}>
       <MainSidebar
@@ -99,52 +119,32 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
         onTogglePinSession={p.onTogglePinSession} onRenameSession={p.onRenameSession} onDeleteSession={p.onDeleteSession}
         onRenameProject={p.onRenameProject} onDeleteProject={p.onDeleteProject} onLinkProjectFolder={p.onLinkProjectFolder}
       />
-      <div className="dual-main-panel" style={{ display: "flex", flex: 1, minWidth: "744px", overflow: "hidden", position: "relative" }}>
+      <div className="dual-main-panel" style={{ display: "flex", flex: 1, minWidth: 0, overflow: "hidden", position: "relative" }}>
         <AgentChatPanel
-          projectId={resolvedProjectId} activeSessionId={p.activeSessionId} selectedNodes={selectedScopeNodes}
-          onDeselectNode={(id) => p.store.selectNode(id, true)}
-          onFocusNode={(id) => {
-            const target = p.state.nodes.find((n) => n.id === id);
-            if (target) p.store.setViewport({ panX: -target.posX + 300, panY: -target.posY + 200, zoom: 1 });
-          }}
+          projectId={chatProjectId} activeSessionId={p.activeSessionId} selectedNodes={selectedScopeNodes}
+          onDeselectNode={(id) => p.store.selectNode(id, true)} onFocusNode={focusNode}
           width={p.splitter.chatWidth} isShortened={p.splitter.isChatShortened}
           onToggleShorten={p.splitter.handleToggleShortenChat} attachmentChips={p.attachments.attachmentChips}
-          onRemoveAttachmentChip={p.attachments.handleRemoveAttachmentChip} onOpenSettings={p.onOpenSettings}
-          proposalControls={{
-            selectedNodeId: p.state.selectedNodeId,
-            selectedNodeKey: primaryNode?.screenKey || null,
-            proposalsCount: proposalCtrl.proposalsCount,
-            isDesignerTalkOpen: proposalCtrl.isDesignerTalkOpen,
-            isDrawerOpen: proposalCtrl.isDrawerOpen,
-            onToggleDesignerTalk: () => proposalCtrl.setIsDesignerTalkOpen((prev) => !prev),
-            onToggleDrawer: () => proposalCtrl.setIsDrawerOpen((prev) => !prev),
-          }}
+          attachmentSnippets={p.attachments.attachmentSnippets}
+          onRemoveAttachmentChip={p.attachments.handleRemoveAttachmentChip} onAttachFiles={p.attachments.handleAddFileChips}
+          onClearAttachments={p.attachments.handleClearAttachments} onOpenSettings={p.onOpenSettings}
+          proposalControls={{ selectedNodeId: p.state.selectedNodeId, selectedNodeKey: primaryNode?.screenKey || null, proposalsCount: proposalCtrl.proposalsCount, isDesignerTalkOpen: proposalCtrl.isDesignerTalkOpen, isDrawerOpen: proposalCtrl.isDrawerOpen, onToggleDesignerTalk: () => proposalCtrl.setIsDesignerTalkOpen((prev) => !prev), onToggleDrawer: () => proposalCtrl.setIsDrawerOpen((prev) => !prev) }}
         />
         <WorkbenchSplitterDivider isDragging={p.splitter.isDraggingSplitter} onMouseDown={p.splitter.handleSplitterMouseDown} />
         <WorkbenchCanvasTabArea
-          state={p.state} store={p.store} projectId={resolvedProjectId} sessionId={p.activeSessionId}
-          activeTabId={p.activeTabId} onTabChange={p.onTabChange} graphHandlers={p.graphHandlers}
-          onCommentOnNode={p.attachments.handleCommentOnNode} onAddQuoteChip={p.attachments.handleAddQuoteChip}
-          isLeftChatCollapsed={p.splitter.isChatShortened}
-          onOpenSettings={p.onOpenSettings}
-          onOpenLeftChat={p.splitter.isChatShortened ? p.splitter.handleToggleShortenChat : undefined}
+          state={p.state} store={p.store} projectId={resolvedProjectId} chatProjectId={chatProjectId} sessionId={p.activeSessionId}
+          sessionEntryKind={activeSession?.entryKind} activeTabId={p.activeTabId} onTabChange={p.onTabChange}
+          graphHandlers={p.graphHandlers} onCommentOnNode={p.attachments.handleCommentOnNode}
+          onAddQuoteChip={p.attachments.handleAddQuoteChip} isLeftChatCollapsed={p.splitter.isChatShortened}
+          attachmentChips={p.attachments.attachmentChips} attachmentSnippets={p.attachments.attachmentSnippets}
+          onRemoveAttachmentChip={p.attachments.handleRemoveAttachmentChip}
+          onAttachFiles={p.attachments.handleAddFileChips}
+          onClearAttachments={p.attachments.handleClearAttachments}
+          onOpenSettings={p.onOpenSettings} onOpenLeftChat={p.splitter.isChatShortened ? p.splitter.handleToggleShortenChat : undefined}
           proposalController={proposalCtrl}
         />
       </div>
-      {p.attachments.quoteTooltip?.visible && (
-        <div
-          className="quote-floating-pill" data-testid="quote-floating-pill"
-          style={{
-            position: "fixed", left: `${p.attachments.quoteTooltip.x}px`, top: `${p.attachments.quoteTooltip.y}px`,
-            zIndex: 100, display: "flex", alignItems: "center", gap: "4px", padding: "4px 10px",
-            borderRadius: "var(--radius-pill)", backgroundColor: "var(--bg-elevated)", border: "1px solid var(--action-primary)",
-            boxShadow: "var(--shadow-lg)", color: "var(--text-primary)", fontSize: "11px", fontWeight: 600, cursor: "pointer", userSelect: "none",
-          }}
-          onClick={() => { if (p.attachments.quoteTooltip) p.attachments.handleAddQuoteChip(p.attachments.quoteTooltip.text); }}
-        >
-          <span>{t("chat.quoteToChat", "Quote vào Chat")}</span>
-        </div>
-      )}
+      <QuoteFloatingPill quoteTooltip={p.attachments.quoteTooltip} onQuote={p.attachments.handleAddQuoteChip} />
     </div>
   );
 };

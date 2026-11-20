@@ -1,5 +1,6 @@
 // @story-04.1
 // @implements AC-3
+import { DEFAULT_FALLBACK_SLIDE_UID } from "../../../lib/validations/presentation";
 import type { WorkbenchNode } from "../store/flow-workbench-types";
 import type { CanvasTabItem } from "./CompanionCanvasTab";
 
@@ -9,6 +10,7 @@ export interface SlidePhaseItem {
   title: string;
   headline: string;
   subtitle: string;
+  speakerNotes?: string;
   kpi1: number;
   kpi2: string;
   kpi3: string;
@@ -82,7 +84,7 @@ export const DEFAULT_TABS: CanvasTabItem[] = [
 
 export const INITIAL_SLIDES: SlidePhaseItem[] = [
   {
-    id: "sld-01",
+    id: DEFAULT_FALLBACK_SLIDE_UID,
     code: "SLIDE 01 • HERO",
     title: "Kiến trúc Điều phối cowok-design v5.4",
     headline: "Kiến trúc Điều phối cowok-design v5.4 — Dual-Pane Studio",
@@ -92,7 +94,7 @@ export const INITIAL_SLIDES: SlidePhaseItem[] = [
     kpi3: "12.4 ms",
   },
   {
-    id: "sld-02",
+    id: "SLD-01ARZ3NDEKTSV4RRFFQ69G5FAW",
     code: "SLIDE 02 • ARCHITECTURE",
     title: "Hybrid Project Boundary & OpenDesign Sync",
     headline: "Đồng bộ 2 chiều Folder-Backed Git & Managed Scratch",
@@ -102,7 +104,7 @@ export const INITIAL_SLIDES: SlidePhaseItem[] = [
     kpi3: "8.2 ms",
   },
   {
-    id: "sld-03",
+    id: "SLD-01ARZ3NDEKTSV4RRFFQ69G5FAX",
     code: "SLIDE 03 • BENCHMARK",
     title: "Tournament 3 Phương án UI & Zero-Drift AST",
     headline: "So sánh trực tiếp Option A / B / C trên Live HTML Stage",

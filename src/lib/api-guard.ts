@@ -17,6 +17,7 @@ export {
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_FORBIDDEN = 403;
+const HTTP_PAYLOAD_TOO_LARGE = 413;
 const HTTP_INTERNAL_ERROR = 500;
 
 export interface GuardedContext {
@@ -38,6 +39,9 @@ export interface GuardedRouteOptions<B = unknown, Q = unknown> {
   roles?: string[];
   authMode?: "default" | "strict-loopback";
   requireHumanAction?: boolean;
+  readOnlyPost?: boolean;
+  maxBodyBytes?: number;
+  maxRawHtmlBytes?: number;
 }
 
 type RouteHandler<B, Q> = (
@@ -60,7 +64,7 @@ function resolveAuthIdentity<B, Q>(
   isHumanWorkbench?: boolean;
   humanSessionToken?: string;
 } | { ok: false; response: Response } {
-  const verified = verifyStrictLoopback(req, url);
+  const verified = verifyStrictLoopback(req, url, { allowViewerReadOnlyPost: Boolean(options.readOnlyPost) });
   if (!verified.ok) return verified;
   if (options.roles && options.roles.length > 0) {
     const allowed = options.roles.map((r) => r.toLowerCase());
@@ -101,6 +105,14 @@ async function parseGuardedBody<B, Q>(
       }),
     };
   }
+  if (typeof options.maxBodyBytes === "number" && new TextEncoder().encode(rawText).length > options.maxBodyBytes) {
+    return {
+      ok: false,
+      response: jsonResp(HTTP_PAYLOAD_TOO_LARGE, {
+        error: { code: "E_PAYLOAD_TOO_LARGE", message: `Payload exceeds ${options.maxBodyBytes} bytes`, retryable: false },
+      }),
+    };
+  }
   if (rawText.trim() === "") {
     return { ok: true, body: options.body ? options.body.parse({}) : undefined };
   }
@@ -114,6 +126,20 @@ async function parseGuardedBody<B, Q>(
         code: "INVALID_JSON",
         error: "INVALID_JSON",
         message: "Malformed JSON request body",
+      }),
+    };
+  }
+  if (
+    typeof options.maxRawHtmlBytes === "number" &&
+    jsonVal &&
+    typeof jsonVal === "object" &&
+    typeof (jsonVal as { rawHtml?: unknown }).rawHtml === "string" &&
+    new TextEncoder().encode((jsonVal as { rawHtml: string }).rawHtml).length > options.maxRawHtmlBytes
+  ) {
+    return {
+      ok: false,
+      response: jsonResp(HTTP_PAYLOAD_TOO_LARGE, {
+        error: { code: "E_PAYLOAD_TOO_LARGE", message: `rawHtml exceeds ${options.maxRawHtmlBytes} UTF-8 bytes`, retryable: false },
       }),
     };
   }
