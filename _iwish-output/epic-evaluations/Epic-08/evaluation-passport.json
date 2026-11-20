@@ -1,0 +1,107 @@
+{
+  "schema_version": "epic-evaluation-passport/v1",
+  "epic_id": "Epic-08",
+  "feature_group": "VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe",
+  "created_at": "2026-11-20T13:44:30Z",
+  "updated_at": "2026-11-20T13:44:30Z",
+  "context_digest": "75b8cf6ae3f446262f8bc8a6d184b72ecf33221a0f23791f03162e23ecbd9bd4",
+  "context_files": [
+    {
+      "path": "_iwish-output/2. Product Planning/2.1. product-brief-or-prd.md",
+      "sha256": "8e5e51b576c5feed8e5abf3aba7e210c79a707173d602004c3b230c13ffdf151"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.4. epics-and-stories.md",
+      "sha256": "8c59b9963c551b33a6173528784b0e9b3700e10ddfaaf05fc06fc238ef0f5add"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.6. feature-hierarchy.md",
+      "sha256": "8cbd53e1a8ceb2be4504e1251326dd10d03e1197ab2bbfaa7a892812ef2dafd6"
+    },
+    {
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe/Epic-08/epic.md",
+      "sha256": "10f5a755728949ea119c3848331627e5a4dc93883af9bee7027a3f8b32498851"
+    }
+  ],
+  "evaluation_integrity": "VERIFIED",
+  "epic_readiness": "READY",
+  "story_creation_envelope": {
+    "max_phase": "IMPLEMENT",
+    "allowed_story_ids": [
+      "08.1",
+      "08.2",
+      "08.3",
+      "08.4",
+      "08.5"
+    ],
+    "blocked_story_ids": [],
+    "remediation_lane": true
+  },
+  "party_mode": {
+    "mode": "deep",
+    "rounds": 2,
+    "roles": [
+      "PM",
+      "Architect",
+      "Review",
+      "Dev",
+      "UX"
+    ],
+    "transcript_ref": "_iwish-output/epic-evaluations/Epic-08/party-mode-transcript.md",
+    "consensus_summary": "Post-PR #14 reconciliation verified Epic-08 under 20-Slice Vertical Master Plan with TDR-006/007.",
+    "pushback_patterns": [
+      "Zero horizontal-only stories; 5-layer E2E slice enforcement and immutable completed baseline."
+    ]
+  },
+  "unknowns": {
+    "depth": "full",
+    "quadrants": [
+      "known_unknowns",
+      "unknown_unknowns",
+      "assumptions",
+      "blind_spots"
+    ],
+    "critical_open": [],
+    "macro_open": [],
+    "report_ref": "_iwish-output/unknowns/reports/unknowns-report-epic-08.md"
+  },
+  "evidence_receipts": [
+    {
+      "id": "epic-08-party-mode-transcript",
+      "path": "_iwish-output/epic-evaluations/Epic-08/party-mode-transcript.md",
+      "sha256": "634ef9b99f1d642e9ea6545c0e50148693b72de7ac1eae4668a62c029d41b84e"
+    },
+    {
+      "id": "epic-08-unknowns-report",
+      "path": "_iwish-output/unknowns/reports/unknowns-report-epic-08.md",
+      "sha256": "9b5e7131e4163ee64615de0e46bb6a68f253409c06fb3471d40ba1dc9123d3ac"
+    },
+    {
+      "id": "epic-08-evaluation-report",
+      "path": "_iwish-output/epic-evaluations/Epic-08/evaluation-report.md",
+      "sha256": "fd77d12a15d702894ec040f04b68df08d254b6727a7ea501ac36a34c5cf8180f"
+    },
+    {
+      "id": "epic-08-plugin-boundary-review",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe/Epic-08/plugin-boundary-review.md",
+      "sha256": "31e31ff008cb9f19737686056b0dfb1ec36ad8ef3bfc498ebeaf86a4e9684029"
+    },
+    {
+      "id": "epic-08-agent-surface-map",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe/Epic-08/agent-surface-map.md",
+      "sha256": "ee6523968ea7b9b10f3d7e44b73b04d7f12a66b10deea6c4d2209b1cc7ed0ae8"
+    },
+    {
+      "id": "epic-08-coherence-report",
+      "path": "_iwish-output/adhoc-workspace/scratch/coherence-report-Epic-08.json",
+      "sha256": "a1f3757a02dc747a88d5ed4d30a3b320a1c8894d56c73818d724edadbec967e2"
+    }
+  ],
+  "approval": {
+    "approved": true,
+    "approved_by": "User",
+    "approved_at": "2026-11-20T20:26:51+07:00",
+    "context_digest": "75b8cf6ae3f446262f8bc8a6d184b72ecf33221a0f23791f03162e23ecbd9bd4"
+  },
+  "has_ui_stories": true
+}

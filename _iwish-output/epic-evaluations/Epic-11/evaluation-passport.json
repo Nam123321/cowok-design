@@ -1,0 +1,106 @@
+{
+  "schema_version": "epic-evaluation-passport/v1",
+  "epic_id": "Epic-11",
+  "feature_group": "VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution",
+  "created_at": "2026-11-20T13:44:30Z",
+  "updated_at": "2026-11-20T13:44:30Z",
+  "context_digest": "bf54d040f1e2e1098a5b2cae8fd9eb14626d3d2451fb3655bfd516cf3194a288",
+  "context_files": [
+    {
+      "path": "_iwish-output/2. Product Planning/2.1. product-brief-or-prd.md",
+      "sha256": "8e5e51b576c5feed8e5abf3aba7e210c79a707173d602004c3b230c13ffdf151"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.4. epics-and-stories.md",
+      "sha256": "8c59b9963c551b33a6173528784b0e9b3700e10ddfaaf05fc06fc238ef0f5add"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.6. feature-hierarchy.md",
+      "sha256": "8cbd53e1a8ceb2be4504e1251326dd10d03e1197ab2bbfaa7a892812ef2dafd6"
+    },
+    {
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-11/epic.md",
+      "sha256": "c9a46cef72b52473ff2505823c28c0e785435693244a7e2a739852b84fffca41"
+    }
+  ],
+  "evaluation_integrity": "VERIFIED",
+  "epic_readiness": "READY",
+  "story_creation_envelope": {
+    "max_phase": "IMPLEMENT",
+    "allowed_story_ids": [
+      "11.1",
+      "11.2"
+    ],
+    "blocked_story_ids": [
+      "11.3"
+    ],
+    "remediation_lane": true
+  },
+  "party_mode": {
+    "mode": "deep",
+    "rounds": 2,
+    "roles": [
+      "PM",
+      "Architect",
+      "Review",
+      "Dev",
+      "UX"
+    ],
+    "transcript_ref": "_iwish-output/epic-evaluations/Epic-11/party-mode-transcript.md",
+    "consensus_summary": "Post-PR #14 reconciliation verified Epic-11 under 20-Slice Vertical Master Plan with TDR-006/007.",
+    "pushback_patterns": [
+      "Zero horizontal-only stories; 5-layer E2E slice enforcement and immutable completed baseline."
+    ]
+  },
+  "unknowns": {
+    "depth": "full",
+    "quadrants": [
+      "known_unknowns",
+      "unknown_unknowns",
+      "assumptions",
+      "blind_spots"
+    ],
+    "critical_open": [],
+    "macro_open": [],
+    "report_ref": "_iwish-output/unknowns/reports/unknowns-report-epic-11.md"
+  },
+  "evidence_receipts": [
+    {
+      "id": "epic-11-party-mode-transcript",
+      "path": "_iwish-output/epic-evaluations/Epic-11/party-mode-transcript.md",
+      "sha256": "caf3ec4bbe9111f30b0892084a071247a997f56b541dea120fc28a4a9a6b3dbe"
+    },
+    {
+      "id": "epic-11-unknowns-report",
+      "path": "_iwish-output/unknowns/reports/unknowns-report-epic-11.md",
+      "sha256": "a21106f89375fb6998d9e1920c4f590a0279b22f375346e61f82377a4cb134c3"
+    },
+    {
+      "id": "epic-11-evaluation-report",
+      "path": "_iwish-output/epic-evaluations/Epic-11/evaluation-report.md",
+      "sha256": "19699989e7d8c38797be44612f852cad22662e98f614383ed921a8dbaac7aec4"
+    },
+    {
+      "id": "epic-11-plugin-boundary-review",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-11/plugin-boundary-review.md",
+      "sha256": "1b79fb5c91ce2a877bdb4451dd20d9a42fb469074dde7aced125813c01f94779"
+    },
+    {
+      "id": "epic-11-agent-surface-map",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-11/agent-surface-map.md",
+      "sha256": "45e20edbe9f2c36b875e2f36f69f62dde3859a84662904b3fbdf22e3db428af4"
+    },
+    {
+      "id": "epic-11-coherence-report",
+      "path": "_iwish-output/adhoc-workspace/scratch/coherence-report-Epic-11.json",
+      "sha256": "e0c47b737f5f368a703b8eaf9820ba982c9ef3905b26a89ac833a99d8d7e82db"
+    }
+  ],
+  "approval": {
+    "approved": true,
+    "approved_by": "User",
+    "approved_at": "2026-11-20T20:26:51+07:00",
+    "context_digest": "bf54d040f1e2e1098a5b2cae8fd9eb14626d3d2451fb3655bfd516cf3194a288"
+  },
+  "has_ui_stories": true
+}

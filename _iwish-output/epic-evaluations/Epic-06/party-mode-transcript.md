@@ -3,6 +3,13 @@
 **Epic:** `Epic-06: Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench`  
 **Value Stream:** `VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio`  
 **Mode:** `deep` (`2` structured cross-examination rounds)  
+**Status Update Post-PR #14 (`2026-11-20`):** `Story 06.1..06.4` merged & `completed` on `master` (`292f2ff`). Round 3 Addendum below unlocks **`Story 06.5`** under `IMPLEMENT`.
+
+---
+
+## Round 3 — Post-PR #14 Delta Evaluation (`Story 06.5`)
+- **PM & Dev:** Kiểm toán codebase sau PR #14 phát hiện `presentation_copilot.rs:1767-1782` vẫn dùng echo stub `prompt.chars().take(160)` và chart mẫu `Q1..Q3`. Thêm **`Story 06.5`** để nối AI Deck Gen end-to-end qua `crates/bot-fleet` + 5-Stage Decision Flow (`09.2`) + `stageshow` (`02.4`), chuẩn hóa `.csv/.tsv/.pdf -> ChartSpecV12` (`100 ± 0.05`, giữ đơn vị gốc), giữ bất biến `06.1..06.4`.
+
 **Panelists:** `PM` (`pm-agent-persona`), `Architect` & `Review` (`architect-agent-persona`), `UX` (`ux-agent-persona`), backed by `Unknowns Analyst` (`4` quadrants, `26` unknowns)  
 
 ---

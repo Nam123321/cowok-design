@@ -139,3 +139,9 @@ design.approve_and_export({
 3. **Phase 3: Flow Engine & Intent Normalizer** (Implement `ScreenState` DAG using XYFlow and Zod schema contracts).
 4. **Phase 4: Preview Sandbox & AST Patch Engine** (Vite iframe runtime, element tagging `data-ff-id`, unified diff generation).
 5. **Phase 5: MCP Server & Cowok Plugin Certification** (Stdio + SSE transports, verification against Cowok test harnesses).
+
+## Post-PR #14 Addendum (2026-11-20): Two-Store `/rea` + `/awesome-re` & License/ToS Firewall
+- **Two-Store Separation (`Story 09.1`):**
+  - **`Tier-1A` (Runtime JIT Prompt Cards):** `<=250` tokens/card, hoàn toàn clean-room (chiết xuất cấu trúc bố cục, hệ token OKLCH, trạng thái tương tác; 0 sao chép mã nguồn có bản quyền).
+  - **`Tier-1B` (Reference Index SQLite FTS5):** `.cowok-design/cache/rea-reference.sqlite3` chứa ~`2,282` mục UI/AI/tooling (`0` game repos), phục vụ truy vấn `BM25` bởi Scout MCP `rea.search_patterns` (`crates/rea-bridge`).
+- **License/ToS Firewall:** Phân loại tự động mọi nguồn `/rea` thành 3 mức: `ADOPT_PRIOR_ART` (MIT/Apache/BSD token & pattern principles), `REFERENCE_ONLY` (chỉ trích xuất mô tả cấu trúc phi bản quyền), và `REJECT` (chặn cứng 100% clone GPL/AGPL hoặc nội dung vi phạm ToS).

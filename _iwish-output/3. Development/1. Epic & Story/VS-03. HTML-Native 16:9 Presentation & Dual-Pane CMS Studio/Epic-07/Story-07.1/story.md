@@ -1,73 +1,77 @@
 ---
 type: I-Wish Story
 id: "07.1"
-title: "Story 07.1: Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9"
-description: "Kiểm tra tự động 17 quy tắc hình học & bố cục (child-overflow, sibling-overlap, clipped-text, small-touch-target, low-contrast-text, hardcoded-color...) trên cả 3 khung nhìn ứng dụng và khung 16:9 của slide."
-resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-07/Story-07.1/story.md"
+title: "Story 07.1: Pooled 1-Chromium Rust CDP Visual QC (lib-audit + slides-check), QC Overlay & 1-Click Auto-Fix"
+description: "Hợp nhất 07.1 + 07.2 + 09.3 occlusion thành lát cắt dọc Pooled <=1 Chromium Rust CDP (1440/1024/768/390 + 320..1440 sweep + 1920x1080 slides-check + elementsFromPoint occlusion + real RGBA SSIM thay drawWireframeCard) + iframe_bridge_fallback (UNVERIFIED_NO_BROWSER), Visual QC Overlay & 1-Click Auto-Fix -> V17 qc_gate_runs (SHA-1 cache)."
+resource: "iwish://uxui-os/development/epic-07/story-07.1"
 status: refactored
-risk_tier: 2
+risk_tier: 3
 delivery: core
-timestamp: "2026-11-12T16:20:00+07:00"
+adr_ref: "ADR-006"
+timestamp: "2026-11-20T20:50:00+07:00"
 tags:
   - "story-07.1"
   - "epic-07"
-  - "uxui-os"
-  - "rust-day-1"
+  - "pooled-cdp"
+  - "visual-qc"
 links_to:
-  - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md"
-  - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.5.%20architecture.md"
-  - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.2.%20database-spec.md"
-dependencies: ["05.2", "06.2"]
+  - "../../../../2. Product Planning/2.1. product-brief-or-prd.md"
+  - "../../../../2. Product Planning/2.5. architecture.md"
+  - "../../../../2. Product Planning/2.2. database-spec.md"
+dependencies: ["05.4", "05.5", "06.2", "06.5"]
 provides_apis:
-  - "internal:epic-07/story-07.1"
-consumes_apis: []
+  - "POST /api/v1/qc/run"
+  - "POST /api/v1/qc/auto-fix"
+consumes_apis:
+  - "POST /api/v1/patch"
 ---
 
-# Story 07.1: Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9
+# Story 07.1: Pooled 1-Chromium Rust CDP Visual QC (`lib-audit` + `slides-check`), QC Overlay & 1-Click Auto-Fix
 
-- **FR Covered:** [FR-18: Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
-- **Epic:** [Epic 07: 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-07/epic.md)
-- **Status:** `planned`
-- **Risk Tier:** `2`
+- **FR Covered:** [FR-18: Bộ kiểm định 25+ Quy tắc Bố cục (Pooled CDP + Real SSIM), E2E Flow Completeness & Visual QC Overlay Auto-Fix](../../../../2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
+- **Epic:** [Epic 07: 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter](../epic.md)
+- **Status:** `refactored`
+- **Risk Tier:** `3`
 
 ## 1. Story Description & Context
-Kiểm tra tự động 17 quy tắc hình học & bố cục (child-overflow, sibling-overlap, clipped-text, small-touch-target, low-contrast-text, hardcoded-color...) trên cả 3 khung nhìn ứng dụng và khung 16:9 của slide.
+Hợp nhất đầy đủ năng lực của Story 07.1 cũ, Story 07.2 (Visual QC Overlay & Auto-Fix) và phần kiểm định che khuất/occlusion từ Story 09.3 thành một Vertical Slice hoàn chỉnh: sử dụng **Pooled 1-Chromium CDP** cho cả `lib-audit` (App screens `1440/1024/768/390` + sweep `320..1440`) và `slides-check` (Slide 16:9 `1920x1080`), tính toán **Real RGBA SSIM** (`pixel/region occlusion`, contrast WCAG 2.2 AA, overflow, Concentric Radii, R-tree overlap, Footer-Rail `CONTENT_MAX_Y`), chạy E2E Flow Completeness Auditor, và hiển thị **Visual QC Overlay** với nút **1-Click Deterministic `lint_fix` (`<10ms`, `0` token)** kèm vòng Auto-Fix qua Agent (tối đa `MAX_ATTEMPTS = 3`), lưu vết kiểm định vào bảng **`V17a qc_gate_runs`** trong SQLite WAL.
 
 ## 2. Plan-Tune Heuristic & Complexity Score
-- **Complexity Score (CS):** `CS = 4` (Scope=1, Data=1, Integration=1, UI=0.5, Security=0.5, Unknowns=0 $\rightarrow$ `CS = 4 < 7`, đạt ngưỡng an toàn, không cần tách nhỏ Story).
+- **Complexity Score (CS):** `CS = 5` (Scope=1, Data=1, Integration=1, UI=1, Security=0.5, Unknowns=0.5 $\rightarrow$ `CS = 5 < 7`, đạt ngưỡng an toàn theo chủ trương không phân mảnh luồng dọc).
+- **Formal-Verify Candidate (`risk_tier: 3`):** Pooled `<= 1` Chromium semaphore + ephemeral `IncognitoBrowserContext` lifecycle và composite `SHA-1` layout cache key khi chạy song song từ `Story 10.2`.
 
 ## 3. Acceptance Criteria (AC)
-- **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
-- **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
-- **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Phát hiện chính xác hiện tượng tràn khung dọc/ngang (scrollHeight > clientHeight) khi người dùng nhập đoạn văn bản quá dài trên slide 16:9.
-- **AC-04 (E2E Flow Completeness Auditor — Dead-End CTA, Orphan Screen & Missing 4-SubStates Detector — GAP-13):** Bên cạnh bộ kiểm định bố cục/WCAG (mở rộng lên 25+ luật hình học + R-tree overlap + Concentric Radii + `Footer-Rail CONTENT_MAX_Y`), bổ sung máy quét toàn đồ thị phát hiện: (1) Nút CTA trên HTML chưa được nối đi đâu (`Unwired Dead-End CTAs`), (2) Màn hình mồ côi không có đường dẫn tới từ Entry (`Orphan Screens`), và (3) Màn hình dữ liệu thiếu các trạng thái `Loading / Empty / Error`.
+- **AC-01 (Pooled 1-Chromium CDP & 25+ Rule Geometry Solver + Real RGBA SSIM):** Dùng chung một tiến trình **Pooled 1-Chromium CDP** (`<= 1` Chromium instance, `<250MB` RSS) điều phối qua semaphore + `IncognitoBrowserContext` cô lập theo từng lượt chạy trong `crates/harness-daemon` cho cả `lib-audit` (các breakpoint `1440/1024/768/390` + sweep `320..1440`) và `slides-check` (`1920x1080`); kiểm định 25+ luật hình học/WCAG 2.2 AA (R-tree overlap, `scrollHeight > clientHeight`, Concentric Radii, `Footer-Rail CONTENT_MAX_Y`), thay thế hoàn toàn `drawWireframeCard` bằng **Real RGBA SSIM** & `elementsFromPoint` hit-testing với khóa cache composite `SHA-1(html + PROJECT_CONSTRAINTS + viewport + fixtureRef)`, và ghi kết quả bất biến vào bảng `V17a qc_gate_runs`.
+- **AC-02 (E2E Flow Completeness Auditor):** Quét toàn bộ đồ thị màn hình & slide để bắt lỗi cấu trúc: (1) CTA chết chưa nối đích (`Unwired Dead-End CTAs`), (2) Màn hình mồ côi (`Orphan Screens`) không thể đi tới từ entry node, và (3) Thiếu 4 trạng thái dữ liệu (`Default / Loading / Empty / Error`), liên kết ngược về các node của `Story 05.4` và `Story 05.5`.
+- **AC-03 ([EDGE-CASE] Resilience, `UNVERIFIED_NO_BROWSER` Fallback & Max 3 Auto-Fix Cap):** Khi môi trường không có Chromium khả dụng, kích hoạt `iframe_bridge_fallback` gắn nhãn trung thực `UNVERIFIED_NO_BROWSER` (không bao giờ giả PASS SSIM); tự động khởi động lại Pooled Chromium khi worker CDP crash hoặc OOM (circuit breaker cooldown) mà không làm treo daemon; mọi vòng Auto-Fix gọi Agent bị khóa cứng tối đa `MAX_ATTEMPTS = 3` kèm Diff Trước/Sau và hồi quy 1 bước (`Cmd+Z`) khi Agent làm hỏng ý đồ thiết kế; các thẻ `<iframe>`/`<canvas>` cross-origin bị chặn an toàn ở sandbox `sandbox="allow-scripts"`.
+- **AC-04 (Visual QC Overlay, Project Readiness Dashboard & `<10ms` Deterministic `lint_fix`):** Đánh dấu tọa độ vi phạm trực tiếp trên canvas Preview/Slide, hiển thị Project Readiness Dashboard trước khi xuất bản; các lỗi token/spacing/radius xác định được sửa ngay qua `POST /api/v1/qc/auto-fix` (`lint_fix < 10ms`, `0` LLM token), chỉ các lỗi viết lại layout phức tạp mới đẩy sang vòng Agent + `POST /api/v1/patch`.
 
 ## 4. Tasks
-- [ ] **Task 07.1.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9" (thỏa mãn `AC-01`).
-- [ ] **Task 07.1.2**: Kết nối tích hợp với `crates/spec-registry` / `crates/harness-daemon` và kiểm định hợp đồng dữ liệu (thỏa mãn `AC-02`).
-- [ ] **Task 07.1.3**: Cài đặt chốt chặn xử lý tình huống biên `[EDGE-CASE]` và viết bài kiểm thử tự động xác nhận (thỏa mãn `AC-03`).
-- [ ] **Task 07.1.4**: Cài đặt E2E Flow Completeness Auditor quét Dead-End CTAs, Orphan Screens và thiếu 4-SubStates (thỏa mãn `AC-04`).
+- [ ] **Task 07.1.1**: Xây dựng `PooledCdpEvaluator` (1 Chromium pool dùng chung `lib-audit` & `slides-check`), bộ giải 25+ quy tắc hình học/WCAG 2.2 AA, Real RGBA SSIM & hit-testing, và ghi nhận bảng `V17 qc_gate_runs` (thỏa mãn `AC-01`, `AC-03`).
+- [ ] **Task 07.1.2**: Cài đặt E2E Flow Completeness Auditor quét Dead-End CTAs, Orphan Screens và thiếu 4-SubStates trên toàn bộ đồ thị dự án (thỏa mãn `AC-02`).
+- [ ] **Task 07.1.3**: Cài đặt `VisualQcOverlay` & `ProjectReadinessDashboard` UI, API `POST /api/v1/qc/run`, `POST /api/v1/qc/auto-fix` (`lint_fix <10ms` xác định) và giới hạn vòng Auto-Fix `MAX_ATTEMPTS = 3` kèm rollback (thỏa mãn `AC-03`, `AC-04`).
+- [ ] **Task 07.1.4**: Viết bộ kiểm thử tích hợp & `[EDGE-CASE]` (CDP OOM recovery, slide 16:9 text overflow, real RGBA SSIM occlusion, deterministic `lint_fix` latency `<10ms`) (thỏa mãn `AC-01..AC-04`).
 
 ## 5. AC-to-Task Traceability Matrix
 
 | Acceptance Criteria | Mapped Implementation Tasks | Verification Method |
 | :--- | :--- | :--- |
-| **AC-01** | `Task 07.1.1` | Unit & Integration Test (`cargo test` / `vitest`) |
-| **AC-02** | `Task 07.1.2` | Contract & Schema Verification |
-| **AC-03 (`[EDGE-CASE]`)** | `Task 07.1.3` | Boundary Regression Test |
-| **AC-04** | `Task 07.1.4` | Flow Completeness AST Graph Scan Test |
+| **AC-01** | `Task 07.1.1`, `Task 07.1.4` | Pooled CDP + Real RGBA SSIM Integration Test (`cargo test`) |
+| **AC-02** | `Task 07.1.2`, `Task 07.1.4` | Flow Completeness AST Graph Scan Test |
+| **AC-03 (`[EDGE-CASE]`)** | `Task 07.1.1`, `Task 07.1.3`, `Task 07.1.4` | Crash Recovery & `MAX_ATTEMPTS=3` Boundary Regression Test |
+| **AC-04** | `Task 07.1.3`, `Task 07.1.4` | Deterministic `lint_fix` (`<10ms`) & QC Overlay Playwright Test |
 
 ## 6. Cross-Feature Dependencies
-- **Story Dependencies:** ["05.2", "06.2"]
+- **Story Dependencies:** ["05.4", "05.5", "06.2", "06.5"]
 
 ### Impacts
-- Cung cấp năng lực của `Story 07.1` cho các Story phụ thuộc trong `Epic 07` và các làn sóng tiếp theo.
+- Cung cấp kết quả `qc_gate_runs` sạch và bề mặt `VisualQcOverlay` làm cổng bắt buộc cho `Story 07.2` (Split Export), `Story 10.2` (`Builder != Scorer` QC), `Story 12.3` (CI/CD), và `Story 13.1` (Sealed Benchmark).
 
 ### Consumes
-- Tiêu thụ các hợp đồng nền tảng từ: ["05.2", "06.2"].
+- Tiêu thụ các hợp đồng nền tảng từ: ["05.4", "05.5", "06.2", "06.5"] (`POST /api/v1/patch`, HTML Sketch/Brand frames, 4-SubState Flow DAG, 16:9 Slide DOM & ChartSpecV12).
 
 ### Shared Entities
-- Sử dụng các bảng được phân vùng trong `2.2. database-spec.md` (`PROJECTS`, `PROJECT_CONSTRAINTS`, `SPEC_DOCUMENTS`, `FLOW_NODES`, `PRESENTATIONS`, `SKILL_PLUGINS`, `FLEET_TASKS`).
+- Sở hữu ghi trên `qc_gate_runs` (`V17`); đọc `PROJECTS`, `SPEC_DOCUMENTS`, `FLOW_NODES`, `PRESENTATIONS`, `deck_slides` trong `2.2. database-spec.md`.
 
 ### Cross-Portal
 - Áp dụng thống nhất trên toàn bộ các Portal của dự án (`SuperAdmin`, `TenantAdmin`, `SalesApp`, `MarketingWeb`, `DeveloperPortal`) và chế độ Presentation Studio 16:9.
@@ -76,14 +80,14 @@ Kiểm tra tự động 17 quy tắc hình học & bố cục (child-overflow, s
 
 | Evaluation Axis | Score | Notes |
 | :--- | :---: | :--- |
-| **1. Functional Correctness** | `9.4/10` | Đáp ứng đầy đủ `FR-18` |
-| **2. Data Integrity & State** | `9.3/10` | Đảm bảo tính nhất quán dữ liệu SQLite WAL & File Sync |
-| **3. Security & Validation** | `9.5/10` | Kiểm soát chặt biên giới an toàn và xác thực đầu vào |
-| **4. Performance & Scalability** | `9.5/10` | Tối ưu hóa độ trễ thực thi trên nhân Rust |
-| **5. Error Handling & Recovery** | `9.3/10` | Có cơ chế xử lý lỗi biên `[EDGE-CASE]` tường minh |
-| **6. Architectural Depth & Leverage** | `9.4/10` | Tái sử dụng kiểu dữ liệu `crates/domain` & `ts-rs` |
-| **7. UX Empathy** | `9.4/10` | Trải nghiệm mượt mà cho cả Human và Agent |
-| **TOTAL AVERAGE** | **9.40/10** | **PASSED (>= 8.5/10)** |
+| **1. Functional Correctness** | `9.5/10` | Hợp nhất trọn vẹn kiểm định CDP + SSIM + E2E Flow + 1-Click Auto-Fix |
+| **2. Data Integrity & State** | `9.4/10` | Lưu vết kiểm định vào `V17 qc_gate_runs` qua SQLite WAL |
+| **3. Security & Validation** | `9.5/10` | Cô lập Pooled Chromium & sandbox frame |
+| **4. Performance & Scalability** | `9.5/10` | Pooled 1-Chromium CDP + deterministic `lint_fix` `<10ms` (`0` token) |
+| **5. Error Handling & Recovery** | `9.4/10` | Circuit breaker CDP crash + khóa cứng `MAX_ATTEMPTS = 3` |
+| **6. Architectural Depth & Leverage** | `9.5/10` | Dùng chung engine cho cả Web App và 16:9 Slides |
+| **7. UX Empathy** | `9.5/10` | Non-tech bấm 1-Click Fix ngay trên canvas không cần hiểu CSS |
+| **TOTAL AVERAGE** | **9.47/10** | **PASSED (>= 8.5/10)** |
 
 ## 8. Change Log
 
@@ -91,3 +95,4 @@ Kiểm tra tự động 17 quy tắc hình học & bố cục (child-overflow, s
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 07.1 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
 | 2026-11-12 | 2.0.0 | [refactor-story] Bổ sung AC-04 E2E Flow Completeness Auditor (Dead-End CTA, Orphan Screen, Missing 4-SubStates — GAP-13) theo Master Plan | /refactor-story |
+| 2026-11-20 | 3.0.0 | [refactor-story] Hợp nhất 07.1 + 07.2 + 09.3 occlusion thành Vertical Slice hoàn chỉnh (Pooled 1-Chromium CDP, Real RGBA SSIM, V17 qc_gate_runs, QC Overlay & 1-Click Auto-Fix); cập nhật dependencies ["05.4", "06.2", "06.5"] theo ADR-006 | /refactor-story |

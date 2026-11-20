@@ -1,18 +1,9 @@
 # Edge Case Guardian & Adversarial Review Report — Story 09.2
 
-- **Story:** Story 09.2 — Tích hợp Jev Choice (<2ms Routing), Jev Noul (<1ms Pre-Filter) & Speculative Multi-Head (crates/jev-engine)
-- **Epic:** Epic 09 (Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine)
-- **Reviewer:** Review Agent (Edge Case Guardian Skill)
-- **Verdict:** APPROVED (PASS)
+- **Story:** `Story 09.2` — Decision Cascade Engine (`DecisionCascadeClient` ~450 LOC), 5-Stage `DE -> Decision #1 -> DR/DE -> DE -> Decision #2`, `RubricShield` & `MAX_ATTEMPTS = 3`
+- **Epic:** `Epic 09` (Design-Only REA & Awesome-RE Forge & Decision Cascade Engine)
+- **Reviewer:** Review Agent (`573b2485-b673-4d45-a4ca-014bf9e375c3`, Edge Case Guardian Skill)
+- **Verdict Notes (`2026-11-20`):** Fixed `ConfidenceKind` ENUM mismatch with `2.2. database-spec.md` (`ExactMatch | ModelVerdict | DeterministicFallback`), removed `chat-ingest` API coupling in favor of internal `VaultStore`, added nonce-tagged `<untrusted_artifact_bytes nonce="...">`, deterministic `RubricShield` tie-break rule, `V17a`, and `MAX_ATTEMPTS = 3` breaker (`EC-E09-05`).
 
-## 1. FMEA & Boundary Evaluation
-- **Identified Edge Case:** Đảm bảo Jev Noul xử lý mượt các luồng streaming chunk bị cắt giữa chừng mà không bỏ lọt class hoặc mã màu vi phạm.
-- **Mitigation Verified:** Embedded into `[EDGE-CASE]` Acceptance Criterion `AC-03` and mapped to `Task 09.2.3`.
-- **Complexity Score (CS):** `4/10` (< 7 threshold — No story split required).
-
-## 2. Final Verdict
+## Final Verdict
 **VERDICT: PASS / APPROVED**
----
-
-## 3. Formal-verify candidates Triage
-- **Formal-verify candidates:** Stage 1/3A deferred triage (story not yet implemented): `JevNoulStreamingCrossChunkScanner` (chunk boundary sliding-window parser state) to be evaluated at Stage 3A before implementation.

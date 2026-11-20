@@ -20,15 +20,11 @@ Hệ thống tính toán lộ trình dựa trên nguyên tắc **Mỏ neo Bậc 
 | :---: | :--- | :---: | :--- |
 | **Epic 01** | Cargo Workspace, Domain Contracts (ts-rs) & 16-Table SQLite Registry | `3` stories | `completed` | Zero-dependency baseline anchor |
 | **Epic 03** | Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher | `3` stories | `completed` | Zero-dependency baseline anchor |
-| **Epic 04** | Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution | `5` stories | `completed` | Zero-dependency baseline anchor |
-| **Epic 05** | Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR | `3` stories | `completed` | Zero-dependency baseline anchor |
-| **Epic 06** | Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench | `4` stories | `completed` | Zero-dependency baseline anchor |
-| **Epic 08** | agentskills.io Repackager Engine, Built-in Harness Skills & GitHub Cron Lifecycle | `4` stories | `completed` | Zero-dependency baseline anchor |
 
 ### 1.2. Thống Kê Active Delta Cần Triển Khai
-- **Tổng số Epics dự án:** 12
-- **Epics đã hoàn thành (Maturity Baseline):** 6
-- **Epics đang triển khai / Backlog:** 6
+- **Tổng số Epics dự án:** 13
+- **Epics đã hoàn thành (Maturity Baseline):** 2
+- **Epics đang triển khai / Backlog:** 11
 - **Số làn sóng phát triển (Waves):** 4 Waves
 - **Số luồng song song (Parallel Tracks):** 5 Tracks
 
@@ -40,12 +36,17 @@ Hệ thống tính toán lộ trình dựa trên nguyên tắc **Mỏ neo Bậc 
 
 | Epic ID / Slice | Tên Khối Nghiệp Vụ | Cung Cấp (Provides - Entities & Contracts) | Tiêu Thụ (Consumes - From Epics) | Độ Toàn Vẹn Tiêu Thụ & Rủi Ro Nghẽn (Blocker Risk) |
 | :--- | :--- | :--- | :--- | :--- |
-| **Epic 02** | JIT Prompt Assembler & 3-Profile Model Capability Adapter | `Stream-1` | `Epic 05`, `Epic 08`, `Epic 11` | `Epic 01` |
-| **Epic 07** | 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter | `Stream-2` | `Epic 12` | `Epic 05`, `Epic 06` |
-| **Epic 09** | Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine | `Stream-3` | `Epic 10`, `Epic 11` | `Epic 03`, `Epic 08` |
-| **Epic 10** | cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design Tournament | `Stream-4` | `Epic 11` | `Epic 05`, `Epic 08`, `Epic 09` |
-| **Epic 11** | POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Compiler-Grade Open MCP Ecosystem | `Stream-5` | `Epic 12` | `Epic 02`, `Epic 09`, `Epic 10` |
-| **Epic 12** | 4-Channel Packaging & Distribution Architecture | `Stream-1` | *(Không có)* | `Epic 07`, `Epic 11` |
+| **Epic 02** | JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills | `Stream-1` | `Epic 05`, `Epic 09`, `Epic 11` | `Epic 01` |
+| **Epic 04** | Flow-First 2D SVG Bezier DAG Studio, Security Kernel, CAS Intake & In-Chat Vault | `Stream-2` | `Epic 10` | `Epic 01` |
+| **Epic 05** | Option 5 2D Storyboard, Cognitive Sketch-to-Polish, Shared lol_html & 3-Tier Auto Flow DAG | `Stream-3` | `Epic 07` | `Epic 02` |
+| **Epic 06** | Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen | `Stream-4` | *(Không có)* | `Epic 03` |
+| **Epic 07** | Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter | `Stream-5` | `Epic 12`, `Epic 13` | `Epic 05` |
+| **Epic 08** | agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN | `Stream-1` | *(Không có)* | `Epic 01` |
+| **Epic 09** | Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield) | `Stream-2` | *(Không có)* | `Epic 02` |
+| **Epic 10** | cowok Master Orchestrator, File Leases, Builder!=Scorer & CMP-07 Design Tournament | `Stream-3` | *(Không có)* | `Epic 04` |
+| **Epic 11** | POSIX BYOS/BYOK Runner (0o600 FD + -PGID), Cross-CLI Normalizer & Universal Open MCP Gateway | `Stream-4` | *(Không có)* | `Epic 02` |
+| **Epic 12** | 4-Channel Packaging, Standalone /api/* Parity & OCI Distribution | `Stream-5` | *(Không có)* | `Epic 07` |
+| **Epic 13** | End-to-End Sealed Anti-Goodhart Benchmark & 25-Case /simulate-user Certification Suite | `Stream-1` | *(Không có)* | `Epic 07` |
 
 ### 2.2. Sơ Đồ Đồ Thị Khối Liên Kết Phụ Thuộc (Macro-DAG Flowchart)
 
@@ -54,29 +55,28 @@ flowchart TD
 flowchart TD
     E01["Epic 01: Cargo Workspace, Domain Contracts ts-rs & 16-Table (Completed)"]
     E03["Epic 03: Project-Scoped Configurable Constraint Engine & <1 (Completed)"]
-    E04["Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kern (Completed)"]
-    E05["Epic 05: Option 5 2D Storyboard, Entry-First Live HTML, Per (Completed)"]
-    E06["Epic 06: Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Wo (Completed)"]
-    E08["Epic 08: agentskills.io Repackager Engine, Built-in Harness (Completed)"]
-    E02["Epic 02: JIT Prompt Assembler & 3-Profile Model Capability "]
-    E07["Epic 07: 17-Rule Multi-Viewport Visual Eval Gate & Self-Con"]
-    E09["Epic 09: Design-Only REA & Awesome-RE Forge & JEV — TypeSaf"]
-    E10["Epic 10: cowok Master Orchestrator, advisor Meta-Agent, OPC"]
-    E11["Epic 11: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & "]
-    E12["Epic 12: 4-Channel Packaging & Distribution Architecture"]
+    E02["Epic 02: JIT Prompt Assembler, KV-Cache Compiler, Hidden SS"]
+    E04["Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kern"]
+    E05["Epic 05: Option 5 2D Storyboard, Cognitive Sketch-to-Polish"]
+    E06["Epic 06: Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Wor"]
+    E07["Epic 07: Pooled 1-Chromium CDP Visual QC & Split Share vs D"]
+    E08["Epic 08: agentskills.io Repackager, Split DE+DR Runtime, 7 "]
+    E09["Epic 09: Two-Store /rea DNA Forge & 5-Stage Rust DecisionCa"]
+    E10["Epic 10: cowok Master Orchestrator, File Leases, Builder!=S"]
+    E11["Epic 11: POSIX BYOS/BYOK Runner 0o600 FD + -PGID, Cross-CLI"]
+    E12["Epic 12: 4-Channel Packaging, Standalone /api/* Parity & OC"]
+    E13["Epic 13: End-to-End Sealed Anti-Goodhart Benchmark & 25-Cas"]
     E01 --> E02
+    E01 --> E04
+    E02 --> E05
+    E03 --> E06
     E05 --> E07
-    E06 --> E07
-    E03 --> E09
-    E08 --> E09
-    E05 --> E10
-    E08 --> E10
-    E09 --> E10
+    E01 --> E08
+    E02 --> E09
+    E04 --> E10
     E02 --> E11
-    E09 --> E11
-    E10 --> E11
     E07 --> E12
-    E11 --> E12
+    E07 --> E13
 ```
 
 ---
@@ -115,10 +115,10 @@ Thứ tự ưu tiên và phân bổ Wave không chỉ dựa vào phụ thuộc k
 
 | Làn Sóng | Tên Làn Sóng & Mục Tiêu Trọng Tâm | Danh Mục Epics & Sub-Epic Phase Slices | Lát Cắt Giá Trị Dọc Bàn Giao (Vertical Value Slice) | Điều Kiện Tiền Đề Mở Khóa (Unblock Condition) |
 | :---: | :--- | :--- | :--- | :--- |
-| **Wave 1** | Wave 1: Vertical Value Increment 1 | `Epic 02`, `Epic 07`, `Epic 09` | Delivery of core capabilities for Wave 1 | Baseline hoàn tất |
-| **Wave 2** | Wave 2: Vertical Value Increment 2 | `Epic 10` | Delivery of core capabilities for Wave 2 | Wave 1 Sync Barrier hoàn tất |
-| **Wave 3** | Wave 3: Vertical Value Increment 3 | `Epic 11` | Delivery of core capabilities for Wave 3 | Wave 2 Sync Barrier hoàn tất |
-| **Wave 4** | Wave 4: Vertical Value Increment 4 | `Epic 12` | Delivery of core capabilities for Wave 4 | Wave 3 Sync Barrier hoàn tất |
+| **Wave 1** | Wave 1: Vertical Value Increment 1 | `Epic 02`, `Epic 04`, `Epic 06`, `Epic 08` | Delivery of core capabilities for Wave 1 | Baseline hoàn tất |
+| **Wave 2** | Wave 2: Vertical Value Increment 2 | `Epic 05`, `Epic 09`, `Epic 11`, `Epic 10` | Delivery of core capabilities for Wave 2 | Wave 1 Sync Barrier hoàn tất |
+| **Wave 3** | Wave 3: Vertical Value Increment 3 | `Epic 07` | Delivery of core capabilities for Wave 3 | Wave 2 Sync Barrier hoàn tất |
+| **Wave 4** | Wave 4: Vertical Value Increment 4 | `Epic 12`, `Epic 13` | Delivery of core capabilities for Wave 4 | Wave 3 Sync Barrier hoàn tất |
 
 ### 5.2. Biểu Đồ Gantt Tiến Độ Thực Thi Đa Làn Sóng (Multi-Wave Phased Gantt)
 
@@ -130,15 +130,20 @@ gantt
     excludes    weekends
 
     section Wave 1
-    Epic 02 JIT Prompt Assembler & 3-Profile Model Capability  :active, e02, 2026-10-22, 10d
-    Epic 07 17-Rule Multi-Viewport Visual Eval Gate & Self-Con :active, e07, 2026-10-22, 10d
-    Epic 09 Design-Only REA & Awesome-RE Forge & JEV — TypeSaf :active, e09, 2026-10-22, 10d
+    Epic 02 JIT Prompt Assembler, KV-Cache Compiler, Hidden SS :active, e02, 2026-10-22, 10d
+    Epic 04 Flow-First 2D SVG Bezier DAG Studio, Security Kern :active, e04, 2026-10-22, 10d
+    Epic 06 Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Wor :active, e06, 2026-10-22, 10d
+    Epic 08 agentskills.io Repackager, Split DE+DR Runtime, 7  :active, e08, 2026-10-22, 10d
     section Wave 2
-    Epic 10 cowok Master Orchestrator, advisor Meta-Agent, OPC : e10, 2026-10-22, 10d
+    Epic 05 Option 5 2D Storyboard, Cognitive Sketch-to-Polish : e05, 2026-10-22, 10d
+    Epic 09 Two-Store /rea DNA Forge & 5-Stage Rust DecisionCa : e09, 2026-10-22, 10d
+    Epic 11 POSIX BYOS/BYOK Runner 0o600 FD + -PGID, Cross-CLI : e11, 2026-10-22, 10d
+    Epic 10 cowok Master Orchestrator, File Leases, Builder!=S : e10, 2026-10-22, 10d
     section Wave 3
-    Epic 11 POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging &  : e11, 2026-10-22, 10d
+    Epic 07 Pooled 1-Chromium CDP Visual QC & Split Share vs D : e07, 2026-10-22, 10d
     section Wave 4
-    Epic 12 4-Channel Packaging & Distribution Architecture : e12, 2026-10-22, 10d
+    Epic 12 4-Channel Packaging, Standalone /api/* Parity & OC : e12, 2026-10-22, 10d
+    Epic 13 End-to-End Sealed Anti-Goodhart Benchmark & 25-Cas : e13, 2026-10-22, 10d
 ```
 
 ---
@@ -149,9 +154,10 @@ Từ Wave hiện tại, hệ thống lọc ra các **Lát Cắt Hành Động P0
 
 | Mã Lát Cắt | Module / Epic Trọng Tâm | Danh Sách Story IDs Triển Khai Ngay | Luồng (Track) | Lý Do Kích Hoạt Tức Thời (Activation Rationale) |
 | :---: | :--- | :--- | :---: | :--- |
-| **P0.1** | **Epic 02**: JIT Prompt Assembler & 3-Profile Model Capability Adapter (Immediate P0 Anchor) | `02.1`, `02.2`, `02.3` | `Stream-1` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
-| **P0.2** | **Epic 07**: 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter (Immediate P0 Anchor) | `07.1`, `07.2`, `07.3` | `Stream-2` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
-| **P0.3** | **Epic 09**: Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine (Immediate P0 Anchor) | `09.1`, `09.2`, `09.3` | `Stream-3` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
+| **P0.1** | **Epic 02**: JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills (Immediate P0 Anchor) | `02.1`, `02.2`, `02.3` | `Stream-1` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
+| **P0.2** | **Epic 04**: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, CAS Intake & In-Chat Vault (Immediate P0 Anchor) | `04.1`, `04.2`, `04.3` | `Stream-2` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
+| **P0.3** | **Epic 06**: Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen (Immediate P0 Anchor) | `06.1`, `06.2`, `06.3` | `Stream-4` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
+| **P0.4** | **Epic 08**: agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN (Immediate P0 Anchor) | `08.1`, `08.2`, `08.3` | `Stream-1` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
 
 ---
 

@@ -1,0 +1,106 @@
+{
+  "schema_version": "epic-evaluation-passport/v1",
+  "epic_id": "Epic-07",
+  "feature_group": "VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio",
+  "created_at": "2026-11-20T13:44:30Z",
+  "updated_at": "2026-11-20T13:44:30Z",
+  "context_digest": "b74a825f336e9d4f825af96adda88ff6a2f99f966e43069d632dd7fca6ba773f",
+  "context_files": [
+    {
+      "path": "_iwish-output/2. Product Planning/2.1. product-brief-or-prd.md",
+      "sha256": "8e5e51b576c5feed8e5abf3aba7e210c79a707173d602004c3b230c13ffdf151"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.4. epics-and-stories.md",
+      "sha256": "8c59b9963c551b33a6173528784b0e9b3700e10ddfaaf05fc06fc238ef0f5add"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.6. feature-hierarchy.md",
+      "sha256": "8cbd53e1a8ceb2be4504e1251326dd10d03e1197ab2bbfaa7a892812ef2dafd6"
+    },
+    {
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-07/epic.md",
+      "sha256": "a6939c8852e612804371e2450dc2e58c4070dc59cf7444c74c20d92ee1436ec3"
+    }
+  ],
+  "evaluation_integrity": "VERIFIED",
+  "epic_readiness": "READY",
+  "story_creation_envelope": {
+    "max_phase": "IMPLEMENT",
+    "allowed_story_ids": [
+      "07.1",
+      "07.2"
+    ],
+    "blocked_story_ids": [
+      "07.3"
+    ],
+    "remediation_lane": true
+  },
+  "party_mode": {
+    "mode": "deep",
+    "rounds": 2,
+    "roles": [
+      "PM",
+      "Architect",
+      "Review",
+      "Dev",
+      "UX"
+    ],
+    "transcript_ref": "_iwish-output/epic-evaluations/Epic-07/party-mode-transcript.md",
+    "consensus_summary": "Post-PR #14 reconciliation verified Epic-07 under 20-Slice Vertical Master Plan with TDR-006/007.",
+    "pushback_patterns": [
+      "Zero horizontal-only stories; 5-layer E2E slice enforcement and immutable completed baseline."
+    ]
+  },
+  "unknowns": {
+    "depth": "full",
+    "quadrants": [
+      "known_unknowns",
+      "unknown_unknowns",
+      "assumptions",
+      "blind_spots"
+    ],
+    "critical_open": [],
+    "macro_open": [],
+    "report_ref": "_iwish-output/unknowns/reports/unknowns-report-epic-07.md"
+  },
+  "evidence_receipts": [
+    {
+      "id": "epic-07-party-mode-transcript",
+      "path": "_iwish-output/epic-evaluations/Epic-07/party-mode-transcript.md",
+      "sha256": "5ed318a1a59b969ba868bb8fe8427f145e1e130c7b916b5e679b494b9dd515c4"
+    },
+    {
+      "id": "epic-07-unknowns-report",
+      "path": "_iwish-output/unknowns/reports/unknowns-report-epic-07.md",
+      "sha256": "52b6a4be3c15fb8dc28ad61717208bc3e4bf633aa04977c01b1170fa2f63649b"
+    },
+    {
+      "id": "epic-07-evaluation-report",
+      "path": "_iwish-output/epic-evaluations/Epic-07/evaluation-report.md",
+      "sha256": "d0d308a8aa66cce2b7a889c15e8656ce418f65530546669c7d509821cb5b7546"
+    },
+    {
+      "id": "epic-07-plugin-boundary-review",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-07/plugin-boundary-review.md",
+      "sha256": "8dcaba1b539824dd9fab53374f1063e1099ef4d8e67ae247aa1b93d6432e3a96"
+    },
+    {
+      "id": "epic-07-agent-surface-map",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-07/agent-surface-map.md",
+      "sha256": "3ef48a0defabce86011724c240c5ef2e38eafd70304a990f0c0dec0274bad46c"
+    },
+    {
+      "id": "epic-07-coherence-report",
+      "path": "_iwish-output/adhoc-workspace/scratch/coherence-report-Epic-07.json",
+      "sha256": "166c484175a2625168e61539dc520997e359f50a26e5cfdc83dffac222c7db17"
+    }
+  ],
+  "approval": {
+    "approved": true,
+    "approved_by": "User",
+    "approved_at": "2026-11-20T20:26:51+07:00",
+    "context_digest": "b74a825f336e9d4f825af96adda88ff6a2f99f966e43069d632dd7fca6ba773f"
+  },
+  "has_ui_stories": true
+}

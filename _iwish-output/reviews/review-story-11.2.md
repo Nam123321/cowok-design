@@ -1,18 +1,9 @@
 # Edge Case Guardian & Adversarial Review Report — Story 11.2
 
-- **Story:** Story 11.2 — Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging)
-- **Epic:** Epic 11 (POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Universal Open MCP Server)
-- **Reviewer:** Review Agent (Edge Case Guardian Skill)
-- **Verdict:** APPROVED (PASS)
+- **Story:** `Story 11.2` — Compiler-Grade Bidirectional Open MCP Server, 1-Click Host Installer UI & Run-Scoped Tool Bundles
+- **Epic:** `Epic 11` (POSIX BYOS/BYOK Sandbox & Universal Open MCP Server)
+- **Reviewer:** Review Agent (`573b2485-b673-4d45-a4ca-014bf9e375c3`, Edge Case Guardian Skill)
+- **Verdict Notes (`2026-11-20`):** Resolved `EC-LEARN-001` contradiction with `08.4`: `ActorKind::McpClient` is unconditionally blocked from `HUMAN_ONLY` / Ephemeral Tool Jail (`403 HUMAN_APPROVAL_REQUIRED` / `-32003` + deep-link to Workbench UI); added `O_NOFOLLOW` atomic host config install + rollback, transactional `apply_batch` rollback `1..k`, and `elk.js` `MAX_NODES` WASM cap (`EC-E11-05`).
 
-## 1. FMEA & Boundary Evaluation
-- **Identified Edge Case:** Chặn mọi lệnh truy cập mạng ngoài, đọc biến môi trường nhạy cảm hoặc ghi file ngoài thư mục dự án đối với script tự rèn.
-- **Mitigation Verified:** Embedded into `[EDGE-CASE]` Acceptance Criterion `AC-03` and mapped to `Task 11.2.3`.
-- **Complexity Score (CS):** `4/10` (< 7 threshold — No story split required).
-
-## 2. Final Verdict
+## Final Verdict
 **VERDICT: PASS / APPROVED**
----
-
-## 3. Formal-verify candidates Triage
-- **Formal-verify candidates:** Stage 1/3A deferred triage (story not yet implemented): `EphemeralToolSandboxLifecycle` (approval -> bounded execution -> teardown cleanup) to be evaluated at Stage 3A.

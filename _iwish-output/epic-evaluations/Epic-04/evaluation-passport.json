@@ -1,0 +1,108 @@
+{
+  "schema_version": "epic-evaluation-passport/v1",
+  "epic_id": "Epic-04",
+  "feature_group": "VS-02. Flow-First Executable Design Workbench & SDI Engine",
+  "created_at": "2026-11-20T13:44:30Z",
+  "updated_at": "2026-11-20T13:44:30Z",
+  "context_digest": "87f0a1df306fde9c7eaa0a12ff98548e00655b96ba17cb5cdc9694ea74d47992",
+  "context_files": [
+    {
+      "path": "_iwish-output/2. Product Planning/2.1. product-brief-or-prd.md",
+      "sha256": "8e5e51b576c5feed8e5abf3aba7e210c79a707173d602004c3b230c13ffdf151"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.4. epics-and-stories.md",
+      "sha256": "8c59b9963c551b33a6173528784b0e9b3700e10ddfaaf05fc06fc238ef0f5add"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.6. feature-hierarchy.md",
+      "sha256": "8cbd53e1a8ceb2be4504e1251326dd10d03e1197ab2bbfaa7a892812ef2dafd6"
+    },
+    {
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-04/epic.md",
+      "sha256": "5afb16330a611aefd0bf9e395a4baece7060651998a4d00aba7fa757454bad31"
+    }
+  ],
+  "evaluation_integrity": "VERIFIED",
+  "epic_readiness": "CONDITIONAL",
+  "story_creation_envelope": {
+    "max_phase": "IMPLEMENT",
+    "allowed_story_ids": [
+      "04.1",
+      "04.2",
+      "04.3",
+      "04.4",
+      "04.5",
+      "04.6"
+    ],
+    "blocked_story_ids": [],
+    "remediation_lane": true
+  },
+  "party_mode": {
+    "mode": "deep",
+    "rounds": 2,
+    "roles": [
+      "PM",
+      "Architect",
+      "Review",
+      "Dev",
+      "UX"
+    ],
+    "transcript_ref": "_iwish-output/epic-evaluations/Epic-04/party-mode-transcript.md",
+    "consensus_summary": "Post-PR #14 reconciliation verified Epic-04 under 20-Slice Vertical Master Plan with TDR-006/007.",
+    "pushback_patterns": [
+      "Zero horizontal-only stories; 5-layer E2E slice enforcement and immutable completed baseline."
+    ]
+  },
+  "unknowns": {
+    "depth": "full",
+    "quadrants": [
+      "known_unknowns",
+      "unknown_unknowns",
+      "assumptions",
+      "blind_spots"
+    ],
+    "critical_open": [],
+    "macro_open": [],
+    "report_ref": "_iwish-output/unknowns/reports/unknowns-report-epic-04.md"
+  },
+  "evidence_receipts": [
+    {
+      "id": "epic-04-party-mode-transcript",
+      "path": "_iwish-output/epic-evaluations/Epic-04/party-mode-transcript.md",
+      "sha256": "bb22e643a2c68ed99e2c76b61353f9cccd3bc8d5e2ed9be6e8a3f2f901b79fac"
+    },
+    {
+      "id": "epic-04-unknowns-report",
+      "path": "_iwish-output/unknowns/reports/unknowns-report-epic-04.md",
+      "sha256": "cdbcae05b071802da50792865c6f83088596e75aebd03fad4e2932864a84bd12"
+    },
+    {
+      "id": "epic-04-evaluation-report",
+      "path": "_iwish-output/epic-evaluations/Epic-04/evaluation-report.md",
+      "sha256": "baee43df1ceb6fe519f15b3d60529f7d5ca3fd7d1b1c5147171f7bba2d1ff9e9"
+    },
+    {
+      "id": "epic-04-plugin-boundary-review",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-04/plugin-boundary-review.md",
+      "sha256": "f600fa1f014b1db8162ccec0e7ef2aeedd79d2d8e08b9f811d5bdf07b5adb132"
+    },
+    {
+      "id": "epic-04-agent-surface-map",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-04/agent-surface-map.md",
+      "sha256": "41244a93bc7460dca15cc555b7534e86665b5ed839788578b9072b8e62628677"
+    },
+    {
+      "id": "epic-04-coherence-report",
+      "path": "_iwish-output/adhoc-workspace/scratch/coherence-report-Epic-04.json",
+      "sha256": "182350b51593d1f46e77d69931888e6999797c57e96ccdc3b29e371db47a3b5c"
+    }
+  ],
+  "approval": {
+    "approved": true,
+    "approved_by": "User",
+    "approved_at": "2026-11-20T20:26:51+07:00",
+    "context_digest": "87f0a1df306fde9c7eaa0a12ff98548e00655b96ba17cb5cdc9694ea74d47992"
+  },
+  "has_ui_stories": true
+}

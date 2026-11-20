@@ -1,14 +1,9 @@
 # Edge Case Guardian & Adversarial Review Report — Story 07.1
 
-- **Story:** Story 07.1 — Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9
-- **Epic:** Epic 07 (17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter)
-- **Reviewer:** Review Agent (Edge Case Guardian Skill)
-- **Verdict:** APPROVED (PASS)
+- **Story:** `Story 07.1` — Pooled 1-Chromium Rust CDP Visual QC (`lib-audit` + `slides-check`), QC Overlay & 1-Click Auto-Fix
+- **Epic:** `Epic 07` (Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter)
+- **Reviewer:** Review Agent (`573b2485-b673-4d45-a4ca-014bf9e375c3`, Edge Case Guardian Skill)
+- **Verdict Notes (`2026-11-20`):** Added `"05.5"` dependency for 4-SubState Flow Completeness check, composite `SHA-1` layout cache key `(html, PROJECT_CONSTRAINTS, viewport, fixtureRef)`, ephemeral `IncognitoBrowserContext` isolation across parallel calls, `V17c qc_gate_runs`, and honest `UNVERIFIED_NO_BROWSER` fallback (`EC-E07-04`, `EC-E07-05`).
 
-## 1. FMEA & Boundary Evaluation
-- **Identified Edge Case:** Phát hiện chính xác hiện tượng tràn khung dọc/ngang (scrollHeight > clientHeight) khi người dùng nhập đoạn văn bản quá dài trên slide 16:9.
-- **Mitigation Verified:** Embedded into `[EDGE-CASE]` Acceptance Criterion `AC-03` and mapped to `Task 07.1.3`.
-- **Complexity Score (CS):** `4/10` (< 7 threshold — No story split required).
-
-## 2. Final Verdict
+## Final Verdict
 **VERDICT: PASS / APPROVED**
