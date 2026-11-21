@@ -146,7 +146,8 @@ export class HarnessDaemonTransport {
   ): Promise<T> {
     const token = await this.ensureSessionToken(retried);
     const headers = new Headers(options.headers || {});
-    if (options.body !== undefined && !headers.has("Content-Type")) {
+    const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+    if (options.body !== undefined && !isFormData && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
     headers.set("X-Cowok-Session-Token", token);

@@ -167,7 +167,9 @@
     "sseEventCompleted": "事件 {{event}} 已完成。",
     "proposalCompileWarning": "暂时无法生成变更提案 (ChangeProposal)，请检查输入参数。",
     "intentStatusLabel": "状态",
-    "forkFromHere": "从此分支对话"
+    "forkFromHere": "从此分支对话",
+    "persistFailed": "无法将消息保存到 SQLite 历史记录。",
+    "vaultComposerPlaceholder": "向 cowok Agent 提问或粘贴 API 密钥..."
   },
   "canvas": {
     "userflowLens": "用户流程 (Userflow)",
@@ -1143,5 +1145,25 @@
     },
     "commentsDrawerTitle": "固定评论",
     "overlaysRegionLabel": "空间交互浮层"
+  },
+  "cas": {
+    "uploadFailed": "上传文件到 CAS 存储失败。",
+    "uploading": "正在将二进制资源上传到 CAS...",
+    "prompt": "附件 .csv / .tsv / .xlsx / .fig / .pdf / .png / .svg / .txt"
+  },
+  "vault": {
+    "onboardingTitle": "Decision Engine API 密钥引导 (Zero-Leak 密钥库)",
+    "onboardingDesc": "从 Google AI Studio 或 TypeSafe JEV 获取 API 密钥并粘贴到聊天框，密钥在存储前会自动加密。",
+    "localOnlyLabel": "企业仅本地锁定 (禁止外部探测)",
+    "googleAiStudioKey": "Google AI Studio 密钥",
+    "typesafeJevKey": "TypeSafe JEV 密钥",
+    "replacePlaceholder": "输入替换的 API 密钥",
+    "confirm": "确认保存",
+    "replace": "替换",
+    "revoke": "吊销",
+    "localOnlyBadge": "仅限本地",
+    "highEntropyBadge": "高熵密钥",
+    "onboardingToggle": "API 密钥库",
+    "ingestFailed": "无法将密钥保存到安全密钥库。"
   }
 }

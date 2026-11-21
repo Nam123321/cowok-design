@@ -17,7 +17,7 @@ import { clearBffSessionHumanToken, setBffSessionHumanToken } from "./api-guard-
 
 export { buildCanonicalHmacHeaders, stripSpoofedHeaders };
 
-const DAEMON_MIN_SCHEMA_VERSION = 15;
+const DAEMON_MIN_SCHEMA_VERSION = 16;
 const DAEMON_STARTUP_TIMEOUT_MS = 8_000;
 const DAEMON_POLL_INTERVAL_MS = 40;
 const HTTP_UNAUTHORIZED = 401;
@@ -263,6 +263,8 @@ interface DaemonForwardOpts {
   daemonPath: string;
   rawQuery?: string;
   body?: unknown;
+  rawBodyBytes?: Uint8Array;
+  contentType?: string;
   inboundHeaders?: Headers;
   extraHeaders?: Record<string, string>;
   principal: { tenantId: string; userId: string; role: "viewer" | "editor" | "admin" };
@@ -278,7 +280,7 @@ async function fetchDaemonOnce(params: {
   opts: DaemonForwardOpts;
   safeInbound: Record<string, string>;
   rawQuery: string;
-  rawBody: string;
+  rawBody: string | Uint8Array;
   correlationId: string;
 }): Promise<Response> {
   const { lock, opts, safeInbound, rawQuery, rawBody, correlationId } = params;
@@ -286,7 +288,7 @@ async function fetchDaemonOnce(params: {
   const signedHeaders = buildCanonicalHmacHeaders({
     daemonNonce: lock.daemon_nonce, hmacKeyHex: lock.hmac_key_hex,
     method: opts.method, canonicalPath: opts.daemonPath, rawQuery,
-    principal: opts.principal, rawBody, correlationId,
+    principal: opts.principal, rawBody, contentType: opts.contentType, correlationId,
   });
   const extraHeaders = resolvedHumanTok
     ? { ...(opts.extraHeaders || {}), "X-Cowok-Human-Session": resolvedHumanTok }
@@ -297,10 +299,11 @@ async function fetchDaemonOnce(params: {
   logger.info("bff_forward_daemon", { method: opts.method, path: opts.daemonPath, correlationId });
   // Only propagate AbortSignal in Node server runtimes (jsdom swaps global AbortSignal across realms).
   const serverSignal = typeof window === "undefined" ? opts.signal : undefined;
+  const emptyBody = typeof rawBody === "string" ? rawBody === "" : rawBody.byteLength === 0;
   return fetch(targetUrl, {
     method: opts.method,
     headers,
-    body: opts.method === "GET" || opts.method === "HEAD" || rawBody === "" ? undefined : rawBody,
+    body: opts.method === "GET" || opts.method === "HEAD" || emptyBody ? undefined : (rawBody as BodyInit),
     ...(serverSignal ? { signal: serverSignal } : {}),
   });
 }
@@ -309,7 +312,12 @@ export async function forwardToDaemonFlow(opts: DaemonForwardOpts): Promise<Resp
   const safeInbound = opts.inboundHeaders ? stripSpoofedHeaders(opts.inboundHeaders) : {};
   const lock = await ensureRunningDaemon();
   const rawQuery = (opts.rawQuery || "").replace(/^\?/, "");
-  const rawBody = opts.body !== undefined ? JSON.stringify(opts.body) : "";
+  const rawBody: string | Uint8Array =
+    opts.rawBodyBytes !== undefined
+      ? opts.rawBodyBytes
+      : opts.body !== undefined
+        ? JSON.stringify(opts.body)
+        : "";
   const correlationId = opts.correlationId || crypto.randomUUID();
   let upstream = await fetchDaemonOnce({ lock, opts, safeInbound, rawQuery, rawBody, correlationId });
   if (

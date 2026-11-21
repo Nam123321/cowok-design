@@ -203,6 +203,14 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  // Mirror pool.rs apply_v16_columns idempotent guard prior to V16 SQL
+  db.exec("ALTER TABLE chat_messages ADD COLUMN seq_no BIGINT;");
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V16__story_04_6_cas_blobs.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
@@ -262,10 +270,16 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
     expect(mappedTables).toContain("knowledge_cards");
     expect(mappedTables).toContain("learn_consumed_nonces");
     expect(mappedTables).toContain("plugin_cron_schedules");
-    expect(mappedTables).toHaveLength(49);
+    expect(mappedTables).toContain("cas_blobs");
+    expect(mappedTables).toContain("cas_attachments");
+    expect(mappedTables).toContain("tenant_cas_blob_usage");
+    expect(mappedTables).toContain("cas_upload_ingress");
+    expect(mappedTables).toContain("cas_command_idempotency");
+    expect(mappedTables).toContain("vault_command_idempotency");
+    expect(mappedTables).toHaveLength(55);
   });
 
-  it("UT-DB-02: executes V1-V15 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V16 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 
@@ -503,5 +517,54 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
         .all() as { name: string }[]
     ).map((r) => r.name);
     expect(idxNames).toContain("deck_slides_slide_uid_key");
+  });
+
+  it("UT-DB-08: verifies Story 04.6 V16 chat seq_no, CAS/quota/idempotency separation, FK cascade, and Prisma parity", () => {
+    const db = openMigratedMemoryDb();
+    const schemaText = fs.readFileSync(schemaPath, "utf-8");
+
+    const chatCols = (db.prepare("PRAGMA table_info(chat_messages)").all() as Array<{ name: string }>).map(
+      (r) => r.name
+    );
+    expect(chatCols).toContain("seq_no");
+    expect(schemaText).toContain('@map("seq_no")');
+
+    const tableModelPairs: Array<[string, string]> = [
+      ["cas_blobs", "CasBlob"],
+      ["cas_attachments", "CasAttachment"],
+      ["tenant_cas_blob_usage", "TenantCasBlobUsage"],
+      ["cas_upload_ingress", "CasUploadIngress"],
+      ["cas_command_idempotency", "CasCommandIdempotency"],
+      ["vault_command_idempotency", "VaultCommandIdempotency"],
+    ];
+    for (const [tableName, modelName] of tableModelPairs) {
+      const pragmaRows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+      const sqliteCols = pragmaRows.map((r) => r.name).sort();
+      const prismaCols = parsePrismaModelColumns(schemaText, modelName);
+      expect(sqliteCols, `Column parity for ${tableName} <-> ${modelName}`).toEqual(prismaCols);
+    }
+
+    const attachmentCols = (db.prepare("PRAGMA table_info(cas_attachments)").all() as Array<{ name: string }>).map(
+      (r) => r.name
+    );
+    const ingressCols = (db.prepare("PRAGMA table_info(cas_upload_ingress)").all() as Array<{ name: string }>).map(
+      (r) => r.name
+    );
+    expect(attachmentCols).not.toContain("expires_at");
+    expect(ingressCols).not.toContain("expires_at");
+
+    const fks = db.prepare("PRAGMA foreign_key_list(cas_command_idempotency)").all() as Array<{
+      table: string;
+      from: string;
+      on_delete: string;
+    }>;
+    expect(
+      fks.some(
+        (fk) =>
+          fk.table === "cas_attachments" &&
+          fk.from === "attachment_id" &&
+          fk.on_delete.toUpperCase() === "CASCADE"
+      )
+    ).toBe(true);
   });
 });

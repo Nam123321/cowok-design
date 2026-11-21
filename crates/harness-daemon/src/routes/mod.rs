@@ -1,5 +1,9 @@
-// @story 04.1
+// @story 04.1, 04.6
 // @implements AC-01, AC-03, AC-04, AC-06
+pub mod chat_cas_archive;
+pub mod chat_cas_storage;
+pub mod chat_cas_upload_handler;
+pub mod chat_cas_vault;
 pub mod doctor_usage;
 pub mod doctor_vault;
 pub mod execution_coordinator;
@@ -63,6 +67,9 @@ pub struct DaemonAppState {
     pub ram_vault: crate::vault::RamVaultStore,
     pub active_workers: execution_reaper::ActiveWorkerRegistry,
     pub sse_tx: tokio::sync::broadcast::Sender<String>,
+    pub cas_sha_locks: Arc<
+        tokio::sync::Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
+    >,
 }
 
 impl DaemonAppState {
@@ -80,6 +87,7 @@ impl DaemonAppState {
             ram_vault: crate::vault::RamVaultStore::default(),
             active_workers: execution_reaper::ActiveWorkerRegistry::new(),
             sse_tx,
+            cas_sha_locks: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
         }
     }
 
@@ -98,7 +106,16 @@ impl DaemonAppState {
             ram_vault: crate::vault::RamVaultStore::default(),
             active_workers: execution_reaper::ActiveWorkerRegistry::new(),
             sse_tx,
+            cas_sha_locks: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
         }
+    }
+
+    pub async fn cas_sha_lock(&self, sha256: &str) -> Arc<tokio::sync::Mutex<()>> {
+        let mut map = self.cas_sha_locks.lock().await;
+        Arc::clone(
+            map.entry(sha256.to_string())
+                .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(()))),
+        )
     }
 }
 

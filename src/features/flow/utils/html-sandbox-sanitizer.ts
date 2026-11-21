@@ -1,54 +1,36 @@
-// @story 04.1, 04.5, 05.1
+// @story 04.1, 04.5, 05.1, 04.6
 // @implements AC-02 (DOMParser-Only Zero-Network HTML/CSS/SVG Double-Parse mXSS Scrubber)
+import {
+  getStartupDesignCdnCspAllowlist,
+  inferSvgViewBox,
+  isAllowedSvgUrl,
+  parseDesignCdnCspAllowlist,
+  sanitizeSvgElements,
+} from "./html-sandbox-svg-policy";
+
+export { getStartupDesignCdnCspAllowlist, inferSvgViewBox, isAllowedSvgUrl, parseDesignCdnCspAllowlist };
+
 const MAX_HTML_PAYLOAD_BYTES = 1_048_576;
 const SAFE_ATTR_NAME_RE = /^[a-zA-Z_:][a-zA-Z0-9_.:-]*$/;
 const INLINE_EVENT_ATTR_RE = /^on/i;
 const URL_CHECKED_ATTRS = new Set(["href", "src", "xlink:href", "action", "formaction", "poster", "data"]);
 const FORBIDDEN_TAGS = [
-  "script",
-  "iframe",
-  "object",
-  "embed",
-  "foreignobject",
-  "math",
-  "link",
-  "applet",
-  "template",
-  "noscript",
-  "base",
-  "meta",
+  "script", "iframe", "object", "embed", "foreignobject", "math",
+  "link", "applet", "template", "noscript", "base", "meta",
 ];
-const FORBIDDEN_SVG_CHILDREN = "foreignobject,script,style,animate,animatemotion,animatetransform,set,use";
 const FORBIDDEN_CSS_NEEDLES = [
-  "@import",
-  "@charset",
-  "@namespace",
-  "@document",
-  "url(",
-  "image-set(",
-  "expression(",
-  "-moz-binding",
-  "behavior:",
-  "javascript:",
-  "vbscript:",
-  "data:",
-  "</style",
-  "<",
+  "@import", "@charset", "@namespace", "@document", "url(", "image-set(",
+  "expression(", "-moz-binding", "behavior:", "javascript:", "vbscript:", "data:", "</style", "<",
 ];
 
 export function escapeHtmlAttr(raw: string): string {
-  return raw.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return raw.replace(/&/g, "&amp;").replace(/\x22/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function validateUserHtmlPayload(raw: string): {
-  valid: boolean;
-  reason?: "empty" | "too_large" | "invalid_html";
-} {
+export function validateUserHtmlPayload(raw: string): { valid: boolean; reason?: "empty" | "too_large" | "invalid_html" } {
   const trimmed = raw.trim();
   if (!trimmed) return { valid: false, reason: "empty" };
-  if (new TextEncoder().encode(trimmed).length > MAX_HTML_PAYLOAD_BYTES) {
-    return { valid: false, reason: "too_large" };
-  }
+  if (new TextEncoder().encode(trimmed).length > MAX_HTML_PAYLOAD_BYTES) return { valid: false, reason: "too_large" };
   const lastOpen = trimmed.lastIndexOf("<");
   const lastClose = trimmed.lastIndexOf(">");
   if (lastOpen === -1 || lastClose === -1 || lastOpen > lastClose || !/<[a-zA-Z][a-zA-Z0-9-]{0,31}(?=[\s/>])/.test(trimmed)) {
@@ -56,8 +38,7 @@ export function validateUserHtmlPayload(raw: string): {
   }
   if (typeof DOMParser !== "undefined") {
     const doc = new DOMParser().parseFromString(trimmed, "text/html");
-    const hasElements =
-      (doc.body && doc.body.children.length > 0) || (doc.head && doc.head.children.length > 0);
+    const hasElements = Boolean(doc.body?.children.length || doc.head?.children.length);
     if (!hasElements) return { valid: false, reason: "invalid_html" };
   }
   return { valid: true };
@@ -80,12 +61,7 @@ export function sanitizeCssContent(cssText: string, inlineMode = false): string 
   if (s.includes("/*") || s.includes("*/")) return "";
   const lower = s.toLowerCase();
   const compact = lower.replace(/\s+/g, "");
-  for (const needle of FORBIDDEN_CSS_NEEDLES) {
-    if (lower.includes(needle) || compact.includes(needle)) {
-      return "";
-    }
-  }
-  return s;
+  return FORBIDDEN_CSS_NEEDLES.some((n) => lower.includes(n) || compact.includes(n)) ? "" : s;
 }
 
 function hasDangerousUrlScheme(value: string): boolean {
@@ -110,63 +86,45 @@ function sanitizeSingleAttribute(el: Element, attr: Attr): void {
     else el.removeAttribute("style");
     return;
   }
-  if (URL_CHECKED_ATTRS.has(lowerName) && hasDangerousUrlScheme(attr.value)) {
-    el.removeAttribute(attr.name);
-  }
+  if (URL_CHECKED_ATTRS.has(lowerName) && hasDangerousUrlScheme(attr.value)) el.removeAttribute(attr.name);
 }
 
 function collectSafeElementAttributes(el: Element | null): string {
   if (!el) return "";
   return Array.from(el.attributes)
-    .filter((a) => {
-      const lower = a.name.trim().toLowerCase();
-      return SAFE_ATTR_NAME_RE.test(a.name) && !INLINE_EVENT_ATTR_RE.test(lower) && lower !== "srcdoc";
-    })
+    .filter((a) => SAFE_ATTR_NAME_RE.test(a.name) && !INLINE_EVENT_ATTR_RE.test(a.name.trim()) && a.name.trim().toLowerCase() !== "srcdoc")
     .map((a) => ` ${a.name}="${escapeHtmlAttr(a.value)}"`)
     .join("");
 }
 
-function scrubParsedDocument(doc: Document, styleNonce: string): void {
-  doc.querySelectorAll(FORBIDDEN_TAGS.join(",")).forEach((el) => el.remove());
-  doc.querySelectorAll("svg").forEach((svgEl) => {
-    const hasEventOrNoViewBox =
-      !svgEl.hasAttribute("viewBox") ||
-      Array.from(svgEl.attributes).some((a) => INLINE_EVENT_ATTR_RE.test(a.name.trim()));
-    if (hasEventOrNoViewBox || svgEl.querySelector(FORBIDDEN_SVG_CHILDREN)) {
-      svgEl.remove();
-      return;
-    }
-    [svgEl, ...Array.from(svgEl.querySelectorAll("*"))].forEach((node) => {
-      node.removeAttribute("href");
-      node.removeAttribute("xlink:href");
-    });
-  });
+function scrubStyleElements(doc: Document, styleNonce: string): void {
   doc.querySelectorAll("meta[http-equiv]").forEach((el) => {
     const eq = (el.getAttribute("http-equiv") || "").trim().toLowerCase();
     if (eq === "refresh" || eq === "content-security-policy") el.remove();
   });
   doc.querySelectorAll("style").forEach((styleEl) => {
     const cleanCss = sanitizeCssContent(styleEl.textContent || "");
-    if (!cleanCss.trim()) {
-      styleEl.remove();
-      return;
+    if (!cleanCss.trim()) styleEl.remove();
+    else {
+      styleEl.textContent = cleanCss;
+      styleEl.setAttribute("nonce", styleNonce);
     }
-    styleEl.textContent = cleanCss;
-    styleEl.setAttribute("nonce", styleNonce);
   });
+}
+
+function hoistInlineStyles(doc: Document, styleNonce: string): void {
   const hoistedRules: string[] = [];
   let styleIdx = 0;
   doc.querySelectorAll("*").forEach((el) => {
     for (const attr of Array.from(el.attributes)) sanitizeSingleAttribute(el, attr);
     const inlineStyle = el.getAttribute("style");
-    if (inlineStyle && inlineStyle.trim()) {
-      const cleanInline = sanitizeCssContent(inlineStyle, true).trim();
-      el.removeAttribute("style");
-      if (cleanInline) {
-        const id = `s${styleIdx++}`;
-        el.setAttribute("data-cowok-s", id);
-        hoistedRules.push(`[data-cowok-s="${id}"]{${cleanInline}}`);
-      }
+    if (!inlineStyle?.trim()) return;
+    const cleanInline = sanitizeCssContent(inlineStyle, true).trim();
+    el.removeAttribute("style");
+    if (cleanInline) {
+      const id = `s${styleIdx++}`;
+      el.setAttribute("data-cowok-s", id);
+      hoistedRules.push(`[data-cowok-s="${id}"]{${cleanInline}}`);
     }
   });
   if (hoistedRules.length > 0 && doc.head) {
@@ -177,33 +135,29 @@ function scrubParsedDocument(doc: Document, styleNonce: string): void {
   }
 }
 
+function scrubParsedDocument(doc: Document, styleNonce: string): void {
+  doc.querySelectorAll(FORBIDDEN_TAGS.join(",")).forEach((el) => el.remove());
+  sanitizeSvgElements(doc);
+  scrubStyleElements(doc, styleNonce);
+  hoistInlineStyles(doc, styleNonce);
+}
+
 export function sanitizeViaDomParser(rawHtml: string, headPrefixHtml: string, styleNonce: string): string {
   if (typeof DOMParser === "undefined") {
-    const safeText = escapeHtmlAttr(rawHtml);
-    return `<!DOCTYPE html><html><head>${headPrefixHtml}</head><body><pre>${safeText}</pre></body></html>`;
+    return `<!DOCTYPE html><html><head>${headPrefixHtml}</head><body><pre>${escapeHtmlAttr(rawHtml)}</pre></body></html>`;
   }
   const parser = new DOMParser();
   const pass1 = parser.parseFromString(rawHtml, "text/html");
   scrubParsedDocument(pass1, styleNonce);
-  const pass1Html = `<!DOCTYPE html><html${collectSafeElementAttributes(pass1.documentElement)}><head>${pass1.head ? pass1.head.innerHTML : ""}</head><body${collectSafeElementAttributes(pass1.body)}>${pass1.body ? pass1.body.innerHTML : ""}</body></html>`;
-  // Pass 2 double-parse mXSS convergence scrub
+  const pass1Html = `<!DOCTYPE html><html${collectSafeElementAttributes(pass1.documentElement)}><head>${pass1.head?.innerHTML || ""}</head><body${collectSafeElementAttributes(pass1.body)}>${pass1.body?.innerHTML || ""}</body></html>`;
   const pass2 = parser.parseFromString(pass1Html, "text/html");
   scrubParsedDocument(pass2, styleNonce);
-  const htmlAttrs = collectSafeElementAttributes(pass2.documentElement);
-  const headHtml = pass2.head ? pass2.head.innerHTML : "";
-  const bodyAttrs = collectSafeElementAttributes(pass2.body);
-  const bodyHtml = pass2.body ? pass2.body.innerHTML : "";
-  return `<!DOCTYPE html><html${htmlAttrs}><head>${headPrefixHtml}${headHtml}</head><body${bodyAttrs}>${bodyHtml}</body></html>`;
+  return `<!DOCTYPE html><html${collectSafeElementAttributes(pass2.documentElement)}><head>${headPrefixHtml}${pass2.head?.innerHTML || ""}</head><body${collectSafeElementAttributes(pass2.body)}>${pass2.body?.innerHTML || ""}</body></html>`;
 }
 
 export function prepareHtmlForApplyBridge(rawHtml: string, scriptNonce?: string): string {
   if (typeof DOMParser === "undefined" || !scriptNonce) return rawHtml;
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(rawHtml, "text/html");
+  const doc = new DOMParser().parseFromString(rawHtml, "text/html");
   scrubParsedDocument(doc, scriptNonce);
-  const htmlAttrs = collectSafeElementAttributes(doc.documentElement);
-  const headHtml = doc.head ? doc.head.innerHTML : "";
-  const bodyAttrs = collectSafeElementAttributes(doc.body);
-  const bodyHtml = doc.body ? doc.body.innerHTML : "";
-  return `<!DOCTYPE html><html${htmlAttrs}><head>${headHtml}</head><body${bodyAttrs}>${bodyHtml}</body></html>`;
+  return `<!DOCTYPE html><html${collectSafeElementAttributes(doc.documentElement)}><head>${doc.head?.innerHTML || ""}</head><body${collectSafeElementAttributes(doc.body)}>${doc.body?.innerHTML || ""}</body></html>`;
 }

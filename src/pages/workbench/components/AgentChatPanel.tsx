@@ -1,7 +1,9 @@
 // @story 04.1, 04.4
 // @implements AC-02, AC-04 (Left-Open Chat Drawer with Node Scope Chips, Zero useEffect)
-import React from "react";
+import React, { useState } from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
+import { apiChatVault } from "../../../api/chat-vault";
+import { DecisionEngineOnboardingCard } from "../../../features/chat-vault/DecisionEngineOnboardingCard";
 import { useFormatter } from "../../../hooks/useFormatter";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { useAgentChatConversation } from "../hooks/useAgentChatConversation";
@@ -143,8 +145,10 @@ const LeftChatScopeChips: React.FC<{
 
 const AgentChatHeader: React.FC<{
   onToggleShorten: () => void;
+  onToggleVaultOnboarding: () => void;
+  isVaultOnboardingOpen: boolean;
   proposalControls?: ChatProposalControls;
-}> = ({ onToggleShorten, proposalControls }) => {
+}> = ({ onToggleShorten, onToggleVaultOnboarding, isVaultOnboardingOpen, proposalControls }) => {
   const { t, locale } = useTranslation();
   const { formatNumber } = useFormatter({ locale });
   const shortenLabel = t("chat.shortenChat", "Thu gọn khung Chat");
@@ -160,9 +164,14 @@ const AgentChatHeader: React.FC<{
             </span>
           )}
         </div>
-        <button type="button" onClick={onToggleShorten} className="btn-shorten-chat cowok-btn cowok-btn-ghost" title={shortenLabel} aria-label={shortenLabel} style={{ width: "26px", height: "26px", minWidth: "26px", flexShrink: 0, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-surface)", color: "var(--text-secondary)", borderRadius: "var(--radius-xs)", cursor: "pointer" }}>
-          <BrandIcon name="panel-left-close" size={RAIL_ICON_SIZE} color="currentColor" />
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <button type="button" onClick={onToggleVaultOnboarding} data-testid="toggle-vault-onboarding-btn" aria-pressed={isVaultOnboardingOpen} title={t("vault.onboardingToggle", "API Key Vault")} style={{ height: "26px", padding: "0 6px", fontSize: "10.5px", border: "1px solid var(--border-subtle)", backgroundColor: isVaultOnboardingOpen ? "var(--bg-selected)" : "var(--bg-surface)", color: "var(--text-secondary)", borderRadius: "var(--radius-xs)", cursor: "pointer" }}>
+            {t("vault.onboardingToggle", "API Key Vault")}
+          </button>
+          <button type="button" onClick={onToggleShorten} className="btn-shorten-chat cowok-btn cowok-btn-ghost" title={shortenLabel} aria-label={shortenLabel} style={{ width: "26px", height: "26px", minWidth: "26px", flexShrink: 0, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-surface)", color: "var(--text-secondary)", borderRadius: "var(--radius-xs)", cursor: "pointer" }}>
+            <BrandIcon name="panel-left-close" size={RAIL_ICON_SIZE} color="currentColor" />
+          </button>
+        </div>
       </div>
       {proposalControls && (
         <div style={{ padding: "4px 10px 6px", display: "flex", alignItems: "center", gap: "6px", borderTop: "1px solid var(--border-subtle)", flexWrap: "nowrap" }}>
@@ -180,6 +189,7 @@ const AgentChatHeader: React.FC<{
 
 export const AgentChatPanel: React.FC<AgentChatPanelProps> = (props) => {
   const { t } = useTranslation();
+  const [showVaultOnboarding, setShowVaultOnboarding] = useState(false);
   const chat = useAgentChatConversation({
     attachmentChips: props.attachmentChips || [],
     onSendMessage: props.onSendMessage,
@@ -196,10 +206,38 @@ export const AgentChatPanel: React.FC<AgentChatPanelProps> = (props) => {
 
   return (
     <aside className="workbench-chat-panel" aria-label={t("chat.agentTitle", "cowok Agent")} style={{ width: `${props.width}px`, height: "100%", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-canvas)", borderRight: "1px solid var(--border-subtle)", boxSizing: "border-box", flexShrink: 0, position: "relative", fontFamily: "var(--font-sans)" }}>
-      <AgentChatHeader onToggleShorten={props.onToggleShorten} proposalControls={props.proposalControls} />
+      <AgentChatHeader onToggleShorten={props.onToggleShorten} onToggleVaultOnboarding={() => setShowVaultOnboarding((v) => !v)} isVaultOnboardingOpen={showVaultOnboarding} proposalControls={props.proposalControls} />
+      {showVaultOnboarding && (
+        <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border-subtle)" }}>
+          <DecisionEngineOnboardingCard enterpriseLocalOnlyLock={chat.enterpriseLocalOnlyLock} onToggleLocalOnlyLock={chat.setEnterpriseLocalOnlyLock} />
+        </div>
+      )}
       <LeftChatScopeChips projectId={props.projectId} sessionId={props.activeSessionId} selectedNodes={props.selectedNodes || []} onDeselectNode={props.onDeselectNode} onFocusNode={props.onFocusNode} />
-      <AgentChatStream messages={chat.messages} showScrollBottom={chat.showScrollBottom} onScrollMessages={chat.handleScrollMessages} onScrollToBottom={chat.scrollToBottom} messagesEndRef={chat.messagesEndRef} onSelectSdiVariant={(intentId, pid, variantId) => { void chat.handleSelectSdiVariant(intentId, pid, variantId); }} onForkFromMessage={(msg) => { void chat.handleForkFromMessage(msg); }} />
-      <AgentChatComposer inputValue={chat.inputValue} onInputChange={chat.setInputValue} onSend={chat.handleSend} attachmentChips={props.attachmentChips || []} onRemoveAttachmentChip={props.onRemoveAttachmentChip} onAttachClick={props.onAttachClick} onAttachFiles={props.onAttachFiles} onOpenSettings={props.onOpenSettings} />
+      <AgentChatStream messages={chat.messages} showScrollBottom={chat.showScrollBottom} onScrollMessages={chat.handleScrollMessages} onScrollToBottom={chat.scrollToBottom} messagesEndRef={chat.messagesEndRef} onSelectSdiVariant={(intentId, pid, variantId) => { void chat.handleSelectSdiVariant(intentId, pid, variantId); }} onForkFromMessage={(msg) => { void chat.handleForkFromMessage(msg); }} onReplaceVaultReceipt={chat.handleReplaceVaultReceipt} onRevokeVaultReceipt={chat.handleRevokeVaultReceipt} />
+      {chat.chatVaultError && (
+        <div data-testid="agent-chat-vault-error" style={{ padding: "6px 12px", fontSize: "11px", color: "var(--state-danger)", backgroundColor: "var(--bg-subtle)", borderTop: "1px solid var(--border-subtle)" }}>
+          {chat.chatVaultError}
+        </div>
+      )}
+      <AgentChatComposer
+        inputValue={chat.inputValue}
+        onInputChange={chat.setInputValue}
+        onSend={chat.handleSend}
+        attachmentChips={props.attachmentChips || []}
+        onRemoveAttachmentChip={props.onRemoveAttachmentChip}
+        onAttachClick={props.onAttachClick}
+        onAttachFiles={props.onAttachFiles}
+        onPasteBinaryFiles={(files) => {
+          const sid = props.activeSessionId || "session-1";
+          chat.setChatVaultError(null);
+          for (const f of files) {
+            void apiChatVault
+              .uploadAttachment({ sessionId: sid, projectId: props.projectId ?? null, file: f, filename: f.name })
+              .catch((err) => { chat.setChatVaultError(err instanceof Error ? err.message : t("cas.uploadFailed", "Upload failed")); });
+          }
+        }}
+        onOpenSettings={props.onOpenSettings}
+      />
     </aside>
   );
 };

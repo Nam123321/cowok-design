@@ -1,0 +1,20 @@
+{
+  "canonical_gate_id": "stage_4b_5b_completion",
+  "epic_id": "04",
+  "gate": "stage_4b_5b_completion",
+  "gate_mode": "AUTO_PIPELINE_SEAL",
+  "generation": 1,
+  "idempotency_key": "aba390a8e28728e5d1f353686c1d795b6a4dc471e0e6f954dbc9004a54ae7a97",
+  "policy_digest": "a76a825953e1c20c8fb53ead3789c0b4f281eec3876b9f31e12a6af90c900f05",
+  "profile": "flow-auto-epic",
+  "risk_classified": 3,
+  "risk_declared": 3,
+  "schema_version": "2.0",
+  "selected_engine": "codex",
+  "status": "approved",
+  "story_id": "04.6",
+  "subject_artifact": "closeout-attestation.json",
+  "subject_artifact_digest": "c2211ae3acbc2a0d2f7910d08598501e4746f9fd9711745682b7eeb5f12b57cd",
+  "timestamp": 1795221487434,
+  "worktree_realpath": "/Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four"
+}

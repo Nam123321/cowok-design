@@ -565,6 +565,7 @@ model ChatMessage {
   proseMarkdown   String  @map("prose_markdown")
   parentMessageId String? @map("parent_message_id")
   turnReceiptJson String? @map("turn_receipt_json")
+  seqNo           BigInt? @map("seq_no")
   createdAt       BigInt  @map("created_at")
 
   session   ChatSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -572,6 +573,7 @@ model ChatMessage {
   snapshots ChatArtifactSnapshot[]
 
   @@index([sessionId, createdAt])
+  @@index([sessionId, seqNo], map: "idx_chat_messages_session_seq")
   @@map("chat_messages")
 }
 
@@ -1016,4 +1018,95 @@ model IdempotencyRecord {
   @@id([tenantId, actorId, idempotencyKey])
   @@index([expiresAt])
   @@map("idempotency_records")
+}
+
+model CasBlob {
+  sha256         String   @id
+  tenantId       String   @default("local-default") @map("tenant_id")
+  byteSize       BigInt   @map("byte_size")
+  mimeType       String   @map("mime_type")
+  fileExt        String   @map("file_ext")
+  storageRelpath String   @map("storage_relpath")
+  refCount       Int      @default(1) @map("ref_count")
+  gcLeaseUntil   BigInt   @default(0) @map("gc_lease_until")
+  createdAt      BigInt   @map("created_at")
+
+  attachments    CasAttachment[]
+  tenantUsages   TenantCasBlobUsage[]
+
+  @@index([gcLeaseUntil, refCount], map: "idx_cas_blobs_gc")
+  @@map("cas_blobs")
+}
+
+model CasAttachment {
+  id         String  @id @default(uuid())
+  blobSha256 String  @map("blob_sha256")
+  tenantId   String  @default("local-default") @map("tenant_id")
+  projectId  String? @map("project_id")
+  sessionId  String  @map("session_id")
+  filename   String
+  createdAt  BigInt  @map("created_at")
+
+  blob              CasBlob                 @relation(fields: [blobSha256], references: [sha256], onDelete: Cascade)
+  idempotencyClaims CasCommandIdempotency[]
+
+  @@index([tenantId, sessionId, createdAt], map: "idx_cas_attachments_tenant_session")
+  @@index([blobSha256], map: "idx_cas_attachments_blob")
+  @@map("cas_attachments")
+}
+
+model TenantCasBlobUsage {
+  tenantId        String @default("local-default") @map("tenant_id")
+  blobSha256      String @map("blob_sha256")
+  byteSize        BigInt @map("byte_size")
+  firstAttachedAt BigInt @map("first_attached_at")
+
+  blob CasBlob @relation(fields: [blobSha256], references: [sha256], onDelete: Cascade)
+
+  @@id([tenantId, blobSha256])
+  @@map("tenant_cas_blob_usage")
+}
+
+model CasUploadIngress {
+  id         String @id @default(uuid())
+  tenantId   String @default("local-default") @map("tenant_id")
+  sessionId  String @map("session_id")
+  byteSize   BigInt @map("byte_size")
+  acceptedAt BigInt @map("accepted_at")
+
+  @@index([tenantId, acceptedAt], map: "idx_cas_upload_ingress_window")
+  @@map("cas_upload_ingress")
+}
+
+model CasCommandIdempotency {
+  id             String @id @default(uuid())
+  tenantId       String @default("local-default") @map("tenant_id")
+  sessionId      String @map("session_id")
+  idempotencyKey String @map("idempotency_key")
+  payloadSha256  String @map("payload_sha256")
+  attachmentId   String @map("attachment_id")
+  acceptedAt     BigInt @map("accepted_at")
+  expiresAt      BigInt @map("expires_at")
+
+  attachment CasAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sessionId, idempotencyKey])
+  @@index([tenantId, expiresAt], map: "idx_cas_cmd_idempotency_exp")
+  @@map("cas_command_idempotency")
+}
+
+model VaultCommandIdempotency {
+  id             String @id @default(uuid())
+  tenantId       String @default("local-default") @map("tenant_id")
+  sessionId      String @map("session_id")
+  idempotencyKey String @map("idempotency_key")
+  payloadSha256  String @map("payload_sha256")
+  receiptId      String @map("receipt_id")
+  receiptJson    String @map("receipt_json")
+  acceptedAt     BigInt @map("accepted_at")
+  expiresAt      BigInt @map("expires_at")
+
+  @@unique([tenantId, sessionId, idempotencyKey])
+  @@index([tenantId, expiresAt], map: "idx_vault_cmd_idempotency_exp")
+  @@map("vault_command_idempotency")
 }

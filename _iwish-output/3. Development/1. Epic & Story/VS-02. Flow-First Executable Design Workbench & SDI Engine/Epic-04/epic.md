@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-04"
 title: "Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, CAS Intake & In-Chat Vault"
-status: in-progress
+status: completed
 track: "Stream-2"
 wave: 2
 provides:
@@ -63,7 +63,7 @@ Epic 04 hiện thực hóa toàn bộ trải nghiệm thiết kế hướng lu�
 | **Story 04.3** | Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier | `completed` | `3` | `['04.2']` |
 | **Story 04.4** | Persistent KeyedParallelCoordinator, Monotonic Fencing, SSE Last-Event-ID, Multi-Node Chat v2 & 3-Level Sidebar | `completed` | `3` | `['04.2']` |
 | **Story 04.5** | State-Hydrated Live Preview (CompanionLiveHtmlRightPane), Option CSP-B Bridge & Persistent Element Comments (stale_mapping) | `completed` | `3` | `['04.4', '03.3']` |
-| **Story 04.6** | SQLite `V4/V16` Chat Persistence, CAS Binary/CSV Intake, `<svg viewBox>` Normalizer & In-Chat Zero-Leak Key Vault | `refactored` | `3` | `['04.2', '04.3']` |
+| **Story 04.6** | SQLite `V4/V16` Chat Persistence, CAS Binary/CSV Intake, `<svg viewBox>` Normalizer & In-Chat Zero-Leak Key Vault | `completed` | `3` | `['04.2', '04.3']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 

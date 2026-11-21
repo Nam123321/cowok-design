@@ -109,8 +109,8 @@ export const LaunchpadPrdPanel: React.FC<{
   return (
     <div data-testid="launchpad-panel-prd" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{t("launchpad.prdDesc", "Nhập mô tả sản phẩm, user story, hoặc tải lên file Markdown / PDF:")}</div>
-      <label data-testid="launchpad-prd-dropzone" style={{ border: "1px dashed var(--border-strong)", borderRadius: "var(--radius-md)", padding: "16px", textAlign: "center", backgroundColor: "var(--bg-canvas)", cursor: "pointer", display: "block" }}>
-        <input data-testid="launchpad-prd-file-input" type="file" accept=".md,.txt,.pdf,.json" onChange={handleFileInput} style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, overflow: "hidden" }} />
+      <label data-ff-id="cas-file-dropzone" data-testid="launchpad-prd-dropzone" style={{ border: "1px dashed var(--border-strong)", borderRadius: "var(--radius-md)", padding: "16px", textAlign: "center", backgroundColor: "var(--bg-canvas)", cursor: "pointer", display: "block" }}>
+        <input data-testid="launchpad-prd-file-input" type="file" accept=".csv,.tsv,.xlsx,.fig,.md,.txt,.pdf,.json,.png,.svg" onChange={handleFileInput} style={{ position: "absolute", width: "1px", height: "1px", opacity: 0, overflow: "hidden" }} />
         <BrandIcon name="upload" size={ICON_SIZE_LG} strokeWidth={STROKE_WIDTH_MONO} color="var(--action-primary)" />
         <div style={{ fontSize: "11px", fontWeight: FONT_WEIGHT_SEMIBOLD, color: "var(--text-primary)", marginTop: "6px" }}>
           {prdFileName ? `${t("launchpad.selectedFilePrefix", "Selected file:")} ${prdFileName}` : t("launchpad.dropPrdPrompt", "Drop or browse PRD file (.md / .txt / .pdf)")}
@@ -177,7 +177,7 @@ export const LaunchpadDesignPanel: React.FC<{
   return (
     <div data-testid="launchpad-panel-design" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{t("launchpad.designDesc", "Nhập URL file Figma, nạp file .fig hoặc dán vector clipboard SVG/HTML:")}</div>
-      <input data-testid="launchpad-design-file-input" type="file" accept=".fig,.svg,.json,.png" onChange={handleDesignFile} style={{ fontSize: "11px", color: "var(--text-secondary)" }} />
+      <input data-testid="launchpad-design-file-input" type="file" accept=".fig,.svg,.json,.png,.csv,.tsv,.xlsx,.pdf,.txt" onChange={handleDesignFile} style={{ fontSize: "11px", color: "var(--text-secondary)" }} />
       <input data-testid="launchpad-figma-url-input" type="text" placeholder={t("launchpad.figmaUrlPlaceholder", "https://www.figma.com/design/... hoặc dán token")} value={designUrl} onChange={(e) => onChangeUrl(e.target.value)} style={FIELD_STYLE} />
       <textarea data-testid="launchpad-clipboard-textarea" rows={CLIPBOARD_ROWS} placeholder={t("launchpad.clipboardPlaceholder", "Dán clipboard mã nguồn SVG / HTML khung wireframe...")} value={clipboardSnippet} onChange={(e) => onChangeClipboard(e.target.value)} style={{ ...FIELD_STYLE, resize: "vertical" }} />
       <button type="button" data-testid="launchpad-extract-tokens-btn" onClick={onExtractTokens} style={{ alignSelf: "flex-start", padding: "6px 12px", fontSize: "11px", fontWeight: FONT_WEIGHT_SEMIBOLD, borderRadius: "var(--radius-xs)", border: "1px solid var(--border-default)", backgroundColor: "var(--bg-workspace)", color: "var(--text-primary)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}>

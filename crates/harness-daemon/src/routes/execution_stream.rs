@@ -185,7 +185,8 @@ pub async fn handle_stream_job_events(
                 } else if is_terminal {
                     st.closed = true;
                 }
-                let payload = serde_json::to_string(&events).unwrap_or_else(|_| "[]".into());
+                let raw_payload = serde_json::to_string(&events).unwrap_or_else(|_| "[]".into());
+                let payload = super::chat_cas_storage::redact_secrets(&raw_payload);
                 let ev = Event::default()
                     .id(st.last_seq.to_string())
                     .event("execution_events")

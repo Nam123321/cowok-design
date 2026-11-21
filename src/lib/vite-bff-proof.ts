@@ -8,6 +8,9 @@ import { getBoundBffPort, isAllowedLoopbackHost } from "./api-guard.ts";
 import { resolveWorkspaceRoot } from "./daemon-client.ts";
 
 export const MAX_BODY_BYTES = 1_048_576;
+const CAS_REQUEST_MAX_BYTES = 26_214_400;
+const CAS_MULTIPART_OVERHEAD_BYTES = 262_144;
+export const MAX_CAS_UPLOAD_BODY_BYTES = CAS_REQUEST_MAX_BYTES + CAS_MULTIPART_OVERHEAD_BYTES;
 export const HTTP_OK = 200;
 export const HTTP_BAD_REQUEST = 400;
 export const HTTP_FORBIDDEN = 403;
@@ -45,15 +48,15 @@ export function injectBootCapMeta(html: string, bootCapToken: string): string {
   return `${metaTag}\n${html}`;
 }
 
-/** Reads an incoming request body up to MAX_BODY_BYTES. */
-export function readRawBody(req: IncomingMessage): Promise<Buffer | "TOO_LARGE"> {
+/** Reads an incoming request body up to maxBytes (defaults to MAX_BODY_BYTES). */
+export function readRawBody(req: IncomingMessage, maxBytes: number = MAX_BODY_BYTES): Promise<Buffer | "TOO_LARGE"> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let total = 0;
     let overflow = false;
     req.on("data", (chunk: Buffer) => {
       total += chunk.length;
-      if (total > MAX_BODY_BYTES) overflow = true;
+      if (total > maxBytes) overflow = true;
       else chunks.push(chunk);
     });
     req.on("end", () => resolve(overflow ? "TOO_LARGE" : Buffer.concat(chunks)));

@@ -30,13 +30,20 @@ export function buildCanonicalHmacHeaders(params: {
   canonicalPath: string;
   rawQuery: string;
   principal: { tenantId: string; userId: string; role: string };
-  rawBody: string;
+  rawBody: string | Uint8Array;
+  contentType?: string;
   correlationId: string;
 }): Record<string, string> {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const requestNonce = crypto.randomUUID();
   const principalB64 = Buffer.from(JSON.stringify(params.principal), "utf8").toString("base64");
-  const bodySha = crypto.createHash("sha256").update(params.rawBody, "utf8").digest("hex");
+  const bodyHasher = crypto.createHash("sha256");
+  if (typeof params.rawBody === "string") {
+    bodyHasher.update(params.rawBody, "utf8");
+  } else {
+    bodyHasher.update(params.rawBody);
+  }
+  const bodySha = bodyHasher.digest("hex");
   const canonical = [
     params.daemonNonce,
     timestamp,
@@ -52,7 +59,7 @@ export function buildCanonicalHmacHeaders(params: {
     .update(canonical, "utf8")
     .digest("hex");
   return {
-    "Content-Type": "application/json",
+    "Content-Type": params.contentType || "application/json",
     Host: "127.0.0.1",
     "X-Correlation-Id": params.correlationId,
     "X-Cowok-Timestamp": timestamp,
@@ -70,6 +77,10 @@ export function assembleForwardHeaders(
   const headers: Record<string, string> = {};
   if (safeInbound["if-match"]) headers["If-Match"] = safeInbound["if-match"];
   if (safeInbound["last-event-id"]) headers["Last-Event-ID"] = safeInbound["last-event-id"];
+  if (safeInbound["x-idempotency-key"]) headers["X-Idempotency-Key"] = safeInbound["x-idempotency-key"];
+  if (safeInbound["x-session-id"]) headers["X-Session-Id"] = safeInbound["x-session-id"];
+  if (safeInbound["x-project-id"]) headers["X-Project-Id"] = safeInbound["x-project-id"];
+  if (safeInbound["x-filename"]) headers["X-Filename"] = safeInbound["x-filename"];
   if (safeInbound.accept) headers.Accept = safeInbound.accept;
   if (extraHeaders) {
     for (const [k, v] of Object.entries(extraHeaders)) {

@@ -1,0 +1,32 @@
+{
+  "stage": "4",
+  "parallel_track": "codex-reviewer-track-3",
+  "story_id": "04.6",
+  "round": 3,
+  "model": "gpt-5.6-terra",
+  "requested_model": "gpt-5.6-terra",
+  "executed_model": "gpt-5.6-terra",
+  "downgrade_reason": null,
+  "effort": "medium",
+  "verdict": "APPROVED",
+  "score": 9.0,
+  "findings_count": 2,
+  "critical_count": 0,
+  "diff_hash": "a91f0be02e0f850f052563b709be23e9eb092eaf87ec3420162b5407cfa8493c",
+  "manifest_hash": "a080b6b19fc5dd1d69ed31e90d3bb5f1acf554becc94f88cc5f4abd3d033ec97",
+  "target_files": [
+    "crates/harness-daemon/src/routes/chat_cas_vault.rs",
+    "crates/spec-registry/migrations/V16__story_04_6_cas_blobs.sql",
+    "prisma/schema.prisma",
+    "src/api/chat-vault.ts",
+    "src/app/api/v1/cas/upload/route.ts",
+    "src/features/flow/utils/html-sandbox-sanitizer.ts",
+    "src/lib/validations/chat-vault.ts"
+  ],
+  "target_files_sha256": "ee969bb219c982bda9ba6e8264b632d03fd9d783399aeac8e02b8bebc124ab18",
+  "timestamp": "2026-11-21T07:05:57.843507",
+  "audit_file": "/Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/reviews/review-codex-story-04.6-round3.md",
+  "findings_file": "/Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/reviews/review-codex-findings-04.6.json",
+  "status": "completed",
+  "receipt_hmac": "2ebd22e1bba2f5425b713de0c5b10def0d73d7de30aa10b6d03cfa3ceb9c1c35"
+}

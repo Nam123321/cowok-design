@@ -1,0 +1,298 @@
+{
+  "schema_version": "3.7.3",
+  "scope_id": "04.6",
+  "touchpoint": "story",
+  "status": "ASSESSED_RESOLVED",
+  "rds_score": 11.28,
+  "rds_classification": "ALIGNED",
+  "rds_components": {
+    "OffGoal": 20.0,
+    "RepetitionWithoutDelta": 1.18,
+    "ScopeThrash": 17.65,
+    "DeadEndObservation": 9.71,
+    "BudgetOverrun": 0.0
+  },
+  "trajectory_behaviors": {
+    "T1_PROBE_CLI_FLAGS": 1,
+    "T2_SWALLOW_EXIT_CODE": 5,
+    "T3_RETRY_IDENTICAL_CMD": 3,
+    "T4_BYPASS_GUARD_SCRIPT": 0,
+    "T5_READ_SOURCE_TO_DEBUG_HARNESS": 45,
+    "T6_DUMMY_ARTIFACT_STUBBING": 0
+  },
+  "script_friction_hotspots": [
+    {
+      "script": ".agent/scripts/dispatch-codex.py",
+      "calls": 16,
+      "failures": 0,
+      "help_probes": 1,
+      "friction_score": 16
+    },
+    {
+      "script": ".agent/scripts/pipeline-integrity-runner.py",
+      "calls": 11,
+      "failures": 0,
+      "help_probes": 0,
+      "friction_score": 9
+    },
+    {
+      "script": ".agent/scripts/worktree-port-manager.py",
+      "calls": 8,
+      "failures": 0,
+      "help_probes": 0,
+      "friction_score": 6
+    },
+    {
+      "script": ".agent/scripts/colocation_contract_engine.py",
+      "calls": 5,
+      "failures": 1,
+      "help_probes": 0,
+      "friction_score": 6
+    },
+    {
+      "script": ".agent/scripts/validate-spec-format.py",
+      "calls": 5,
+      "failures": 0,
+      "help_probes": 0,
+      "friction_score": 3
+    },
+    {
+      "script": "src/api/chat-vault.ts",
+      "calls": 5,
+      "failures": 0,
+      "help_probes": 0,
+      "friction_score": 3
+    },
+    {
+      "script": ".agent/scripts/validate-spec-semantics.py",
+      "calls": 5,
+      "failures": 0,
+      "help_probes": 0,
+      "friction_score": 3
+    },
+    {
+      "script": ".agent/scripts/flow-auto-epic-orchestrator.py",
+      "calls": 4,
+      "failures": 0,
+      "help_probes": 0,
+      "friction_score": 2
+    },
+    {
+      "script": ".agent/skills/codebase-drift-auditor/scripts/audit-all.ts",
+      "calls": 2,
+      "failures": 0,
+      "help_probes": 1,
+      "friction_score": 2
+    },
+    {
+      "script": "src/features/flow/utils/html-sandbox-sanitizer.ts",
+      "calls": 4,
+      "failures": 0,
+      "help_probes": 0,
+      "friction_score": 2
+    }
+  ],
+  "code_quality_blindspots": [],
+  "spec_obligations": [
+    {
+      "obligation_id": "OBL-AC-1",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-01 (SQLite `V4` Chat Persistence & Auto-Provisioned Session FK)",
+      "status": "VERIFIED",
+      "code_evidence_file": "crates/harness-daemon/src/routes/chat_cas_storage.rs"
+    },
+    {
+      "obligation_id": "OBL-AC-2",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-02 (CAS Binary/CSV Intake & Drag/Paste Capture)",
+      "status": "VERIFIED",
+      "code_evidence_file": "crates/harness-daemon/src/routes/chat_cas_upload_handler.rs"
+    },
+    {
+      "obligation_id": "OBL-AC-3",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-03 (`<svg viewBox>` Auto-Inference & SVG mXSS Sanitizer)",
+      "status": "VERIFIED",
+      "code_evidence_file": "src/features/flow/utils/html-sandbox-wrapper.ts"
+    },
+    {
+      "obligation_id": "OBL-AC-4",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-04 (In-Chat Zero-Leak Key Vault UX & Pre-Persistence 3-Layer Secret Interceptor)",
+      "status": "VERIFIED",
+      "code_evidence_file": "src/features/chat-vault/DecisionEngineOnboardingCard.tsx"
+    },
+    {
+      "obligation_id": "OBL-AC-5",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-05 ([EDGE-CASE] Concurrent SSE Redaction, Corrupted CAS & Dedupe GC Lock)",
+      "status": "VERIFIED",
+      "code_evidence_file": "crates/harness-daemon/src/routes/execution_stream.rs"
+    },
+    {
+      "obligation_id": "OBL-AC-6",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-01, AC-02, AC-04 validations",
+      "status": "VERIFIED",
+      "code_evidence_file": "src/lib/validations/chat-vault.ts"
+    },
+    {
+      "obligation_id": "OBL-AC-7",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-01, AC-02, AC-04 API client SDK",
+      "status": "VERIFIED",
+      "code_evidence_file": "src/api/chat-vault.ts"
+    },
+    {
+      "obligation_id": "OBL-AC-8",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-03 SVG policy sanitization",
+      "status": "VERIFIED",
+      "code_evidence_file": "src/features/flow/utils/html-sandbox-svg-policy.ts"
+    },
+    {
+      "obligation_id": "OBL-AC-9",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-04, AC-05 client secret interceptor",
+      "status": "VERIFIED",
+      "code_evidence_file": "src/features/chat-vault/secret-interceptor.ts"
+    },
+    {
+      "obligation_id": "OBL-AC-10",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-01 SQLite V4/V16 persistence matrix",
+      "status": "VERIFIED",
+      "code_evidence_file": "crates/harness-daemon/src/routes/chat_cas_storage.rs"
+    },
+    {
+      "obligation_id": "OBL-AC-11",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-02 CAS multipart intake matrix",
+      "status": "VERIFIED",
+      "code_evidence_file": "crates/harness-daemon/src/routes/chat_cas_upload_handler.rs"
+    },
+    {
+      "obligation_id": "OBL-AC-12",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-03 SVG mXSS & viewBox matrix",
+      "status": "VERIFIED",
+      "code_evidence_file": "src/features/flow/utils/html-sandbox-svg-policy.ts"
+    },
+    {
+      "obligation_id": "OBL-AC-13",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-04 Zero-leak Key Vault matrix",
+      "status": "VERIFIED",
+      "code_evidence_file": "crates/harness-daemon/src/routes/chat_cas_vault.rs"
+    },
+    {
+      "obligation_id": "OBL-AC-14",
+      "source": "story.md",
+      "type": "ACCEPTANCE_CRITERIA",
+      "claim": "AC-05 Concurrent SSE & GC lock matrix",
+      "status": "VERIFIED",
+      "code_evidence_file": "crates/harness-daemon/src/routes/chat_cas_archive.rs"
+    }
+  ],
+  "b2_capability_upgrades": [],
+  "infra_transient_events": [],
+  "unexplained_anomalies": [
+    {
+      "anomaly_id": "ANOM-TRAJ-T2_SWALLOW_EXIT_CODE",
+      "category": "GROUP_B_TRAJECTORY_ANOMALY",
+      "count": 5,
+      "summary": "Detected 5 occurrence(s) of T2_SWALLOW_EXIT_CODE in story window."
+    },
+    {
+      "anomaly_id": "ANOM-TRAJ-T5_READ_SOURCE_TO_DEBUG_HARNESS",
+      "category": "GROUP_B_TRAJECTORY_ANOMALY",
+      "count": 45,
+      "summary": "Detected 45 occurrence(s) of T5_READ_SOURCE_TO_DEBUG_HARNESS in story window."
+    },
+    {
+      "anomaly_id": "ANOM-SCRIPT-dispatch-codex.py",
+      "category": "GROUP_B_SCRIPT_FRICTION",
+      "script": ".agent/scripts/dispatch-codex.py",
+      "friction_score": 16,
+      "failures": 0,
+      "summary": "Script '.agent/scripts/dispatch-codex.py' had 0 failure(s) and friction_score=16."
+    },
+    {
+      "anomaly_id": "ANOM-SCRIPT-pipeline-integrity-runner.py",
+      "category": "GROUP_B_SCRIPT_FRICTION",
+      "script": ".agent/scripts/pipeline-integrity-runner.py",
+      "friction_score": 9,
+      "failures": 0,
+      "summary": "Script '.agent/scripts/pipeline-integrity-runner.py' had 0 failure(s) and friction_score=9."
+    },
+    {
+      "anomaly_id": "ANOM-SCRIPT-worktree-port-manager.py",
+      "category": "GROUP_B_SCRIPT_FRICTION",
+      "script": ".agent/scripts/worktree-port-manager.py",
+      "friction_score": 6,
+      "failures": 0,
+      "summary": "Script '.agent/scripts/worktree-port-manager.py' had 0 failure(s) and friction_score=6."
+    },
+    {
+      "anomaly_id": "ANOM-SCRIPT-colocation_contract_engine.py",
+      "category": "GROUP_B_SCRIPT_FRICTION",
+      "script": ".agent/scripts/colocation_contract_engine.py",
+      "friction_score": 6,
+      "failures": 1,
+      "summary": "Script '.agent/scripts/colocation_contract_engine.py' had 1 failure(s) and friction_score=6."
+    }
+  ],
+  "anomaly_resolutions": [
+    {
+      "anomaly_id": "ANOM-TRAJ-T2_SWALLOW_EXIT_CODE",
+      "classification": "GROUP_B_TRAJECTORY_ANOMALY",
+      "react_thinking_analysis": "Exit-code masking occurred during early exploratory shell chains using `2>/dev/null || true` around non-existent files or diagnostics. Replaced with strict fail-fast subprocess orchestration (`run_stage5a_qa.py`) and explicit existence checks."
+    },
+    {
+      "anomaly_id": "ANOM-TRAJ-T5_READ_SOURCE_TO_DEBUG_HARNESS",
+      "classification": "GROUP_B_COGNITIVE_LESSON",
+      "react_thinking_analysis": "Inspected `.agent/scripts` and `scripts/run-qa-sandbox.py` to diagnose pre-code seals, OCR provenance TOCTOU on `edit_file`, `review-consensus` `--inputs` flag, Vite `generic-polyglot` fallback, and Stage 5a HAR + transcript checks rather than guessing."
+    },
+    {
+      "anomaly_id": "ANOM-SCRIPT-dispatch-codex.py",
+      "classification": "GROUP_B_SCRIPT_FRICTION",
+      "react_thinking_analysis": "All 16 invocations succeeded (0 failures); elevated friction reflects multi-round Stage 4 dual review (Rounds 1-3) for risk_tier 3 Story 04.6 plus `--help` CLI flag check."
+    },
+    {
+      "anomaly_id": "ANOM-SCRIPT-pipeline-integrity-runner.py",
+      "classification": "GROUP_B_SCRIPT_FRICTION",
+      "react_thinking_analysis": "Pre-code, post-code, and Stage 5a manual-test invocations exposed real blockers (uncommitted V16 architecture doc, missing HAR & nonce isolation in E2E, zombie daemon SQLite corruption), all resolved cleanly via `run_stage5a_qa.py`."
+    },
+    {
+      "anomaly_id": "ANOM-SCRIPT-worktree-port-manager.py",
+      "classification": "GROUP_B_SCRIPT_FRICTION",
+      "react_thinking_analysis": "CLI expects positional `<action> <story_id> [<worktree_path>]` arguments and pairs FE+BE ports for isolated Vite QA; zero failures once invoked with positional syntax."
+    },
+    {
+      "anomaly_id": "ANOM-SCRIPT-colocation_contract_engine.py",
+      "classification": "GROUP_B_SCRIPT_FRICTION",
+      "react_thinking_analysis": "One invocation failed due to calling `.agent/scripts/colocation_contract_engine.py` instead of `.agent/skills/feature-colocation-architecture/scripts/colocation_contract_engine.py`; resolved immediately by locating the skill path."
+    }
+  ],
+  "cognitive_reflection_summary": "Story 04.6 (V16 SQLite chat persistence, 25 MiB CAS upload + atomic rollbacks + CSV formula neutralization, SVG mXSS/viewBox sanitizer, and Zero-Leak AES-256-GCM Key Vault UX) converged through 3 full OCR/Codex review rounds (9.4 / 9.0 APPROVED, 0 blockers), cleared audit-360, recovered from 33 stale worktree daemon locks corrupting the runtime SQLite WAL, and passed live Vite Stage 5a QA (HAR 944 requests, 0 5xx, distinct visual deltas, and clean QA provenance audit) via reusable runner run_stage5a_qa.py.",
+  "emitted_pending_lessons": [
+    "LSN-04.6-STAGE5A-QA"
+  ],
+  "emitted_pending_evolutions": [],
+  "macro_convergence": {},
+  "story_blocking": false,
+  "generated_at": "2026-11-21T00:34:00.519683+00:00"
+}

@@ -12,6 +12,8 @@ import {
   HTTP_FORBIDDEN,
   HTTP_OK,
   HTTP_PAYLOAD_TOO_LARGE,
+  MAX_BODY_BYTES,
+  MAX_CAS_UPLOAD_BODY_BYTES,
   buildWorkbenchProofCookieHeader,
   handleBootstrapSession,
   injectBootCapMeta,
@@ -170,8 +172,17 @@ async function dispatchMiddlewareRequest(
     next();
     return;
   }
-  const rawBuf = await readRawBody(req);
+  const isCasUpload = method === "POST" && parsedUrl.pathname === "/api/v1/cas/upload";
+  const rawBuf = await readRawBody(req, isCasUpload ? MAX_CAS_UPLOAD_BODY_BYTES : MAX_BODY_BYTES);
   if (rawBuf === "TOO_LARGE") {
+    if (isCasUpload) {
+      return writeJson(res, HTTP_PAYLOAD_TOO_LARGE, {
+        code: "CAS_QUOTA_EXCEEDED",
+        message: "Request upload size limit exceeded",
+        retryable: false,
+        limit: "REQUEST_BYTES",
+      });
+    }
     return writeJson(res, HTTP_PAYLOAD_TOO_LARGE, { code: "PAYLOAD_TOO_LARGE", error: "PAYLOAD_TOO_LARGE" });
   }
   const headers = new Headers();

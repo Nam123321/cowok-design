@@ -167,7 +167,9 @@
     "sseEventCompleted": "Event {{event}} completed.",
     "proposalCompileWarning": "Unable to synthesize ChangeProposal right now; please inspect inputs.",
     "intentStatusLabel": "Status",
-    "forkFromHere": "Fork conversation from here"
+    "forkFromHere": "Fork conversation from here",
+    "persistFailed": "Unable to save message to SQLite history.",
+    "vaultComposerPlaceholder": "Ask cowok Agent or paste API key..."
   },
   "canvas": {
     "userflowLens": "Userflow",
@@ -1143,5 +1145,25 @@
     },
     "commentsDrawerTitle": "Pinned Comments",
     "overlaysRegionLabel": "Spatial overlays"
+  },
+  "cas": {
+    "uploadFailed": "Failed to upload file to CAS storage.",
+    "uploading": "Uploading binary asset to CAS...",
+    "prompt": "Attach .csv / .tsv / .xlsx / .fig / .pdf / .png / .svg / .txt"
+  },
+  "vault": {
+    "onboardingTitle": "Decision Engine API Key Onboarding (Zero-Leak Vault)",
+    "onboardingDesc": "Get an API key from Google AI Studio or TypeSafe JEV and paste it into chat. Keys are encrypted before storage.",
+    "localOnlyLabel": "Enterprise Local-Only Lock (no outbound probe)",
+    "googleAiStudioKey": "Google AI Studio Key",
+    "typesafeJevKey": "TypeSafe JEV Key",
+    "replacePlaceholder": "Enter replacement API key",
+    "confirm": "Confirm Save",
+    "replace": "Replace",
+    "revoke": "Revoke",
+    "localOnlyBadge": "Local-Only",
+    "highEntropyBadge": "High-Entropy Key",
+    "onboardingToggle": "API Key Vault",
+    "ingestFailed": "Failed to save credential to secure vault."
   }
 }

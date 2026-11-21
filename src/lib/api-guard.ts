@@ -34,6 +34,7 @@ export interface GuardedContext {
 
 export interface GuardedRouteOptions<B = unknown, Q = unknown> {
   body?: ZodSchema<B>;
+  rawBinary?: boolean;
   rawJsonPassthrough?: boolean;
   query?: ZodSchema<Q>;
   roles?: string[];
@@ -89,7 +90,12 @@ async function parseGuardedBody<B, Q>(
   req: Request,
   options: GuardedRouteOptions<B, Q>
 ): Promise<{ ok: true; body: B | undefined } | { ok: false; response: Response }> {
-  if (req.method === "GET" || req.method === "HEAD" || (!options.body && !options.rawJsonPassthrough)) {
+  if (
+    req.method === "GET" ||
+    req.method === "HEAD" ||
+    options.rawBinary ||
+    (!options.body && !options.rawJsonPassthrough)
+  ) {
     return { ok: true, body: undefined };
   }
   let rawText: string;

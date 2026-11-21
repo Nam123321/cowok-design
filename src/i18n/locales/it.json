@@ -167,7 +167,9 @@
     "sseEventCompleted": "Evento {{event}} completato.",
     "proposalCompileWarning": "Impossibile sintetizzare ChangeProposal ora; controlla i dati inseriti.",
     "intentStatusLabel": "Stato",
-    "forkFromHere": "Ramifica conversazione da qui"
+    "forkFromHere": "Ramifica conversazione da qui",
+    "persistFailed": "Impossibile salvare il messaggio nella cronologia SQLite.",
+    "vaultComposerPlaceholder": "Chiedi a cowok Agent o incolla la chiave API..."
   },
   "canvas": {
     "userflowLens": "Flusso utente (Userflow)",
@@ -1143,5 +1145,25 @@
     },
     "commentsDrawerTitle": "Commenti fissati",
     "overlaysRegionLabel": "Livelli di interazione spaziale"
+  },
+  "cas": {
+    "uploadFailed": "Caricamento del file nell'archivio CAS non riuscito.",
+    "uploading": "Caricamento della risorsa binaria su CAS...",
+    "prompt": "Allega .csv / .tsv / .xlsx / .fig / .pdf / .png / .svg / .txt"
+  },
+  "vault": {
+    "onboardingTitle": "Configurazione Chiave Decision Engine (Vault Zero-Leak)",
+    "onboardingDesc": "Ottieni una chiave API da Google AI Studio o TypeSafe JEV e incollala nella chat. Le chiavi vengono cifrate prima del salvataggio.",
+    "localOnlyLabel": "Blocco Solo Locale Aziendale (nessun probe in uscita)",
+    "googleAiStudioKey": "Chiave Google AI Studio",
+    "typesafeJevKey": "Chiave TypeSafe JEV",
+    "replacePlaceholder": "Inserisci la chiave API sostitutiva",
+    "confirm": "Conferma salvataggio",
+    "replace": "Sostituisci",
+    "revoke": "Revoca",
+    "localOnlyBadge": "Solo locale",
+    "highEntropyBadge": "Chiave ad alta entropia",
+    "onboardingToggle": "Vault API",
+    "ingestFailed": "Impossibile salvare la chiave nel vault sicuro."
   }
 }

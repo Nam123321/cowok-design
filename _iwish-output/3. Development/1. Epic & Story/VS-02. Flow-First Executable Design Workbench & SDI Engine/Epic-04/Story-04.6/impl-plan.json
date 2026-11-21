@@ -1,0 +1,242 @@
+{
+  "story_id": "04.6",
+  "source_impl_plan_md_sha256": "b4bd931d0ab76ac5e126187ea3b68135f5b51585b52dd73519b58f2df144c255",
+  "synced_at": 1795191073,
+  "target_files": {
+    "create": [
+      "crates/spec-registry/migrations/V16__story_04_6_cas_blobs.sql",
+      "src/api/chat-vault.ts",
+      "src/app/api/v1/cas/upload/route.ts",
+      "src/lib/validations/chat-vault.ts"
+    ],
+    "modify": [
+      "prisma/schema.prisma",
+      "src/features/flow/utils/html-sandbox-sanitizer.ts"
+    ],
+    "delete": []
+  },
+  "tasks": [
+    {
+      "id": "T1",
+      "task_id": "T1",
+      "name": "Cập nhật `data-spec.md`, `prisma/schema.prisma`, và SQLite migration `crates/spec-registry/migrations/V16__story_04_6_cas_blobs.sql`: materialize đầy đủ `CasBlob`, `CasAttachment`, `TenantCasBlobUsage`, `CasUploadIngress`, `CasCommandIdempotency`, `VaultCommandIdempotency`; `cas_attachments`/`cas_upload_ingress` không có `expires_at`; `cas_command_idempotency` có FK `attachment_id ON DELETE CASCADE`, unique `(tenant_id, session_id, idempotency_key)`, digest/timestamps/index expiry; kiểm tra bằng sqlite migration test.",
+      "status": "pending",
+      "target": "prisma/schema.prisma",
+      "target_files": [
+        "prisma/schema.prisma",
+        "crates/spec-registry/migrations/V16__story_04_6_cas_blobs.sql"
+      ],
+      "files": [
+        "prisma/schema.prisma",
+        "crates/spec-registry/migrations/V16__story_04_6_cas_blobs.sql"
+      ]
+    },
+    {
+      "id": "T2",
+      "task_id": "T2",
+      "name": "Implement SQLite idempotency purge allowlist trong Axum service: chỉ chạy `DELETE FROM cas_command_idempotency WHERE tenant_id = ? AND expires_at < ?` và `DELETE FROM vault_command_idempotency WHERE tenant_id = ? AND expires_at < ?`; cấm mọi route handler hoặc worker xóa `cas_attachments`, `cas_blobs`, `cas_upload_ingress` vì idempotency TTL.",
+      "status": "pending",
+      "target": "",
+      "target_files": [],
+      "files": []
+    },
+    {
+      "id": "T3",
+      "task_id": "T3",
+      "name": "Tạo Zod `ApiErrorDtoSchema`, schemas chat/CAS/vault/idempotency trong `src/lib/validations/chat-vault.ts`, và typed client sdk duy nhất `src/api/chat-vault.ts`; UI/hooks không dùng direct `fetch()`.",
+      "status": "pending",
+      "target": "src/lib/validations/chat-vault.ts",
+      "target_files": [
+        "src/lib/validations/chat-vault.ts",
+        "src/api/chat-vault.ts"
+      ],
+      "files": [
+        "src/lib/validations/chat-vault.ts",
+        "src/api/chat-vault.ts"
+      ]
+    },
+    {
+      "id": "T4",
+      "task_id": "T4",
+      "name": "Với `GET /api/v1/chat-sessions/:sid/messages`, implement Axum route handler principal-scoped, Next `src/app/api/v1/chat-sessions/[sid]/messages/route.ts` bọc `guardedRoute`, client sdk `src/api/chat-vault.ts`, và zod schema; cross-tenant/missing trả `404 RESOURCE_NOT_FOUND`.",
+      "status": "pending",
+      "target": "src/api/chat-vault.ts",
+      "target_files": [
+        "src/api/chat-vault.ts"
+      ],
+      "files": [
+        "src/api/chat-vault.ts"
+      ]
+    },
+    {
+      "id": "T5",
+      "task_id": "T5",
+      "name": "Với `POST /api/v1/chat-sessions/:sid/messages`, implement Axum route handler auto-provision session tenant-bound, Next route handler `guardedRoute`, client sdk `src/api/chat-vault.ts`, và zod schema; server intercept/redact secret trước optimistic state, sqlite persistence và SSE serialization.",
+      "status": "pending",
+      "target": "src/api/chat-vault.ts",
+      "target_files": [
+        "src/api/chat-vault.ts"
+      ],
+      "files": [
+        "src/api/chat-vault.ts"
+      ]
+    },
+    {
+      "id": "T6",
+      "task_id": "T6",
+      "name": "Với `POST /api/v1/cas/upload`, implement Axum route handler anti-IDOR và receipt idempotency, Next route handler `src/app/api/v1/cas/upload/route.ts` bọc `guardedRoute`, client sdk `src/api/chat-vault.ts`, và zod schema; cấm direct fetch tại UI/hooks.",
+      "status": "pending",
+      "target": "src/app/api/v1/cas/upload/route.ts",
+      "target_files": [
+        "src/app/api/v1/cas/upload/route.ts",
+        "src/api/chat-vault.ts"
+      ],
+      "files": [
+        "src/app/api/v1/cas/upload/route.ts",
+        "src/api/chat-vault.ts"
+      ]
+    },
+    {
+      "id": "T7",
+      "task_id": "T7",
+      "name": "Với `POST /api/v1/vault/chat-ingest`, implement Axum route handler 3-layer secret interceptor và vault receipt replay, Next route handler `guardedRoute`, client sdk `src/api/chat-vault.ts`, và zod schema; không persist/log/SSE plaintext secret.",
+      "status": "pending",
+      "target": "src/api/chat-vault.ts",
+      "target_files": [
+        "src/api/chat-vault.ts"
+      ],
+      "files": [
+        "src/api/chat-vault.ts"
+      ]
+    },
+    {
+      "id": "T8",
+      "task_id": "T8",
+      "name": "Với `POST` và `DELETE /api/v1/vault/receipts/:receipt_id`, implement Axum route handler authorization, Next route handler `guardedRoute`, client sdk `src/api/chat-vault.ts`, và zod schema; receipt cross-tenant/missing phải không phân biệt bằng `404 RESOURCE_NOT_FOUND`.",
+      "status": "pending",
+      "target": "src/api/chat-vault.ts",
+      "target_files": [
+        "src/api/chat-vault.ts"
+      ],
+      "files": [
+        "src/api/chat-vault.ts"
+      ]
+    },
+    {
+      "id": "T9",
+      "task_id": "T9",
+      "name": "Implement reusable SQLite retry executor cho Axum route handler: 3 attempts, 25ms initial exponential backoff, cap 200ms, jitter 0–25ms, deadline 3000ms; exhausted busy trả `503 CHAT_WRITE_CONTENTION`, `retryable:true`, không partial sqlite write.",
+      "status": "pending",
+      "target": "",
+      "target_files": [],
+      "files": []
+    },
+    {
+      "id": "T10",
+      "task_id": "T10",
+      "name": "Implement CAS Axum route handler order: stream `.tmp-<uuid>` với `O_NOFOLLOW`/`0600`, hard-stop `26_214_401`, SHA/magic/archive validation, shared per-SHA mutex, sqlite `BEGIN IMMEDIATE`, purge receipt TTL allowlist, replay/mismatch decision, quota checks, fsync/rename, upsert blob/attachment/usage/permanent ingress/new CAS receipt, commit, release lock.",
+      "status": "pending",
+      "target": "",
+      "target_files": [],
+      "files": []
+    },
+    {
+      "id": "T11",
+      "task_id": "T11",
+      "name": "Implement rollback/GC trong Axum service với cùng mutex: cleanup temp; final mới chỉ được unlink sau sqlite `BEGIN IMMEDIATE` chứng minh không có committed blob reference; attachment deletion cập nhật refcount; GC chỉ unlink `ref_count == 0 AND gc_lease_until < now_ms`.",
+      "status": "pending",
+      "target": "",
+      "target_files": [],
+      "files": []
+    },
+    {
+      "id": "T12",
+      "task_id": "T12",
+      "name": "Update `src/features/flow/utils/html-sandbox-sanitizer.ts` với deterministic viewBox fallback, strict SVG URL grammar, và `DESIGN_CDN_CSP` parser fail-closed.",
+      "status": "pending",
+      "target": "src/features/flow/utils/html-sandbox-sanitizer.ts",
+      "target_files": [
+        "src/features/flow/utils/html-sandbox-sanitizer.ts"
+      ],
+      "files": [
+        "src/features/flow/utils/html-sandbox-sanitizer.ts"
+      ]
+    },
+    {
+      "id": "T13",
+      "task_id": "T13",
+      "name": "`UT-IDOR-001`: xác minh sáu operations chat/CAS/vault dùng Axum route handler, guardedRoute, client sdk và zod contracts; cross-tenant/missing trả `404`, thiếu capability trả `403`, không leak metadata.",
+      "status": "pending",
+      "target": "",
+      "target_files": [],
+      "files": []
+    },
+    {
+      "id": "T14",
+      "task_id": "T14",
+      "name": "`UT-IDEMPOTENCY-001`: cùng key/cùng digest chỉ commit một lần; replay `200` không tăng attachment refcount, physical usage hoặc ingress; digest khác trả `409`.",
+      "status": "pending",
+      "target": "",
+      "target_files": [],
+      "files": []
+    },
+    {
+      "id": "T15",
+      "task_id": "T15",
+      "name": "`UT-IDEMPOTENCY-002`: sau `expires_at < now_ms`, purge chỉ xóa CAS receipt và cho phép reuse key; assert existing `cas_attachments`, `cas_blobs`, `cas_upload_ingress` vẫn nguyên vẹn byte-for-byte/row-for-row.",
+      "status": "pending",
+      "target": "",
+      "target_files": [],
+      "files": []
+    },
+    {
+      "id": "T16",
+      "task_id": "T16",
+      "name": "`UT-IDEMPOTENCY-003`: assert purge Vault chỉ xóa expired `vault_command_idempotency`; không xóa vault receipt hợp lệ trước expiry và không có secret material trong sqlite row.",
+      "status": "pending",
+      "target": "",
+      "target_files": [],
+      "files": []
+    },
+    {
+      "id": "T17",
+      "task_id": "T17",
+      "name": "`UT-FK-RECEIPT-001`: verify `CasCommandIdempotency.attachment_id` FK `ON DELETE CASCADE`; attachment lifecycle hợp lệ xóa receipt liên quan, còn TTL purge không được gọi attachment delete.",
+      "status": "pending",
+      "target": "",
+      "target_files": [],
+      "files": []
+    },
+    {
+      "id": "T18",
+      "task_id": "T18",
+      "name": "`UT-GC-RACE-001`, `UT-ARCHIVE-CAPS-001`, `UT-RETRY-001`, `UT-CSP-SVG-001`, và `UT-ERROR-001`: giữ toàn bộ boundary/race/error assertions trước đó, bao gồm no-leak error DTO và sqlite atomicity.",
+      "status": "pending",
+      "target": "",
+      "target_files": [],
+      "files": []
+    },
+    {
+      "id": "T19",
+      "task_id": "T19",
+      "name": "`E2E-CHAT-CAS-VAULT-001`: dùng client sdk `src/api/chat-vault.ts` qua guardedRoute route handler; verify reload chat persistence, binary/CSV/XLSX/FIG upload, paste prevention, vault receipt masking, and no direct UI fetch.",
+      "status": "pending",
+      "target": "src/api/chat-vault.ts",
+      "target_files": [
+        "src/api/chat-vault.ts"
+      ],
+      "files": [
+        "src/api/chat-vault.ts"
+      ]
+    },
+    {
+      "id": "T20",
+      "task_id": "T20",
+      "name": "`E2E-TTL-PRESERVATION-001`: tạo attachment và ingress, advance clock >24h, chạy TTL purge, upload lại với same key, và assert attachment/blob/ingress cũ không mất trước/sau command mới.",
+      "status": "pending",
+      "target": "",
+      "target_files": [],
+      "files": []
+    }
+  ]
+}

@@ -24,6 +24,7 @@ import {
   type RouteFn,
 } from "./vite-bff-flow-routes";
 import { PLUGIN_ECOSYSTEM_ROUTES } from "./vite-bff-plugins-routes";
+import { CHAT_VAULT_ROUTES } from "./vite-bff-chat-vault-routes";
 import * as doctorRoute from "../app/api/doctor/route";
 import * as snapshotRoute from "../app/api/projects/[id]/flow/snapshot/route";
 import * as nodesRoute from "../app/api/projects/[id]/flow/nodes/route";
@@ -165,6 +166,7 @@ const ROUTE_TABLE: RouteEntry[] = [
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/sdi\/intent\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent/${safeEncodeSegment(m[2])}`),
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/sdi\/clarification$/, extractParams: idOnly, resolveHandler: () => sdiClarificationRoute.POST },
   ...PLUGIN_ECOSYSTEM_ROUTES,
+  ...CHAT_VAULT_ROUTES,
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.POST },
   { method: "PUT", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/reorder$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]) }), resolveHandler: () => deckReorderRoute.PUT },

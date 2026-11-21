@@ -167,7 +167,9 @@
     "sseEventCompleted": "Evento {{event}} concluído.",
     "proposalCompileWarning": "Não foi possível sintetizar ChangeProposal agora; verifique as entradas.",
     "intentStatusLabel": "Estado",
-    "forkFromHere": "Ramificar conversa daqui"
+    "forkFromHere": "Ramificar conversa daqui",
+    "persistFailed": "Não foi possível salvar a mensagem no histórico SQLite.",
+    "vaultComposerPlaceholder": "Pergunte ao cowok Agent ou cole a chave API..."
   },
   "canvas": {
     "userflowLens": "Fluxo de usuário (Userflow)",
@@ -1143,5 +1145,25 @@
     },
     "commentsDrawerTitle": "Comentários fixados",
     "overlaysRegionLabel": "Camadas de interação espacial"
+  },
+  "cas": {
+    "uploadFailed": "Falha ao enviar arquivo para o armazenamento CAS.",
+    "uploading": "Enviando ativo binário para o CAS...",
+    "prompt": "Anexar .csv / .tsv / .xlsx / .fig / .pdf / .png / .svg / .txt"
+  },
+  "vault": {
+    "onboardingTitle": "Integração de Chave Decision Engine (Cofre Zero-Leak)",
+    "onboardingDesc": "Obtenha uma chave API no Google AI Studio ou TypeSafe JEV e cole no chat. As chaves são criptografadas antes do armazenamento.",
+    "localOnlyLabel": "Bloqueio Local Corporativo (sem sondas externas)",
+    "googleAiStudioKey": "Chave Google AI Studio",
+    "typesafeJevKey": "Chave TypeSafe JEV",
+    "replacePlaceholder": "Digite a nova chave API",
+    "confirm": "Confirmar salvamento",
+    "replace": "Substituir",
+    "revoke": "Revogar",
+    "localOnlyBadge": "Somente local",
+    "highEntropyBadge": "Chave de alta entropia",
+    "onboardingToggle": "Cofre API",
+    "ingestFailed": "Falha ao salvar a chave no cofre seguro."
   }
 }

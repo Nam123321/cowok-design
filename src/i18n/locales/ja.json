@@ -167,7 +167,9 @@
     "sseEventCompleted": "イベント {{event}} が完了しました。",
     "proposalCompileWarning": "現在 ChangeProposal を生成できません。入力内容をご確認ください。",
     "intentStatusLabel": "状態",
-    "forkFromHere": "ここから会話を分岐"
+    "forkFromHere": "ここから会話を分岐",
+    "persistFailed": "SQLite 履歴へのメッセージ保存に失敗しました。",
+    "vaultComposerPlaceholder": "cowok Agent に質問するか API キーを貼り付け..."
   },
   "canvas": {
     "userflowLens": "ユーザーフロー (Userflow)",
@@ -1143,5 +1145,25 @@
     },
     "commentsDrawerTitle": "固定コメント",
     "overlaysRegionLabel": "空間インタラクションオーバーレイ"
+  },
+  "cas": {
+    "uploadFailed": "CAS ストレージへのファイルアップロードに失敗しました。",
+    "uploading": "CAS へバイナリアセットをアップロード中...",
+    "prompt": "添付 .csv / .tsv / .xlsx / .fig / .pdf / .png / .svg / .txt"
+  },
+  "vault": {
+    "onboardingTitle": "Decision Engine API キー登録 (Zero-Leak 保管庫)",
+    "onboardingDesc": "Google AI Studio または TypeSafe JEV の API キーを取得してチャットに貼り付けてください。保存前に暗号化されます。",
+    "localOnlyLabel": "エンタープライズ ローカル限定ロック (外部通信なし)",
+    "googleAiStudioKey": "Google AI Studio キー",
+    "typesafeJevKey": "TypeSafe JEV キー",
+    "replacePlaceholder": "新しい API キーを入力",
+    "confirm": "保存を確定",
+    "replace": "置換",
+    "revoke": "失効",
+    "localOnlyBadge": "ローカル限定",
+    "highEntropyBadge": "高エントロピーキー",
+    "onboardingToggle": "API 保管庫",
+    "ingestFailed": "安全な保管庫への認証キー保存に失敗しました。"
   }
 }

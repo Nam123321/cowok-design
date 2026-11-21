@@ -167,7 +167,9 @@
     "sseEventCompleted": "이벤트 {{event}}이(가) 완료되었습니다.",
     "proposalCompileWarning": "지금은 ChangeProposal을 생성할 수 없습니다. 입력값을 확인하세요.",
     "intentStatusLabel": "상태",
-    "forkFromHere": "여기에서 대화 분기"
+    "forkFromHere": "여기에서 대화 분기",
+    "persistFailed": "SQLite 기록에 메시지를 저장할 수 없습니다.",
+    "vaultComposerPlaceholder": "cowok Agent에게 질문하거나 API 키를 붙여넣으세요..."
   },
   "canvas": {
     "userflowLens": "사용자 흐름 (Userflow)",
@@ -1143,5 +1145,25 @@
     },
     "commentsDrawerTitle": "고정된 댓글",
     "overlaysRegionLabel": "공간 인터랙션 오버레이"
+  },
+  "cas": {
+    "uploadFailed": "CAS 스토리지에 파일을 업로드하지 못했습니다.",
+    "uploading": "CAS에 바이너리 자산 업로드 중...",
+    "prompt": "첨부 .csv / .tsv / .xlsx / .fig / .pdf / .png / .svg / .txt"
+  },
+  "vault": {
+    "onboardingTitle": "Decision Engine API 키 등록 (Zero-Leak 볼트)",
+    "onboardingDesc": "Google AI Studio 또는 TypeSafe JEV에서 API 키를 발급받아 채팅에 붙여넣으세요. 저장 전에 암호화됩니다.",
+    "localOnlyLabel": "엔터프라이즈 로컬 전용 잠금 (외부 프로브 없음)",
+    "googleAiStudioKey": "Google AI Studio 키",
+    "typesafeJevKey": "TypeSafe JEV 키",
+    "replacePlaceholder": "새 API 키 입력",
+    "confirm": "저장 확인",
+    "replace": "교체",
+    "revoke": "해지",
+    "localOnlyBadge": "로컬 전용",
+    "highEntropyBadge": "고엔트로피 키",
+    "onboardingToggle": "API 보관함",
+    "ingestFailed": "보안 볼트에 인증 키를 저장하지 못했습니다."
   }
 }
