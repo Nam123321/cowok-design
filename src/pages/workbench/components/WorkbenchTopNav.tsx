@@ -1,6 +1,7 @@
 // cowok-design — Canonical Workbench Top Window Bar (DESIGN.md v4.3-OS & Section 9.3 / Hình 2 & Hình 5)
 import React from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
+import { ContextMeterWidget } from "../../../features/context-meter/ContextMeterWidget";
 import { useTranslation } from "../../../hooks/useTranslation";
 
 export type ThemeMode = "warm" | "dim" | "night" | "night-low" | "monochrome";
@@ -194,6 +195,7 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
 
       {/* Right Zone: Clean Global Window Context (Tab-specific DAG/Slide controls are strictly scoped inside the active tab) */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <ContextMeterWidget projectId={projectId} />
         <a
           href={pluginCenterHref}
           data-testid="nav-plugin-center"

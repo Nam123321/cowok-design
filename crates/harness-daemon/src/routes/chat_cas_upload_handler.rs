@@ -22,8 +22,8 @@ use crate::routes::chat_cas_archive::{
 use crate::routes::chat_cas_storage::{
     compute_cas_payload_digest, ensure_session_for_tenant, execute_immediate_with_retry,
     purge_expired_idempotency_receipts, resolve_idempotency_key, safe_api_error_response,
-    ChatCasTxError, CAS_GC_LEASE_MS, CAS_MAX_SESSION_ATTACHMENTS,
-    CAS_MAX_TENANT_INGRESS_24H_BYTES, CAS_MAX_TENANT_PHYSICAL_BYTES, IDEMPOTENCY_TTL_MS,
+    ChatCasTxError, CAS_GC_LEASE_MS, CAS_MAX_SESSION_ATTACHMENTS, CAS_MAX_TENANT_INGRESS_24H_BYTES,
+    CAS_MAX_TENANT_PHYSICAL_BYTES, IDEMPOTENCY_TTL_MS,
 };
 use crate::routes::DaemonAppState;
 
@@ -70,7 +70,9 @@ fn sanitize_upload_filename(raw: &str) -> Result<String, Response> {
         || base == "."
         || base == ".."
         || base.len() > 255
-        || base.bytes().any(|b| b < 0x20 || b == 0x7f || b == b'/' || b == b'\\')
+        || base
+            .bytes()
+            .any(|b| b < 0x20 || b == 0x7f || b == b'/' || b == b'\\')
     {
         return Err(safe_api_error_response(
             StatusCode::BAD_REQUEST,
@@ -168,15 +170,18 @@ fn parse_multipart_bytes(boundary: &str, raw: &[u8]) -> Result<ParsedCasInput, R
         }
     }
 
-    let sid = session_id.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).ok_or_else(|| {
-        safe_api_error_response(
-            StatusCode::BAD_REQUEST,
-            "CAS_INVALID_REQUEST",
-            "Missing sessionId field",
-            false,
-            None,
-        )
-    })?;
+    let sid = session_id
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            safe_api_error_response(
+                StatusCode::BAD_REQUEST,
+                "CAS_INVALID_REQUEST",
+                "Missing sessionId field",
+                false,
+                None,
+            )
+        })?;
     let fname = sanitize_upload_filename(&filename.unwrap_or_default())?;
     let bytes = file_bytes.ok_or_else(|| {
         safe_api_error_response(
@@ -206,7 +211,12 @@ fn parse_cas_input(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
     if let Some(idx) = ct.find("boundary=") {
-        let b = ct[idx + 9..].split(';').next().unwrap_or("").trim().trim_matches('"');
+        let b = ct[idx + 9..]
+            .split(';')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .trim_matches('"');
         if !b.is_empty() {
             return parse_multipart_bytes(b, raw);
         }
@@ -334,7 +344,11 @@ async fn execute_cas_upload_core(
 ) -> Response {
     let sha_lock = state.cas_sha_lock(blob_sha).await;
     let _sha_guard = sha_lock.lock().await;
-    let cas_root = state.registry.pool().workspace_root().join(".cowok-design/cas");
+    let cas_root = state
+        .registry
+        .pool()
+        .workspace_root()
+        .join(".cowok-design/cas");
     let byte_size = parsed.file_bytes.len() as i64;
     let relpath = format!(".cowok-design/cas/{blob_sha}");
 
@@ -380,7 +394,14 @@ async fn execute_cas_upload_core(
                 parsed.project_id.as_deref(),
                 now_ms,
             )?;
-            enforce_cas_quotas(tx, tenant_id, &parsed.session_id, blob_sha, byte_size, now_ms)?;
+            enforce_cas_quotas(
+                tx,
+                tenant_id,
+                &parsed.session_id,
+                blob_sha,
+                byte_size,
+                now_ms,
+            )?;
             Ok(None)
         },
     )

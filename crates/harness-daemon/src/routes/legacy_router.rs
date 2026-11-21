@@ -8,6 +8,7 @@ use axum::{
 
 use crate::daemon_auth::legacy_project_auth_middleware;
 use crate::routes::chat_cas_vault::chat_cas_vault_routes;
+use crate::routes::context_assemble::{handle_context_assemble, handle_get_context_telemetry};
 use crate::routes::fs_jail;
 use crate::routes::github_ide_integrations::integration_routes;
 use crate::routes::legacy_proposals::{
@@ -84,6 +85,11 @@ fn legacy_project_spec_routes() -> Router<DaemonAppState> {
             post(handle_model_adapter),
         )
         .route("/api/v1/projects/:id/lint", post(handle_lint_source))
+        .route("/api/v1/context/assemble", post(handle_context_assemble))
+        .route(
+            "/api/v1/context/telemetry",
+            get(handle_get_context_telemetry),
+        )
 }
 
 fn legacy_sdi_proposal_routes() -> Router<DaemonAppState> {

@@ -491,7 +491,9 @@ pub async fn handle_vault_chat_ingest(
     let sec_seal = secret.clone();
     let sealed_ok = tokio::task::spawn_blocking(move || {
         let store = VaultStore::from_workspace_root(&ws_root);
-        store.upsert_secret_scoped(&tid_seal, &vkey_seal, &sec_seal, None).is_ok()
+        store
+            .upsert_secret_scoped(&tid_seal, &vkey_seal, &sec_seal, None)
+            .is_ok()
     })
     .await
     .unwrap_or(false);
@@ -732,7 +734,8 @@ pub async fn handle_revoke_vault_receipt(
     let tid_del = tenant_id.clone();
     let vkey_del = vkey.clone();
     let _ = tokio::task::spawn_blocking(move || {
-        let _ = VaultStore::from_workspace_root(&ws_del).delete_secret_scoped(&tid_del, &vkey_del, None);
+        let _ = VaultStore::from_workspace_root(&ws_del)
+            .delete_secret_scoped(&tid_del, &vkey_del, None);
     })
     .await;
     state.ram_vault.remove(&tenant_id, &vkey);

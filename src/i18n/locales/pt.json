@@ -1165,5 +1165,38 @@
     "highEntropyBadge": "Chave de alta entropia",
     "onboardingToggle": "Cofre API",
     "ingestFailed": "Falha ao salvar a chave no cofre seguro."
+  },
+  "contextMeter": {
+    "triggerLabel": "Medidor de Orçamento de Contexto",
+    "popoverTitle": "Telemetria KV-Cache e Contexto do Portal",
+    "portalLabel": "Portal do aplicativo",
+    "horizonLabel": "Horizonte de tarefa",
+    "profileLabel": "Perfil do modelo",
+    "textBudgetLabel": "Texto em BPE",
+    "outlineLabel": "Estrutura de DOM",
+    "ssotLabel": "Índice SSOT",
+    "shaLabel": "Código SHA",
+    "loading": "Montando contexto do portal...",
+    "emptyState": "Selecione um projeto ou clique em Montar para ver o orçamento.",
+    "assembleButton": "Montar contexto",
+    "errors": {
+      "invalidRequest": "A solicitação de montagem de contexto é inválida.",
+      "invalidIdempotencyKey": "Cabeçalho Idempotency-Key UUIDv4 ausente ou inválido.",
+      "invalidCursor": "Cursor de paginação de telemetria inválido ou expirado.",
+      "projectTenantMismatch": "Acesso negado ao projeto neste inquilino.",
+      "crossPortalLeak": "Vazamento privilegiado entre portais bloqueado.",
+      "imageBudgetExceeded": "Os tokens de imagem excedem o limite por turno.",
+      "atomicBlockOverBudget": "Bloco atômico HTML/JSON excede o teto de tokens.",
+      "ssotRatioBelowMinimum": "Proporção SSOT/DOM abaixo do mínimo de 60%.",
+      "idempotencyKeyReused": "Chave de idempotência reutilizada com dados diferentes.",
+      "projectReferenceInvalid": "Referência do projeto de destino não existe.",
+      "telemetryConflict": "Conflito de persistência na telemetria.",
+      "telemetryWriteBusy": "Gravador SQLite de telemetria temporariamente ocupado.",
+      "telemetryStorageUnavailable": "Armazenamento de telemetria indisponível.",
+      "daemonContractViolation": "O daemon retornou um contrato de contexto inválido.",
+      "invalidSources": "A lista sourceIds deve conter entre 1 e 100 itens.",
+      "duplicateSourceId": "A lista sourceIds não pode conter entradas duplicadas.",
+      "storage": "Erro de armazenamento de contexto."
+    }
   }
 }

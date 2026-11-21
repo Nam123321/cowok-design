@@ -1165,5 +1165,38 @@
     "highEntropyBadge": "Khóa Entropy Cao",
     "onboardingToggle": "Kho API Key",
     "ingestFailed": "Không thể lưu khóa vào kho bảo mật."
+  },
+  "contextMeter": {
+    "triggerLabel": "Đồng hồ ngân sách ngữ cảnh",
+    "popoverTitle": "Thống kê KV-Cache & Cổng ngữ cảnh",
+    "portalLabel": "Cổng mục tiêu",
+    "horizonLabel": "Tầm tác vụ",
+    "profileLabel": "Hồ sơ mô hình",
+    "textBudgetLabel": "Văn bản BPE",
+    "outlineLabel": "Khung DOM",
+    "ssotLabel": "Chỉ số SSOT",
+    "shaLabel": "Mã SHA",
+    "loading": "Đang biên dịch ngữ cảnh cổng...",
+    "emptyState": "Chọn dự án hoặc bấm Biên dịch để xem ngân sách token.",
+    "assembleButton": "Biên dịch ngữ cảnh",
+    "errors": {
+      "invalidRequest": "Yêu cầu biên dịch ngữ cảnh không hợp lệ.",
+      "invalidIdempotencyKey": "Thiếu hoặc sai tiêu đề Idempotency-Key UUIDv4.",
+      "invalidCursor": "Con trỏ phân trang thống kê không hợp lệ.",
+      "projectTenantMismatch": "Không có quyền truy cập dự án ở tenant hiện tại.",
+      "crossPortalLeak": "Đã chặn rò rỉ dữ liệu đặc quyền chéo cổng.",
+      "imageBudgetExceeded": "Số token ảnh vượt quá giới hạn mỗi lượt.",
+      "atomicBlockOverBudget": "Khối HTML/JSON nguyên tử vượt trần ngân sách.",
+      "ssotRatioBelowMinimum": "Tỷ lệ SSOT/DOM thấp hơn ngưỡng tối thiểu 60%.",
+      "idempotencyKeyReused": "Khóa chống lặp bị tái sử dụng cho nội dung khác.",
+      "projectReferenceInvalid": "Tham chiếu dự án đích không tồn tại.",
+      "telemetryConflict": "Xảy ra xung đột khi ghi thống kê.",
+      "telemetryWriteBusy": "Kho ghi SQLite đang bận, vui lòng thử lại.",
+      "telemetryStorageUnavailable": "Dịch vụ lưu trữ thống kê tạm thời gián đoạn.",
+      "daemonContractViolation": "Daemon trả về cấu trúc hợp đồng ngữ cảnh sai.",
+      "invalidSources": "Danh sách sourceIds phải có từ 1 đến 100 mục.",
+      "duplicateSourceId": "Danh sách sourceIds không được chứa phần tử trùng lặp.",
+      "storage": "Lỗi lưu trữ ngữ cảnh."
+    }
   }
 }

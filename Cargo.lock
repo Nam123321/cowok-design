@@ -376,6 +376,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "context-compiler"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "domain",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "spec-registry",
+ "tempfile",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
 name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -828,6 +845,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "constraint-engine",
+ "context-compiler",
  "croner",
  "domain",
  "flow-graph",

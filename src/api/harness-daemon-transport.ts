@@ -175,6 +175,30 @@ export class HarnessDaemonTransport {
     return schema.parse(JSON.parse(rawText));
   }
 
+  /** Performs an authenticated fetch returning the raw Response so custom error envelopes can be parsed intact. */
+  protected async fetchAuthedResponse(
+    path: string,
+    options: RequestInit = {},
+    retried = false
+  ): Promise<Response> {
+    const token = await this.ensureSessionToken(retried);
+    const headers = new Headers(options.headers || {});
+    if (options.body !== undefined && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+    headers.set("X-Cowok-Session-Token", token);
+    if (!headers.has("X-Correlation-Id")) {
+      headers.set("X-Correlation-Id", nextCorrelationId());
+    }
+    const doFetch = this.resolveFetch();
+    const res = await doFetch(`${this.baseUrl}${path}`, { ...options, headers });
+    if (res.status === HTTP_STATUS_UNAUTHORIZED && !retried) {
+      this.cachedToken = null;
+      return this.fetchAuthedResponse(path, options, true);
+    }
+    return res;
+  }
+
   /** Opens an authenticated SSE Response using the loopback BFF session token header. */
   async openEventStream(path: string, signal?: AbortSignal, retried = false): Promise<Response> {
     const token = await this.ensureSessionToken(retried);

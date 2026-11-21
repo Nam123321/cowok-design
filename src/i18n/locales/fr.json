@@ -1165,5 +1165,38 @@
     "highEntropyBadge": "Clé haute entropie",
     "onboardingToggle": "Coffre API",
     "ingestFailed": "Échec de l'enregistrement de la clé dans le coffre sécurisé."
+  },
+  "contextMeter": {
+    "triggerLabel": "Jauge du budget de contexte",
+    "popoverTitle": "Télémétrie KV-Cache et contexte du portail",
+    "portalLabel": "Portail cible",
+    "horizonLabel": "Portée de tâche",
+    "profileLabel": "Profil de modèle",
+    "textBudgetLabel": "Texte BPE",
+    "outlineLabel": "Plan DOM",
+    "ssotLabel": "Indice SSOT",
+    "shaLabel": "Empreinte SHA",
+    "loading": "Assemblage du contexte du portail...",
+    "emptyState": "Sélectionnez un projet ou cliquez sur Assembler pour inspecter.",
+    "assembleButton": "Assembler le contexte",
+    "errors": {
+      "invalidRequest": "La requête d'assemblage de contexte est invalide.",
+      "invalidIdempotencyKey": "En-tête Idempotency-Key UUIDv4 manquant ou invalide.",
+      "invalidCursor": "Le curseur de pagination télémétrique est invalide.",
+      "projectTenantMismatch": "Accès au projet refusé pour ce locataire.",
+      "crossPortalLeak": "Fuite de contexte privilégié inter-portail bloquée.",
+      "imageBudgetExceeded": "Les jetons image demandés dépassent la limite.",
+      "atomicBlockOverBudget": "Le bloc atomique HTML/JSON dépasse le plafond.",
+      "ssotRatioBelowMinimum": "Le ratio SSOT/DOM est inférieur au seuil de 60%.",
+      "idempotencyKeyReused": "Clé d'idempotence réutilisée avec un autre contenu.",
+      "projectReferenceInvalid": "La référence du projet cible n'existe pas.",
+      "telemetryConflict": "Conflit de persistance télémétrique détecté.",
+      "telemetryWriteBusy": "L'écriture SQLite de télémétrie est occupée.",
+      "telemetryStorageUnavailable": "Le stockage de télémétrie est indisponible.",
+      "daemonContractViolation": "Le démon a retourné un contrat de contexte invalide.",
+      "invalidSources": "La liste sourceIds doit contenir entre 1 et 100 éléments.",
+      "duplicateSourceId": "La liste sourceIds ne doit pas contenir de doublons.",
+      "storage": "Erreur de stockage du contexte."
+    }
   }
 }

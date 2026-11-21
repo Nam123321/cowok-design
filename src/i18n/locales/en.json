@@ -1165,5 +1165,38 @@
     "highEntropyBadge": "High-Entropy Key",
     "onboardingToggle": "API Key Vault",
     "ingestFailed": "Failed to save credential to secure vault."
+  },
+  "contextMeter": {
+    "triggerLabel": "Context Budget Meter",
+    "popoverTitle": "KV-Cache & Portal Context Telemetry",
+    "portalLabel": "Portal",
+    "horizonLabel": "Horizon",
+    "profileLabel": "Model Profile",
+    "textBudgetLabel": "Text BPE",
+    "outlineLabel": "DOM Outline",
+    "ssotLabel": "SSOT",
+    "shaLabel": "SHA",
+    "loading": "Assembling portal context...",
+    "emptyState": "Select a project or click Assemble to inspect context budget.",
+    "assembleButton": "Assemble Context",
+    "errors": {
+      "invalidRequest": "Context assembly request is invalid.",
+      "invalidIdempotencyKey": "Missing or invalid Idempotency-Key UUIDv4 header.",
+      "invalidCursor": "Telemetry pagination cursor is invalid or expired.",
+      "projectTenantMismatch": "Project access denied for current tenant.",
+      "crossPortalLeak": "Cross-portal privileged context leakage blocked.",
+      "imageBudgetExceeded": "Requested image tokens exceed turn limit.",
+      "atomicBlockOverBudget": "Atomic HTML/JSON block exceeds token ceiling.",
+      "ssotRatioBelowMinimum": "SSOT/DOM ratio dropped below 60% floor.",
+      "idempotencyKeyReused": "Idempotency key reused with a different request payload.",
+      "projectReferenceInvalid": "Target project reference does not exist.",
+      "telemetryConflict": "Telemetry persistence conflict occurred.",
+      "telemetryWriteBusy": "SQLite telemetry writer is temporarily busy.",
+      "telemetryStorageUnavailable": "Context telemetry storage is unavailable.",
+      "daemonContractViolation": "Daemon returned a malformed context contract payload.",
+      "invalidSources": "Requested context sourceIds must contain 1 to 100 entries.",
+      "duplicateSourceId": "Requested context sourceIds must not contain duplicates.",
+      "storage": "Context storage error occurred."
+    }
   }
 }

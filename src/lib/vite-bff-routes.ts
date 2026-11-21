@@ -43,6 +43,8 @@ import * as verifyPathTokenRoute from "../app/api/projects/[id]/verify-path-toke
 import * as projectPromoteRoute from "../app/api/projects/[id]/promote/route";
 import * as projectSpecsRoute from "../app/api/projects/[id]/specs/route";
 import * as singleSpecRoute from "../app/api/projects/[id]/specs/[spec_key]/route";
+import * as contextAssembleRoute from "../app/api/v1/context/assemble/route";
+import * as contextTelemetryRoute from "../app/api/v1/context/telemetry/route";
 import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize/route";
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
 import * as versionSnapshotsRoute from "../app/api/projects/[id]/snapshots/route";
@@ -167,6 +169,8 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/sdi\/clarification$/, extractParams: idOnly, resolveHandler: () => sdiClarificationRoute.POST },
   ...PLUGIN_ECOSYSTEM_ROUTES,
   ...CHAT_VAULT_ROUTES,
+  { method: "POST", pattern: /^\/api\/context\/assemble$/, extractParams: noParams, resolveHandler: () => contextAssembleRoute.POST },
+  { method: "GET", pattern: /^\/api\/context\/telemetry$/, extractParams: noParams, resolveHandler: () => contextTelemetryRoute.GET },
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.POST },
   { method: "PUT", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/reorder$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]) }), resolveHandler: () => deckReorderRoute.PUT },

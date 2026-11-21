@@ -1165,5 +1165,38 @@
     "highEntropyBadge": "Chiave ad alta entropia",
     "onboardingToggle": "Vault API",
     "ingestFailed": "Impossibile salvare la chiave nel vault sicuro."
+  },
+  "contextMeter": {
+    "triggerLabel": "Misuratore Budget Contesto",
+    "popoverTitle": "Telemetria KV-Cache e Contesto Portale",
+    "portalLabel": "Portale di destinazione",
+    "horizonLabel": "Orizzonte operativo",
+    "profileLabel": "Profilo modello",
+    "textBudgetLabel": "Testo BPE",
+    "outlineLabel": "Struttura DOM",
+    "ssotLabel": "Indice SSOT",
+    "shaLabel": "Codice SHA",
+    "loading": "Assemblaggio contesto del portale...",
+    "emptyState": "Seleziona un progetto o premi Assembla per ispezionare il budget.",
+    "assembleButton": "Assembla contesto",
+    "errors": {
+      "invalidRequest": "La richiesta di assemblaggio contesto non è valida.",
+      "invalidIdempotencyKey": "Intestazione Idempotency-Key UUIDv4 mancante o non valida.",
+      "invalidCursor": "Cursore di paginazione telemetrica non valido.",
+      "projectTenantMismatch": "Accesso al progetto negato per il tenant corrente.",
+      "crossPortalLeak": "Bloccata fuga di contesto privilegiato tra portali.",
+      "imageBudgetExceeded": "I token immagine richiesti superano il limite per turno.",
+      "atomicBlockOverBudget": "Blocco atomico HTML/JSON oltre il limite massimo.",
+      "ssotRatioBelowMinimum": "Rapporto SSOT/DOM inferiore alla soglia minima del 60%.",
+      "idempotencyKeyReused": "Chiave di idempotenza riutilizzata con carico diverso.",
+      "projectReferenceInvalid": "Riferimento al progetto di destinazione inesistente.",
+      "telemetryConflict": "Rilevato conflitto nella persistenza telemetrica.",
+      "telemetryWriteBusy": "Scrittura SQLite telemetria momentaneamente occupata.",
+      "telemetryStorageUnavailable": "Archivio telemetria non disponibile.",
+      "daemonContractViolation": "Il daemon ha restituito un contratto contesto errato.",
+      "invalidSources": "L'elenco sourceIds deve contenere da 1 a 100 voci.",
+      "duplicateSourceId": "L'elenco sourceIds non deve contenere duplicati.",
+      "storage": "Errore di archiviazione del contesto."
+    }
   }
 }

@@ -77,6 +77,7 @@ export function assembleForwardHeaders(
   const headers: Record<string, string> = {};
   if (safeInbound["if-match"]) headers["If-Match"] = safeInbound["if-match"];
   if (safeInbound["last-event-id"]) headers["Last-Event-ID"] = safeInbound["last-event-id"];
+  if (safeInbound["idempotency-key"]) headers["Idempotency-Key"] = safeInbound["idempotency-key"];
   if (safeInbound["x-idempotency-key"]) headers["X-Idempotency-Key"] = safeInbound["x-idempotency-key"];
   if (safeInbound["x-session-id"]) headers["X-Session-Id"] = safeInbound["x-session-id"];
   if (safeInbound["x-project-id"]) headers["X-Project-Id"] = safeInbound["x-project-id"];
@@ -103,6 +104,8 @@ export async function relayDaemonResponse(
   if (disposition) responseHeaders["Content-Disposition"] = disposition;
   const bundleSha = upstream.headers.get("x-cowok-bundle-sha256");
   if (bundleSha) responseHeaders["X-Cowok-Bundle-Sha256"] = bundleSha;
+  const retryAfter = upstream.headers.get("retry-after");
+  if (retryAfter) responseHeaders["Retry-After"] = retryAfter;
 
   if (contentType.includes("text/event-stream") && upstream.body) {
     responseHeaders["Cache-Control"] = "no-cache";

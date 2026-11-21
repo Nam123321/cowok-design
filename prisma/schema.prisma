@@ -1110,3 +1110,36 @@ model VaultCommandIdempotency {
   @@index([tenantId, expiresAt], map: "idx_vault_cmd_idempotency_exp")
   @@map("vault_command_idempotency")
 }
+
+model ContextAssemblyTelemetry {
+  id                       String  @id @default(uuid())
+  tenantId                 String  @default("local-default") @map("tenant_id")
+  projectId                String  @map("project_id")
+  idempotencyKey           String? @map("idempotency_key")
+  requestFingerprintSha256 String  @default("") @map("request_fingerprint_sha256")
+  portalId                 String  @map("portal_id")
+  horizon                  String
+  modelProfile             String  @map("model_profile")
+  adapterMode              String  @default("frontier_full") @map("adapter_mode")
+  prefixSha256             String  @map("prefix_sha256")
+  staticPrefixTokens       Int     @default(0) @map("static_prefix_tokens")
+  dynamicTailTokens        Int     @default(0) @map("dynamic_tail_tokens")
+  outlineTokens            Int     @map("outline_tokens")
+  totalTextTokens          Int     @map("total_text_tokens")
+  imageTokens              Int     @default(0) @map("image_tokens")
+  ssotDomTokens            Int     @default(0) @map("ssot_dom_tokens")
+  nonSsotTokens            Int     @default(0) @map("non_ssot_tokens")
+  ssotDomRatio             Float   @default(1.0) @map("ssot_dom_ratio")
+  sourcesRequested         Int     @default(0) @map("sources_requested")
+  sourcesIncluded          Int     @default(0) @map("sources_included")
+  sourcesPruned            Int     @default(0) @map("sources_pruned")
+  reasonCode               String  @map("reason_code")
+  responseJson             String  @default("{}") @map("response_json")
+  latencyMs                Int     @map("latency_ms")
+  createdAt                BigInt  @map("created_at")
+
+  @@unique([tenantId, projectId, idempotencyKey], map: "uq_ctx_telemetry_idem")
+  @@index([projectId, portalId, createdAt, id], map: "idx_ctx_telemetry_proj_portal")
+  @@index([tenantId, projectId, createdAt, id], map: "idx_ctx_telemetry_tenant_proj")
+  @@map("context_assembly_telemetry")
+}

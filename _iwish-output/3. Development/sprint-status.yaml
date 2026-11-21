@@ -14,7 +14,7 @@ start_date: '2026-07-24'
 
 # Epic 02: JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills
 "Epic 02 - JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills": in-progress
-"Story 02.1 - Portal-Safe Context Slicing, KV-Cache Static-Prefix Prompt Compiler & 3-Profile Live Execution": refactored
+"Story 02.1 - Portal-Safe Context Slicing, KV-Cache Static-Prefix Prompt Compiler & 3-Profile Live Execution": completed
 "Story 02.2 - Token Budget Governor (<= 1,500 Input Tokens) & Deterministic Prompt Compiler": cancelled
 "Story 02.3 - Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter)": cancelled
 "Story 02.4 - Hidden Dual-Use SSOT (V16), AppShell & Component Registry, cowok-design-opt Spine, 7 Craft Skills & 3-Zone Router": refactored

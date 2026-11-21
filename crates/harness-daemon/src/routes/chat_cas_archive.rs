@@ -138,7 +138,8 @@ pub fn validate_zip_archive_limits(bytes: &[u8]) -> Result<(), Response> {
                 None,
             ));
         }
-        if uncomp > 0 && (comp == 0 || (uncomp as f64) / (comp as f64) > ZIP_MAX_COMPRESSION_RATIO) {
+        if uncomp > 0 && (comp == 0 || (uncomp as f64) / (comp as f64) > ZIP_MAX_COMPRESSION_RATIO)
+        {
             return Err(safe_api_error_response(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "CAS_ARCHIVE_REJECTED",
@@ -173,7 +174,10 @@ pub fn validate_zip_archive_limits(bytes: &[u8]) -> Result<(), Response> {
     Ok(())
 }
 
-pub fn validate_cas_magic_and_ext(filename: &str, bytes: &[u8]) -> Result<ValidatedCasUpload, Response> {
+pub fn validate_cas_magic_and_ext(
+    filename: &str,
+    bytes: &[u8],
+) -> Result<ValidatedCasUpload, Response> {
     if bytes.is_empty() {
         return Err(safe_api_error_response(
             StatusCode::BAD_REQUEST,
@@ -216,9 +220,10 @@ pub fn validate_cas_magic_and_ext(filename: &str, bytes: &[u8]) -> Result<Valida
             }
             ("fig", "application/x-figma")
         }
-        "svg" if std::str::from_utf8(bytes)
-            .map(|s| s.contains("<svg"))
-            .unwrap_or(false) =>
+        "svg"
+            if std::str::from_utf8(bytes)
+                .map(|s| s.contains("<svg"))
+                .unwrap_or(false) =>
         {
             ("svg", "image/svg+xml")
         }
@@ -310,12 +315,17 @@ pub fn neutralize_csv_tsv_formulas(bytes: &[u8], file_ext: &str) -> Vec<u8> {
     out.into_bytes()
 }
 
-pub fn write_atomic_cas_blob(cas_root: &Path, sha256: &str, bytes: &[u8]) -> Result<(PathBuf, bool), Response> {
+pub fn write_atomic_cas_blob(
+    cas_root: &Path,
+    sha256: &str,
+    bytes: &[u8],
+) -> Result<(PathBuf, bool), Response> {
     let final_path = cas_root.join(sha256);
     if fs::symlink_metadata(&final_path).is_ok() {
         return Ok((final_path, false));
     }
-    let (tmp_path, mut tmp_file) = open_secure_temp_file(cas_root, &format!(".tmp-{}", Uuid::new_v4()))?;
+    let (tmp_path, mut tmp_file) =
+        open_secure_temp_file(cas_root, &format!(".tmp-{}", Uuid::new_v4()))?;
     if tmp_file.write_all(bytes).is_err() || tmp_file.sync_all().is_err() {
         let _ = fs::remove_file(&tmp_path);
         return Err(safe_api_error_response(
@@ -365,9 +375,9 @@ pub async fn run_cas_gc_sweep(state: &DaemonAppState, now_ms: i64) -> usize {
     let Ok(conn) = state.registry.pool().connection() else {
         return 0;
     };
-    let Ok(mut stmt) = conn.prepare(
-        "SELECT sha256 FROM cas_blobs WHERE ref_count = 0 AND gc_lease_until < ?1",
-    ) else {
+    let Ok(mut stmt) =
+        conn.prepare("SELECT sha256 FROM cas_blobs WHERE ref_count = 0 AND gc_lease_until < ?1")
+    else {
         return 0;
     };
     let candidates: Vec<String> = stmt
@@ -376,7 +386,11 @@ pub async fn run_cas_gc_sweep(state: &DaemonAppState, now_ms: i64) -> usize {
         .map(|it| it.filter_map(Result::ok).collect())
         .unwrap_or_default();
 
-    let cas_root = state.registry.pool().workspace_root().join(".cowok-design/cas");
+    let cas_root = state
+        .registry
+        .pool()
+        .workspace_root()
+        .join(".cowok-design/cas");
     let mut swept = 0usize;
     for sha in candidates {
         let lock = state.cas_sha_lock(&sha).await;

@@ -1165,5 +1165,38 @@
     "highEntropyBadge": "高エントロピーキー",
     "onboardingToggle": "API 保管庫",
     "ingestFailed": "安全な保管庫への認証キー保存に失敗しました。"
+  },
+  "contextMeter": {
+    "triggerLabel": "コンテキスト予算メーター",
+    "popoverTitle": "KVキャッシュとポータルコンテキスト計測",
+    "portalLabel": "対象ポータル",
+    "horizonLabel": "タスク範囲",
+    "profileLabel": "モデルプロファイル",
+    "textBudgetLabel": "BPEテキスト",
+    "outlineLabel": "DOMアウトライン",
+    "ssotLabel": "SSOT 比率",
+    "shaLabel": "SHA 要約",
+    "loading": "ポータルコンテキストを編集中...",
+    "emptyState": "プロジェクトを選択するか編集を押して予算を確認してください。",
+    "assembleButton": "コンテキストを編集",
+    "errors": {
+      "invalidRequest": "コンテキスト編集リクエストが無効です。",
+      "invalidIdempotencyKey": "Idempotency-Key UUIDv4 ヘッダーが不足または無効です。",
+      "invalidCursor": "計測ページネーションカーソルが無効または期限切れです。",
+      "projectTenantMismatch": "現在のテナントではプロジェクトへのアクセスが拒否されました。",
+      "crossPortalLeak": "ポータル間の特権データ漏洩を遮断しました。",
+      "imageBudgetExceeded": "要求画像トークン数がターン上限を超えています。",
+      "atomicBlockOverBudget": "不可分HTML/JSONブロックがトークン上限を超過しました。",
+      "ssotRatioBelowMinimum": "SSOT/DOM比率が下限60%を下回りました。",
+      "idempotencyKeyReused": "異なるリクエスト内容で冪等キーが再利用されました。",
+      "projectReferenceInvalid": "対象プロジェクト参照が存在しません。",
+      "telemetryConflict": "計測データの永続化で競合が発生しました。",
+      "telemetryWriteBusy": "SQLite 計測書き込みが一時的にビジー状態です。",
+      "telemetryStorageUnavailable": "コンテキスト計測ストレージを利用できません。",
+      "daemonContractViolation": "デーモンが不正な契約ペイロードを返しました。",
+      "invalidSources": "指定する sourceIds は 1〜100 件である必要があります。",
+      "duplicateSourceId": "指定する sourceIds に重複を含めることはできません。",
+      "storage": "コンテキスト保存エラーが発生しました。"
+    }
   }
 }

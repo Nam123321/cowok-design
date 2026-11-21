@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 domain = { path = "../domain" }
 spec-registry = { path = "../spec-registry" }
+context-compiler = { path = "../context-compiler" }
 constraint-engine = { path = "../constraint-engine" }
 presentation-cms = { path = "../presentation-cms" }
 flow-graph = { path = "../flow-graph" }

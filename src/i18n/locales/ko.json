@@ -1165,5 +1165,38 @@
     "highEntropyBadge": "고엔트로피 키",
     "onboardingToggle": "API 보관함",
     "ingestFailed": "보안 볼트에 인증 키를 저장하지 못했습니다."
+  },
+  "contextMeter": {
+    "triggerLabel": "컨텍스트 예산 미터",
+    "popoverTitle": "KV-캐시 및 포털 컨텍스트 텔레메트리",
+    "portalLabel": "대상 포털",
+    "horizonLabel": "작업 범위",
+    "profileLabel": "모델 프로필",
+    "textBudgetLabel": "BPE 텍스트",
+    "outlineLabel": "DOM 개요",
+    "ssotLabel": "SSOT 비율",
+    "shaLabel": "SHA 해시",
+    "loading": "포털 컨텍스트를 조립하는 중...",
+    "emptyState": "프로젝트를 선택하거나 조립을 눌러 예산을 검사하세요.",
+    "assembleButton": "컨텍스트 조립",
+    "errors": {
+      "invalidRequest": "컨텍스트 조립 요청이 유효하지 않습니다.",
+      "invalidIdempotencyKey": "Idempotency-Key UUIDv4 헤더가 없거나 유효하지 않습니다.",
+      "invalidCursor": "텔레메트리 페이지 커서가 유효하지 않거나 만료되었습니다.",
+      "projectTenantMismatch": "현재 테넌트에 대한 프로젝트 접근이 거부되었습니다.",
+      "crossPortalLeak": "포털 간 권한 컨텍스트 유출이 차단되었습니다.",
+      "imageBudgetExceeded": "요청한 이미지 토큰이 턴 제한을 초과합니다.",
+      "atomicBlockOverBudget": "원자적 HTML/JSON 블록이 토큰 상한을 초과했습니다.",
+      "ssotRatioBelowMinimum": "SSOT/DOM 비율이 최소 60% 기준선 미만입니다.",
+      "idempotencyKeyReused": "다른 요청 본문에 멱등성 키가 재사용되었습니다.",
+      "projectReferenceInvalid": "대상 프로젝트 참조가 존재하지 않습니다.",
+      "telemetryConflict": "텔레메트리 영속성 충돌이 발생했습니다.",
+      "telemetryWriteBusy": "SQLite 텔레메트리 기록기가 일시적으로 사용 중입니다.",
+      "telemetryStorageUnavailable": "컨텍스트 텔레메트리 저장소를 사용할 수 없습니다.",
+      "daemonContractViolation": "데몬이 잘못된 컨텍스트 계약 페이로드를 반환했습니다.",
+      "invalidSources": "요청한 sourceIds 항목은 1개에서 100개 사이여야 합니다.",
+      "duplicateSourceId": "요청한 sourceIds 목록에 중복 항목이 없어야 합니다.",
+      "storage": "컨텍스트 저장소 오류가 발생했습니다."
+    }
   }
 }

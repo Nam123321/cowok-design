@@ -211,6 +211,12 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V17__story_02_1_context_telemetry.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
@@ -276,10 +282,11 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
     expect(mappedTables).toContain("cas_upload_ingress");
     expect(mappedTables).toContain("cas_command_idempotency");
     expect(mappedTables).toContain("vault_command_idempotency");
-    expect(mappedTables).toHaveLength(55);
+    expect(mappedTables).toContain("context_assembly_telemetry");
+    expect(mappedTables).toHaveLength(56);
   });
 
-  it("UT-DB-02: executes V1-V16 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V17 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 
@@ -566,5 +573,37 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
           fk.on_delete.toUpperCase() === "CASCADE"
       )
     ).toBe(true);
+  });
+
+  it("UT-DB-09: verifies Story 02.1 V17 context_assembly_telemetry Prisma parity, indexes, and project cascade", () => {
+    const db = openMigratedMemoryDb();
+    const schemaText = fs.readFileSync(schemaPath, "utf-8");
+
+    const pragmaRows = db
+      .prepare("PRAGMA table_info(context_assembly_telemetry)")
+      .all() as Array<{ name: string }>;
+    const sqliteCols = pragmaRows.map((r) => r.name).sort();
+    const prismaCols = parsePrismaModelColumns(schemaText, "ContextAssemblyTelemetry");
+    expect(sqliteCols).toEqual(prismaCols);
+
+    const fks = db
+      .prepare("PRAGMA foreign_key_list(context_assembly_telemetry)")
+      .all() as Array<{ table: string; from: string; on_delete: string }>;
+    expect(
+      fks.some(
+        (fk) =>
+          fk.table === "projects" &&
+          fk.from === "project_id" &&
+          fk.on_delete.toUpperCase() === "CASCADE"
+      )
+    ).toBe(true);
+
+    const idxRows = db
+      .prepare("PRAGMA index_list(context_assembly_telemetry)")
+      .all() as Array<{ name: string }>;
+    const idxNames = idxRows.map((r) => r.name);
+    expect(idxNames).toContain("idx_ctx_telemetry_proj_portal");
+    expect(idxNames).toContain("idx_ctx_telemetry_tenant_proj");
+    expect(idxNames).toContain("uq_ctx_telemetry_idem");
   });
 });

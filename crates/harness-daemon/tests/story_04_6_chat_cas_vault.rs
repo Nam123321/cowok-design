@@ -20,7 +20,9 @@ use spec_registry::{SpecRegistry, SqlitePool, SqliteWalConfig};
 use tempfile::TempDir;
 use tower::ServiceExt;
 
-fn setup_daemon_with_tenants(tmp: &TempDir) -> (Arc<DaemonAppState>, axum::Router, String, String, String) {
+fn setup_daemon_with_tenants(
+    tmp: &TempDir,
+) -> (Arc<DaemonAppState>, axum::Router, String, String, String) {
     let db_path = tmp.path().join(".cowok-design/cowok-design.sqlite3");
     let pool = SqlitePool::open_wal(SqliteWalConfig::new(&db_path, tmp.path())).expect("open wal");
     let reg = Arc::new(SpecRegistry::new(pool));
@@ -69,7 +71,9 @@ async fn json_req(
     idem_key: Option<&str>,
     body: Option<serde_json::Value>,
 ) -> (StatusCode, serde_json::Value) {
-    let raw = body.map(|v| serde_json::to_vec(&v).unwrap()).unwrap_or_default();
+    let raw = body
+        .map(|v| serde_json::to_vec(&v).unwrap())
+        .unwrap_or_default();
     let mut b = Request::builder()
         .method(method)
         .uri(uri)
@@ -81,10 +85,17 @@ async fn json_req(
     if !raw.is_empty() {
         b = b.header("content-type", "application/json");
     }
-    let resp = router.clone().oneshot(b.body(Body::from(raw)).unwrap()).await.unwrap();
+    let resp = router
+        .clone()
+        .oneshot(b.body(Body::from(raw)).unwrap())
+        .await
+        .unwrap();
     let st = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (st, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        st,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn upload_cas_req(
@@ -111,13 +122,19 @@ async fn upload_cas_req(
         .header("host", "127.0.0.1:4170")
         .header("x-cowok-session-token", tok)
         .header("x-idempotency-key", idem_key)
-        .header("content-type", format!("multipart/form-data; boundary={boundary}"))
+        .header(
+            "content-type",
+            format!("multipart/form-data; boundary={boundary}"),
+        )
         .body(Body::from(payload))
         .unwrap();
     let resp = router.clone().oneshot(req).await.unwrap();
     let st = resp.status();
     let out = resp.into_body().collect().await.unwrap().to_bytes();
-    (st, serde_json::from_slice(&out).unwrap_or(serde_json::Value::Null))
+    (
+        st,
+        serde_json::from_slice(&out).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn build_synthetic_zip(entries: &[(&str, u32, u32)]) -> Vec<u8> {
@@ -162,7 +179,10 @@ async fn ut_idor_001_and_error_no_leak() {
     )
     .await;
     assert_eq!(st, StatusCode::CREATED);
-    assert!(m["proseMarkdown"].as_str().unwrap().contains("[REDACTED:GOOGLE_AI_STUDIO]"));
+    assert!(m["proseMarkdown"]
+        .as_str()
+        .unwrap()
+        .contains("[REDACTED:GOOGLE_AI_STUDIO]"));
 
     let (st_v, v_rcpt) = json_req(
         &router,
@@ -182,10 +202,34 @@ async fn ut_idor_001_and_error_no_leak() {
     let rid = v_rcpt["receiptId"].as_str().unwrap();
 
     // Viewer forbidden (403)
-    let (st_vw1, _) = json_req(&router, "POST", "/api/v1/chat-sessions/sid-a1/messages", &tok_viewer, None, Some(json!({ "role": "user", "proseMarkdown": "nope" }))).await;
-    let (st_vw2, _) = upload_cas_req(&router, &tok_viewer, "sid-a1", "a.csv", "cv1", b"a,b\n1,2\n".to_vec()).await;
+    let (st_vw1, _) = json_req(
+        &router,
+        "POST",
+        "/api/v1/chat-sessions/sid-a1/messages",
+        &tok_viewer,
+        None,
+        Some(json!({ "role": "user", "proseMarkdown": "nope" })),
+    )
+    .await;
+    let (st_vw2, _) = upload_cas_req(
+        &router,
+        &tok_viewer,
+        "sid-a1",
+        "a.csv",
+        "cv1",
+        b"a,b\n1,2\n".to_vec(),
+    )
+    .await;
     let (st_vw3, _) = json_req(&router, "POST", "/api/v1/vault/chat-ingest", &tok_viewer, Some("vk-vw"), Some(json!({ "sessionId": "sid-a1", "provider": "custom", "rawSecretEnvelope": "jev_secret_viewer_1234" }))).await;
-    let (st_vw4, _) = json_req(&router, "DELETE", &format!("/api/v1/vault/receipts/{rid}"), &tok_viewer, None, None).await;
+    let (st_vw4, _) = json_req(
+        &router,
+        "DELETE",
+        &format!("/api/v1/vault/receipts/{rid}"),
+        &tok_viewer,
+        None,
+        None,
+    )
+    .await;
     assert_eq!(st_vw1, StatusCode::FORBIDDEN);
     assert_eq!(st_vw2, StatusCode::FORBIDDEN);
     assert_eq!(st_vw3, StatusCode::FORBIDDEN);
@@ -195,9 +239,23 @@ async fn ut_idor_001_and_error_no_leak() {
     for (method, uri, body) in [
         ("GET", "/api/v1/chat-sessions/sid-a1/messages", None),
         ("GET", "/api/v1/chat-sessions/missing-sid/messages", None),
-        ("POST", "/api/v1/chat-sessions/sid-a1/messages", Some(json!({"role":"user","proseMarkdown":"hijack"}))),
-        ("POST", "/api/v1/vault/chat-ingest", Some(json!({"sessionId":"sid-a1","provider":"custom","rawSecretEnvelope":"jev_secret_hijack_9999"}))),
-        ("POST", &format!("/api/v1/vault/receipts/{rid}"), Some(json!({"provider":"custom","rawSecretEnvelope":"jev_secret_replace_999"}))),
+        (
+            "POST",
+            "/api/v1/chat-sessions/sid-a1/messages",
+            Some(json!({"role":"user","proseMarkdown":"hijack"})),
+        ),
+        (
+            "POST",
+            "/api/v1/vault/chat-ingest",
+            Some(
+                json!({"sessionId":"sid-a1","provider":"custom","rawSecretEnvelope":"jev_secret_hijack_9999"}),
+            ),
+        ),
+        (
+            "POST",
+            &format!("/api/v1/vault/receipts/{rid}"),
+            Some(json!({"provider":"custom","rawSecretEnvelope":"jev_secret_replace_999"})),
+        ),
         ("DELETE", &format!("/api/v1/vault/receipts/{rid}"), None),
         ("DELETE", "/api/v1/vault/receipts/rcpt-nonexistent", None),
     ] {
@@ -206,7 +264,15 @@ async fn ut_idor_001_and_error_no_leak() {
         assert_eq!(e["code"], "RESOURCE_NOT_FOUND");
         assert!(!e.to_string().contains("tenant-alpha"));
     }
-    let (s_cas_x, e_cas_x) = upload_cas_req(&router, &tok_b, "sid-a1", "x.csv", "x1", b"a,b\n1,2\n".to_vec()).await;
+    let (s_cas_x, e_cas_x) = upload_cas_req(
+        &router,
+        &tok_b,
+        "sid-a1",
+        "x.csv",
+        "x1",
+        b"a,b\n1,2\n".to_vec(),
+    )
+    .await;
     assert_eq!(s_cas_x, StatusCode::NOT_FOUND);
     assert_eq!(e_cas_x["code"], "RESOURCE_NOT_FOUND");
 }
@@ -228,35 +294,89 @@ async fn ut_idempotency_001_002_003_and_fk_and_gc_race() {
     assert_eq!(st_m, StatusCode::CREATED);
 
     let csv_bytes = b"col1,col2\n10,20\n".to_vec();
-    let (st1, d1) = upload_cas_req(&router, &tok_a, "sid-idem", "data.csv", "k-same", csv_bytes.clone()).await;
+    let (st1, d1) = upload_cas_req(
+        &router,
+        &tok_a,
+        "sid-idem",
+        "data.csv",
+        "k-same",
+        csv_bytes.clone(),
+    )
+    .await;
     assert_eq!(st1, StatusCode::CREATED);
     assert_eq!(d1["replayed"], false);
     let att1 = d1["id"].as_str().unwrap().to_string();
     let sha = d1["blobSha256"].as_str().unwrap().to_string();
 
     // UT-IDEMPOTENCY-001: Replay returns 200 without incrementing refcount, usage, or ingress
-    let (st2, d2) = upload_cas_req(&router, &tok_a, "sid-idem", "data.csv", "k-same", csv_bytes.clone()).await;
+    let (st2, d2) = upload_cas_req(
+        &router,
+        &tok_a,
+        "sid-idem",
+        "data.csv",
+        "k-same",
+        csv_bytes.clone(),
+    )
+    .await;
     assert_eq!(st2, StatusCode::OK);
     assert_eq!(d2["replayed"], true);
     assert_eq!(d2["id"], att1);
 
-    let (st_mismatch, d_mis) = upload_cas_req(&router, &tok_a, "sid-idem", "data.csv", "k-same", b"different,csv\n99,100\n".to_vec()).await;
+    let (st_mismatch, d_mis) = upload_cas_req(
+        &router,
+        &tok_a,
+        "sid-idem",
+        "data.csv",
+        "k-same",
+        b"different,csv\n99,100\n".to_vec(),
+    )
+    .await;
     assert_eq!(st_mismatch, StatusCode::CONFLICT);
     assert_eq!(d_mis["code"], "IDEMPOTENCY_KEY_PAYLOAD_MISMATCH");
 
     let conn = state.registry.pool().connection().unwrap();
-    let ref_cnt: i64 = conn.query_row("SELECT ref_count FROM cas_blobs WHERE sha256 = ?1", params![sha], |r| r.get(0)).unwrap();
-    let ingress_cnt: i64 = conn.query_row("SELECT COUNT(*) FROM cas_upload_ingress WHERE tenant_id = 'tenant-alpha'", [], |r| r.get(0)).unwrap();
+    let ref_cnt: i64 = conn
+        .query_row(
+            "SELECT ref_count FROM cas_blobs WHERE sha256 = ?1",
+            params![sha],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let ingress_cnt: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM cas_upload_ingress WHERE tenant_id = 'tenant-alpha'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
     assert_eq!(ref_cnt, 1);
     assert_eq!(ingress_cnt, 1);
 
     // UT-IDEMPOTENCY-002: Expire CAS receipt (>24h), reuse same key -> previous attachment/blob/ingress stay intact
-    conn.execute("UPDATE cas_command_idempotency SET expires_at = accepted_at - 10 WHERE attachment_id = ?1", params![att1]).unwrap();
-    let (st3, d3) = upload_cas_req(&router, &tok_a, "sid-idem", "data2.csv", "k-same", b"x,y\n1,2\n".to_vec()).await;
+    conn.execute(
+        "UPDATE cas_command_idempotency SET expires_at = accepted_at - 10 WHERE attachment_id = ?1",
+        params![att1],
+    )
+    .unwrap();
+    let (st3, d3) = upload_cas_req(
+        &router,
+        &tok_a,
+        "sid-idem",
+        "data2.csv",
+        "k-same",
+        b"x,y\n1,2\n".to_vec(),
+    )
+    .await;
     assert_eq!(st3, StatusCode::CREATED);
     let att2 = d3["id"].as_str().unwrap().to_string();
     assert_ne!(att1, att2);
-    let old_att_still: i64 = conn.query_row("SELECT COUNT(*) FROM cas_attachments WHERE id = ?1", params![att1], |r| r.get(0)).unwrap();
+    let old_att_still: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM cas_attachments WHERE id = ?1",
+            params![att1],
+            |r| r.get(0),
+        )
+        .unwrap();
     assert_eq!(old_att_still, 1);
 
     // UT-IDEMPOTENCY-003: Vault receipt TTL boundary (expires_at == now_ms kept, < now_ms purged), zero raw secrets in SQLite
@@ -274,26 +394,51 @@ async fn ut_idempotency_001_002_003_and_fk_and_gc_race() {
         })),
     )
     .await;
-    let raw_row_json: String = conn.query_row("SELECT receipt_json FROM vault_command_idempotency WHERE receipt_id = ?1", params![vr["receiptId"].as_str().unwrap()], |r| r.get(0)).unwrap();
+    let raw_row_json: String = conn
+        .query_row(
+            "SELECT receipt_json FROM vault_command_idempotency WHERE receipt_id = ?1",
+            params![vr["receiptId"].as_str().unwrap()],
+            |r| r.get(0),
+        )
+        .unwrap();
     assert!(!raw_row_json.contains("AIzaSyTopSecret"));
 
     {
         let mut c2 = state.registry.pool().connection().unwrap();
         let now_exact = Utc::now().timestamp_millis();
-        c2.execute("UPDATE vault_command_idempotency SET expires_at = ?1 WHERE idempotency_key = 'vk-ttl'", params![now_exact]).unwrap();
+        c2.execute(
+            "UPDATE vault_command_idempotency SET expires_at = ?1 WHERE idempotency_key = 'vk-ttl'",
+            params![now_exact],
+        )
+        .unwrap();
         let tx = c2.transaction().unwrap();
-        let (_, v_purged_eq) = purge_expired_idempotency_receipts(&tx, "tenant-alpha", now_exact).unwrap();
+        let (_, v_purged_eq) =
+            purge_expired_idempotency_receipts(&tx, "tenant-alpha", now_exact).unwrap();
         tx.commit().unwrap();
         assert_eq!(v_purged_eq, 0, "expires_at == now_ms must NOT be purged");
         let tx2 = c2.transaction().unwrap();
-        let (_, v_purged_lt) = purge_expired_idempotency_receipts(&tx2, "tenant-alpha", now_exact + 1).unwrap();
+        let (_, v_purged_lt) =
+            purge_expired_idempotency_receipts(&tx2, "tenant-alpha", now_exact + 1).unwrap();
         tx2.commit().unwrap();
         assert_eq!(v_purged_lt, 1);
     }
 
     // UT-FK-RECEIPT-001 & UT-GC-RACE-001: Deleting attachment cascades its CAS receipt & respects 60s GC lease
-    assert!(delete_cas_attachment_scoped(&state, "tenant-alpha", &att2, Utc::now().timestamp_millis()).await.unwrap());
-    let receipt_for_att2: i64 = conn.query_row("SELECT COUNT(*) FROM cas_command_idempotency WHERE attachment_id = ?1", params![att2], |r| r.get(0)).unwrap();
+    assert!(delete_cas_attachment_scoped(
+        &state,
+        "tenant-alpha",
+        &att2,
+        Utc::now().timestamp_millis()
+    )
+    .await
+    .unwrap());
+    let receipt_for_att2: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM cas_command_idempotency WHERE attachment_id = ?1",
+            params![att2],
+            |r| r.get(0),
+        )
+        .unwrap();
     assert_eq!(receipt_for_att2, 0);
 
     let sha2 = d3["blobSha256"].as_str().unwrap().to_string();
@@ -309,10 +454,19 @@ async fn ut_idempotency_001_002_003_and_fk_and_gc_race() {
 }
 
 #[tokio::test]
+#[allow(clippy::result_large_err)]
 async fn ut_archive_caps_001_and_retry_001() {
     let tmp = TempDir::new().unwrap();
     let (state, router, tok_a, _, _) = setup_daemon_with_tenants(&tmp);
-    let _ = json_req(&router, "POST", "/api/v1/chat-sessions/sid-zip/messages", &tok_a, None, Some(json!({"role":"user","proseMarkdown":"zip test"}))).await;
+    let _ = json_req(
+        &router,
+        "POST",
+        "/api/v1/chat-sessions/sid-zip/messages",
+        &tok_a,
+        None,
+        Some(json!({"role":"user","proseMarkdown":"zip test"})),
+    )
+    .await;
 
     // Valid ZIP .xlsx succeeds
     let valid_zip = build_synthetic_zip(&[("xl/workbook.xml", 50, 100)]);
@@ -321,19 +475,40 @@ async fn ut_archive_caps_001_and_retry_001() {
 
     // Ratio > 20:1 fails 422
     let ratio_bomb = build_synthetic_zip(&[("xl/huge.xml", 10, 500)]);
-    let (st_ratio, b_ratio) = upload_cas_req(&router, &tok_a, "sid-zip", "bomb.xlsx", "zk-2", ratio_bomb).await;
+    let (st_ratio, b_ratio) =
+        upload_cas_req(&router, &tok_a, "sid-zip", "bomb.xlsx", "zk-2", ratio_bomb).await;
     assert_eq!(st_ratio, StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(b_ratio["code"], "CAS_ARCHIVE_REJECTED");
 
     // >1024 entries fails 422
-    let many_names: Vec<(String, u32, u32)> = (0..1025).map(|i| (format!("e{i}.txt"), 2, 10)).collect();
-    let many_refs: Vec<(&str, u32, u32)> = many_names.iter().map(|(s, c, u)| (s.as_str(), *c, *u)).collect();
-    let (st_cnt, _) = upload_cas_req(&router, &tok_a, "sid-zip", "many.fig", "zk-3", build_synthetic_zip(&many_refs)).await;
+    let many_names: Vec<(String, u32, u32)> =
+        (0..1025).map(|i| (format!("e{i}.txt"), 2, 10)).collect();
+    let many_refs: Vec<(&str, u32, u32)> = many_names
+        .iter()
+        .map(|(s, c, u)| (s.as_str(), *c, *u))
+        .collect();
+    let (st_cnt, _) = upload_cas_req(
+        &router,
+        &tok_a,
+        "sid-zip",
+        "many.fig",
+        "zk-3",
+        build_synthetic_zip(&many_refs),
+    )
+    .await;
     assert_eq!(st_cnt, StatusCode::UNPROCESSABLE_ENTITY);
 
     // Oversize >26,214,400 + 262,144 fails 413 CAS_QUOTA_EXCEEDED without leaking internals
     let oversized = vec![b'a'; 26_500_000];
-    let (st_big, b_big) = upload_cas_req(&router, &tok_a, "sid-zip", "huge-secret-name.csv", "zk-4", oversized).await;
+    let (st_big, b_big) = upload_cas_req(
+        &router,
+        &tok_a,
+        "sid-zip",
+        "huge-secret-name.csv",
+        "zk-4",
+        oversized,
+    )
+    .await;
     assert_eq!(st_big, StatusCode::PAYLOAD_TOO_LARGE);
     assert_eq!(b_big["code"], "CAS_QUOTA_EXCEEDED");
     assert_eq!(b_big["limit"], "REQUEST_BYTES");
@@ -341,14 +516,22 @@ async fn ut_archive_caps_001_and_retry_001() {
 
     // UT-RETRY-001 (A): Real SQLite IMMEDIATE lock contention -> 503 CHAT_WRITE_CONTENTION + 0 partial rows
     let mut lock_conn = state.registry.pool().connection().unwrap();
-    let lock_tx = lock_conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate).unwrap();
+    let lock_tx = lock_conn
+        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+        .unwrap();
     lock_tx.execute("INSERT OR IGNORE INTO cas_upload_ingress (id, tenant_id, session_id, byte_size, accepted_at) VALUES ('lock-seed', 'tenant-alpha', 'sid-zip', 1, 1000)", []).unwrap();
 
     let db_path = tmp.path().join(".cowok-design/cowok-design.sqlite3");
     let err_real_busy = execute_immediate_with_retry(
         || {
             let c = rusqlite::Connection::open(&db_path).map_err(|_| {
-                safe_api_error_response(StatusCode::INTERNAL_SERVER_ERROR, "ERR", "err", false, None)
+                safe_api_error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "ERR",
+                    "err",
+                    false,
+                    None,
+                )
             })?;
             c.busy_timeout(std::time::Duration::from_millis(0)).unwrap();
             Ok(c)
@@ -366,7 +549,13 @@ async fn ut_archive_caps_001_and_retry_001() {
     let err_resp = execute_immediate_with_retry(
         || {
             rusqlite::Connection::open_in_memory().map_err(|_| {
-                safe_api_error_response(StatusCode::INTERNAL_SERVER_ERROR, "ERR", "err", false, None)
+                safe_api_error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "ERR",
+                    "err",
+                    false,
+                    None,
+                )
             })
         },
         |_tx| {
@@ -401,7 +590,11 @@ async fn ut_archive_caps_001_and_retry_001() {
     )
     .await;
     assert_eq!(st_csv, StatusCode::CREATED);
-    let stored_csv = std::fs::read_to_string(tmp.path().join(body_csv["storageRelpath"].as_str().unwrap())).unwrap();
+    let stored_csv = std::fs::read_to_string(
+        tmp.path()
+            .join(body_csv["storageRelpath"].as_str().unwrap()),
+    )
+    .unwrap();
     assert!(stored_csv.contains("'=HYPERLINK("));
     assert!(stored_csv.contains("\"'=SUM(1,2)\""));
 
@@ -473,13 +666,40 @@ async fn ut_archive_caps_001_and_retry_001() {
     assert_eq!(st_rep, StatusCode::OK);
     assert_eq!(b_rep["presenterMask"], "AIza...3210");
 
-    let (st_g1, b_g1) = json_req(&router, "GET", "/api/v1/chat-sessions/sid-standalone-fresh/messages", &tok_a, None, None).await;
+    let (st_g1, b_g1) = json_req(
+        &router,
+        "GET",
+        "/api/v1/chat-sessions/sid-standalone-fresh/messages",
+        &tok_a,
+        None,
+        None,
+    )
+    .await;
     assert_eq!(st_g1, StatusCode::OK);
-    assert_eq!(b_g1["messages"][0]["vaultReceipt"]["presenterMask"], "AIza...3210");
+    assert_eq!(
+        b_g1["messages"][0]["vaultReceipt"]["presenterMask"],
+        "AIza...3210"
+    );
 
-    let (st_rev, _) = json_req(&router, "DELETE", &format!("/api/v1/vault/receipts/{rcpt_id}"), &tok_a, None, None).await;
+    let (st_rev, _) = json_req(
+        &router,
+        "DELETE",
+        &format!("/api/v1/vault/receipts/{rcpt_id}"),
+        &tok_a,
+        None,
+        None,
+    )
+    .await;
     assert_eq!(st_rev, StatusCode::OK);
-    let (st_g2, b_g2) = json_req(&router, "GET", "/api/v1/chat-sessions/sid-standalone-fresh/messages", &tok_a, None, None).await;
+    let (st_g2, b_g2) = json_req(
+        &router,
+        "GET",
+        "/api/v1/chat-sessions/sid-standalone-fresh/messages",
+        &tok_a,
+        None,
+        None,
+    )
+    .await;
     assert_eq!(st_g2, StatusCode::OK);
     assert!(b_g2["messages"][0]["vaultReceipt"].is_null());
 
@@ -498,11 +718,15 @@ async fn ut_archive_caps_001_and_retry_001() {
         .header("host", "127.0.0.1:4170")
         .header("x-cowok-session-token", &tok_a)
         .header("x-idempotency-key", "png-bound-1")
-        .header("content-type", format!("multipart/form-data; boundary={boundary}"))
+        .header(
+            "content-type",
+            format!("multipart/form-data; boundary={boundary}"),
+        )
         .body(Body::from(mp))
         .unwrap();
     let resp_png = router.clone().oneshot(req_png).await.unwrap();
     assert_eq!(resp_png.status(), StatusCode::CREATED);
-    let body_png: serde_json::Value = serde_json::from_slice(&resp_png.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    let body_png: serde_json::Value =
+        serde_json::from_slice(&resp_png.into_body().collect().await.unwrap().to_bytes()).unwrap();
     assert_eq!(body_png["byteSize"], png_with_bound.len() as i64);
 }

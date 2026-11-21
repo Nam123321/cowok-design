@@ -8,7 +8,9 @@ use axum::{
     Json,
 };
 use rand::Rng;
-use rusqlite::{params, Connection, ErrorCode, OptionalExtension, Transaction, TransactionBehavior};
+use rusqlite::{
+    params, Connection, ErrorCode, OptionalExtension, Transaction, TransactionBehavior,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -329,7 +331,10 @@ pub fn compute_cas_payload_digest(
 
 pub fn default_project_id_for_tenant(tenant_id: &str) -> (String, String) {
     if tenant_id == "local-default" {
-        ("__workbench_default__".to_string(), "__workbench_default__".to_string())
+        (
+            "__workbench_default__".to_string(),
+            "__workbench_default__".to_string(),
+        )
     } else {
         let digest_hex = format!("{:x}", Sha256::digest(tenant_id.as_bytes()));
         let suffix = &digest_hex[..16];

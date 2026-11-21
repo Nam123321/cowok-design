@@ -4,6 +4,7 @@ pub mod chat_cas_archive;
 pub mod chat_cas_storage;
 pub mod chat_cas_upload_handler;
 pub mod chat_cas_vault;
+pub mod context_assemble;
 pub mod doctor_usage;
 pub mod doctor_vault;
 pub mod execution_coordinator;
@@ -67,9 +68,8 @@ pub struct DaemonAppState {
     pub ram_vault: crate::vault::RamVaultStore,
     pub active_workers: execution_reaper::ActiveWorkerRegistry,
     pub sse_tx: tokio::sync::broadcast::Sender<String>,
-    pub cas_sha_locks: Arc<
-        tokio::sync::Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
-    >,
+    pub cas_sha_locks:
+        Arc<tokio::sync::Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
 }
 
 impl DaemonAppState {

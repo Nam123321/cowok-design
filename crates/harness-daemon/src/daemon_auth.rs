@@ -1300,7 +1300,11 @@ pub async fn legacy_project_auth_middleware(
         }
     }
     let (raw_bytes, body_sha_hex, staged_cas) = if is_cas_upload {
-        let cas_dir = state.registry.pool().workspace_root().join(".cowok-design/cas");
+        let cas_dir = state
+            .registry
+            .pool()
+            .workspace_root()
+            .join(".cowok-design/cas");
         match stream_cas_body_to_temp(&cas_dir, body).await {
             Ok((sha, guard)) => (axum::body::Bytes::new(), sha, Some(Arc::new(guard))),
             Err(resp) => return resp,
@@ -1322,8 +1326,13 @@ pub async fn legacy_project_auth_middleware(
     let auth = state_auth(&state);
     let verified: Option<VerifiedLegacyIngress> = if parts.headers.contains_key("x-cowok-hmac-sig")
     {
-        match verify_hmac_v2_with_sha(&auth, &parts.method, &parts.uri, &parts.headers, &body_sha_hex)
-        {
+        match verify_hmac_v2_with_sha(
+            &auth,
+            &parts.method,
+            &parts.uri,
+            &parts.headers,
+            &body_sha_hex,
+        ) {
             Ok(mut principal) => {
                 // Honor explicit header downgrade to viewer/editor while preserving HMAC-verified admin
                 if let Some(hdr_role) = parts

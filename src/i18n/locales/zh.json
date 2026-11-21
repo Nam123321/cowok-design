@@ -1165,5 +1165,38 @@
     "highEntropyBadge": "高熵密钥",
     "onboardingToggle": "API 密钥库",
     "ingestFailed": "无法将密钥保存到安全密钥库。"
+  },
+  "contextMeter": {
+    "triggerLabel": "上下文预算计量表",
+    "popoverTitle": "KV-Cache 与门户上下文遥测",
+    "portalLabel": "目标门户",
+    "horizonLabel": "任务范围",
+    "profileLabel": "模型配置",
+    "textBudgetLabel": "BPE 文本",
+    "outlineLabel": "DOM 大纲",
+    "ssotLabel": "SSOT 比例",
+    "shaLabel": "SHA 摘要",
+    "loading": "正在装配门户上下文...",
+    "emptyState": "选择项目或点击装配以查看 Token 预算。",
+    "assembleButton": "装配上下文",
+    "errors": {
+      "invalidRequest": "上下文装配请求无效。",
+      "invalidIdempotencyKey": "缺少或无效的 Idempotency-Key UUIDv4 请求头。",
+      "invalidCursor": "遥测分页游标无效或已过期。",
+      "projectTenantMismatch": "当前租户无权访问该项目。",
+      "crossPortalLeak": "已阻止跨门户特权上下文泄漏。",
+      "imageBudgetExceeded": "请求的图像 Token 超出单轮上限。",
+      "atomicBlockOverBudget": "原子 HTML/JSON 块超出 Token 上限。",
+      "ssotRatioBelowMinimum": "SSOT/DOM 比例低于 60% 下限。",
+      "idempotencyKeyReused": "幂等键被用于不同的请求内容。",
+      "projectReferenceInvalid": "目标项目引用不存在。",
+      "telemetryConflict": "遥测写入发生冲突。",
+      "telemetryWriteBusy": "SQLite 遥测写入器正忙。",
+      "telemetryStorageUnavailable": "上下文遥测存储不可用。",
+      "daemonContractViolation": "后台服务返回了畸形的上下文契约响应。",
+      "invalidSources": "请求的 sourceIds 必须包含 1 到 100 项。",
+      "duplicateSourceId": "请求的 sourceIds 不能包含重复项。",
+      "storage": "上下文存储发生错误。"
+    }
   }
 }
