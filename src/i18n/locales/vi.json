@@ -1198,5 +1198,30 @@
       "duplicateSourceId": "Danh sách sourceIds không được chứa phần tử trùng lặp.",
       "storage": "Lỗi lưu trữ ngữ cảnh."
     }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "Đang khóa ở phiên khác",
+      "refresh": "Làm mới",
+      "locked": "Đã khóa khung",
+      "unlock": "Mở khóa",
+      "unlocked": "Chưa khóa",
+      "lock": "Khóa khung"
+    },
+    "export": {
+      "busy": "Đang xuất...",
+      "cta": "Xuất SSOT"
+    },
+    "patterns": {
+      "title": "Mẫu thiết kế",
+      "pendingSuffix": "chờ duyệt",
+      "close": "Đóng danh sách mẫu",
+      "portalSelect": "Cổng đang xem",
+      "refresh": "Làm mới",
+      "pending": "Chờ duyệt",
+      "synced": "Đã đồng bộ",
+      "empty": "Chưa có thành phần nào cho cổng này.",
+      "button": "Mẫu UI"
+    }
   }
 }

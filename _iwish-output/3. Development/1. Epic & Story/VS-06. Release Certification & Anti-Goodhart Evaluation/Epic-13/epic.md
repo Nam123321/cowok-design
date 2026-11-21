@@ -108,3 +108,6 @@ flowchart TD
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
 
 <!-- END AUTO-ROADMAP -->
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-13.1](./Story-13.1/story.md) | End-to-End Sealed Anti-Goodhart Benchmark Runner & 25-Case /simulate-user M1..M5 Certification Suite | 05.5, 07.1, 08.5, 09.2, 10.3, 12.1, 12.3 | refactored |

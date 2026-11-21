@@ -32,7 +32,10 @@ model Project {
   tombstones     SpecTombstone[]
   recoveryCommits RecoveryCommit[]
   workspaceSyncIntents WorkspaceSyncIntent[]
+  componentPatterns ComponentPattern[]
+  appShellLocks  AppShellLock[]
 
+  @@unique([id, tenantId], map: "uq_projects_id_tenant")
   @@index([inheritBrandFromProjectId])
   @@map("projects")
 }
@@ -1142,4 +1145,51 @@ model ContextAssemblyTelemetry {
   @@index([projectId, portalId, createdAt, id], map: "idx_ctx_telemetry_proj_portal")
   @@index([tenantId, projectId, createdAt, id], map: "idx_ctx_telemetry_tenant_proj")
   @@map("context_assembly_telemetry")
+}
+
+model ComponentPattern {
+  id                  String  @id @default(uuid())
+  tenantId            String  @default("local-default") @map("tenant_id")
+  projectId           String  @map("project_id")
+  portalId            String  @map("portal_id")
+  patternSlug         String  @map("pattern_slug")
+  componentName       String  @map("component_name")
+  sourcePath          String? @map("source_path")
+  astSignatureSha256  String  @map("ast_signature_sha256")
+  dedupMarkerSha256   String  @default("") @map("dedup_marker_sha256")
+  sourceRevision      BigInt  @default(0) @map("source_revision")
+  lastSyncSource      String  @default("manual") @map("last_sync_source")
+  tokensSnapshotJson  String  @default("{}") @map("tokens_snapshot_json")
+  docMarkdown         String  @default("") @map("doc_markdown")
+  driftStatus         String  @default("synced") @map("drift_status")
+  quarantinedDiffJson String  @default("{}") @map("quarantined_diff_json")
+  revision            BigInt  @default(1)
+  createdAt           BigInt  @map("created_at")
+  updatedAt           BigInt  @map("updated_at")
+
+  project Project @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, portalId, patternSlug])
+  @@index([tenantId, projectId, portalId, updatedAt, id], map: "idx_component_patterns_proj_portal")
+  @@map("component_patterns")
+}
+
+model AppShellLock {
+  id              String @id @default(uuid())
+  tenantId        String @default("local-default") @map("tenant_id")
+  projectId       String @map("project_id")
+  portalId        String @map("portal_id")
+  lockOwnerId     String @map("lock_owner_id")
+  fencingToken    BigInt @default(1) @map("fencing_token")
+  lockedSlotsJson String @default("[]") @map("locked_slots_json")
+  expiresAt       BigInt @map("expires_at")
+  revision        BigInt @default(1)
+  createdAt       BigInt @map("created_at")
+  updatedAt       BigInt @map("updated_at")
+
+  project Project @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, portalId])
+  @@index([tenantId, projectId, portalId], map: "idx_app_shell_locks_proj_portal")
+  @@map("app_shell_locks")
 }

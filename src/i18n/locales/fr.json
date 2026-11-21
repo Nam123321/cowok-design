@@ -1198,5 +1198,30 @@
       "duplicateSourceId": "La liste sourceIds ne doit pas contenir de doublons.",
       "storage": "Erreur de stockage du contexte."
     }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "Verrouillé ailleurs",
+      "refresh": "Actualiser",
+      "locked": "Cadre verrouillé",
+      "unlock": "Déverrouiller",
+      "unlocked": "Déverrouillé",
+      "lock": "Verrouiller"
+    },
+    "export": {
+      "busy": "Exportation...",
+      "cta": "Exporter SSOT"
+    },
+    "patterns": {
+      "title": "Modèles UI",
+      "pendingSuffix": "en attente",
+      "close": "Fermer les modèles",
+      "portalSelect": "Portail actif",
+      "refresh": "Actualiser",
+      "pending": "À vérifier",
+      "synced": "Synchronisé",
+      "empty": "Aucun composant enregistré ici.",
+      "button": "Modèles"
+    }
   }
 }

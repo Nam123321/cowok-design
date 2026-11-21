@@ -120,3 +120,8 @@ flowchart TD
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
 
 <!-- END AUTO-ROADMAP -->
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-09.1](./Story-09.1/story.md) | Two-Store /rea + /awesome-re Bridge (crates/rea-bridge), Design-Only DNA Forge & License/ToS Firewall | 03.1, 08.2, 08.5 | refactored |
+| [Story-09.2](./Story-09.2/story.md) | Decision Cascade Engine (~450 LOC Rust DecisionCascadeClient), 5-Stage DE->Decision#1->DR/DE->DE->Decision#2 & MAX_ATTEMPTS=3 Breaker | 02.1, 02.4, 04.6, 08.5 | refactored |
+| [Story-09.3](./Story-09.3/story.md) | Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile OCC & 3-Strike Breaker | 09.2, 05.4, 07.1 | cancelled |

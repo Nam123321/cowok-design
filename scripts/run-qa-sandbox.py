@@ -185,10 +185,15 @@ def main():
                 f"[run-qa-sandbox] backend readiness check timed out on port {api_port}: {last_backend_err}\n"
             )
 
+    is_vite_frontend = (
+        stack_adapter == 'fastify-vite-spa'
+        or any((Path(project_root) / cfg).is_file() for cfg in ('vite.config.ts', 'vite.config.mts', 'vite.config.js'))
+        or str(pkg_scripts.get('dev', '')).strip().startswith('vite')
+    )
     if not server_already_running:
         dev_cmd = (
             ['npx', 'vite', '--port', str(port), '--host', '127.0.0.1']
-            if stack_adapter == 'fastify-vite-spa'
+            if is_vite_frontend
             else ['npx', 'next', 'dev', '-p', str(port), '-H', '127.0.0.1']
         )
         print(f"🚀 Starting Frontend dev server ({stack_adapter}) on port {port} (proxying /api -> {api_port})...")

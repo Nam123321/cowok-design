@@ -132,3 +132,8 @@ flowchart TD
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
 
 <!-- END AUTO-ROADMAP -->
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx) | 07.2, 11.1, 11.2 | refactored |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai | 12.1, 08.5 | refactored |
+| [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD | 07.1, 12.1 | refactored |

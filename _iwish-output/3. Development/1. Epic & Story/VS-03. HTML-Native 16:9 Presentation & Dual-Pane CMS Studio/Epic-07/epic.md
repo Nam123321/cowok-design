@@ -131,3 +131,8 @@ flowchart TD
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
 
 <!-- END AUTO-ROADMAP -->
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-07.1](./Story-07.1/story.md) | Pooled 1-Chromium Rust CDP Visual QC (lib-audit + slides-check), QC Overlay & 1-Click Auto-Fix | 05.4, 05.5, 06.2, 06.5 | refactored |
+| [Story-07.2](./Story-07.2/story.md) | Non-Tech Share & Present Export vs Developer Handoff (Offline HTML, Vector PDF & Plugin PPTX) | 06.1, 06.5, 07.1 | refactored |
+| [Story-07.3](./Story-07.3/story.md) | Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080) | 07.1, 06.5 | cancelled |

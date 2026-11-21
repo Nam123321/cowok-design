@@ -1198,5 +1198,30 @@
       "duplicateSourceId": "La lista de sourceIds no debe contener duplicados.",
       "storage": "Error de almacenamiento de contexto."
     }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "Bloqueado en otra sesión",
+      "refresh": "Actualizar",
+      "locked": "Marco bloqueado",
+      "unlock": "Desbloquear",
+      "unlocked": "Desbloqueado",
+      "lock": "Bloquear"
+    },
+    "export": {
+      "busy": "Exportando...",
+      "cta": "Exportar SSOT"
+    },
+    "patterns": {
+      "title": "Patrones de diseño",
+      "pendingSuffix": "pendientes de revisión",
+      "close": "Cerrar patrones",
+      "portalSelect": "Portal del espacio de trabajo",
+      "refresh": "Actualizar",
+      "pending": "Revisión pendiente",
+      "synced": "Sincronizado",
+      "empty": "Aún no hay componentes guardados.",
+      "button": "Patrones"
+    }
   }
 }

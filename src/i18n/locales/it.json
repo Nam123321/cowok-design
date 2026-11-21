@@ -1198,5 +1198,30 @@
       "duplicateSourceId": "L'elenco sourceIds non deve contenere duplicati.",
       "storage": "Errore di archiviazione del contesto."
     }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "Bloccato altrove",
+      "refresh": "Aggiorna",
+      "locked": "Struttura bloccata",
+      "unlock": "Sblocca",
+      "unlocked": "Sbloccato",
+      "lock": "Blocca"
+    },
+    "export": {
+      "busy": "Esportazione...",
+      "cta": "Esporta SSOT"
+    },
+    "patterns": {
+      "title": "Modelli di design",
+      "pendingSuffix": "in attesa",
+      "close": "Chiudi modelli",
+      "portalSelect": "Portale attivo",
+      "refresh": "Aggiorna",
+      "pending": "In revisione",
+      "synced": "Sincronizzato",
+      "empty": "Nessun componente salvato qui.",
+      "button": "Modelli"
+    }
   }
 }

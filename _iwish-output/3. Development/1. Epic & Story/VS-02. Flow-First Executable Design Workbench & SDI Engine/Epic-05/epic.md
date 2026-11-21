@@ -191,3 +191,10 @@ flowchart TD
 | [Story-05.1](./Story-05.1/story.md) | Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11) | 04.5 | completed |
 | [Story-05.2](./Story-05.2/story.md) | Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup | 05.1 | completed |
 | [Story-05.3](./Story-05.3/story.md) | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | 05.2 | completed |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-05.1](./Story-05.1/story.md) | Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11) | 04.5 | completed |
+| [Story-05.2](./Story-05.2/story.md) | Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup | 05.1 | completed |
+| [Story-05.3](./Story-05.3/story.md) | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | 05.2 | completed |
+| [Story-05.4](./Story-05.4/story.md) | Cognitive Sketch-to-Polish, Steering Chips, Shared `lol_html` + `reconcile_ff_ids` Surgical Editing & 2-Tier Auto-Apply | 05.1, 05.2, 06.2, 02.4 | refactored |
+| [Story-05.5](./Story-05.5/story.md) | End-to-End `/simulate-user` (8D) & `/edge-case-guardian` (FMEA) -> 3-Tier Interactive Flow DAG | 05.1, 05.4, 09.2 | refactored |

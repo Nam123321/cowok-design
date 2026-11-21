@@ -1198,5 +1198,30 @@
       "duplicateSourceId": "指定する sourceIds に重複を含めることはできません。",
       "storage": "コンテキスト保存エラーが発生しました。"
     }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "他セッションでロック中",
+      "refresh": "更新",
+      "locked": "シェルロック済",
+      "unlock": "ロック解除",
+      "unlocked": "未ロック",
+      "lock": "ロック"
+    },
+    "export": {
+      "busy": "書き出し中...",
+      "cta": "SSOT書き出し"
+    },
+    "patterns": {
+      "title": "デザインパターン",
+      "pendingSuffix": "件確認待ち",
+      "close": "パターンを閉じる",
+      "portalSelect": "作業ポータル",
+      "refresh": "再読み込み",
+      "pending": "確認待ち",
+      "synced": "同期済み",
+      "empty": "このポータルにはまだ保存されたコンポーネントがありません。",
+      "button": "パターン"
+    }
   }
 }

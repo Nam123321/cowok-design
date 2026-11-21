@@ -1198,5 +1198,30 @@
       "duplicateSourceId": "Requested context sourceIds must not contain duplicates.",
       "storage": "Context storage error occurred."
     }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "Locked elsewhere",
+      "refresh": "Refresh",
+      "locked": "Shell locked",
+      "unlock": "Unlock",
+      "unlocked": "Unlocked",
+      "lock": "Lock"
+    },
+    "export": {
+      "busy": "Exporting...",
+      "cta": "Export SSOT"
+    },
+    "patterns": {
+      "title": "Design patterns",
+      "pendingSuffix": "pending review",
+      "close": "Close patterns",
+      "portalSelect": "Active workspace portal",
+      "refresh": "Refresh",
+      "pending": "Pending review",
+      "synced": "Synced",
+      "empty": "No saved components in this portal yet.",
+      "button": "Patterns"
+    }
   }
 }

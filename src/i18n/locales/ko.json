@@ -1198,5 +1198,30 @@
       "duplicateSourceId": "요청한 sourceIds 목록에 중복 항목이 없어야 합니다.",
       "storage": "컨텍스트 저장소 오류가 발생했습니다."
     }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "다른 세션에서 잠금",
+      "refresh": "새로고침",
+      "locked": "셸 잠금됨",
+      "unlock": "잠금 해제",
+      "unlocked": "잠금 해제됨",
+      "lock": "잠금"
+    },
+    "export": {
+      "busy": "내보내는 중...",
+      "cta": "SSOT 내보내기"
+    },
+    "patterns": {
+      "title": "디자인 패턴",
+      "pendingSuffix": "건 검토 대기",
+      "close": "패턴 닫기",
+      "portalSelect": "작업 포털",
+      "refresh": "새로고침",
+      "pending": "검토 대기",
+      "synced": "동기화됨",
+      "empty": "이 포털에 저장된 컴포넌트가 아직 없습니다.",
+      "button": "패턴"
+    }
   }
 }

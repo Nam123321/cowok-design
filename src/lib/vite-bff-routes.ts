@@ -45,6 +45,10 @@ import * as projectSpecsRoute from "../app/api/projects/[id]/specs/route";
 import * as singleSpecRoute from "../app/api/projects/[id]/specs/[spec_key]/route";
 import * as contextAssembleRoute from "../app/api/v1/context/assemble/route";
 import * as contextTelemetryRoute from "../app/api/v1/context/telemetry/route";
+import * as ssotComponentsRoute from "../app/api/v1/ssot/components/route";
+import * as ssotAppShellLockRoute from "../app/api/v1/ssot/appshell/lock/route";
+import * as ssotExportRoute from "../app/api/v1/ssot/export/route";
+import * as skillsRouteHandler from "../app/api/v1/skills/route/route";
 import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize/route";
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
 import * as versionSnapshotsRoute from "../app/api/projects/[id]/snapshots/route";
@@ -171,6 +175,10 @@ const ROUTE_TABLE: RouteEntry[] = [
   ...CHAT_VAULT_ROUTES,
   { method: "POST", pattern: /^\/api\/context\/assemble$/, extractParams: noParams, resolveHandler: () => contextAssembleRoute.POST },
   { method: "GET", pattern: /^\/api\/context\/telemetry$/, extractParams: noParams, resolveHandler: () => contextTelemetryRoute.GET },
+  { method: "GET", pattern: /^\/api\/ssot\/components$/, extractParams: noParams, resolveHandler: () => ssotComponentsRoute.GET },
+  { method: "POST", pattern: /^\/api\/ssot\/appshell\/lock$/, extractParams: noParams, resolveHandler: () => ssotAppShellLockRoute.POST },
+  { method: "POST", pattern: /^\/api\/ssot\/export$/, extractParams: noParams, resolveHandler: () => ssotExportRoute.POST },
+  { method: "POST", pattern: /^\/api\/skills\/route$/, extractParams: noParams, resolveHandler: () => skillsRouteHandler.POST },
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.POST },
   { method: "PUT", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/reorder$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]) }), resolveHandler: () => deckReorderRoute.PUT },

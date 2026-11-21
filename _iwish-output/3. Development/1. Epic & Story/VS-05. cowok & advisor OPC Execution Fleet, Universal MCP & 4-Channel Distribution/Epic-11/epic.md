@@ -131,3 +131,8 @@ flowchart TD
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
 
 <!-- END AUTO-ROADMAP -->
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway | 04.3, 04.4, 04.6, 02.1 | refactored |
+| [Story-11.2](./Story-11.2/story.md) | Compiler-Grade Bidirectional Open MCP Server, 1-Click Host Installer UI & Run-Scoped Tool Bundles | 10.1, 11.1, 08.5 | refactored |
+| [Story-11.3](./Story-11.3/story.md) | Compiler-Grade Bidirectional Open MCP Server & 1-Click Host Installer UI | 11.1, 11.2 | cancelled |

@@ -1561,6 +1561,7 @@ fn is_anchored_readonly_post_path(path: &str) -> bool {
                 "validate"
             ]
             | ["api", "v1", "decks", _, "presenter", "handshake"]
+            | ["api", "v1", "skills", "route"]
             | [
                 "api",
                 "v1",

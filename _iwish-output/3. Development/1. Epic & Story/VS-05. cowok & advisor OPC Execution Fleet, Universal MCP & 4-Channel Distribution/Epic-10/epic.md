@@ -142,3 +142,8 @@ flowchart TD
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
 
 <!-- END AUTO-ROADMAP -->
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-10.1](./Story-10.1/story.md) | Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z) | 04.4, 09.2, 11.1 | refactored |
+| [Story-10.2](./Story-10.2/story.md) | Parallel Swarm Dispatch, Disjoint V17 worker_file_leases, 429 Semaphore Clamp & Independent Builder != Scorer QC (E1..E4 >= 95%) | 10.1, 07.1, 08.5 | refactored |
+| [Story-10.3](./Story-10.3/story.md) | Anti-Slop Design Tournament (CMP-07, 4 Trục Trực giao <=15s, AST Distance <=0.78, Position-Swapped RubricShield), Cross-Variant Borrow & advisor 6-Step Loop | 05.4, 09.2, 10.2 | refactored |

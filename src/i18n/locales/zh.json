@@ -1198,5 +1198,30 @@
       "duplicateSourceId": "请求的 sourceIds 不能包含重复项。",
       "storage": "上下文存储发生错误。"
     }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "已被其他会话锁定",
+      "refresh": "刷新",
+      "locked": "外框已锁定",
+      "unlock": "解锁",
+      "unlocked": "未锁定",
+      "lock": "锁定"
+    },
+    "export": {
+      "busy": "导出中...",
+      "cta": "导出 SSOT"
+    },
+    "patterns": {
+      "title": "设计模式",
+      "pendingSuffix": "项待审",
+      "close": "关闭模式列表",
+      "portalSelect": "当前门户",
+      "refresh": "刷新",
+      "pending": "待审核",
+      "synced": "已同步",
+      "empty": "该门户暂无已保存组件。",
+      "button": "设计模式"
+    }
   }
 }

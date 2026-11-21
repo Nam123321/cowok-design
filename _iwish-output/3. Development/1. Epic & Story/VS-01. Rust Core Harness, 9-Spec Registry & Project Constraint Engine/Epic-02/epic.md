@@ -5,7 +5,7 @@ title: "Epic 02: JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-de
 status: in-progress
 track: "Stream-1"
 wave: 1
-provides: ["Portal-Safe ContextSlicer (<=350 tok outline)", "Static-Prefix/Dynamic-Tail KV-Cache Compiler (<=1,500 tok + max_image_tokens_per_turn)", "3-Profile Live Adapter", "Hidden Dual-Use SSOT V16 (component_patterns, app_shell_locks)", "cowok-design-opt (<=250 tok) + 7 Craft Skills + <15ms 3-Zone CachePreservingSkillRouter"]
+provides: ["Portal-Safe ContextSlicer (<=350 tok outline)", "Static-Prefix/Dynamic-Tail KV-Cache Compiler (<=1,500 tok + max_image_tokens_per_turn)", "3-Profile Live Adapter", "Hidden Dual-Use SSOT V18 (component_patterns, app_shell_locks)", "cowok-design-opt (<=250 tok) + 7 Craft Skills + <15ms 3-Zone CachePreservingSkillRouter"]
 consumes: ["Epic 01", "Epic 03"]
 links_to:
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md"
@@ -19,17 +19,17 @@ links_to:
 - **Value Stream:** `VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine`
 - **Execution Stream:** `Stream-1` (Wave 1/2)
 - **FR Covered:** `FR-14`, `FR-27`, `FR-32`
-- **Provides:** Portal-Safe Context Slicer + KV-Cache Compiler (`02.1`), Hidden Dual-Use SSOT `V16` (`component_patterns`, `app_shell_locks`), `cowok-design-opt` Spine (`<=250 tok`), 7 Craft Skills 3 tầng & `<15ms` 3-Zone `CachePreservingSkillRouter` (`02.4`).
+- **Provides:** Portal-Safe Context Slicer + KV-Cache Compiler (`02.1`), Hidden Dual-Use SSOT `V18` (`component_patterns`, `app_shell_locks`, `58` tables), `cowok-design-opt` Spine (`<=250 tok`), 7 Craft Skills 3 tầng & `<15ms` 3-Zone `CachePreservingSkillRouter` (`02.4`).
 - **Consumes:** `Epic 01`, `Epic 03`.
 
 ## 2. Goals / Business Value
 1. **Tiết kiệm Token & Giữ KV-Cache (`Story 02.1`):** Hợp nhất `02.1 + 02.2 + 02.3` thành một lát cắt 5 lớp (`Context Meter / CLI --inspect-prompt <-> /api/v1/context/assemble <-> TaskHorizonRouter + ContextSlicer >=60% SSOT/DOM <=350 tok outline + Static-Prefix/Dynamic-Tail Compiler <=1,500 text tok + max_image_tokens_per_turn + 3-Profile Adapter`), bảo đảm `0` tràn ngân sách và `0` rò rỉ chéo Portal.
-2. **Kiến trúc Ẩn SSOT Dự án Dài & 7 Kỹ năng Nghiệp vụ Thiết kế (`Story 02.4`):** Hợp nhất Hidden Dual-Use SSOT `V16` (`AppShell`/Component Lock UI + Export `.cowok-design/exports/` + `packages/ui-shell`), xương sống vận hành `cowok-design-opt` (`<=250 tok`), **7 Craft Skills 3 tầng** (`typography`, `oklch-palette`, `stageshow-slide`, `dashboard-ux`, `impeccable-polish`, `sketch-monochrome`, `archify-diagram`), `<15ms` 3-Zone `CachePreservingSkillRouter` và `oxc` reverse sync (`confusion_risk < 0.35`, `>= +25%` first-pass `lib-audit` lift).
+2. **Kiến trúc Ẩn SSOT Dự án Dài & 7 Kỹ năng Nghiệp vụ Thiết kế (`Story 02.4`):** Hợp nhất Hidden Dual-Use SSOT `V18` (`AppShell`/Component Lock UI + Export `.cowok-design/exports/` + `packages/ui-shell`), xương sống vận hành `cowok-design-opt` (`<=250 tok`), **7 Craft Skills 3 tầng** (`typography`, `oklch-palette`, `stageshow-slide`, `dashboard-ux`, `impeccable-polish`, `sketch-monochrome`, `archify-diagram`), `<15ms` 3-Zone `CachePreservingSkillRouter` và `oxc` reverse sync (`confusion_risk < 0.35`, `>= +25%` first-pass `lib-audit` lift).
 
 ## 3. Scope / Scope Boundaries
 - **In-Scope:**
-  - `Story 02.1` (refactored — hợp nhất `02.2 + 02.3`): Portal-Safe Context Slicing, KV-Cache Static-Prefix Prompt Compiler & 3-Profile Live Execution.
-  - `Story 02.4` (refactored / new slice): Hidden Dual-Use SSOT (`V16`), `AppShell` & Component Registry, `cowok-design-opt` Spine, 7 Craft Skills & 3-Zone Router.
+  - `Story 02.1` (`completed` — hợp nhất `02.2 + 02.3`): Portal-Safe Context Slicing, KV-Cache Static-Prefix Prompt Compiler & 3-Profile Live Execution.
+  - `Story 02.4` (`refactored` / active slice): Hidden Dual-Use SSOT (`V18`, `58` tables), `AppShell` & Component Registry, `cowok-design-opt` Spine, 7 Craft Skills & 3-Zone Router.
   - `Story 02.2`, `Story 02.3`: `[DEPRECATED]` / `cancelled` (superseded by `Story 02.1`, giữ lịch sử audit).
 - **Out-of-Scope:**
   - Built-in DE tools, Tool Jail & `LEARN` loop (thuộc `Story 08.5`).
@@ -38,8 +38,8 @@ links_to:
 
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
-| [Story-02.1](./Story-02.1/story.md) | Portal-Safe Context Slicing, KV-Cache Static-Prefix Prompt Compiler & 3-Profile Live Execution *(Consolidated)* | `refactored` | `2` | `['01.2', '01.3']` |
-| [Story-02.4](./Story-02.4/story.md) | Hidden Dual-Use SSOT (`V16`), `AppShell` & Component Registry, `cowok-design-opt` Spine, 7 Craft Skills & 3-Zone Router | `refactored` | `3` | `['01.3', '02.1', '03.1']` |
+| [Story-02.1](./Story-02.1/story.md) | Portal-Safe Context Slicing, KV-Cache Static-Prefix Prompt Compiler & 3-Profile Live Execution *(Consolidated)* | `completed` | `3` | `['01.2', '01.3']` |
+| [Story-02.4](./Story-02.4/story.md) | Hidden Dual-Use SSOT (`V18`), `AppShell` & Component Registry, `cowok-design-opt` Spine, 7 Craft Skills & 3-Zone Router | `refactored` | `3` | `['01.3', '02.1', '03.1']` |
 | [Story-02.2](./Story-02.2/story.md) | *(Superseded by `Story 02.1`)* Token Budget Governor & Deterministic Prompt Compiler | `cancelled` | `2` | `['02.1']` |
 | [Story-02.3](./Story-02.3/story.md) | *(Superseded by `Story 02.1`)* 3-Profile Model Capability Adapter | `cancelled` | `2` | `['02.2']` |
 
@@ -78,10 +78,10 @@ links_to:
 
 | Story ID | Trạng thái Thực tế | Provides (Cung cấp) | Consumes (Tiêu thụ) | Zod Schema Status | Ghi chú & Rào chắn |
 |---|---|---|---|:---:|---|
-| **Story-02.1** | `refactored` | Cung cấp hợp đồng `POST /api/v1/context/assemble` và KV-cache Static-Prefix compiler cho `Story 02.4 | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
+| **Story-02.1** | `completed` | Cung cấp hợp đồng `POST /api/v1/context/assemble` và KV-cache Static-Prefix compiler cho `Story 02.4 | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
 | **Story-02.2** | `cancelled` | Cung cấp năng lực của `Story 02.2` cho các Story phụ thuộc trong `Epic 02` và các làn sóng tiếp theo | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
 | **Story-02.3** | `cancelled` | Cung cấp năng lực của `Story 02.3` cho các Story phụ thuộc trong `Epic 02` và các làn sóng tiếp theo | consumes_apis: [] | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
-| **Story-02.4** | `refactored` | **AC-01 (`V16b` Hidden Dual-Use SSOT & `AppShell` Lock):** Tạo bảng `V16` (`migration slot V16b` tác | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
+| **Story-02.4** | `refactored` | **AC-01 (`V18` Hidden Dual-Use SSOT & `AppShell` Lock):** Tạo bảng `V18` (`component_patterns`, `app_shell_locks`, `58` tables) | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
 
 ---
 
@@ -134,3 +134,9 @@ flowchart TD
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
 
 <!-- END AUTO-ROADMAP -->
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-02.1](./Story-02.1/story.md) | Portal-Safe Context Slicing, KV-Cache Static-Prefix Prompt Compiler & 3-Profile Live Execution | 01.2, 01.3 | completed |
+| [Story-02.2](./Story-02.2/story.md) | Token Budget Governor (<= 1,500 Input Tokens) & Deterministic Prompt Compiler | 02.1 | cancelled |
+| [Story-02.3](./Story-02.3/story.md) | Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter) | 02.1 | cancelled |
+| [Story-02.4](./Story-02.4/story.md) | Hidden Dual-Use SSOT (V18), AppShell & Component Registry, cowok-design-opt Spine, 7 Craft Skills & 3-Zone Router | 01.3, 02.1, 03.1 | completed |

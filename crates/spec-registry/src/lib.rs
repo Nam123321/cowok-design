@@ -10,12 +10,16 @@
 
 pub mod context_slicer;
 pub mod errors;
+pub mod exports;
 pub mod lock;
+pub mod locks;
 pub mod plugin_store;
 pub mod pool;
 pub mod presentation_repo;
 pub mod recovery;
 pub mod registry;
+pub mod reverse_sync;
+pub mod skill_router;
 pub mod sync;
 pub mod watcher;
 

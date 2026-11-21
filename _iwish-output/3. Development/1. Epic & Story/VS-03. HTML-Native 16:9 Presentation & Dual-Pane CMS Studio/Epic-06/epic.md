@@ -164,3 +164,11 @@ flowchart TD
 - [Layer-Epic-DB](./layer-epic-db.md)
 - [Layer-Epic-API](./layer-epic-api.md)
 - [Contract Claims](./contract_claims.yaml)
+
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-06.1](./Story-06.1/story.md) | Khung trình chiếu HTML Slide Engine (16:9/16:10/Auto), 8 Layout Templates, V12 Schema Foundation & HostRuntimeContract | 03.2, 04.1 | completed |
+| [Story-06.2](./Story-06.2/story.md) | Dual-Pane Slide-Over CMS Workbench (inert-Guarded), Two-Tier <16ms Non-Reloading Sync, lol_html + html5ever mXSS & Crash Recovery | 06.1, 03.3 | completed |
+| [Story-06.3](./Story-06.3/story.md) | Contextual Slide Copilot (KeyedParallelCoordinator Lease) & Offline CSP-B 2D Live Interactive Charts | 06.2, 04.4 | completed |
+| [Story-06.4](./Story-06.4/story.md) | Dual-Screen Presenter Mode, Out-of-Band BroadcastChannel Security, Pace Timer & Fallback Modes | 06.1, 06.2 | completed |
+| [Story-06.5](./Story-06.5/story.md) | End-to-End AI Multi-Slide Deck Generation, CSV/PDF-to-ChartSpecV12 Normalizer & `<Stage>/<Window>/<Phone>` (`stageshow`) Flow | 06.1, 06.3, 09.2, 11.1 | refactored |

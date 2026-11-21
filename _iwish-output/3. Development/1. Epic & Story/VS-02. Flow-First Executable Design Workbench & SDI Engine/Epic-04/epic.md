@@ -164,3 +164,10 @@ flowchart TD
 - [Layer-Epic-DB](./layer-epic-db.md)
 - [Layer-Epic-API](./layer-epic-api.md)
 - [Contract Claims](./contract_claims.yaml)
+
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-04.1](./Story-04.1/story.md) | Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation | 01.3, 03.2 | completed |
+| [Story-04.2](./Story-04.2/story.md) | SQLite V7 Schema Convergence, Streaming Dual-Ingress Vite BFF & Managed Root / FS Jail | 04.1 | completed |
+| [Story-04.3](./Story-04.3/story.md) | Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier | 04.2 | completed |
+| [Story-04.6](./Story-04.6/story.md) | SQLite `V4/V16` Chat Persistence, CAS Binary/CSV Intake, `<svg viewBox>` Normalizer & In-Chat Zero-Leak Key Vault | 04.2, 04.3 | completed |

@@ -22,6 +22,9 @@ pub use icon_validator::*;
 pub mod surgical_patcher;
 pub use surgical_patcher::*;
 
+pub mod ssot_ast;
+pub use ssot_ast::*;
+
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
