@@ -232,15 +232,14 @@ fn fold_math_alphanumeric(c: char) -> Option<char> {
         }
     }
     match cp {
-        0x210E => Some('h'),
         0x2102 | 0x212D => Some('c'),
-        0x210B | 0x210C | 0x210D => Some('h'),
+        0x210B..=0x210E => Some('h'),
         0x2110 | 0x2111 => Some('i'),
         0x2112 => Some('l'),
         0x2115 => Some('n'),
         0x2119 => Some('p'),
         0x211A => Some('q'),
-        0x211B | 0x211C | 0x211D => Some('r'),
+        0x211B..=0x211D => Some('r'),
         0x2124 | 0x2128 => Some('z'),
         0x212C => Some('b'),
         0x2130 => Some('e'),

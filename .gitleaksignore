@@ -11,3 +11,9 @@
 9a5b2e41f4a13d1a4c772cc41c714c175e84144b:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:363
 9a5b2e41f4a13d1a4c772cc41c714c175e84144b:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:378
 9a5b2e41f4a13d1a4c772cc41c714c175e84144b:crates/harness-daemon/tests/story_05_1_backend_core.rs:generic-api-key:393
+
+# False-positive synthetic test fixtures & SHA-256 idempotency_key from Story 04.6 commit (zero real credentials)
+4de23b829d84cd5ddf05b068b271f31a870b8430:_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-04/Story-04.6/qa-approved-evidence.json:generic-api-key:7
+4de23b829d84cd5ddf05b068b271f31a870b8430:src/features/chat-vault/chat-vault.test.ts:generic-api-key:70
+4de23b829d84cd5ddf05b068b271f31a870b8430:crates/harness-daemon/tests/story_04_6_chat_cas_vault.rs:generic-api-key:272
+4de23b829d84cd5ddf05b068b271f31a870b8430:crates/harness-daemon/tests/story_04_6_chat_cas_vault.rs:generic-api-key:468

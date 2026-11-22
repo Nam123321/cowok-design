@@ -1310,7 +1310,7 @@ fn authorize_host_fs_caller(
         None => Err(crate::routes::legacy_workbench_v6::json_err(
             axum::http::StatusCode::UNAUTHORIZED,
             "UNAUTHENTICATED",
-            &format!("Missing caller verification for {action_label}"),
+            format!("Missing caller verification for {action_label}"),
         )),
     }
 }
