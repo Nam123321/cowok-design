@@ -7,6 +7,83 @@ import {
   type ScreenPreviewData,
   type SlidePhaseItem,
 } from "../components/companion-canvas-data";
+import { computeEffectivePatchStack, type PatchHistoryEntryLike } from "../../../lib/sketch-polish-occ-store";
+
+export const MAX_FIELD_CHARS = 8_000;
+export const APP_CMS_STORAGE_KEY = "cowok:app-cms:v1";
+export const FORBIDDEN_RECORD_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function sanitizeStringRecord(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const clean: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof k === "string" && !FORBIDDEN_RECORD_KEYS.has(k) && typeof v === "string") {
+      clean[k] = v.slice(0, MAX_FIELD_CHARS);
+    }
+  }
+  return clean;
+}
+
+export function readPersistedAppCmsState(): {
+  overrides: Record<string, Record<string, string>>;
+  notes: Record<string, string>;
+} {
+  if (typeof window === "undefined") return { overrides: {}, notes: {} };
+  try {
+    const raw = window.localStorage?.getItem(APP_CMS_STORAGE_KEY);
+    if (!raw) return { overrides: {}, notes: {} };
+    const parsed = JSON.parse(raw) as { overrides?: unknown; notes?: unknown };
+    const overrides: Record<string, Record<string, string>> = {};
+    if (parsed?.overrides && typeof parsed.overrides === "object" && !Array.isArray(parsed.overrides)) {
+      for (const [screenKey, fields] of Object.entries(parsed.overrides)) {
+        if (typeof screenKey === "string" && !FORBIDDEN_RECORD_KEYS.has(screenKey)) {
+          overrides[screenKey] = sanitizeStringRecord(fields);
+        }
+      }
+    }
+    return { overrides, notes: sanitizeStringRecord(parsed?.notes) };
+  } catch {
+    return { overrides: {}, notes: {} };
+  }
+}
+
+export function writePersistedAppCmsState(
+  overrides: Record<string, Record<string, string>>,
+  notes: Record<string, string>
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage?.setItem(APP_CMS_STORAGE_KEY, JSON.stringify({ overrides, notes }));
+  } catch { /* ignore storage quota errors */ }
+}
+
+export function extractOverridesFromPatches(
+  patches: ReadonlyArray<PatchHistoryEntryLike>
+): Record<string, string> {
+  const effectiveStack = computeEffectivePatchStack(patches);
+  const out: Record<string, string> = {};
+  for (const patch of effectiveStack) {
+    if (patch.opKind !== "TEXT_EDIT" || typeof patch.payloadJson?.text !== "string") continue;
+    if (FORBIDDEN_RECORD_KEYS.has(patch.ffId.toLowerCase())) continue;
+    out[patch.ffId] = patch.payloadJson.text.slice(0, MAX_FIELD_CHARS);
+  }
+  return out;
+}
+
+export function applyOverrideUpdate(
+  prev: Record<string, Record<string, string>>,
+  screenKey: string,
+  ffId: string,
+  nextValue: string | undefined
+): Record<string, Record<string, string>> {
+  const nextScreen = { ...(prev[screenKey] ?? {}) };
+  if (nextValue === undefined) {
+    delete nextScreen[ffId];
+  } else {
+    nextScreen[ffId] = nextValue;
+  }
+  return { ...prev, [screenKey]: nextScreen };
+}
 
 export interface AppScreenUndoEntry {
   screenKey: string;

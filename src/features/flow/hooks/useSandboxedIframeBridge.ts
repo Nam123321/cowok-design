@@ -239,7 +239,12 @@ function useBridgePostActions(
       postToPort({ type: "RENDER_2D_CHART", slideUid: opts.slideUid, ffId: opts.ffId, spec: opts.spec, ariaLabel: opts.ariaLabel }),
     [postToPort]
   );
-  return { postApplyHtml, postFixtureHydrate, postCtaHoverSync, postPatchByFfId, postDeckKeyNav, postDeckBlackout, postRender2DChart };
+  const postStageSkinSwap = useCallback(
+    (skin: "sketch-paper" | "brand-color", cssVars?: Record<string, string>) =>
+      postToPort({ type: "STAGE_SKIN_SWAP", skin, cssVars }),
+    [postToPort]
+  );
+  return { postApplyHtml, postFixtureHydrate, postCtaHoverSync, postPatchByFfId, postDeckKeyNav, postDeckBlackout, postRender2DChart, postStageSkinSwap };
 }
 
 export function useSandboxedIframeBridge(params: SandboxedBridgeParams) {

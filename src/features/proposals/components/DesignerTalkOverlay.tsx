@@ -138,7 +138,7 @@ const TradeoffPopoverCard: React.FC<{
 const DesignerTalkEmptyCard: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
   const { t } = useTranslation();
   return (
-    <div className="cp-dt-overlay" data-testid="designer-talk-overlay">
+    <div className="cp-dt-overlay" data-testid="designer-talk-overlay" data-ff-id="designer-talk-overlay">
       <div className="cp-dt-popover" data-testid="designer-talk-empty-card" style={{ left: `${INITIAL_POPOVER_LEFT}px`, top: `${INITIAL_POPOVER_TOP}px` }}>
         <div className="cp-dt-popover-header">
           <span className="cp-dt-index-pill">T</span>
@@ -168,7 +168,7 @@ export const DesignerTalkOverlay: React.FC<DesignerTalkOverlayProps> = ({
   const anchored = boundedTradeoffs.filter((item) => Boolean(elementRects[item.elementFfId]));
 
   return (
-    <div ref={overlayRef} className="cp-dt-overlay" data-testid="designer-talk-overlay">
+    <div ref={overlayRef} className="cp-dt-overlay" data-testid="designer-talk-overlay" data-ff-id="designer-talk-overlay">
       {docked.length > 0 && (
         <div className="cp-dt-dock">
           {docked.map((item) => (

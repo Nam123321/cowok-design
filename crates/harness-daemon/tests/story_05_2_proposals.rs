@@ -143,8 +143,8 @@ async fn story_05_2_v10_schema_node_filtering_and_target_cascade() {
     let tmp = TempDir::new().expect("tempdir");
     let (state, router, tok) = setup_daemon(&tmp);
 
-    // Health endpoint reports schema_version == CURRENT_SCHEMA_VERSION (V18)
-    assert_eq!(CURRENT_SCHEMA_VERSION, 18);
+    // Health endpoint reports schema_version == CURRENT_SCHEMA_VERSION (V19)
+    assert_eq!(CURRENT_SCHEMA_VERSION, 19);
     let (st_h, health) = send_req(&router, "GET", "/api/v1/health", &tok, None).await;
     assert_eq!(st_h, StatusCode::OK);
     assert_eq!(health["schema_version"], CURRENT_SCHEMA_VERSION);

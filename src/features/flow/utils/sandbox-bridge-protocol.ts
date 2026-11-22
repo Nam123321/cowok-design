@@ -37,6 +37,7 @@ export interface SpatialTargetSelection {
 }
 
 export const POOL_MAX_SLOTS = 5;
+const EMPTY_ELEMENT_RECTS: Record<string, ElementRectBox> = Object.freeze({});
 const RANDOM_ID_RADIX = 36;
 const RANDOM_SLICE_START = 2;
 const RANDOM_SLICE_END = 7;
@@ -189,7 +190,7 @@ export function buildActiveSlotSnapshot(
     protocolStatus: activeSlot?.protocolStatus ?? "IDLE",
     retryCount: activeSlot?.retryCount ?? 0,
     protocolError,
-    elementRects: activeSlot?.elementRects ?? {},
+    elementRects: activeSlot?.elementRects ?? EMPTY_ELEMENT_RECTS,
     iframeRef: activeSlot?.iframeRef ?? fallbackRef,
     wrappedSrcDoc: activeSlot?.wrappedSrcDoc ?? "",
     activeSlotId: activeSlot?.slotId ?? "",

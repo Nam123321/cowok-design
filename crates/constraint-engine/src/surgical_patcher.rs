@@ -88,6 +88,16 @@ pub struct AstInjectionResponse {
     pub generated_ids: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReconcileFfIdsResponse {
+    pub reconciled_source: String,
+    pub preserved_count: usize,
+    pub remapped_count: usize,
+    pub total_ff_ids: usize,
+    pub min_match_confidence: f64,
+}
+
 enum TargetKind {
     JsxText,
     EmptyJsxElement,
@@ -250,6 +260,182 @@ impl SurgicalPatcher {
             total_elements_tagged,
             tagged_source,
             generated_ids,
+        })
+    }
+
+    fn read_jsx_string_attr(el: &JSXElement<'_>, attr_name: &str) -> Option<String> {
+        el.opening_element.attributes.iter().find_map(|attr| {
+            if let JSXAttributeItem::Attribute(a) = attr {
+                if Self::jsx_attr_name(&a.name) == attr_name {
+                    if let Some(JSXAttributeValue::StringLiteral(lit)) = &a.value {
+                        return lit.value.as_str().map(|s| s.trim().to_string());
+                    }
+                }
+            }
+            None
+        })
+    }
+
+    fn collect_jsx_text(el: &JSXElement<'_>) -> String {
+        let mut out = String::new();
+        for child in &el.children {
+            if let JSXChild::Text(t) = child {
+                let trimmed = t.value.as_str().trim();
+                if !trimmed.is_empty() {
+                    if !out.is_empty() {
+                        out.push(' ');
+                    }
+                    out.push_str(trimmed);
+                }
+            }
+        }
+        out.to_ascii_lowercase()
+    }
+
+    /// Reconciles `data-ff-id` anchors between `prev_source` and `next_source` TSX/JSX trees.
+    /// Fails closed with `HarnessError::Conflict` (`STALE_MAPPING`) if any previous `data-ff-id`
+    /// cannot be matched with structural confidence >= `min_confidence`.
+    pub fn reconcile_ff_ids(
+        prev_source: &str,
+        next_source: &str,
+        min_confidence: f64,
+    ) -> Result<ReconcileFfIdsResponse, HarnessError> {
+        let threshold = if min_confidence.is_finite() {
+            min_confidence.clamp(0.1, 1.0)
+        } else {
+            0.65
+        };
+        let prev_alloc = Allocator::default();
+        let next_alloc = Allocator::default();
+        let prev_parsed = Self::validate_source_size_and_parse(&prev_alloc, prev_source)?;
+        let next_parsed = Self::validate_source_size_and_parse(&next_alloc, next_source)?;
+
+        let mut prev_els = Vec::new();
+        for stmt in &prev_parsed.program.body {
+            Self::collect_elements_stmt(stmt, &mut prev_els);
+        }
+        let mut next_els = Vec::new();
+        for stmt in &next_parsed.program.body {
+            Self::collect_elements_stmt(stmt, &mut next_els);
+        }
+
+        let mut next_existing: HashMap<String, usize> = HashMap::new();
+        for (idx, el) in next_els.iter().enumerate() {
+            if let Some(fid) = Self::read_existing_ff_id(el) {
+                next_existing.insert(fid, idx);
+            }
+        }
+
+        let mut claimed_next: HashSet<usize> = HashSet::new();
+        let mut preserved_count = 0usize;
+        let mut insertions: Vec<(usize, String)> = Vec::new();
+        let mut missing: Vec<String> = Vec::new();
+        let mut lowest_confidence: f64 = 1.0;
+
+        for prev_el in prev_els {
+            let Some(fid) = Self::read_existing_ff_id(prev_el) else {
+                continue;
+            };
+            if let Some(&next_idx) = next_existing.get(&fid) {
+                claimed_next.insert(next_idx);
+                preserved_count += 1;
+                continue;
+            }
+            let prev_tag = Self::jsx_tag_name(&prev_el.opening_element.name).to_ascii_lowercase();
+            let prev_text = Self::collect_jsx_text(prev_el);
+            let prev_id = Self::read_jsx_string_attr(prev_el, "id");
+            let prev_role = Self::read_jsx_string_attr(prev_el, "role");
+            let prev_aria = Self::read_jsx_string_attr(prev_el, "aria-label");
+
+            let mut candidates: Vec<(usize, f64)> = next_els
+                .iter()
+                .enumerate()
+                .filter(|(idx, el)| {
+                    !claimed_next.contains(idx) && Self::read_existing_ff_id(el).is_none()
+                })
+                .filter_map(|(idx, el)| {
+                    let next_tag =
+                        Self::jsx_tag_name(&el.opening_element.name).to_ascii_lowercase();
+                    if next_tag != prev_tag {
+                        return None;
+                    }
+                    let mut score: f64 = 0.35;
+                    if prev_id.is_some() && prev_id == Self::read_jsx_string_attr(el, "id") {
+                        score += 0.35;
+                    }
+                    if prev_role.is_some() && prev_role == Self::read_jsx_string_attr(el, "role") {
+                        score += 0.15;
+                    }
+                    if prev_aria.is_some()
+                        && prev_aria == Self::read_jsx_string_attr(el, "aria-label")
+                    {
+                        score += 0.20;
+                    }
+                    let next_text = Self::collect_jsx_text(el);
+                    if !prev_text.is_empty() && prev_text == next_text {
+                        score += 0.40;
+                    }
+                    Some((idx, score.min(1.0)))
+                })
+                .collect();
+
+            candidates.sort_by(|a, b| {
+                b.1.partial_cmp(&a.1)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| a.0.cmp(&b.0))
+            });
+
+            let Some(&(best_idx, best_score)) = candidates.first() else {
+                missing.push(fid);
+                lowest_confidence = 0.0;
+                continue;
+            };
+            let second_score = candidates.get(1).map(|c| c.1).unwrap_or(0.0);
+            let ambiguous = candidates.len() > 1
+                && (best_score - second_score) < 0.08
+                && second_score >= threshold * 0.85;
+            if best_score < threshold || ambiguous {
+                missing.push(fid);
+                lowest_confidence = lowest_confidence.min(best_score);
+                continue;
+            }
+            claimed_next.insert(best_idx);
+            lowest_confidence = lowest_confidence.min(best_score);
+            let target_el = next_els[best_idx];
+            let insert_offset = target_el
+                .opening_element
+                .type_arguments
+                .as_ref()
+                .map_or(target_el.opening_element.name.span().end, |ta| ta.span.end)
+                as usize;
+            insertions.push((insert_offset, format!(" data-ff-id=\"{fid}\"")));
+        }
+
+        if !missing.is_empty() {
+            return Err(HarnessError::ValidationFailed {
+                reason: format!(
+                    "STALE_MAPPING: Unable to reconcile data-ff-id(s) {missing:?} (lowest_confidence={lowest_confidence:.2}, threshold={threshold:.2})"
+                ),
+            });
+        }
+
+        let remapped_count = insertions.len();
+        insertions.sort_by_key(|a| std::cmp::Reverse(a.0));
+        let mut reconciled_source = next_source.to_string();
+        for (offset, text) in insertions {
+            if offset <= reconciled_source.len() && reconciled_source.is_char_boundary(offset) {
+                reconciled_source.insert_str(offset, &text);
+            }
+        }
+        let verify_alloc = Allocator::default();
+        let _ = Self::validate_source_size_and_parse(&verify_alloc, &reconciled_source)?;
+
+        Ok(ReconcileFfIdsResponse {
+            reconciled_source,
+            preserved_count,
+            remapped_count,
+            total_ff_ids: preserved_count + remapped_count,
+            min_match_confidence: lowest_confidence,
         })
     }
 

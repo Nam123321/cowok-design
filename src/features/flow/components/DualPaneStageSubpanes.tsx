@@ -1,6 +1,6 @@
-// @story 04.1, 05.1, 05.3, 06.3
-// @implements AC-03, AC-04, AC-06 (Dual-Pane Stage Left/Right Subpanes)
-import React, { useCallback } from "react";
+// @story 04.1, 05.1, 05.3, 05.4, 06.3
+// @implements AC-03, AC-04, AC-05, AC-06 (Dual-Pane Stage Left/Right Subpanes with Live Iframe elementRects)
+import React, { useCallback, useState } from "react";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { useFormatter } from "../../../hooks/useFormatter";
 import { normalizeFixtureRef } from "../../../lib/validations/screen-fixture";
@@ -13,12 +13,11 @@ import { CompanionLiveHtmlRightPane } from "./CompanionLiveHtmlRightPane";
 import { FloatingSlideCopilot, SlideCopilotToastBanner } from "./FloatingSlideCopilot";
 import { useCmsSlideEditorController, type PostPatchByFfIdFn } from "../hooks/useCmsSlideEditorController";
 import { useAppScreenCmsState } from "../hooks/useAppScreenCmsState";
+import type { ElementRectBox } from "../hooks/useSandboxedIframeBridge";
 import { useSlideCopilotController } from "../hooks/useSlideCopilotController";
 import type { IframeToHostDeckMessage, WordingSlotDto } from "../../../lib/validations/presentation";
 import type { ChartSpecV12 } from "../../../lib/validations/presentation-chart-specs";
 import type { StageProps } from "./CompanionDualPaneStage";
-
-const EMPTY_ELEMENT_RECTS: Record<string, never> = {};
 
 function buildAppScreenCmsAdapter(appCms: ReturnType<typeof useAppScreenCmsState>): CmsStudioControllerAdapter {
   return {
@@ -148,6 +147,7 @@ export function DualPaneRightStage(props: {
 }) {
   const { p, isDeckTab, cmsController, appCms, copilot } = props;
   const { vp } = p;
+  const [liveElementRects, setLiveElementRects] = useState<Record<string, ElementRectBox>>({});
   const copilotReadOnly = props.isHistoricalReadOnly || (isDeckTab && props.isDeckResolving);
   const { cmsActions, cmsRecovery } = buildRightStageCmsBindings({ p, isDeckTab, cmsController, appCms, isReadOnly: copilotReadOnly });
   const handleInlineEdit = useCallback((ffId: string, nextVal: string, prevVal: string) => {
@@ -173,12 +173,15 @@ export function DualPaneRightStage(props: {
         onOpenRegionCmsEdit={props.onOpenRegionCmsEdit} onLinkToDag={handleLinkToDag} isLeftDagFocused={!isDeckTab && vp.structureLens === "userflow"}
         blackoutMode={props.blackoutMode} isPresenterActive={props.isPresenterActive} onOpenPresenter={props.onOpenPresenter}
         onRegisterDeckBlackout={props.onRegisterDeckBlackout} presenterToastNode={props.presenterToastNode}
+        stageSkin={p.stageSkin} sketchPolishBarNode={p.sketchPolishBarNode}
+        onRegisterStageSkinSwap={p.onRegisterStageSkinSwap} onRegisterStageApplyHtml={p.onRegisterStageApplyHtml}
+        onElementRectsChange={setLiveElementRects}
         copilotToastNode={isDeckTab ? <SlideCopilotToastBanner toast={copilot.receiptToast} onDismiss={dismissReceiptToast} /> : null}
         floatingCopilotNode={isDeckTab ? (
           <FloatingSlideCopilot isOpen={copilot.isOpen} isCollapsed={copilot.isCollapsed} isReadOnly={copilotReadOnly} slideCode={props.slideCode} slideUid={cmsController.slideUid} targetFfId={copilot.targetFfId} draftPrompt={copilot.draftPrompt} attachedComment={copilot.attachedComment} activeLease={copilot.activeLease} messages={copilot.messages} activeGlobalSlots={copilot.activeGlobalSlots} maxGlobalSlots={copilot.maxGlobalSlots} onDraftPromptChange={setDraftPrompt} onSendPrompt={(kind) => { void submitPrompt(copilot.draftPrompt, kind); }} onCancelLease={() => { void cancelCopilot(); }} onCollapse={() => setIsCollapsed(true)} onExpand={() => setIsCollapsed(false)} onClose={() => setIsOpen(false)} onClearAttachedComment={clearAttachedComment} />
         ) : null}
       />
-      <DesignerTalkOverlay isOpen={p.isDesignerTalkOpen} tradeoffs={p.activeProposal?.tradeoffs ?? []} elementRects={EMPTY_ELEMENT_RECTS} drawerWidth={p.isProposalDrawerOpen ? PROPOSAL_DRAWER_WIDTH_PX : 0} isModalOpen={p.isModalOpen} isInlineEditorOpen={vp.isInlineCodeOpen} onClose={p.onCloseDesignerTalk} onDecide={p.onDecideTradeoff} />
+      <DesignerTalkOverlay isOpen={p.isDesignerTalkOpen} tradeoffs={p.activeProposal?.tradeoffs ?? []} elementRects={liveElementRects} drawerWidth={p.isProposalDrawerOpen ? PROPOSAL_DRAWER_WIDTH_PX : 0} isModalOpen={p.isModalOpen} isInlineEditorOpen={vp.isInlineCodeOpen} onClose={p.onCloseDesignerTalk} onDecide={p.onDecideTradeoff} />
     </div>
   );
 }

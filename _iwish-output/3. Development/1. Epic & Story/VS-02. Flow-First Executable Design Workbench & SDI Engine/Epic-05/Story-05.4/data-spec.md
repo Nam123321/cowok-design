@@ -2,13 +2,17 @@
 type: I-Wish Data & Contract Spec
 story_id: "05.4"
 title: "Data, HTML Forge & Surgical Patch Specification: Story 05.4"
-status: refactored
+status: synced
 adr_ref: "../../../../2. Product Planning/ADRs/ADR-006-Decision-Cascade-Pooled-CDP-and-Shared-Html-Forge.md"
 data_decision_records:
   - model: ScreenArtifactPatch
-    action: EXTENDS_AGGREGATE
+    action: EXTEND
     bounded_context: html-forge
-    justification: "Shares presentation-cms::cms_patcher (lol_html + html5ever) into crates/html-forge with SurgicalPatcher::reconcile_ff_ids"
+    justification: "Shares presentation-cms::cms_patcher (lol_html + html5ever) into crates/html-forge with SurgicalPatcher::reconcile_ff_ids and V19 SQLite WAL OCC persistence"
+  - model: SdiClarificationSession
+    action: NEW_AGGREGATE
+    bounded_context: html-forge
+    justification: "Persists Day-0 Goal+Locale clarification lock state, 2 Live Direction Switcher pills, and monotonic generation_epoch for -PGID preemption"
 links_to:
   - "../../../../2. Product Planning/2.2. database-spec.md"
   - "../../../../2. Product Planning/2.5. architecture.md"
@@ -25,23 +29,51 @@ Story `05.4` extracts `presentation-cms::cms_patcher` (`lol_html + html5ever`) i
 ## 2. Persistence Schema & OCC Invariants
 
 ```sql
--- Extends existing screen_artifacts & change_proposals (no conflicting V-migration)
--- app_screen_revisions tracked atomically via revision + artifact_sha256 OCC
+-- V19__story_05_4_html_forge_and_sketch_polish.sql (CURRENT_SCHEMA_VERSION = 19, 60 SQLite WAL tables)
+-- screen_artifact_patches & sdi_clarification_sessions with composite FKs (project_id, tenant_id)
+-- and OCC UNIQUE(tenant_id, project_id, screen_id, ast_revision)
 ```
 
 ```prisma
 model ScreenArtifactPatch {
-  id              String @id @default(uuid())
-  projectId       String @map("project_id")
-  screenId        String @map("screen_id")
-  baseArtifactSha String @map("base_artifact_sha")
-  applyTier       String @map("apply_tier")
-  reconciledFfIds Int    @map("reconciled_ff_ids")
-  lockedRuleJson  String? @map("locked_rule_json")
-  createdAt       BigInt @map("created_at")
+  id                String  @id @default(uuid())
+  tenantId          String  @map("tenant_id")
+  projectId         String  @map("project_id")
+  screenId          String  @map("screen_id")
+  astRevision       Int     @map("ast_revision")
+  baseArtifactSha   String  @map("base_artifact_sha")
+  resultArtifactSha String  @map("result_artifact_sha")
+  ffId              String  @map("ff_id")
+  opKind            String  @map("op_kind")
+  applyTier         String  @map("apply_tier")
+  reconciledFfIds   Int     @default(0) @map("reconciled_ff_ids")
+  payloadJson       String  @default("{}") @map("payload_json")
+  htmlSnapshot      String  @map("html_snapshot")
+  lockedRuleJson    String? @map("locked_rule_json")
+  createdAt         BigInt  @map("created_at")
 
-  @@index([projectId, screenId])
+  @@unique([tenantId, projectId, screenId, astRevision])
+  @@index([tenantId, projectId, screenId])
   @@map("screen_artifact_patches")
+}
+
+model SdiClarificationSession {
+  id                  String  @id @default(uuid())
+  tenantId            String  @map("tenant_id")
+  projectId           String  @map("project_id")
+  phase               String  @default("clarifying")
+  goalPrompt          String  @map("goal_prompt")
+  locale              String  @default("vi")
+  activeDirectionId   String  @map("active_direction_id")
+  generationEpoch     Int     @default(1) @map("generation_epoch")
+  directionsJson      String  @default("[]") @map("directions_json")
+  lastPreemptedPgid   Int?    @map("last_preempted_pgid")
+  activeSkillsJson    String  @default("[]") @map("active_skills_json")
+  updatedAt           BigInt  @map("updated_at")
+  createdAt           BigInt  @map("created_at")
+
+  @@unique([tenantId, projectId])
+  @@map("sdi_clarification_sessions")
 }
 ```
 

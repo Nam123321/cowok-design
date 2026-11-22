@@ -6,3 +6,10 @@ license.workspace = true
 
 [dependencies]
 domain = { path = "../domain" }
+html5ever = "0.40"
+lol_html = "3.0"
+markup5ever_rcdom = "0.40"
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
