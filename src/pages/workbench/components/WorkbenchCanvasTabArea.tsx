@@ -9,8 +9,35 @@ import { ContextualNodeFloatingChat } from "../../../features/flow/components/Co
 import type { useNodeProposalController } from "../../../features/proposals/hooks/useNodeProposalController";
 import { ErrorBoundary } from "../../../components/ui/ErrorBoundary";
 import { findOrphanNodes } from "../../../features/flow/utils/graph-analysis";
+import { VisualClarificationModal } from "../../../features/sdi/components/VisualClarificationModal";
+import {
+  LockedRuleChangeReceiptCard,
+  StageSkinToggleBar,
+  SteeringChipsBar,
+  useSketchPolishController,
+} from "../../../features/sketch-polish";
+import type { LiveDirectionOption } from "../../../lib/validations/sketch-polish";
 import { useWorkbenchGraphHandlers } from "../hooks/useWorkbenchGraphHandlers";
 import { DEFAULT_FLOW_PROJECT_ID } from "../constants";
+
+const DEFAULT_LIVE_DIRECTIONS: readonly LiveDirectionOption[] = [
+  {
+    id: "dir-editorial-sketch",
+    label: "Direction 1 · Monochrome Sketch",
+    summary: "Warm sketch paper hierarchy first before locking brand colors.",
+    accentHex: "#2563EB",
+    surfaceHex: "#FAF9F6",
+    skillSlug: "sketch-monochrome",
+  },
+  {
+    id: "dir-polish-workbench",
+    label: "Direction 2 · Polished Workbench",
+    summary: "High-density Bento workspace with WCAG AA contrast guard.",
+    accentHex: "#0F766E",
+    surfaceHex: "#F8FAFC",
+    skillSlug: "impeccable-polish",
+  },
+];
 
 const FOCUS_OFFSET_X = 300;
 const FOCUS_OFFSET_Y = 200;
@@ -104,24 +131,90 @@ export interface WorkbenchCanvasTabAreaProps {
   proposalController?: ReturnType<typeof useNodeProposalController>;
 }
 
+const SketchPolishOverlayModals: React.FC<{
+  polish: ReturnType<typeof useSketchPolishController>;
+}> = ({ polish }) => (
+  <>
+    <LockedRuleChangeReceiptCard
+      receipt={polish.lockedRuleReceipt}
+      onConfirmOverride={polish.handleConfirmRuleOverride}
+      onDismiss={polish.dismissLockedRuleReceipt}
+    />
+    <VisualClarificationModal
+      isOpen={polish.isClarifyOpen}
+      variants={[]}
+      liveDirections={polish.clarifySession?.directions ?? [...DEFAULT_LIVE_DIRECTIONS]}
+      activeDirectionId={polish.clarifySession?.activeDirectionId ?? DEFAULT_LIVE_DIRECTIONS[0]!.id}
+      generationEpoch={polish.clarifySession?.generationEpoch ?? 1}
+      goalPrompt={polish.goalPrompt}
+      clarifyLocale={polish.clarifyLocale}
+      referenceApps={polish.referenceApps}
+      themeModes={polish.themeModes}
+      selectedPopularComponents={polish.selectedPopularComponents}
+      onChangeGoalPrompt={polish.setGoalPrompt}
+      onChangeClarifyLocale={polish.setClarifyLocale}
+      onChangeReferenceApps={polish.setReferenceApps}
+      onToggleThemeMode={polish.toggleThemeMode}
+      onTogglePopularComponent={polish.togglePopularComponent}
+      onSwitchLiveDirection={(dirId) => { void polish.handleSwitchLiveDirection(dirId); }}
+      onConfirm={polish.handleConfirmStyleDirection}
+      onClose={polish.handleCancelStyleModal}
+    />
+  </>
+);
+
+const SketchPolishToolbarStrip: React.FC<{
+  polish: ReturnType<typeof useSketchPolishController>;
+}> = ({ polish }) => (
+  <div className="sp-toolbar-strip" data-testid="sketch-polish-strip">
+    <StageSkinToggleBar
+      skin={polish.stageSkin}
+      cognitivePhase={polish.cognitivePhase}
+      onChangeSkin={polish.handleChangeSkin}
+      onSelectPhase={polish.handleSelectPhase}
+      onAdvanceToStyle={polish.handleAdvanceToStyle}
+      onApproveV1={polish.handleApproveV1}
+      onToggleSketchLens={polish.handleToggleSketchLens}
+      oklchWarning={polish.oklchWarning}
+      lastSwapMs={polish.lastSwapMs}
+      onOpenClarify={polish.handleAdvanceToStyle}
+    />
+    <SteeringChipsBar
+      activeChipId={polish.activeChipId}
+      isApplying={polish.isApplying}
+      canUndo={polish.canUndo}
+      onSelectChip={polish.handleSelectChip}
+      onUndo={polish.handleUndo}
+    />
+  </div>
+);
+
 export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = ({
   state, store, activeTabId, projectId = DEFAULT_FLOW_PROJECT_ID, chatProjectId, sessionId = "session-1", sessionEntryKind,
   onTabChange, graphHandlers, onCommentOnNode, onAddQuoteChip, onOpenLeftChat, isLeftChatCollapsed = false,
   attachmentChips, attachmentSnippets, onRemoveAttachmentChip, onAttachFiles, onClearAttachments,
   onOpenSettings, proposalController,
 }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const [isDeploying, setIsDeploying] = useState(false);
   const handleDeployDraft = async () => { if (!isDeploying) { setIsDeploying(true); try { await store.syncDeployDraft(projectId); } finally { setIsDeploying(false); } } };
   const orphanCount = findOrphanNodes(state.nodes.map((n) => ({ id: n.id })), state.transitions.map((tr) => ({ source: tr.sourceNodeId, target: tr.targetNodeId }))).length;
+  const polish = useSketchPolishController({
+    projectId,
+    screenId: state.selectedNodeId || state.nodes[0]?.id || "default",
+    locale: locale === "vi" ? "vi" : "en",
+  });
+  const isDeckFocus = activeTabId.includes("slide") || activeTabId.includes("deck");
+  const sketchPolishBarNode = isDeckFocus ? null : <SketchPolishToolbarStrip polish={polish} />;
 
   return (
     <main style={{ flex: 1, minWidth: 0, height: "100%", overflow: "hidden", position: "relative", backgroundColor: "var(--bg-canvas)" }}>
-      <CompanionCanvasTab projectId={projectId} sessionId={sessionId} sessionEntryKind={sessionEntryKind} activeTabId={activeTabId} onTabChange={onTabChange} selectedNodeId={state.selectedNodeId} onSelectNode={(id) => store.selectNode(id, false)} nodes={state.nodes} isDraftDirty={state.isDraftDirty} orphanCount={orphanCount} conflictState={state.conflictState} canUndo={(state.undoStack?.length || 0) > 0} canRedo={(state.redoStack?.length || 0) > 0} onUndo={() => store.undo()} onRedo={() => store.redo()} onResolveConflict={(c) => { void store.resolveConflict(c); }} onDeployDraft={() => { void handleDeployDraft(); }} onDiscardDraft={() => store.discardDraft()} onAttachRegionToChat={onCommentOnNode} onQuoteText={onAddQuoteChip} onSelectNodeSubState={(nid, sub) => store.setNodeSubState(nid, sub)} proposalController={proposalController}>
+      <CompanionCanvasTab projectId={projectId} sessionId={sessionId} sessionEntryKind={sessionEntryKind} activeTabId={activeTabId} onTabChange={onTabChange} selectedNodeId={state.selectedNodeId} onSelectNode={(id) => store.selectNode(id, false)} nodes={state.nodes} isDraftDirty={state.isDraftDirty} orphanCount={orphanCount} conflictState={state.conflictState} canUndo={(state.undoStack?.length || 0) > 0} canRedo={(state.redoStack?.length || 0) > 0} onUndo={() => store.undo()} onRedo={() => store.redo()} onResolveConflict={(c) => { void store.resolveConflict(c); }} onDeployDraft={() => { void handleDeployDraft(); }} onDiscardDraft={() => store.discardDraft()} onAttachRegionToChat={onCommentOnNode} onQuoteText={onAddQuoteChip} onSelectNodeSubState={(nid, sub) => store.setNodeSubState(nid, sub)} proposalController={proposalController} stageSkin={polish.stageSkin} sketchPolishBarNode={sketchPolishBarNode} onRegisterStageSkinSwap={polish.onRegisterStageSkinSwap} onRegisterStageApplyHtml={polish.onRegisterStageApplyHtml} onLockedRuleReceipt={polish.handleLockedRuleNotice}>
         <ErrorBoundary fallbackTitle={t("errors.dagCanvasRender", "Lỗi hiển thị Canvas 2D DAG")} onReset={() => store.discardDraft()}>
           <DagCanvas2D state={state} projectId={projectId} sessionId={sessionId} onUpdatePosition={graphHandlers.handleUpdatePosition} onSetViewport={graphHandlers.handleSetViewport} onSelectNode={(id, multi) => store.selectNode(id, multi)} onSelectTransition={(id) => store.selectTransition(id)} onAddNode={graphHandlers.handleAddNode} onAutoLayout={() => store.autoLayoutNodes()} onSelectSubState={(id, sub) => store.setNodeSubState(id, sub)} onDuplicateNode={(id) => store.duplicateNode(id)} onRenameNode={(id, title) => store.renameNode(id, title)} onDeleteNode={(id) => store.deleteNode(id)} onAddTransition={graphHandlers.handleAddTransition} onUpdateTransition={(id, u) => store.updateTransition(id, u)} onReverseTransition={graphHandlers.handleReverseTransition} onDeleteTransition={(id) => store.deleteTransition(id)} onUpdateNodeNote={(id, note) => store.updateNodeNote(id, note)} onToggleMinimap={() => store.toggleMinimap()} onUndo={() => store.undo()} onRedo={() => store.redo()} onCommentOnNode={onCommentOnNode} />
         </ErrorBoundary>
       </CompanionCanvasTab>
+      <SketchPolishOverlayModals polish={polish} />
       <FloatingChatOverlay
         visible={isLeftChatCollapsed}
         activeTabId={activeTabId}

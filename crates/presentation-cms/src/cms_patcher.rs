@@ -5,8 +5,12 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 use std::time::Instant;
 
-use html5ever::tendril::TendrilSink;
-use html5ever::{parse_document, ParseOpts};
+use html_forge::{
+    escape_html_attr as forge_escape_html_attr, escape_html_text as forge_escape_html_text,
+    is_safe_asset_url as forge_is_safe_asset_url, is_valid_ff_id as forge_is_valid_ff_id,
+    parse_html5_dom as forge_parse_html5_dom,
+    validate_and_scrub_css_tokens as forge_validate_and_scrub_css_tokens, HtmlForgeError,
+};
 use lol_html::html_content::ContentType;
 use lol_html::{element, rewrite_str, RewriteStrSettings};
 use markup5ever_rcdom::{Handle, NodeData, RcDom};
@@ -18,38 +22,10 @@ use crate::protocol::MAX_SLIDE_HTML_BYTES;
 use crate::templates::compute_sha256_hex;
 use crate::ulid::is_valid_slide_uid;
 
-pub const MAX_SLOT_TEXT_CHARS: usize = 8_000;
-pub const MAX_FF_ID_LEN: usize = 64;
+pub const MAX_SLOT_TEXT_CHARS: usize = html_forge::MAX_SLOT_TEXT_CHARS;
+pub const MAX_FF_ID_LEN: usize = html_forge::MAX_FF_ID_LEN;
 pub const MAX_CHARTS_JSON_BYTES: usize = 65_536;
 pub const CUSTOM_OVERRIDE_ATTR: &str = "data-cowok-custom-override";
-
-const ALLOWED_INLINE_CSS_PROPS: &[&str] = &[
-    "color",
-    "background-color",
-    "font-size",
-    "font-weight",
-    "font-family",
-    "line-height",
-    "letter-spacing",
-    "text-align",
-    "opacity",
-    "border-color",
-    "border-radius",
-    "padding",
-    "margin",
-    "gap",
-    "display",
-];
-
-const ALLOWED_DISPLAY_VALUES: &[&str] =
-    &["none", "block", "inline", "inline-block", "flex", "grid"];
-
-const ALLOWED_TEXT_ALIGN_VALUES: &[&str] = &["left", "center", "right", "justify", "start", "end"];
-
-const ALLOWED_FONT_WEIGHT_VALUES: &[&str] = &[
-    "normal", "bold", "lighter", "bolder", "100", "200", "300", "400", "500", "600", "700", "800",
-    "900",
-];
 
 const FORBIDDEN_ELEMENTS: &[&str] = &[
     "script",
@@ -285,336 +261,26 @@ pub enum CmsPatcherError {
     RewriterFailure(String),
 }
 
-/// Validates canonical `[data-ff-id]` syntax (`^[a-zA-Z0-9_-]{1,64}$`) to block CSS selector injection.
+/// Validates canonical `[data-ff-id]` syntax (`^[a-zA-Z0-9_-]{1,64}$`) via shared `html-forge`.
 pub fn is_valid_ff_id(value: &str) -> bool {
-    if value.is_empty() || value.len() > MAX_FF_ID_LEN {
-        return false;
-    }
-    value
-        .bytes()
-        .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+    forge_is_valid_ff_id(value)
 }
 
-/// Strict fail-closed URL allowlist for `img[src]` and `a[href]`.
+/// Strict fail-closed URL allowlist for `img[src]` and `a[href]` via shared `html-forge`.
 pub fn is_safe_asset_url(raw: &str) -> bool {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() || trimmed.len() > 2048 {
-        return false;
-    }
-    if trimmed.bytes().any(|b| b < 0x20 || b == 0x7F) {
-        return false;
-    }
-    let compact_lower: String = trimmed
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .map(|c| c.to_ascii_lowercase())
-        .collect();
-    if compact_lower.starts_with("javascript:")
-        || compact_lower.starts_with("vbscript:")
-        || compact_lower.starts_with("data:")
-        || compact_lower.starts_with("file:")
-        || compact_lower.starts_with("//")
-        || compact_lower.contains("..")
-    {
-        return false;
-    }
-    compact_lower.starts_with("https://")
-        || compact_lower.starts_with("/assets/")
-        || compact_lower.starts_with("assets/")
-        || compact_lower.starts_with("presentations/")
-        || compact_lower.starts_with("slides/")
-        || compact_lower.starts_with('#')
+    forge_is_safe_asset_url(raw)
 }
 
-fn strip_css_comments_fail_closed(input: &str) -> Result<String, CmsPatcherError> {
-    if input.contains('\0') {
-        return Err(CmsPatcherError::CssTokenBlocked("null-byte".to_string()));
-    }
-    if input.contains('\\') {
-        return Err(CmsPatcherError::CssTokenBlocked(
-            "backslash-escape".to_string(),
-        ));
-    }
-    let bytes = input.as_bytes();
-    let mut out = String::with_capacity(input.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'*' {
-            i += 2;
-            let mut closed = false;
-            while i + 1 < bytes.len() {
-                if bytes[i] == b'*' && bytes[i + 1] == b'/' {
-                    i += 2;
-                    closed = true;
-                    break;
-                }
-                i += 1;
-            }
-            if !closed {
-                return Err(CmsPatcherError::CssTokenBlocked(
-                    "unclosed-comment".to_string(),
-                ));
-            }
-            out.push(' ');
-        } else {
-            let ch = input[i..].chars().next().unwrap_or(' ');
-            out.push(ch);
-            i += ch.len_utf8();
-        }
-    }
-    Ok(out)
-}
-
-fn scan_forbidden_css_tokens(stripped: &str) -> Result<(), CmsPatcherError> {
-    let lower = stripped.to_ascii_lowercase();
-    let compact: String = lower.chars().filter(|c| !c.is_whitespace()).collect();
-    if lower.contains('<') || compact.contains("</style") {
-        return Err(CmsPatcherError::CssTokenBlocked("</style".to_string()));
-    }
-    for needle in [
-        "@import",
-        "@charset",
-        "@namespace",
-        "@document",
-        "@-moz-",
-        "expression(",
-        "-moz-binding",
-        "behavior:",
-        "unsafe-inline",
-        "url(",
-        "image-set(",
-        "cross-fade(",
-        "image(",
-        "src(",
-        "javascript:",
-        "vbscript:",
-        "data:",
-    ] {
-        if lower.contains(needle) || compact.contains(needle) {
-            return Err(CmsPatcherError::CssTokenBlocked(needle.to_string()));
-        }
-    }
-    Ok(())
-}
-
-fn selector_targets_protected_root(selector: &str) -> bool {
-    let lower = selector.to_ascii_lowercase();
-    if lower.contains("live-html-frame")
-        || lower.contains(":root")
-        || lower.contains('*')
-        || lower.contains("[class")
-    {
-        return true;
-    }
-    for token in lower.split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_')) {
-        if matches!(token, "html" | "body") {
-            return true;
-        }
-    }
-    false
-}
-
-fn is_valid_hex_color(v: &str) -> bool {
-    let Some(hex) = v.strip_prefix('#') else {
-        return false;
-    };
-    matches!(hex.len(), 3 | 6 | 8) && hex.bytes().all(|b| b.is_ascii_hexdigit())
-}
-
-fn is_valid_rgb_color(v: &str) -> bool {
-    let lower = v.to_ascii_lowercase();
-    let Some(inner) = lower.strip_prefix("rgb(").and_then(|s| s.strip_suffix(')')) else {
-        return false;
-    };
-    let parts: Vec<&str> = inner.split(',').map(str::trim).collect();
-    parts.len() == 3
-        && parts
-            .iter()
-            .all(|p| !p.is_empty() && p.parse::<u8>().is_ok())
-}
-
-fn is_valid_css_var(v: &str) -> bool {
-    let Some(inner) = v.strip_prefix("var(--").and_then(|s| s.strip_suffix(')')) else {
-        return false;
-    };
-    !inner.is_empty()
-        && inner.len() <= 64
-        && inner
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
-}
-
-fn is_valid_css_length_token(tok: &str) -> bool {
-    if tok == "0" || tok == "auto" {
-        return true;
-    }
-    let mut num_end = tok.len();
-    for suffix in ["px", "rem", "em", "%", "fr"] {
-        if let Some(prefix) = tok.strip_suffix(suffix) {
-            num_end = prefix.len();
-            break;
-        }
-    }
-    if num_end == tok.len() {
-        return false;
-    }
-    let num = &tok[..num_end];
-    if num.is_empty() {
-        return false;
-    }
-    num.parse::<f64>().is_ok()
-}
-
-fn is_valid_css_value(prop: &str, raw_val: &str) -> bool {
-    let val = raw_val.trim();
-    if val.is_empty() || val.len() > 256 {
-        return false;
-    }
-    if val.to_ascii_lowercase().contains("!important") {
-        return false;
-    }
-    if is_valid_css_var(val) {
-        return true;
-    }
-    match prop {
-        "color" | "background-color" | "border-color" => {
-            val == "transparent"
-                || val == "currentColor"
-                || val == "inherit"
-                || is_valid_hex_color(val)
-                || is_valid_rgb_color(val)
-        }
-        "font-size" | "letter-spacing" | "border-radius" | "gap" => {
-            val.split_whitespace().count() <= 4
-                && val
-                    .split_whitespace()
-                    .all(|t| is_valid_css_var(t) || is_valid_css_length_token(t))
-        }
-        "padding" | "margin" => {
-            val.split_whitespace().count() <= 4
-                && val
-                    .split_whitespace()
-                    .all(|t| is_valid_css_var(t) || is_valid_css_length_token(t))
-        }
-        "line-height" => {
-            val == "normal"
-                || is_valid_css_length_token(val)
-                || val.parse::<f64>().is_ok_and(|n| (0.5..=4.0).contains(&n))
-        }
-        "opacity" => val.parse::<f64>().is_ok_and(|n| (0.0..=1.0).contains(&n)),
-        "font-weight" => ALLOWED_FONT_WEIGHT_VALUES.contains(&val.to_ascii_lowercase().as_str()),
-        "text-align" => ALLOWED_TEXT_ALIGN_VALUES.contains(&val.to_ascii_lowercase().as_str()),
-        "display" => ALLOWED_DISPLAY_VALUES.contains(&val.to_ascii_lowercase().as_str()),
-        "font-family" => {
-            val.len() <= 128
-                && val.bytes().all(|b| {
-                    b.is_ascii_alphanumeric()
-                        || matches!(b, b' ' | b',' | b'-' | b'_' | b'"' | b'\'')
-                })
-        }
-        _ => false,
-    }
-}
-
-/// Fail-closed deterministic CSS sanitizer for both `style=""` inline attributes and `<style>` blocks.
+/// Fail-closed deterministic CSS sanitizer via shared `html-forge`.
 pub fn validate_and_scrub_css_tokens(
     css: &str,
     is_inline_style: bool,
 ) -> Result<String, CmsPatcherError> {
-    let stripped = strip_css_comments_fail_closed(css)?;
-    scan_forbidden_css_tokens(&stripped)?;
-
-    if is_inline_style {
-        let mut normalized = Vec::new();
-        for decl in stripped.split(';') {
-            let trimmed = decl.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
-            let Some((raw_prop, raw_val)) = trimmed.split_once(':') else {
-                return Err(CmsPatcherError::CssTokenBlocked(format!(
-                    "malformed-decl:{trimmed}"
-                )));
-            };
-            let prop = raw_prop.trim().to_ascii_lowercase();
-            let val = raw_val.trim();
-            if !ALLOWED_INLINE_CSS_PROPS.contains(&prop.as_str()) {
-                return Err(CmsPatcherError::CssTokenBlocked(format!(
-                    "disallowed-prop:{prop}"
-                )));
-            }
-            if !is_valid_css_value(&prop, val) {
-                return Err(CmsPatcherError::CssTokenBlocked(format!(
-                    "invalid-value:{prop}:{val}"
-                )));
-            }
-            normalized.push(format!("{prop}: {val}"));
-        }
-        return Ok(normalized.join("; "));
-    }
-
-    // Stylesheet `<style>` block validation: string-aware brace scanner & protected-root !important guard
-    let mut selector_stack: Vec<String> = Vec::new();
-    let mut body_stack: Vec<String> = Vec::new();
-    let mut pending_prelude = String::new();
-    let mut quote_char: Option<char> = None;
-    for ch in stripped.chars() {
-        if let Some(q) = quote_char {
-            pending_prelude.push(ch);
-            if ch == q {
-                quote_char = None;
-            }
-            continue;
-        }
-        match ch {
-            '"' | '\'' => {
-                quote_char = Some(ch);
-                pending_prelude.push(ch);
-            }
-            '{' => {
-                if selector_stack.len() >= 2 {
-                    return Err(CmsPatcherError::CssTokenBlocked(
-                        "excessive-css-nesting".to_string(),
-                    ));
-                }
-                selector_stack.push(std::mem::take(&mut pending_prelude));
-                body_stack.push(String::new());
-            }
-            '}' => {
-                let Some(sel) = selector_stack.pop() else {
-                    return Err(CmsPatcherError::CssTokenBlocked(
-                        "unbalanced-braces".to_string(),
-                    ));
-                };
-                let block = body_stack.pop().unwrap_or_default();
-                let combined_block = format!("{block}{pending_prelude}");
-                pending_prelude.clear();
-                if selector_targets_protected_root(&sel)
-                    && combined_block.to_ascii_lowercase().contains("!important")
-                {
-                    return Err(CmsPatcherError::CssTokenBlocked(
-                        "protected-selector-important".to_string(),
-                    ));
-                }
-            }
-            ';' => {
-                if let Some(cur_body) = body_stack.last_mut() {
-                    cur_body.push_str(&pending_prelude);
-                    cur_body.push(';');
-                }
-                pending_prelude.clear();
-            }
-            _ => {
-                pending_prelude.push(ch);
-            }
-        }
-    }
-    if quote_char.is_some() || !selector_stack.is_empty() {
-        return Err(CmsPatcherError::CssTokenBlocked(
-            "unbalanced-braces".to_string(),
-        ));
-    }
-    Ok(stripped)
+    forge_validate_and_scrub_css_tokens(css, is_inline_style).map_err(|err| match err {
+        HtmlForgeError::CssTokenBlocked(tok) => CmsPatcherError::CssTokenBlocked(tok),
+        HtmlForgeError::MxssBlocked(tok) => CmsPatcherError::MxssBlocked(tok),
+        other => CmsPatcherError::InvalidSlotValue(other.to_string()),
+    })
 }
 
 fn parse_safe_styles_map(safe_styles_json: &str) -> Result<String, CmsPatcherError> {
@@ -632,22 +298,11 @@ fn parse_safe_styles_map(safe_styles_json: &str) -> Result<String, CmsPatcherErr
 }
 
 fn escape_html_text(input: &str) -> String {
-    let mut out = String::with_capacity(input.len());
-    for ch in input.chars() {
-        match ch {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&#39;"),
-            _ => out.push(ch),
-        }
-    }
-    out
+    forge_escape_html_text(input)
 }
 
 fn escape_html_attr(input: &str) -> String {
-    escape_html_text(input)
+    forge_escape_html_attr(input)
 }
 
 /// High-speed (`< 1ms`) streaming HTML5 slot patcher powered by `lol_html`.
@@ -1270,10 +925,7 @@ fn audit_dom_no_forbidden(handle: &Handle, in_svg: bool) -> Result<(), CmsPatche
 }
 
 fn parse_html5_dom(html: &str) -> RcDom {
-    parse_document(RcDom::default(), ParseOpts::default())
-        .from_utf8()
-        .read_from(&mut html.as_bytes())
-        .unwrap_or_default()
+    forge_parse_html5_dom(html)
 }
 
 /// Fail-closed `html5ever` two-pass mXSS & CSS sanitizer with optional `one-page` `scope_slide_uid`.

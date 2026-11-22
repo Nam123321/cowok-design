@@ -13,6 +13,7 @@ domain = { path = "../domain" }
 spec-registry = { path = "../spec-registry" }
 context-compiler = { path = "../context-compiler" }
 constraint-engine = { path = "../constraint-engine" }
+html-forge = { path = "../html-forge" }
 presentation-cms = { path = "../presentation-cms" }
 flow-graph = { path = "../flow-graph" }
 plugin-host = { path = "../plugin-host" }

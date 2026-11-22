@@ -303,7 +303,7 @@ export function DualPaneHtmlStage(p: StageProps) {
   const showSplitter = !vp.isLeftStructureHidden && !vp.isRightPreviewHidden && !vp.isPresenting;
   const { cmsController, postPatchByFfIdRef, onRegisterPatchByFfId, pinnedSlideIds, isDeckResolving, isHistoricalReadOnly } = useStageCmsBindings(p, isDeckTab);
   const { selectedNode, baseScreenData } = resolveBaseScreenDataForStage(p);
-  const appCms = useAppScreenCmsState({ nodes: p.nodes, selectedNodeId: p.selectedNodeId, baseScreenData, isReadOnly: isHistoricalReadOnly, postPatchByFfIdRef });
+  const appCms = useAppScreenCmsState({ projectId: p.projectId, nodes: p.nodes, selectedNodeId: p.selectedNodeId, baseScreenData, isReadOnly: isHistoricalReadOnly, postPatchByFfIdRef, onLockedRuleReceipt: p.onLockedRuleReceipt });
   const [cmsFilterFfIds, setCmsFilterFfIds] = useState<string[]>([]);
   const render2DChartRef = useRef<((opts: { slideUid: string; ffId: string; spec: ChartSpecV12; ariaLabel: string }) => void) | null>(null);
   const onRegisterRender2DChart = useCallback((fn: ((opts: { slideUid: string; ffId: string; spec: ChartSpecV12; ariaLabel: string }) => void) | null) => { render2DChartRef.current = fn; }, []);

@@ -83,6 +83,23 @@ impl ActiveWorkerRegistry {
             .collect();
         keys.into_iter().filter_map(|k| guard.remove(&k)).collect()
     }
+    pub fn take_by_project_and_pgid(&self, project_id: &str, pgid: i32) -> Vec<ActiveWorkerEntry> {
+        let Ok(mut guard) = self.inner.lock() else {
+            return Vec::new();
+        };
+        let keys: Vec<_> = guard
+            .iter()
+            .filter(|(_, entry)| entry.project_id == project_id && entry.pgid == pgid)
+            .map(|(k, _)| k.clone())
+            .collect();
+        let taken: Vec<ActiveWorkerEntry> =
+            keys.into_iter().filter_map(|k| guard.remove(&k)).collect();
+        drop(guard);
+        for entry in &taken {
+            self.cancel_heartbeat(&entry.job_id, entry.fencing_token);
+        }
+        taken
+    }
 }
 
 fn validate_safe_segment(raw: &str, label: &str) -> Result<String, HarnessError> {

@@ -852,6 +852,7 @@ dependencies = [
  "domain",
  "flow-graph",
  "futures-util",
+ "html-forge",
  "http-body-util",
  "libc",
  "plugin-host",
@@ -912,6 +913,13 @@ name = "html-forge"
 version = "0.1.0"
 dependencies = [
  "domain",
+ "html5ever",
+ "lol_html",
+ "markup5ever_rcdom",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
 ]
 
 [[package]]
@@ -1951,6 +1959,7 @@ name = "presentation-cms"
 version = "0.1.0"
 dependencies = [
  "domain",
+ "html-forge",
  "html5ever",
  "lol_html",
  "markup5ever_rcdom",

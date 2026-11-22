@@ -30,6 +30,7 @@ pub mod presentation_copilot;
 pub mod presentation_presenter;
 pub mod presentation_storage;
 pub mod project_trash;
+pub mod sketch_polish;
 pub mod ssot_registry;
 
 use std::sync::Arc;

@@ -82,6 +82,11 @@ export interface CompanionCanvasTabProps {
   onSelectNodeSubState?: (nodeId: string, subState: FixtureVariant) => void;
   onUpdateNodeViewport?: (nodeId: string, vp: ViewportPreset) => void;
   proposalController?: ReturnType<typeof useNodeProposalController>;
+  stageSkin?: "sketch-paper" | "brand-color";
+  sketchPolishBarNode?: React.ReactNode;
+  onRegisterStageSkinSwap?: (fn: ((skin: "sketch-paper" | "brand-color", cssVars?: Record<string, string>) => void) | null) => void;
+  onRegisterStageApplyHtml?: (fn: ((html: string) => void) | null) => void;
+  onLockedRuleReceipt?: (notice: import("../../../lib/sketch-polish-occ-store").LockedRuleReceiptNotice) => void;
   children: React.ReactNode;
 }
 

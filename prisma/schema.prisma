@@ -35,6 +35,8 @@ model Project {
   componentPatterns ComponentPattern[]
   appShellLocks  AppShellLock[]
   contextAssemblyTelemetry ContextAssemblyTelemetry[]
+  screenArtifactPatches ScreenArtifactPatch[]
+  sdiClarificationSessions SdiClarificationSession[]
 
   @@unique([id, tenantId], map: "uq_projects_id_tenant")
   @@index([inheritBrandFromProjectId])
@@ -1195,4 +1197,50 @@ model AppShellLock {
   @@unique([tenantId, projectId, portalId])
   @@index([tenantId, projectId, portalId], map: "idx_app_shell_locks_proj_portal")
   @@map("app_shell_locks")
+}
+
+model ScreenArtifactPatch {
+  id                String  @id @default(uuid())
+  tenantId          String  @default("local-default") @map("tenant_id")
+  projectId         String  @map("project_id")
+  screenId          String  @map("screen_id")
+  astRevision       BigInt  @default(1) @map("ast_revision")
+  baseArtifactSha   String  @map("base_artifact_sha")
+  resultArtifactSha String  @map("result_artifact_sha")
+  ffId              String  @map("ff_id")
+  opKind            String  @map("op_kind")
+  applyTier         String  @map("apply_tier")
+  reconciledFfIds   Int     @default(0) @map("reconciled_ff_ids")
+  payloadJson       String  @default("{}") @map("payload_json")
+  htmlSnapshot      String  @default("") @map("html_snapshot")
+  lockedRuleJson    String? @map("locked_rule_json")
+  createdAt         BigInt  @map("created_at")
+
+  project Project @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, screenId, astRevision])
+  @@index([tenantId, projectId, screenId, astRevision], map: "idx_screen_artifact_patches_proj_screen")
+  @@map("screen_artifact_patches")
+}
+
+model SdiClarificationSession {
+  id                   String  @id @default(uuid())
+  tenantId             String  @default("local-default") @map("tenant_id")
+  projectId            String  @map("project_id")
+  status               String  @default("clarifying")
+  goalPrompt           String  @map("goal_prompt")
+  locale               String  @default("vi")
+  activeDirectionId    String  @map("active_direction_id")
+  directionsJson       String  @default("[]") @map("directions_json")
+  generationEpoch      BigInt  @default(1) @map("generation_epoch")
+  preemptPgid          BigInt? @map("preempt_pgid")
+  routedSkillSlugsJson String  @default("[]") @map("routed_skill_slugs_json")
+  createdAt            BigInt  @map("created_at")
+  updatedAt            BigInt  @map("updated_at")
+
+  project Project @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([tenantId, projectId])
+  @@index([tenantId, projectId, updatedAt], map: "idx_sdi_clarification_sessions_proj")
+  @@map("sdi_clarification_sessions")
 }

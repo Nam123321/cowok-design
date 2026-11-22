@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 domain = { path = "../domain" }
+html-forge = { path = "../html-forge" }
 html5ever = "0.40"
 lol_html = "3.0"
 markup5ever_rcdom = "0.40"

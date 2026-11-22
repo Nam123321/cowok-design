@@ -224,6 +224,9 @@ ${buildMountAppliedStylesSnippet()}
       var nodes = Array.from(parsed.body.childNodes).map(function(n){ return document.importNode(n, true); });
       document.body.replaceChildren.apply(document.body, nodes);
     }
+    if (typeof currentStageSkin === "string" && currentStageSkin === "sketch-paper") {
+      applyStageSkinSwap(currentStageSkin, currentStageSkinVars);
+    }
     if (typeof hydrateEmbeddedCharts === "function") hydrateEmbeddedCharts();
     var h = document.documentElement ? document.documentElement.scrollHeight : 0;
     if (bridgePort) bridgePort.postMessage({ type: "HEIGHT_CHANGED", epoch: EPOCH, bootSecretAck: BOOT_SECRET, channelSecret: CHANNEL_SECRET, seq: ++localSeq, height: h });
@@ -458,18 +461,124 @@ function buildDeckNavAndRectsSnippet(): string {
   }
   function publishElementRects() {
     if (!bridgePort || !document.querySelectorAll) return;
-    var rects = {};
+    var rects = Object.create(null);
     var nodes = document.querySelectorAll("[data-ff-id]");
     var count = Math.min(nodes.length, 128);
     for (var i = 0; i < count; i++) {
       var el = nodes[i];
       var id = String(el.getAttribute("data-ff-id") || "").slice(0, 200);
-      if (!id || !el.getBoundingClientRect) continue;
+      var lowId = id.toLowerCase();
+      if (!id || lowId === "__proto__" || lowId === "constructor" || lowId === "prototype" || !el.getBoundingClientRect) continue;
       var r = el.getBoundingClientRect();
       rects[id] = { left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) };
     }
     bridgePort.postMessage({ type: "ELEMENT_RECTS", epoch: EPOCH, bootSecretAck: BOOT_SECRET, channelSecret: CHANNEL_SECRET, seq: ++localSeq, rects: rects });
-  }`;
+  }
+  var currentStageSkin = "brand-color";
+  var currentStageSkinVars = null;
+  var SKETCH_ART_CSS = [
+    "html[data-stage-skin='sketch-paper'], html[data-stage-skin='sketch-paper'] body {",
+    "  background-color: var(--stage-sketch-bg, #FAF6EC) !important;",
+    "  background-image: radial-gradient(var(--stage-sketch-grid, rgba(44,42,38,0.09)) 1.1px, transparent 1.1px) !important;",
+    "  background-size: 14px 14px !important;",
+    "  color: var(--stage-sketch-ink, #2C2A26) !important;",
+    "  font-family: 'Chalkboard SE', 'Noteworthy', 'Segoe Print', 'Bradley Hand', cursive !important;",
+    "}",
+    "html[data-stage-skin='sketch-paper'] * {",
+    "  font-family: inherit !important;",
+    "}",
+    "html[data-stage-skin='sketch-paper'] .card, html[data-stage-skin='sketch-paper'] section {",
+    "  background: var(--stage-sketch-card, #FFFDF8) !important;",
+    "  color: var(--stage-sketch-ink, #2C2A26) !important;",
+    "  border: 1.75px solid var(--stage-sketch-border, #3E3B35) !important;",
+    "  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px !important;",
+    "  box-shadow: 3px 3px 0px var(--stage-sketch-shadow, rgba(44,42,38,0.16)) !important;",
+    "}",
+    "html[data-stage-skin='sketch-paper'] .kpi {",
+    "  background: transparent !important;",
+    "  border: 1.5px dashed var(--stage-sketch-border, #3E3B35) !important;",
+    "  border-radius: 14px 22px 16px 20px / 20px 14px 22px 14px !important;",
+    "}",
+    "html[data-stage-skin='sketch-paper'] h1, html[data-stage-skin='sketch-paper'] h2, html[data-stage-skin='sketch-paper'] h3 {",
+    "  color: var(--stage-sketch-ink, #2C2A26) !important;",
+    "  letter-spacing: 0.01em !important;",
+    "  text-decoration: underline wavy var(--stage-sketch-grid, rgba(44,42,38,0.25)) 1px !important;",
+    "  text-underline-offset: 4px !important;",
+    "}",
+    "html[data-stage-skin='sketch-paper'] p, html[data-stage-skin='sketch-paper'] span, html[data-stage-skin='sketch-paper'] div {",
+    "  color: inherit !important;",
+    "}",
+    "html[data-stage-skin='sketch-paper'] [data-ff-id$='-label'], html[data-stage-skin='sketch-paper'] [data-ff-id='ff-slide-subtitle'], html[data-stage-skin='sketch-paper'] [data-ff-id='ff-action-hint'] {",
+    "  color: var(--stage-sketch-muted, #5C5850) !important;",
+    "}",
+    "html[data-stage-skin='sketch-paper'] button, html[data-stage-skin='sketch-paper'] .cta {",
+    "  background: transparent !important;",
+    "  color: var(--stage-sketch-ink, #2C2A26) !important;",
+    "  border: 2px solid var(--stage-sketch-ink, #2C2A26) !important;",
+    "  border-radius: 255px 18px 225px 18px / 18px 225px 18px 255px !important;",
+    "  box-shadow: 2.5px 2.5px 0px var(--stage-sketch-ink, #2C2A26) !important;",
+    "  font-weight: 700 !important;",
+    "}"
+  ].join("\\n");
+  function syncSketchArtStyleTag(enabled) {
+    if (!document.head) return;
+    var existing = document.getElementById("cowok-sketch-paper-art");
+    if (!enabled) {
+      if (existing) existing.remove();
+      return;
+    }
+    if (!existing) {
+      existing = document.createElement("style");
+      existing.id = "cowok-sketch-paper-art";
+      var activeNonce = SCRIPT_NONCE || (document.currentScript && document.currentScript.nonce) || (document.querySelector("script[nonce]") && document.querySelector("script[nonce]").nonce) || "";
+      if (activeNonce) { existing.setAttribute("nonce", activeNonce); existing.nonce = activeNonce; }
+      existing.textContent = SKETCH_ART_CSS;
+    }
+    document.head.appendChild(existing);
+  }
+  function applyStageSkinSwap(skin, cssVars) {
+    try {
+      var root = document.documentElement;
+      if (!root) return;
+      var safeSkin = skin === "sketch-paper" ? "sketch-paper" : "brand-color";
+      currentStageSkin = safeSkin;
+      currentStageSkinVars = cssVars && typeof cssVars === "object" ? cssVars : null;
+      root.setAttribute("data-stage-skin", safeSkin);
+      if (safeSkin === "sketch-paper") {
+        if (cssVars && typeof cssVars === "object") {
+          var keys = Object.keys(cssVars);
+          for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            if (k && k.indexOf("--") === 0 && /^--[a-zA-Z0-9_-]{1,64}$/.test(k)) {
+              var v = String(cssVars[k] || "").trim();
+              if (v && v.length <= 128 && sanitizeCss(v)) root.style.setProperty(k, v);
+            }
+          }
+        }
+        syncSketchArtStyleTag(true);
+      } else {
+        syncSketchArtStyleTag(false);
+        var clearKeys = ["--stage-sketch-bg", "--stage-sketch-card", "--stage-sketch-ink", "--stage-sketch-muted", "--stage-sketch-border", "--stage-sketch-grid", "--stage-sketch-shadow"];
+        for (var ci = 0; ci < clearKeys.length; ci++) root.style.removeProperty(clearKeys[ci]);
+        if (document.body) {
+          document.body.style.removeProperty("background-color");
+          document.body.style.removeProperty("color");
+        }
+      }
+      scheduleElementRectsPublish();
+    } catch (_) {}
+  }
+  window.__jevFast = Object.freeze({
+    hitAtPoint: function(x, y) {
+      if (!document.elementFromPoint) return null;
+      var el = document.elementFromPoint(Number(x) || 0, Number(y) || 0);
+      var anchor = el && el.closest ? el.closest("[data-ff-id]") : null;
+      if (!anchor) return null;
+      var r = anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : { left: 0, top: 0, width: 0, height: 0 };
+      return { ffId: String(anchor.getAttribute("data-ff-id") || ""), rect: { left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) } };
+    },
+    measureAll: function() { publishElementRects(); }
+  });`;
 }
 
 function buildChart2DArcSnippet(): string {
@@ -531,6 +640,7 @@ function buildPortOnMessageSnippet(): string {
       if (pe.data.type === "RENDER_2D_CHART") applyRender2DChart(pe.data);
       if (pe.data.type === "DECK_KEY_NAV") applyDeckKeyNav(pe.data.direction, pe.data.targetIndex);
       if (pe.data.type === "DECK_BLACKOUT_SET") applyDeckBlackout(pe.data.mode);
+      if (pe.data.type === "STAGE_SKIN_SWAP") applyStageSkinSwap(pe.data.skin, pe.data.cssVars);
     };
     if (typeof ResizeObserver === "function") {
       try {

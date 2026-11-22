@@ -43,8 +43,9 @@ start_date: '2026-07-24'
 "Story 05.1 - Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11)": completed
 "Story 05.2 - Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup": completed
 "Story 05.3 - Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17)": completed
-"Story 05.4 - Cognitive Sketch-to-Polish, Steering Chips, Shared lol_html + reconcile_ff_ids Surgical Editing & 2-Tier Auto-Apply": refactored
+"Story 05.4 - Cognitive Sketch-to-Polish, Steering Chips, Shared lol_html + reconcile_ff_ids Surgical Editing & 2-Tier Auto-Apply": completed
 "Story 05.5 - End-to-End /simulate-user (8D) & /edge-case-guardian (FMEA) -> 3-Tier Interactive Flow DAG": refactored
+"Story 05.6 - Phase 2 Brand & Component Visual Studio, User-Driven Theme Modes, Bidirectional Hidden Spec Drawer & FE Data Contract": backlog
 
 # ==================================================
 # Feature Group: VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio
@@ -75,6 +76,7 @@ start_date: '2026-07-24'
 "Story 08.3 - Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core)": completed
 "Story 08.4 - SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI": completed
 "Story 08.5 - Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 LEARN Loop": refactored
+"Story 08.6 - Standalone Open-Source Default Plugin Repo (design-craft) — 4-Pillar Assembly, Optional Upstream REA Peer & Multi-Harness Export": backlog
 
 # Epic 09: Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)
 "Epic 09 - Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)": in-progress

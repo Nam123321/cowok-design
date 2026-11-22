@@ -33,6 +33,7 @@ import { StageSpatialOverlaysLayer } from "./StageSpatialOverlaysLayer";
 import type { PostPatchByFfIdFn } from "../hooks/useCmsSlideEditorController";
 import { usePreviewPaneActions } from "../hooks/usePreviewPaneActions";
 import { useRawPreviewHtml, useSampleFixtureSyncEffect } from "../hooks/usePreviewFixtureHtml";
+import { registerScreenBaseHtmlProvider } from "../../../lib/sketch-polish-occ-store";
 import {
   buildSlideWalkthroughLabel,
   resolveStageMode,
@@ -133,6 +134,11 @@ export interface CompanionLiveHtmlRightPaneProps {
   blackoutMode?: "none" | "black" | "white";
   onRegisterDeckBlackout?: (fn: ((mode: "none" | "black" | "white") => void) | null) => void;
   presenterToastNode?: React.ReactNode;
+  stageSkin?: "sketch-paper" | "brand-color";
+  sketchPolishBarNode?: React.ReactNode;
+  onRegisterStageSkinSwap?: (fn: ((skin: "sketch-paper" | "brand-color", cssVars?: Record<string, string>) => void) | null) => void;
+  onRegisterStageApplyHtml?: (fn: ((html: string) => void) | null) => void;
+  onElementRectsChange?: (rects: Record<string, import("../hooks/useSandboxedIframeBridge").ElementRectBox>) => void;
 }
 
 function usePaneInlineApplyHandler(deps: {
@@ -395,6 +401,20 @@ function usePaneCommentsAndBridgeSync(
     return () => props.onRegisterDeckBlackout?.(null);
   }, [bridge.postDeckBlackout, props.onRegisterDeckBlackout]);
 
+  useEffect(() => {
+    props.onRegisterStageSkinSwap?.(bridge.postStageSkinSwap);
+    return () => props.onRegisterStageSkinSwap?.(null);
+  }, [bridge.postStageSkinSwap, props.onRegisterStageSkinSwap]);
+
+  useEffect(() => {
+    props.onRegisterStageApplyHtml?.(bridge.postApplyHtml);
+    return () => props.onRegisterStageApplyHtml?.(null);
+  }, [bridge.postApplyHtml, props.onRegisterStageApplyHtml]);
+
+  useEffect(() => {
+    props.onElementRectsChange?.(bridge.elementRects);
+  }, [bridge.elementRects, props.onElementRectsChange]);
+
   const actions = usePreviewPaneActions({
     projectId: props.projectId, selectedNodeId: props.selectedNodeId, artifactSha256: bridge.artifactSha256,
     elementRects: bridge.elementRects, postFixtureHydrate: bridge.postFixtureHydrate,
@@ -443,6 +463,13 @@ function useLiveHtmlPaneController(props: CompanionLiveHtmlRightPaneProps) {
   const activeSubState = normalizeFixtureRef(props.activeSubState ?? localSubState);
   const effectiveCustomHtml = props.customRawHtml ?? localCustomRawHtml;
   const rawHtml = useRawPreviewHtml(props, activeSubState, effectiveCustomHtml);
+  const rawHtmlRef = useRef(rawHtml);
+  rawHtmlRef.current = rawHtml;
+  useEffect(() => {
+    const sid = props.selectedNodeId || "default";
+    registerScreenBaseHtmlProvider(props.projectId, sid, () => rawHtmlRef.current);
+    return () => registerScreenBaseHtmlProvider(props.projectId, sid, null);
+  }, [props.projectId, props.selectedNodeId]);
   const subStateLabels = useLocalizedSubStateLabels(t);
   const actionsRef = useRef<ReturnType<typeof usePreviewPaneActions> | null>(null);
   const spatialSelectRef = useRef<((target: SpatialTargetSelection) => void) | null>(null);
@@ -526,7 +553,7 @@ const StageOverflowAndWalkthroughOverlay: React.FC<{
 export const CompanionLiveHtmlRightPane: React.FC<CompanionLiveHtmlRightPaneProps> = (props) => {
   const c = useLiveHtmlPaneController(props);
   return (
-    <div id="htmlSubPane" className="canvas-live-html-right-pane" aria-label={c.t("canvas.liveHtmlPane", "Live HTML Preview Sandbox")} style={{ flex: 1, minWidth: 0, height: "100%", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-surface)", overflow: "hidden", position: "relative" }}>
+    <div id="htmlSubPane" className="canvas-live-html-right-pane" data-stage-skin={props.stageSkin ?? "brand-color"} aria-label={c.t("canvas.liveHtmlPane", "Live HTML Preview Sandbox")} style={{ flex: 1, minWidth: 0, height: "100%", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-surface)", overflow: "hidden", position: "relative" }}>
       <HtmlPreviewToolbar
         structureLens={props.structureLens}
         pointerMode={props.pointerMode} onSetPointerMode={props.onSetPointerMode} activeSubState={c.activeSubState}
@@ -545,6 +572,7 @@ export const CompanionLiveHtmlRightPane: React.FC<CompanionLiveHtmlRightPaneProp
         isPresenterActive={props.isPresenterActive}
         onOpenPresenter={props.onOpenPresenter}
       />
+      {props.sketchPolishBarNode}
       <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
         <PaneStageViewportBody
           props={props} activeSubState={c.activeSubState} htmlEditorError={c.htmlEditorError} setHtmlEditorError={c.setHtmlEditorError}

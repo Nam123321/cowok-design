@@ -38,6 +38,10 @@ use crate::routes::legacy_specs::{
 };
 use crate::routes::presentation::presentation_routes;
 use crate::routes::project_trash::handle_restore_project;
+use crate::routes::sketch_polish::{
+    handle_apply_sketch_patch, handle_get_sdi_clarify, handle_get_sketch_patch_history,
+    handle_sdi_clarify,
+};
 use crate::routes::ssot_registry::{
     handle_export_ssot, handle_get_ssot_components, handle_mutate_appshell_lock,
     handle_route_skills,
@@ -101,6 +105,14 @@ fn legacy_project_spec_routes() -> Router<DaemonAppState> {
         )
         .route("/api/v1/ssot/export", post(handle_export_ssot))
         .route("/api/v1/skills/route", post(handle_route_skills))
+        .route(
+            "/api/v1/sdi/clarify",
+            get(handle_get_sdi_clarify).post(handle_sdi_clarify),
+        )
+        .route(
+            "/api/v1/patch",
+            get(handle_get_sketch_patch_history).post(handle_apply_sketch_patch),
+        )
 }
 
 fn legacy_sdi_proposal_routes() -> Router<DaemonAppState> {

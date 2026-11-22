@@ -98,13 +98,25 @@ export async function parseJsonBodyStrict<T>(
   maxBytes = DEFAULT_MAX_BODY_BYTES
 ): Promise<{ ok: true; data: T } | { ok: false; response: Response }> {
   const rawBuf = await readBoundedRequestBytes(req, maxBytes);
-  if (rawBuf === "EMPTY" || rawBuf === "TOO_LARGE") {
+  if (rawBuf === "TOO_LARGE") {
+    return {
+      ok: false,
+      response: buildSsotErrorResponse({
+        status: HTTP_PAYLOAD_TOO_LARGE,
+        code: "PAYLOAD_TOO_LARGE",
+        message: "Request body exceeds size limit",
+        requestId,
+        field: "body",
+      }),
+    };
+  }
+  if (rawBuf === "EMPTY") {
     return {
       ok: false,
       response: buildSsotErrorResponse({
         status: HTTP_UNPROCESSABLE,
         code: "INVALID_REQUEST",
-        message: "Request body is empty or exceeds size limit",
+        message: "Request body is empty",
         requestId,
         field: "body",
       }),
@@ -164,6 +176,8 @@ function mapFlatDaemonAuthError(
     code = "UNAUTHORIZED";
   } else if (status === HTTP_FORBIDDEN) {
     code = "AUTH_FORBIDDEN";
+  } else if (status === HTTP_PAYLOAD_TOO_LARGE) {
+    code = "PAYLOAD_TOO_LARGE";
   }
   return buildSsotErrorResponse({ status, code, message: msg, requestId });
 }
