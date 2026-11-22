@@ -265,7 +265,8 @@ fn encode_cursor(
         filters_hash: filters_hash.to_string(),
         sig: sign_cursor(db_root, created_at, id, project_id, tenant_id, filters_hash),
     };
-    let json_bytes = serde_json::to_vec(&payload).expect("CursorPayload serialization is infallible");
+    let json_bytes =
+        serde_json::to_vec(&payload).expect("CursorPayload serialization is infallible");
     URL_SAFE_NO_PAD.encode(json_bytes)
 }
 
@@ -296,7 +297,14 @@ pub fn compute_request_fingerprint_sha256(cmd: &ContextAssemblyCommand) -> Strin
     let mut blocks: Vec<(u8, &str, &str, &str)> = cmd
         .optional_blocks
         .iter()
-        .map(|b| (b.priority, b.format.as_str(), b.id.as_str(), b.content.as_str()))
+        .map(|b| {
+            (
+                b.priority,
+                b.format.as_str(),
+                b.id.as_str(),
+                b.content.as_str(),
+            )
+        })
         .collect();
     blocks.sort();
     let encoded = serde_json::to_vec(&(

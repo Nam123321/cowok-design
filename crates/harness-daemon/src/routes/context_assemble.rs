@@ -487,17 +487,14 @@ fn parse_telemetry_query(raw_query: Option<&str>) -> Result<ContextTelemetryQuer
                 project_id = Some(Uuid::parse_str(v.trim()).map_err(|_| "projectId".to_string())?);
             }
             "portalId" => {
-                portal_id = Some(
-                    parse_portal_id_strict(&v).ok_or_else(|| "portalId".to_string())?,
-                );
+                portal_id = Some(parse_portal_id_strict(&v).ok_or_else(|| "portalId".to_string())?);
             }
             "horizon" => {
                 horizon = Some(Horizon::parse_strict(&v).ok_or_else(|| "horizon".to_string())?);
             }
             "modelProfile" => {
-                model_profile = Some(
-                    parse_model_profile_strict(&v).ok_or_else(|| "modelProfile".to_string())?,
-                );
+                model_profile =
+                    Some(parse_model_profile_strict(&v).ok_or_else(|| "modelProfile".to_string())?);
             }
             "cursor" => cursor = Some(v),
             "limit" => {

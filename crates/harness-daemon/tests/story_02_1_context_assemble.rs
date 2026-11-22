@@ -410,7 +410,9 @@ async fn story_02_1_daemon_assemble_idempotency_portal_guard_and_telemetry_curso
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri(format!("/api/v1/context/telemetry?projectId={proj_id}&limit=5"))
+                .uri(format!(
+                    "/api/v1/context/telemetry?projectId={proj_id}&limit=5"
+                ))
                 .header("host", "127.0.0.1:4170")
                 .header("x-cowok-session-token", &foreign_admin_tok)
                 .header("authorization", format!("Bearer {superadmin_secret}"))

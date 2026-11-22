@@ -277,8 +277,12 @@ fn resolve_project_scope(
     }
 
     if let Ok(project_uuid) = Uuid::parse_str(project_id) {
-        return match verify_anti_idor_with_caller(&state.registry, project_uuid, headers, Some(verified))
-        {
+        return match verify_anti_idor_with_caller(
+            &state.registry,
+            project_uuid,
+            headers,
+            Some(verified),
+        ) {
             Ok((_reg, ws_root, anti_idor_superadmin)) => {
                 let conn = state.registry.pool().connection().map_err(|_| {
                     error_response(
@@ -412,8 +416,8 @@ fn resolve_project_scope(
             state.registry.pool().workspace_root().join(p)
         }
     };
-    let canon_root = crate::lockfile::validate_and_canonicalize_workspace_root(&raw_root)
-        .map_err(|_| {
+    let canon_root =
+        crate::lockfile::validate_and_canonicalize_workspace_root(&raw_root).map_err(|_| {
             error_response(
                 StatusCode::FORBIDDEN,
                 "PATH_JAIL_VIOLATION",
@@ -539,12 +543,22 @@ fn map_lock_error(err: SsotLockError, request_id: String) -> Response {
             None,
             request_id,
         ),
-        SsotLockError::Forbidden { code, message } => {
-            error_response(StatusCode::FORBIDDEN, code, &message, None, None, request_id)
-        }
-        SsotLockError::NotFound { code, message } => {
-            error_response(StatusCode::NOT_FOUND, code, &message, None, None, request_id)
-        }
+        SsotLockError::Forbidden { code, message } => error_response(
+            StatusCode::FORBIDDEN,
+            code,
+            &message,
+            None,
+            None,
+            request_id,
+        ),
+        SsotLockError::NotFound { code, message } => error_response(
+            StatusCode::NOT_FOUND,
+            code,
+            &message,
+            None,
+            None,
+            request_id,
+        ),
         SsotLockError::FencingConflict(details @ AppShellLockConflictDetails { .. }) => {
             let details_val = serde_json::to_value(details).ok();
             error_response(
@@ -593,9 +607,14 @@ fn map_export_error(err: SsotExportError, request_id: String) -> Response {
             None,
             request_id,
         ),
-        SsotExportError::NotFound { code, message } => {
-            error_response(StatusCode::NOT_FOUND, code, &message, None, None, request_id)
-        }
+        SsotExportError::NotFound { code, message } => error_response(
+            StatusCode::NOT_FOUND,
+            code,
+            &message,
+            None,
+            None,
+            request_id,
+        ),
         SsotExportError::ExportSuperseded {
             attempted_revision,
             latest_revision,
@@ -960,9 +979,11 @@ pub(crate) async fn handle_export_ssot(
     let ws_root = scope.workspace_root;
     let req_id_for_blocking = request_id.clone();
     let blocking_res = tokio::task::spawn_blocking(move || {
-        let mut conn = pool.connection().map_err(|_| SsotExportError::StorageBusy {
-            details: "Storage connection unavailable".to_string(),
-        })?;
+        let mut conn = pool
+            .connection()
+            .map_err(|_| SsotExportError::StorageBusy {
+                details: "Storage connection unavailable".to_string(),
+            })?;
         export_hidden_ssot_bundle(&mut conn, &ws_root, &export_req)
     })
     .await;

@@ -85,12 +85,27 @@ pub struct AppShellLockCommand {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SsotLockError {
-    Validation { code: &'static str, message: String },
-    Forbidden { code: &'static str, message: String },
-    NotFound { code: &'static str, message: String },
+    Validation {
+        code: &'static str,
+        message: String,
+    },
+    Forbidden {
+        code: &'static str,
+        message: String,
+    },
+    NotFound {
+        code: &'static str,
+        message: String,
+    },
     FencingConflict(AppShellLockConflictDetails),
-    StorageBusy { details: String, retry_after_secs: u64 },
-    Internal { code: &'static str, message: String },
+    StorageBusy {
+        details: String,
+        retry_after_secs: u64,
+    },
+    Internal {
+        code: &'static str,
+        message: String,
+    },
 }
 
 impl std::fmt::Display for SsotLockError {
@@ -173,10 +188,7 @@ where
                     });
                 }
                 let sleep_ms = compute_deterministic_jitter_backoff_ms(
-                    tenant_id,
-                    project_id,
-                    portal_id,
-                    attempt,
+                    tenant_id, project_id, portal_id, attempt,
                 );
                 attempt = attempt.saturating_add(1);
                 std::thread::sleep(Duration::from_millis(sleep_ms));
@@ -340,8 +352,9 @@ pub fn mutate_appshell_lock(
     } else if !cmd.is_privileged_role && cmd.lock_owner_id != cmd.caller_actor_id {
         return Err(SsotLockError::Forbidden {
             code: "AUTH_FORBIDDEN",
-            message: "lockOwnerId must match authenticated caller unless transferring via admin role"
-                .to_string(),
+            message:
+                "lockOwnerId must match authenticated caller unless transferring via admin role"
+                    .to_string(),
         });
     }
 

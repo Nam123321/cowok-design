@@ -78,7 +78,11 @@ fn to_kebab_slug(name: &str) -> String {
             }
             out.push(ch.to_ascii_lowercase());
         } else if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
-            out.push(if ch == '_' { '-' } else { ch.to_ascii_lowercase() });
+            out.push(if ch == '_' {
+                '-'
+            } else {
+                ch.to_ascii_lowercase()
+            });
         }
     }
     if out.is_empty() {
@@ -108,10 +112,12 @@ fn parse_cursor(cursor: Option<&str>) -> Result<Option<(i64, String)>, SsotLockE
             message: "Invalid cursor format; expected '<updatedAt>:<id>'".to_string(),
         });
     };
-    let ts = ts_str.parse::<i64>().map_err(|_| SsotLockError::Validation {
-        code: "INVALID_REQUEST",
-        message: "Invalid cursor timestamp".to_string(),
-    })?;
+    let ts = ts_str
+        .parse::<i64>()
+        .map_err(|_| SsotLockError::Validation {
+            code: "INVALID_REQUEST",
+            message: "Invalid cursor timestamp".to_string(),
+        })?;
     if id.is_empty() {
         return Err(SsotLockError::Validation {
             code: "INVALID_REQUEST",
@@ -235,7 +241,10 @@ pub fn list_component_patterns(
                 message: map_sqlite_error(e, "list_component_patterns.prepare").to_string(),
             })?;
         let rows = stmt
-            .query_map(params![tenant_id, project_id, portal_id, fetch_limit], row_mapper)
+            .query_map(
+                params![tenant_id, project_id, portal_id, fetch_limit],
+                row_mapper,
+            )
             .map_err(|e| SsotLockError::Internal {
                 code: "INTERNAL_ERROR",
                 message: map_sqlite_error(e, "list_component_patterns.query").to_string(),
@@ -294,10 +303,12 @@ pub fn reverse_sync_tsx_components(
         });
     }
 
-    let extracted = extract_component_signatures(&req.source_file_path, &req.source_code)
-        .map_err(|e| SsotLockError::Validation {
-            code: "INVALID_REQUEST",
-            message: e.to_string(),
+    let extracted =
+        extract_component_signatures(&req.source_file_path, &req.source_code).map_err(|e| {
+            SsotLockError::Validation {
+                code: "INVALID_REQUEST",
+                message: e.to_string(),
+            }
         })?;
     if extracted.is_empty() {
         return Ok(Vec::new());
@@ -319,7 +330,8 @@ pub fn reverse_sync_tsx_components(
                     params![req.tenant_id, req.project_id, req.portal_id],
                     |r| {
                         let slots_raw: String = r.get(2)?;
-                        let slots: Vec<String> = serde_json::from_str(&slots_raw).unwrap_or_default();
+                        let slots: Vec<String> =
+                            serde_json::from_str(&slots_raw).unwrap_or_default();
                         Ok((r.get(0)?, r.get(1)?, slots))
                     },
                 )
@@ -446,12 +458,7 @@ pub fn reverse_sync_tsx_components(
                                  revision = revision + 1, \
                                  updated_at = ?2 \
                              WHERE id = ?3 AND tenant_id = ?4",
-                            params![
-                                quarantine_payload,
-                                now_ms,
-                                existing.id,
-                                req.tenant_id
-                            ],
+                            params![quarantine_payload, now_ms, existing.id, req.tenant_id],
                         )?;
 
                         existing.drift_status = "quarantined_drift".to_string();

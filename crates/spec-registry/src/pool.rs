@@ -159,8 +159,7 @@ pub fn v17_migration_checksum() -> String {
     cached_migration_sha256(&CACHE, V17_MIGRATION_SQL)
 }
 
-pub const V18_MIGRATION_SQL: &str =
-    include_str!("../migrations/V18__story_02_4_hidden_ssot.sql");
+pub const V18_MIGRATION_SQL: &str = include_str!("../migrations/V18__story_02_4_hidden_ssot.sql");
 pub const V18_MIGRATION_NAME: &str = "V18__story_02_4_hidden_ssot.sql";
 
 pub fn v18_migration_checksum() -> String {

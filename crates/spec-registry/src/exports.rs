@@ -226,16 +226,31 @@ pub struct SsotExportRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SsotExportError {
-    Validation { code: &'static str, message: String },
-    PathTraversal { path: String },
-    NotFound { code: &'static str, message: String },
+    Validation {
+        code: &'static str,
+        message: String,
+    },
+    PathTraversal {
+        path: String,
+    },
+    NotFound {
+        code: &'static str,
+        message: String,
+    },
     ExportSuperseded {
         attempted_revision: i64,
         latest_revision: i64,
     },
-    ManifestInvalid { reason: String },
-    StorageBusy { details: String },
-    Io { code: &'static str, message: String },
+    ManifestInvalid {
+        reason: String,
+    },
+    StorageBusy {
+        details: String,
+    },
+    Io {
+        code: &'static str,
+        message: String,
+    },
 }
 
 impl std::fmt::Display for SsotExportError {
@@ -333,12 +348,13 @@ pub fn resolve_jailed_export_root(
         message: format!("Failed to create export dir: {e}"),
     })?;
 
-    let canonical_base = fs::canonicalize(workspace_root.join(".cowok-design/exports")).map_err(
-        |e| SsotExportError::Io {
-            code: "INTERNAL_ERROR",
-            message: format!("Failed to canonicalize base export dir: {e}"),
-        },
-    )?;
+    let canonical_base =
+        fs::canonicalize(workspace_root.join(".cowok-design/exports")).map_err(|e| {
+            SsotExportError::Io {
+                code: "INTERNAL_ERROR",
+                message: format!("Failed to canonicalize base export dir: {e}"),
+            }
+        })?;
     let canonical_target = fs::canonicalize(&full).map_err(|e| SsotExportError::Io {
         code: "INTERNAL_ERROR",
         message: format!("Failed to canonicalize target export dir: {e}"),
@@ -637,7 +653,10 @@ pub fn acquire_export_reader_lease(
     Ok(ExportReaderLease { lease_path })
 }
 
-fn active_leased_generations(export_root: &Path, now_ms: i64) -> std::collections::BTreeSet<String> {
+fn active_leased_generations(
+    export_root: &Path,
+    now_ms: i64,
+) -> std::collections::BTreeSet<String> {
     let mut set = std::collections::BTreeSet::new();
     let leases_dir = export_root.join("leases");
     let Ok(entries) = fs::read_dir(&leases_dir) else {
@@ -875,10 +894,7 @@ pub fn read_and_verify_latest_export(
     Ok(manifest)
 }
 
-fn render_human_markdown_export(
-    req: &SsotExportRequest,
-    snapshot: &ExportSnapshot,
-) -> String {
+fn render_human_markdown_export(req: &SsotExportRequest, snapshot: &ExportSnapshot) -> String {
     let mut md = format!(
         "# SSOT Registry Snapshot — Portal `{}` (Revision {})\n\n- Project ID: `{}`\n- Pattern Count: `{}`\n\n## Component Patterns\n\n",
         req.portal_id,
@@ -938,13 +954,11 @@ pub fn commit_export_snapshot(
             let prior_scope_manifest = read_manifest_path_no_verify(&scoped_manifest_path)
                 .ok()
                 .or_else(|| {
-                    read_manifest_raw_no_verify(&export_root)
-                        .ok()
-                        .filter(|m| {
-                            m.tenant_id == req.tenant_id
-                                && m.project_id == req.project_id
-                                && m.portal_id == req.portal_id
-                        })
+                    read_manifest_raw_no_verify(&export_root).ok().filter(|m| {
+                        m.tenant_id == req.tenant_id
+                            && m.project_id == req.project_id
+                            && m.portal_id == req.portal_id
+                    })
                 });
             if let Some(current) = prior_scope_manifest {
                 if snapshot.export_revision <= current.export_revision {
@@ -1118,7 +1132,8 @@ pub fn export_hidden_ssot_bundle(
     {
         return Err(SsotExportError::Validation {
             code: "INVALID_REQUEST",
-            message: "formats must contain 1..=2 unique items from ['markdown', 'json']".to_string(),
+            message: "formats must contain 1..=2 unique items from ['markdown', 'json']"
+                .to_string(),
         });
     }
     let now_ms = req.now_ms.unwrap_or_else(current_epoch_ms);

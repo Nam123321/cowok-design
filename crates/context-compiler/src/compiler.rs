@@ -663,7 +663,11 @@ fn resolve_untruncated_slice_content(
             |r| r.get(0),
         )
         .map_err(map_sqlite_error)?;
-    if let Some(sha) = expected_sha.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    if let Some(sha) = expected_sha
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         if compute_sha256_hex(&bytes) != sha {
             return Err(ContextCompilerError::TelemetryStorageUnavailable {
                 reason: format!("spec digest mismatch on disk ({})", sl.spec_key.as_str()),
@@ -701,8 +705,13 @@ fn collect_spec_lines(
                 .verify_project_scope(cmd.project_id)
                 .map_err(map_harness_error)?;
             for sl in sliced.slices {
-                let full_content =
-                    resolve_untruncated_slice_content(reg, cmd.project_id, &workspace_root, portal, &sl)?;
+                let full_content = resolve_untruncated_slice_content(
+                    reg,
+                    cmd.project_id,
+                    &workspace_root,
+                    portal,
+                    &sl,
+                )?;
                 scan_text_for_portal(cmd.portal_id, "spec_slice", &full_content)?;
                 let excerpt =
                     format_structured_spec_excerpt(&full_content, SPEC_SNIPPET_MAX_TOKENS, None)?;

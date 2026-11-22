@@ -280,7 +280,10 @@ fn it_lock_07_and_08_cas_fencing_concurrency_expiry_and_transfer_rbac() {
         },
     )
     .expect_err("transfer with stale fencing token must conflict");
-    assert!(matches!(stale_tok_transfer, SsotLockError::FencingConflict(_)));
+    assert!(matches!(
+        stale_tok_transfer,
+        SsotLockError::FencingConflict(_)
+    ));
 
     // Admin TRANSFER with matching expectedFencingToken=1 succeeds -> bumps both fencing_token (2) & revision (2)
     let transferred = mutate_appshell_lock(
@@ -382,7 +385,10 @@ fn it_export_06_07_atomic_manifest_superseded_retention_leases_and_tamper_detect
     let workspace_root = dir.path();
 
     let traversal = resolve_jailed_export_root(workspace_root, Some("../escape"));
-    assert!(matches!(traversal, Err(SsotExportError::PathTraversal { .. })));
+    assert!(matches!(
+        traversal,
+        Err(SsotExportError::PathTraversal { .. })
+    ));
 
     let mut conn = Connection::open(&db_path).expect("open conn");
 
@@ -539,7 +545,10 @@ fn reverse_sync_suppresses_duplicates_and_quarantines_drift_when_locked_by_anoth
         },
     )
     .expect("dedup sync");
-    assert_eq!(second[0].disposition, ReverseSyncDisposition::SuppressedNoOp);
+    assert_eq!(
+        second[0].disposition,
+        ReverseSyncDisposition::SuppressedNoOp
+    );
 
     mutate_appshell_lock(
         &mut conn,
@@ -622,8 +631,8 @@ fn reverse_sync_suppresses_duplicates_and_quarantines_drift_when_locked_by_anoth
     assert_eq!(page.patterns.len(), 1);
     assert_eq!(page.quarantined_count, 0);
 
-    let b_patterns = list_component_patterns(&conn, "tenant-b", "proj-b", "SalesApp", None, 50)
-        .expect("list b");
+    let b_patterns =
+        list_component_patterns(&conn, "tenant-b", "proj-b", "SalesApp", None, 50).expect("list b");
     assert!(b_patterns.patterns.is_empty());
     let wrong_proj = list_component_patterns(&conn, "tenant-b", "proj-1", "SalesApp", None, 50);
     assert!(matches!(wrong_proj, Err(SsotLockError::NotFound { .. })));
@@ -653,7 +662,8 @@ fn bench_01_02_router_spine_under_250_bpe_lexicographic_sort_and_kv_prefix_invar
 
     let r2 = CachePreservingSkillRouter::route(&SkillRouteCommand {
         project_id: "proj-1".to_string(),
-        intent_summary: "Completely different user prompt about drawer states and modals".to_string(),
+        intent_summary: "Completely different user prompt about drawer states and modals"
+            .to_string(),
         portal_id: "DeveloperPortal".to_string(),
         requested_slugs: Some(vec![
             "dashboard-ux".to_string(),

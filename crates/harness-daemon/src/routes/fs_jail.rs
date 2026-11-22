@@ -1325,7 +1325,9 @@ fn load_tenant_registered_roots(
         .connection()
         .map_err(map_error_to_response)?;
     let mut stmt = conn
-        .prepare("SELECT workspace_root FROM projects WHERE tenant_id = ?1 AND trash_deleted_at IS NULL")
+        .prepare(
+            "SELECT workspace_root FROM projects WHERE tenant_id = ?1 AND trash_deleted_at IS NULL",
+        )
         .map_err(|e| {
             map_error_to_response(HarnessError::ValidationFailed {
                 reason: format!("FS_BROWSE_DB_ERROR: {e}"),
@@ -1492,14 +1494,15 @@ pub(super) async fn handle_fs_pick_native(
         .map(|s| s.chars().take(160).collect::<String>())
         .unwrap_or_else(|| "Select project folder for cowok-design".to_string());
 
-    let picked_opt = tokio::task::spawn_blocking(move || invoke_os_folder_picker(default_dir, prompt))
-        .await
-        .map_err(|e| {
-            map_error_to_response(HarnessError::ValidationFailed {
-                reason: format!("NATIVE_PICKER_JOIN_FAILED: {e}"),
-            })
-        })?
-        .map_err(map_error_to_response)?;
+    let picked_opt =
+        tokio::task::spawn_blocking(move || invoke_os_folder_picker(default_dir, prompt))
+            .await
+            .map_err(|e| {
+                map_error_to_response(HarnessError::ValidationFailed {
+                    reason: format!("NATIVE_PICKER_JOIN_FAILED: {e}"),
+                })
+            })?
+            .map_err(map_error_to_response)?;
 
     let Some(picked_raw) = picked_opt else {
         return Ok(Json(FsNativePickResponse {

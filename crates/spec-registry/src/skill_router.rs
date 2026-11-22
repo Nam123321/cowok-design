@@ -132,13 +132,25 @@ pub fn compute_length_prefixed_prefix_sha256(zone1: &str, zone2: &str) -> String
 fn infer_slugs_from_intent(portal_id: &str, intent: &str) -> Vec<String> {
     let lower = intent.to_ascii_lowercase();
     let mut inferred = BTreeSet::new();
-    if lower.contains("chart") || lower.contains("kpi") || lower.contains("dashboard") || lower.contains("bento") {
+    if lower.contains("chart")
+        || lower.contains("kpi")
+        || lower.contains("dashboard")
+        || lower.contains("bento")
+    {
         inferred.insert("dashboard-ux".to_string());
     }
-    if lower.contains("color") || lower.contains("palette") || lower.contains("theme") || lower.contains("oklch") {
+    if lower.contains("color")
+        || lower.contains("palette")
+        || lower.contains("theme")
+        || lower.contains("oklch")
+    {
         inferred.insert("oklch-palette".to_string());
     }
-    if lower.contains("font") || lower.contains("type") || lower.contains("heading") || lower.contains("typography") {
+    if lower.contains("font")
+        || lower.contains("type")
+        || lower.contains("heading")
+        || lower.contains("typography")
+    {
         inferred.insert("typography".to_string());
     }
     if lower.contains("diagram") || lower.contains("graph") || lower.contains("architecture") {
@@ -150,7 +162,11 @@ fn infer_slugs_from_intent(portal_id: &str, intent: &str) -> Vec<String> {
     if lower.contains("wireframe") || lower.contains("sketch") || lower.contains("monochrome") {
         inferred.insert("sketch-monochrome".to_string());
     }
-    if inferred.is_empty() || lower.contains("polish") || lower.contains("contrast") || lower.contains("a11y") {
+    if inferred.is_empty()
+        || lower.contains("polish")
+        || lower.contains("contrast")
+        || lower.contains("a11y")
+    {
         inferred.insert("impeccable-polish".to_string());
     }
     inferred.into_iter().collect()

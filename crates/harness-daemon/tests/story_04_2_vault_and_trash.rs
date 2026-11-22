@@ -1195,10 +1195,17 @@ async fn test_fs_browse_home_local_folders_and_tilde_expansion() {
     .await;
     assert_eq!(st_home, StatusCode::OK, "{val_home}");
     let browse_home: FsBrowseResponse = serde_json::from_value(val_home).unwrap();
-    let home_names: Vec<&str> = browse_home.entries.iter().map(|e| e.name.as_str()).collect();
+    let home_names: Vec<&str> = browse_home
+        .entries
+        .iter()
+        .map(|e| e.name.as_str())
+        .collect();
     assert!(home_names.contains(&"Desktop"), "{home_names:?}");
     assert!(home_names.contains(&"Projects"), "{home_names:?}");
-    assert!(!home_names.contains(&"Library"), "Library leaked: {home_names:?}");
+    assert!(
+        !home_names.contains(&"Library"),
+        "Library leaked: {home_names:?}"
+    );
     assert!(!home_names.contains(&".ssh"), ".ssh leaked: {home_names:?}");
 
     // Browsing ~/Projects detects local git repo outside ~/CowokProjects
@@ -1227,7 +1234,11 @@ async fn test_fs_browse_home_local_folders_and_tilde_expansion() {
             None,
         )
         .await;
-        assert_eq!(st_den, StatusCode::FORBIDDEN, "expected 403 for {denied}, got {val_den}");
+        assert_eq!(
+            st_den,
+            StatusCode::FORBIDDEN,
+            "expected 403 for {denied}, got {val_den}"
+        );
     }
 
     // Creating a folder-backed project directly at ~ root is rejected
@@ -1262,7 +1273,10 @@ async fn test_fs_browse_home_local_folders_and_tilde_expansion() {
     .await;
     assert_eq!(st_local, StatusCode::CREATED, "{val_local}");
     assert_eq!(val_local["provenance"], json!("folder-backed"));
-    assert!(fake_home_canon.join("Projects").join("new-local-proj").is_dir());
+    assert!(fake_home_canon
+        .join("Projects")
+        .join("new-local-proj")
+        .is_dir());
 
     // Native Finder picker endpoint enforces same non-superadmin Bearer scope rejection
     let (st_pick_auth, val_pick_auth) = send_req(

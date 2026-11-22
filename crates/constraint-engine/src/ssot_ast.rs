@@ -108,8 +108,11 @@ fn collect_jsx_element(el: &JSXElement<'_>, out: &mut ComponentCollector) {
             out.jsx_tags.insert(jsx_member_expr_to_string(member));
         }
         oxc_ast::ast::JSXElementName::NamespacedName(ns) => {
-            out.jsx_tags
-                .insert(format!("{}:{}", ns.namespace.name.as_str(), ns.name.name.as_str()));
+            out.jsx_tags.insert(format!(
+                "{}:{}",
+                ns.namespace.name.as_str(),
+                ns.name.name.as_str()
+            ));
         }
         oxc_ast::ast::JSXElementName::ThisExpression(_) => {}
     }
@@ -649,14 +652,8 @@ mod tests {
         assert_eq!(sigs.len(), 1);
         assert_eq!(sigs[0].component_key, "AppShellPanel");
         assert_eq!(sigs[0].prop_names, vec!["isLocked", "portalId"]);
-        assert_eq!(
-            sigs[0].css_variables,
-            vec!["--bg-card", "--text-primary"]
-        );
-        assert_eq!(
-            sigs[0].ff_ids,
-            vec!["appshell-lock-panel", "lock-btn"]
-        );
+        assert_eq!(sigs[0].css_variables, vec!["--bg-card", "--text-primary"]);
+        assert_eq!(sigs[0].ff_ids, vec!["appshell-lock-panel", "lock-btn"]);
         assert_eq!(sigs[0].ast_signature_sha256.len(), 64);
     }
 
