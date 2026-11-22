@@ -187,10 +187,7 @@ pub fn is_sensitive_or_system_path(path: &Path) -> bool {
             return true;
         }
     }
-    if lower.starts_with("/usr/") && !lower.starts_with("/usr/local/") {
-        return true;
-    }
-    false
+    lower.starts_with("/usr/") && !lower.starts_with("/usr/local/")
 }
 
 fn is_sensitive_home_subdir(lower: &str) -> bool {
