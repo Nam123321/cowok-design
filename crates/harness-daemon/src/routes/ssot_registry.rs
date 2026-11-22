@@ -248,6 +248,14 @@ struct ProjectScope {
     tenant_id: String,
     workspace_root: PathBuf,
     is_superadmin: bool,
+    is_tenant_admin: bool,
+}
+
+fn is_write_role(role: &str) -> bool {
+    matches!(
+        role.trim().to_ascii_lowercase().as_str(),
+        "editor" | "admin" | "owner"
+    )
 }
 
 fn resolve_project_scope(
@@ -272,11 +280,11 @@ fn resolve_project_scope(
         return match verify_anti_idor_with_caller(&state.registry, project_uuid, headers, Some(verified))
         {
             Ok((_reg, ws_root, anti_idor_superadmin)) => {
-                let conn = state.registry.pool().connection().map_err(|e| {
+                let conn = state.registry.pool().connection().map_err(|_| {
                     error_response(
                         StatusCode::SERVICE_UNAVAILABLE,
                         "STORAGE_BUSY",
-                        &e.to_string(),
+                        "Storage connection unavailable",
                         None,
                         None,
                         request_id.to_string(),
@@ -298,8 +306,10 @@ fn resolve_project_scope(
                             request_id.to_string(),
                         )
                     })?;
-                let is_privileged = (matches!(verified.kind, LegacyAuthKind::Bearer)
+                let is_superadmin = (matches!(verified.kind, LegacyAuthKind::Bearer)
                     && anti_idor_superadmin)
+                    || crate::daemon_auth::is_valid_superadmin_bearer(headers);
+                let is_tenant_admin = is_superadmin
                     || (matches!(
                         verified.kind,
                         LegacyAuthKind::HmacV2 | LegacyAuthKind::SessionToken
@@ -322,7 +332,8 @@ fn resolve_project_scope(
                 Ok(ProjectScope {
                     tenant_id,
                     workspace_root: ws_root,
-                    is_superadmin: is_privileged,
+                    is_superadmin,
+                    is_tenant_admin,
                 })
             }
             Err(HarnessError::ProjectNotFound { .. }) => Err(error_response(
@@ -341,10 +352,10 @@ fn resolve_project_scope(
                 None,
                 request_id.to_string(),
             )),
-            Err(e) => Err(error_response(
+            Err(_) => Err(error_response(
                 StatusCode::FORBIDDEN,
                 "AUTH_FORBIDDEN",
-                &e.to_string(),
+                "Project access denied",
                 None,
                 None,
                 request_id.to_string(),
@@ -353,11 +364,11 @@ fn resolve_project_scope(
     }
 
     // String (non-UUID) project ID fallback with identical strict tenant/token anti-IDOR verification.
-    let conn = state.registry.pool().connection().map_err(|e| {
+    let conn = state.registry.pool().connection().map_err(|_| {
         error_response(
             StatusCode::SERVICE_UNAVAILABLE,
             "STORAGE_BUSY",
-            &e.to_string(),
+            "Storage connection unavailable",
             None,
             None,
             request_id.to_string(),
@@ -370,11 +381,11 @@ fn resolve_project_scope(
             |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .optional()
-        .map_err(|e| {
+        .map_err(|_| {
             error_response(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "STORAGE_BUSY",
-                &e.to_string(),
+                "Project lookup failed",
                 None,
                 None,
                 request_id.to_string(),
@@ -402,18 +413,72 @@ fn resolve_project_scope(
         }
     };
     let canon_root = crate::lockfile::validate_and_canonicalize_workspace_root(&raw_root)
-        .map_err(|e| {
+        .map_err(|_| {
             error_response(
                 StatusCode::FORBIDDEN,
                 "PATH_JAIL_VIOLATION",
-                &e.to_string(),
+                "Workspace root failed path-jail validation",
                 None,
                 None,
                 request_id.to_string(),
             )
         })?;
+    let daemon_canon_root = crate::lockfile::validate_and_canonicalize_workspace_root(
+        state.registry.pool().workspace_root(),
+    )
+    .map_err(|_| {
+        error_response(
+            StatusCode::FORBIDDEN,
+            "PATH_JAIL_VIOLATION",
+            "Daemon workspace root failed path-jail validation",
+            None,
+            None,
+            request_id.to_string(),
+        )
+    })?;
+    let is_folder_backed: bool = conn
+        .query_row(
+            "SELECT 1 FROM project_boundaries WHERE project_id = ?1 AND boundary_type = 'folder_backed' LIMIT 1",
+            params![project_id],
+            |r| r.get::<_, i64>(0),
+        )
+        .optional()
+        .unwrap_or(None)
+        .is_some();
+    if !is_folder_backed && !canon_root.starts_with(&daemon_canon_root) {
+        return Err(error_response(
+            StatusCode::FORBIDDEN,
+            "PATH_JAIL_VIOLATION",
+            "Project workspace root escapes daemon boundary",
+            None,
+            None,
+            request_id.to_string(),
+        ));
+    }
+    if let Some(hdr_val) = headers.get("x-cowok-workspace-root") {
+        let hdr_str = hdr_val.to_str().unwrap_or("");
+        let hdr_path = PathBuf::from(hdr_str);
+        let is_sym = std::fs::symlink_metadata(&hdr_path)
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false);
+        let hdr_canon = if is_sym {
+            None
+        } else {
+            hdr_path.canonicalize().ok()
+        };
+        if hdr_canon.as_ref() != Some(&canon_root) {
+            return Err(error_response(
+                StatusCode::FORBIDDEN,
+                "PATH_JAIL_VIOLATION",
+                "X-Cowok-Workspace-Root mismatch",
+                None,
+                None,
+                request_id.to_string(),
+            ));
+        }
+    }
 
-    let is_superadmin = match verified.kind {
+    let (is_superadmin, is_tenant_admin) = match verified.kind {
         LegacyAuthKind::HmacV2 | LegacyAuthKind::SessionToken => {
             if verified.principal.tenant_id.trim() != project_tenant.trim() {
                 return Err(error_response(
@@ -425,8 +490,11 @@ fn resolve_project_scope(
                     request_id.to_string(),
                 ));
             }
-            verified.principal.role.eq_ignore_ascii_case("admin")
-                || verified.principal.role.eq_ignore_ascii_case("owner")
+            let sa = crate::daemon_auth::is_valid_superadmin_bearer(headers);
+            let ta = sa
+                || verified.principal.role.eq_ignore_ascii_case("admin")
+                || verified.principal.role.eq_ignore_ascii_case("owner");
+            (sa, ta)
         }
         LegacyAuthKind::Bearer => {
             let tok = verified.bearer_token.as_deref().unwrap_or("");
@@ -449,7 +517,7 @@ fn resolve_project_scope(
                     request_id.to_string(),
                 ));
             }
-            superadmin
+            (superadmin, superadmin)
         }
     };
 
@@ -457,6 +525,7 @@ fn resolve_project_scope(
         tenant_id: project_tenant,
         workspace_root: canon_root,
         is_superadmin,
+        is_tenant_admin,
     })
 }
 
@@ -487,10 +556,18 @@ fn map_lock_error(err: SsotLockError, request_id: String) -> Response {
                 request_id,
             )
         }
-        SsotLockError::StorageBusy { details, .. } => error_response(
+        SsotLockError::StorageBusy { .. } => error_response(
             StatusCode::SERVICE_UNAVAILABLE,
             "STORAGE_BUSY",
-            &details,
+            "Storage is temporarily busy",
+            None,
+            None,
+            request_id,
+        ),
+        SsotLockError::Internal { code, .. } => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            code,
+            "Internal storage error",
             None,
             None,
             request_id,
@@ -508,10 +585,10 @@ fn map_export_error(err: SsotExportError, request_id: String) -> Response {
             None,
             request_id,
         ),
-        SsotExportError::PathTraversal { path } => error_response(
+        SsotExportError::PathTraversal { .. } => error_response(
             StatusCode::FORBIDDEN,
             "PATH_JAIL_VIOLATION",
-            &format!("Export path escaped jail: {path}"),
+            "Export path escaped workspace jail",
             None,
             None,
             request_id,
@@ -532,26 +609,26 @@ fn map_export_error(err: SsotExportError, request_id: String) -> Response {
             None,
             request_id,
         ),
-        SsotExportError::ManifestInvalid { reason } => error_response(
+        SsotExportError::ManifestInvalid { .. } => error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             "EXPORT_MANIFEST_INVALID",
-            &reason,
+            "Export manifest integrity check failed",
             None,
             None,
             request_id,
         ),
-        SsotExportError::StorageBusy { details } => error_response(
+        SsotExportError::StorageBusy { .. } => error_response(
             StatusCode::SERVICE_UNAVAILABLE,
             "STORAGE_BUSY",
-            &details,
+            "Storage is temporarily busy",
             None,
             None,
             request_id,
         ),
-        SsotExportError::Io { code, message } => error_response(
+        SsotExportError::Io { code, .. } => error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             code,
-            &message,
+            "Export I/O operation failed",
             None,
             None,
             request_id,
@@ -559,40 +636,54 @@ fn map_export_error(err: SsotExportError, request_id: String) -> Response {
     }
 }
 
-fn parse_query_params(raw_query: Option<&str>) -> std::collections::HashMap<String, String> {
+fn parse_query_params(
+    raw_query: Option<&str>,
+) -> Result<std::collections::HashMap<String, String>, String> {
     let mut map = std::collections::HashMap::new();
     let Some(q) = raw_query else {
-        return map;
+        return Ok(map);
     };
     for pair in q.split('&') {
         if pair.is_empty() {
             continue;
         }
-        let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
-        map.insert(k.to_string(), url_decode_simple(v));
+        let (raw_k, raw_v) = pair.split_once('=').unwrap_or((pair, ""));
+        let k = url_decode_strict(raw_k).map_err(|_| raw_k.to_string())?;
+        if !matches!(k.as_str(), "projectId" | "portalId" | "cursor" | "limit") {
+            return Err(k);
+        }
+        if map.contains_key(&k) {
+            return Err(k);
+        }
+        let v = url_decode_strict(raw_v).map_err(|_| k.clone())?;
+        map.insert(k, v);
     }
-    map
+    Ok(map)
 }
 
-fn url_decode_simple(input: &str) -> String {
+fn url_decode_strict(input: &str) -> Result<String, ()> {
     let mut bytes = Vec::with_capacity(input.len());
     let raw = input.as_bytes();
     let mut i = 0;
     while i < raw.len() {
-        if raw[i] == b'%' && i + 2 < raw.len() {
-            if let (Some(h), Some(l)) = (
+        if raw[i] == b'%' {
+            if i + 2 >= raw.len() {
+                return Err(());
+            }
+            let (Some(h), Some(l)) = (
                 char::from(raw[i + 1]).to_digit(16),
                 char::from(raw[i + 2]).to_digit(16),
-            ) {
-                bytes.push(((h << 4) | l) as u8);
-                i += 3;
-                continue;
-            }
+            ) else {
+                return Err(());
+            };
+            bytes.push(((h << 4) | l) as u8);
+            i += 3;
+            continue;
         }
         bytes.push(if raw[i] == b'+' { b' ' } else { raw[i] });
         i += 1;
     }
-    String::from_utf8_lossy(&bytes).into_owned()
+    String::from_utf8(bytes).map_err(|_| ())
 }
 
 pub(crate) async fn handle_get_ssot_components(
@@ -607,7 +698,19 @@ pub(crate) async fn handle_get_ssot_components(
         Err(resp) => return resp,
     };
 
-    let params_map = parse_query_params(raw_query.as_deref());
+    let params_map = match parse_query_params(raw_query.as_deref()) {
+        Ok(m) => m,
+        Err(bad_field) => {
+            return error_response(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "INVALID_REQUEST",
+                "Invalid, duplicate, or unknown query parameter",
+                Some(bad_field),
+                None,
+                request_id,
+            );
+        }
+    };
     let project_id = params_map.get("projectId").cloned().unwrap_or_default();
     let portal_id = params_map.get("portalId").cloned().unwrap_or_default();
     let cursor = params_map.get("cursor").map(String::as_str);
@@ -646,11 +749,9 @@ pub(crate) async fn handle_get_ssot_components(
     let req_id_for_blocking = request_id.clone();
 
     let blocking_res = tokio::task::spawn_blocking(move || {
-        let conn = pool.connection().map_err(|e| {
-            SsotLockError::StorageBusy {
-                details: e.to_string(),
-                retry_after_secs: 1,
-            }
+        let conn = pool.connection().map_err(|_| SsotLockError::StorageBusy {
+            details: "Storage connection unavailable".to_string(),
+            retry_after_secs: 1,
         })?;
         list_component_patterns(
             &conn,
@@ -679,10 +780,10 @@ pub(crate) async fn handle_get_ssot_components(
             req_id_for_blocking,
         ),
         Ok(Err(err)) => map_lock_error(err, req_id_for_blocking),
-        Err(join_err) => error_response(
+        Err(_) => error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             "INTERNAL_ERROR",
-            &join_err.to_string(),
+            "Internal component query task failed",
             None,
             None,
             req_id_for_blocking,
@@ -701,11 +802,11 @@ pub(crate) async fn handle_mutate_appshell_lock(
         Ok(v) => v,
         Err(resp) => return resp,
     };
-    if verified.principal.role.eq_ignore_ascii_case("viewer") {
+    if !is_write_role(&verified.principal.role) {
         return error_response(
             StatusCode::FORBIDDEN,
             "AUTH_FORBIDDEN",
-            "Viewer role cannot mutate AppShell locks",
+            "Role is not permitted to mutate AppShell locks",
             None,
             None,
             request_id,
@@ -752,7 +853,7 @@ pub(crate) async fn handle_mutate_appshell_lock(
         project_id: req.project_id,
         portal_id: req.portal_id,
         caller_actor_id: verified.principal.user_id.clone(),
-        is_privileged_role: scope.is_superadmin,
+        is_privileged_role: scope.is_tenant_admin,
         action: req.action,
         lock_owner_id: req.lock_owner_id,
         expected_revision: req.expected_revision,
@@ -766,8 +867,8 @@ pub(crate) async fn handle_mutate_appshell_lock(
     let pool = state.registry.pool().clone();
     let req_id_for_blocking = request_id.clone();
     let blocking_res = tokio::task::spawn_blocking(move || {
-        let mut conn = pool.connection().map_err(|e| SsotLockError::StorageBusy {
-            details: e.to_string(),
+        let mut conn = pool.connection().map_err(|_| SsotLockError::StorageBusy {
+            details: "Storage connection unavailable".to_string(),
             retry_after_secs: 1,
         })?;
         mutate_appshell_lock(&mut conn, &cmd)
@@ -777,10 +878,10 @@ pub(crate) async fn handle_mutate_appshell_lock(
     match blocking_res {
         Ok(Ok(res)) => ok_response(HttpLockMutationData { lock: res.lock }, req_id_for_blocking),
         Ok(Err(err)) => map_lock_error(err, req_id_for_blocking),
-        Err(join_err) => error_response(
+        Err(_) => error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             "INTERNAL_ERROR",
-            &join_err.to_string(),
+            "Internal lock mutation task failed",
             None,
             None,
             req_id_for_blocking,
@@ -799,11 +900,11 @@ pub(crate) async fn handle_export_ssot(
         Ok(v) => v,
         Err(resp) => return resp,
     };
-    if verified.principal.role.eq_ignore_ascii_case("viewer") {
+    if !is_write_role(&verified.principal.role) {
         return error_response(
             StatusCode::FORBIDDEN,
             "AUTH_FORBIDDEN",
-            "Viewer role cannot trigger SSOT export",
+            "Role is not permitted to trigger SSOT export",
             None,
             None,
             request_id,
@@ -859,8 +960,8 @@ pub(crate) async fn handle_export_ssot(
     let ws_root = scope.workspace_root;
     let req_id_for_blocking = request_id.clone();
     let blocking_res = tokio::task::spawn_blocking(move || {
-        let mut conn = pool.connection().map_err(|e| SsotExportError::StorageBusy {
-            details: e.to_string(),
+        let mut conn = pool.connection().map_err(|_| SsotExportError::StorageBusy {
+            details: "Storage connection unavailable".to_string(),
         })?;
         export_hidden_ssot_bundle(&mut conn, &ws_root, &export_req)
     })
@@ -869,10 +970,10 @@ pub(crate) async fn handle_export_ssot(
     match blocking_res {
         Ok(Ok(out @ SsotExportResult { .. })) => ok_response(out, req_id_for_blocking),
         Ok(Err(err)) => map_export_error(err, req_id_for_blocking),
-        Err(join_err) => error_response(
+        Err(_) => error_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             "INTERNAL_ERROR",
-            &join_err.to_string(),
+            "Internal export task failed",
             None,
             None,
             req_id_for_blocking,

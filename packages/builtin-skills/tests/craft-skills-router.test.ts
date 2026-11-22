@@ -13,12 +13,36 @@ import {
 } from "../src/craft-skills";
 
 describe("Story 02.4: cowok-design-opt & 3-Zone Craft Skill Router (BENCH-01 & BENCH-02)", () => {
-  it("BENCH-01: keeps cowok-design-opt spine <= 250 cl100k_base BPE tokens and exports all 7 3-tier craft skills", () => {
+  it("BENCH-01: keeps cowok-design-opt spine <= 250 cl100k_base BPE tokens, validates bounds, and exports all 7 3-tier craft skills", () => {
     const budget = verifySpineBpeBudget();
-    expect(budget.tokens).toBeGreaterThan(0);
+    expect(budget.tokens).toBeGreaterThan(20);
     expect(budget.tokens).toBeLessThanOrEqual(COWOK_DESIGN_OPT_SPINE_MAX_TOKENS);
     expect(budget.withinBudget).toBe(true);
-    expect(countCl100kBpeTokens(COWOK_DESIGN_OPT_SPINE)).toBe(budget.tokens);
+    expect(COWOK_DESIGN_OPT_SPINE).toContain("--bg-surface");
+    expect(COWOK_DESIGN_OPT_SPINE).toContain("--action-primary");
+
+    expect(() =>
+      routeCraftSkillsDeterministic({
+        projectId: "proj-1",
+        portalId: "DeveloperPortal",
+        intentSummary: "   ",
+      })
+    ).toThrow(/INVALID_REQUEST/);
+    expect(() =>
+      routeCraftSkillsDeterministic({
+        projectId: "proj-1",
+        portalId: "DeveloperPortal",
+        intentSummary: "Build KPI card",
+        maxSpineTokens: 999,
+      })
+    ).toThrow(/SPINE_TOKEN_BUDGET_EXCEEDED/);
+    expect(() =>
+      routeCraftSkillsDeterministic({
+        projectId: "proj-1",
+        portalId: "UnknownPortal",
+        intentSummary: "Build KPI card",
+      })
+    ).toThrow(/INVALID_REQUEST/);
 
     expect(CRAFT_SKILL_SLUGS).toHaveLength(7);
     for (const slug of CRAFT_SKILL_SLUGS) {

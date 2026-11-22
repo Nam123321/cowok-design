@@ -150,7 +150,7 @@ test.describe("Story 02.4 Live Browser E2E Full-Userflow (V18 SSOT, AppShell Loc
       await exportBtn.click();
       const exportResp = await exportRespPromise;
       expect(exportResp.status()).toBe(200);
-      await expect(page.getByTestId("ssot-export-toast")).toContainText(/SSOT exported cleanly/);
+      await expect(page.getByTestId("ssot-export-toast")).toContainText(/Design kit exported|Đã xuất bộ thiết kế/);
 
       // 3. Live UI Pattern Registry Drawer + Light Screenshot
       await patternsBtn.click();

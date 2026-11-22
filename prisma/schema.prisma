@@ -34,6 +34,7 @@ model Project {
   workspaceSyncIntents WorkspaceSyncIntent[]
   componentPatterns ComponentPattern[]
   appShellLocks  AppShellLock[]
+  contextAssemblyTelemetry ContextAssemblyTelemetry[]
 
   @@unique([id, tenantId], map: "uq_projects_id_tenant")
   @@index([inheritBrandFromProjectId])
@@ -1140,6 +1141,8 @@ model ContextAssemblyTelemetry {
   responseJson             String  @default("{}") @map("response_json")
   latencyMs                Int     @map("latency_ms")
   createdAt                BigInt  @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, projectId, idempotencyKey], map: "uq_ctx_telemetry_idem")
   @@index([projectId, portalId, createdAt, id], map: "idx_ctx_telemetry_proj_portal")

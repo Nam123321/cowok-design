@@ -53,14 +53,32 @@ export function readRawBody(req: IncomingMessage, maxBytes: number = MAX_BODY_BY
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let total = 0;
-    let overflow = false;
-    req.on("data", (chunk: Buffer) => {
+    let settled = false;
+    const onData = (chunk: Buffer) => {
+      if (settled) return;
       total += chunk.length;
-      if (total > maxBytes) overflow = true;
-      else chunks.push(chunk);
+      if (total > maxBytes) {
+        settled = true;
+        req.off("data", onData);
+        req.pause();
+        resolve("TOO_LARGE");
+        return;
+      }
+      chunks.push(chunk);
+    };
+    req.on("data", onData);
+    req.on("end", () => {
+      if (!settled) {
+        settled = true;
+        resolve(Buffer.concat(chunks));
+      }
     });
-    req.on("end", () => resolve(overflow ? "TOO_LARGE" : Buffer.concat(chunks)));
-    req.on("error", reject);
+    req.on("error", (err) => {
+      if (!settled) {
+        settled = true;
+        reject(err);
+      }
+    });
   });
 }
 

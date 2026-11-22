@@ -130,12 +130,18 @@ export class HarnessDaemonTransport {
       if (injected) return injected;
     }
     if (!forceRefresh && this.cachedToken) return this.cachedToken;
-    if (!forceRefresh && this.inflightBootstrap) return this.inflightBootstrap;
+    if (this.inflightBootstrap) return this.inflightBootstrap;
 
-    this.inflightBootstrap = this.bootstrapToken().finally(() => {
-      this.inflightBootstrap = null;
+    if (forceRefresh) {
+      this.cachedToken = null;
+    }
+    const pending = this.bootstrapToken().finally(() => {
+      if (this.inflightBootstrap === pending) {
+        this.inflightBootstrap = null;
+      }
     });
-    return this.inflightBootstrap;
+    this.inflightBootstrap = pending;
+    return pending;
   }
 
   async request<T>(

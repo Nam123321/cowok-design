@@ -13,7 +13,12 @@ use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use spec_registry::SqlitePool;
-use std::sync::OnceLock;
+use std::collections::HashMap;
+use std::fs::{self, OpenOptions};
+use std::io::{Read, Write};
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+use std::sync::{Mutex, OnceLock};
 use std::thread::sleep;
 use std::time::Duration;
 use uuid::Uuid;
@@ -25,6 +30,7 @@ const BUSY_BACKOFF_BASE_MS: u64 = 15;
 const MAX_CURSOR_LEN: usize = 512;
 
 static CURSOR_HMAC_SECRET: OnceLock<[u8; 32]> = OnceLock::new();
+static WORKSPACE_CURSOR_SECRET_CACHE: OnceLock<Mutex<HashMap<String, [u8; 32]>>> = OnceLock::new();
 
 fn process_cursor_secret() -> &'static [u8; 32] {
     CURSOR_HMAC_SECRET.get_or_init(|| {
@@ -104,9 +110,94 @@ fn map_storage_err(err: rusqlite::Error) -> ContextCompilerError {
 
 fn compute_filters_hash(query: &ContextTelemetryQueryDto, allow_superadmin: bool) -> String {
     let portal = query.portal_id.map(|p| p.as_str()).unwrap_or("*");
+    let horizon = query.horizon.map(|h| h.as_str()).unwrap_or("*");
     let profile = query.model_profile.map(|m| m.as_str()).unwrap_or("*");
-    let raw = format!("{}:{portal}:{profile}:{allow_superadmin}", query.project_id);
+    let raw = format!(
+        "{}:{portal}:{horizon}:{profile}:{allow_superadmin}",
+        query.project_id
+    );
     format!("{:x}", Sha256::digest(raw.as_bytes()))
+}
+
+fn read_verified_hex_key_nofollow(key_path: &std::path::Path) -> Option<[u8; 32]> {
+    let meta = fs::symlink_metadata(key_path).ok()?;
+    if meta.file_type().is_symlink() || !meta.file_type().is_file() {
+        return None;
+    }
+    let mut opts = OpenOptions::new();
+    opts.read(true);
+    #[cfg(unix)]
+    opts.custom_flags(libc::O_NOFOLLOW);
+    let mut file = opts.open(key_path).ok()?;
+    let mut raw = String::new();
+    file.read_to_string(&mut raw).ok()?;
+    let trimmed = raw.trim();
+    if trimmed.len() == 64 && trimmed.bytes().all(|b| b.is_ascii_hexdigit()) {
+        let digest = Sha256::digest(trimmed.as_bytes());
+        let mut key = [0u8; 32];
+        key.copy_from_slice(&digest[..32]);
+        return Some(key);
+    }
+    None
+}
+
+fn load_or_create_workspace_cursor_secret(db_root: &str) -> [u8; 32] {
+    if let Ok(env_secret) = std::env::var("COWOK_CURSOR_HMAC_SECRET") {
+        let trimmed = env_secret.trim();
+        if !trimmed.is_empty() {
+            let digest = Sha256::digest(trimmed.as_bytes());
+            let mut key = [0u8; 32];
+            key.copy_from_slice(&digest[..32]);
+            return key;
+        }
+    }
+    let cache = WORKSPACE_CURSOR_SECRET_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Ok(guard) = cache.lock() {
+        if let Some(cached) = guard.get(db_root) {
+            return *cached;
+        }
+    }
+    let root_path = std::path::Path::new(db_root);
+    if !db_root.trim().is_empty() && root_path.is_dir() {
+        let state_dir = root_path.join(".cowok-design");
+        let state_is_symlink = fs::symlink_metadata(&state_dir)
+            .map(|m| m.file_type().is_symlink())
+            .unwrap_or(false);
+        if !state_is_symlink {
+            let key_path = state_dir.join(".cursor-hmac.key");
+            if let Some(key) = read_verified_hex_key_nofollow(&key_path) {
+                if let Ok(mut guard) = cache.lock() {
+                    guard.insert(db_root.to_string(), key);
+                }
+                return key;
+            }
+            if fs::create_dir_all(&state_dir).is_ok() {
+                let fresh_hex = format!(
+                    "{:x}",
+                    Sha256::digest(format!("{}{}", Uuid::new_v4(), Uuid::new_v4()).as_bytes())
+                );
+                let tmp_path = state_dir.join(format!(".cursor-hmac.key.tmp.{}", Uuid::new_v4()));
+                let mut opts = OpenOptions::new();
+                opts.write(true).create_new(true);
+                #[cfg(unix)]
+                opts.mode(0o600).custom_flags(libc::O_NOFOLLOW);
+                if let Ok(mut f) = opts.open(&tmp_path) {
+                    if f.write_all(fresh_hex.as_bytes()).is_ok() && f.sync_all().is_ok() {
+                        drop(f);
+                        let _ = fs::hard_link(&tmp_path, &key_path);
+                    }
+                    let _ = fs::remove_file(&tmp_path);
+                }
+                if let Some(key) = read_verified_hex_key_nofollow(&key_path) {
+                    if let Ok(mut guard) = cache.lock() {
+                        guard.insert(db_root.to_string(), key);
+                    }
+                    return key;
+                }
+            }
+        }
+    }
+    *process_cursor_secret()
 }
 
 fn sign_cursor(
@@ -117,8 +208,9 @@ fn sign_cursor(
     tenant_id: &str,
     filters_hash: &str,
 ) -> String {
+    let secret = load_or_create_workspace_cursor_secret(db_root);
     let msg = format!("{db_root}|{created_at}|{id}|{project_id}|{tenant_id}|{filters_hash}");
-    hmac_sha256_hex(process_cursor_secret(), msg.as_bytes())
+    hmac_sha256_hex(&secret, msg.as_bytes())
 }
 
 fn decode_and_verify_cursor(
@@ -173,7 +265,7 @@ fn encode_cursor(
         filters_hash: filters_hash.to_string(),
         sig: sign_cursor(db_root, created_at, id, project_id, tenant_id, filters_hash),
     };
-    let json_bytes = serde_json::to_vec(&payload).unwrap_or_default();
+    let json_bytes = serde_json::to_vec(&payload).expect("CursorPayload serialization is infallible");
     URL_SAFE_NO_PAD.encode(json_bytes)
 }
 
@@ -201,10 +293,10 @@ pub fn compute_request_fingerprint_sha256(cmd: &ContextAssemblyCommand) -> Strin
         })
         .collect();
     outline_sigs.sort();
-    let mut blocks: Vec<(u8, &str, &str)> = cmd
+    let mut blocks: Vec<(u8, &str, &str, &str)> = cmd
         .optional_blocks
         .iter()
-        .map(|b| (b.priority, b.id.as_str(), b.content.as_str()))
+        .map(|b| (b.priority, b.format.as_str(), b.id.as_str(), b.content.as_str()))
         .collect();
     blocks.sort();
     let encoded = serde_json::to_vec(&(
@@ -214,6 +306,7 @@ pub fn compute_request_fingerprint_sha256(cmd: &ContextAssemblyCommand) -> Strin
         cmd.model_profile.as_str(),
         nfc_intent,
         cmd.requested_image_tokens,
+        cmd.max_image_tokens_per_turn,
         cmd.inspect_only,
         cmd.brand_tokens_prefix.as_str(),
         cmd.active_skill_prefix.as_str(),
@@ -222,7 +315,7 @@ pub fn compute_request_fingerprint_sha256(cmd: &ContextAssemblyCommand) -> Strin
         outline_sigs,
         blocks,
     ))
-    .unwrap_or_default();
+    .expect("request fingerprint serialization is infallible");
     format!("{:x}", Sha256::digest(&encoded))
 }
 
@@ -328,11 +421,42 @@ fn write_telemetry_row_tx(
     .map_err(|err| {
         if is_busy_error(&err) {
             ContextCompilerError::TelemetryWriteBusy
-        } else {
+        } else if matches!(
+            err,
+            rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error {
+                    extended_code: rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE
+                        | rusqlite::ffi::SQLITE_CONSTRAINT_PRIMARYKEY,
+                    ..
+                },
+                _
+            )
+        ) {
             ContextCompilerError::TelemetryConflict
+        } else {
+            ContextCompilerError::TelemetryStorageUnavailable {
+                reason: err.to_string(),
+            }
         }
     })?;
     Ok(())
+}
+
+pub fn lookup_idempotent_replay(
+    pool: &SqlitePool,
+    cmd: &ContextAssemblyCommand,
+) -> Result<Option<ContextAssembleDataDto>, ContextCompilerError> {
+    if cmd.idempotency_key.is_none() {
+        return Ok(None);
+    }
+    let fingerprint = compute_request_fingerprint_sha256(cmd);
+    let conn =
+        pool.connection()
+            .map_err(|e| ContextCompilerError::TelemetryStorageUnavailable {
+                reason: e.to_string(),
+            })?;
+    verify_project_tenant_in_conn(&conn, &cmd.project_id.to_string(), &cmd.tenant_id)?;
+    check_idempotency_replay_tx(&conn, cmd, &fingerprint)
 }
 
 fn insert_telemetry_tx(
@@ -469,6 +593,7 @@ fn query_telemetry_rows(
     allow_superadmin: bool,
 ) -> Result<TelemetryRowBatch, ContextCompilerError> {
     let portal_filter = query.portal_id.map(|p| p.as_str().to_string());
+    let horizon_filter = query.horizon.map(|h| h.as_str().to_string());
     let profile_filter = query.model_profile.map(|m| m.as_str().to_string());
     let allow_sa_flag: i64 = i64::from(allow_superadmin);
     let mut stmt = conn
@@ -480,6 +605,7 @@ fn query_telemetry_rows(
              WHERE tenant_id = ?1 AND project_id = ?2
                AND (?3 IS NULL OR portal_id = ?3)
                AND (?4 IS NULL OR model_profile = ?4)
+               AND (?9 IS NULL OR horizon = ?9)
                AND (?8 = 1 OR portal_id != 'SuperAdmin')
                AND (created_at < ?5 OR (created_at = ?5 AND id < ?6))
              ORDER BY created_at DESC, id DESC
@@ -497,6 +623,7 @@ fn query_telemetry_rows(
                 c_id,
                 (limit + 1) as i64,
                 allow_sa_flag,
+                horizon_filter,
             ],
             scan_telemetry_row,
         )

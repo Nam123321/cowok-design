@@ -2,7 +2,7 @@
 // @implements AC-01, AC-02, AC-03, AC-04
 use super::legacy_specs::verify_anti_idor_with_caller;
 use super::DaemonAppState;
-use crate::daemon_auth::VerifiedLegacyIngress;
+use crate::daemon_auth::{is_valid_superadmin_bearer, LegacyAuthKind, VerifiedLegacyIngress};
 use axum::{
     body::Bytes,
     extract::{Extension, RawQuery, State},
@@ -14,7 +14,7 @@ use context_compiler::{
     assemble_and_record, list_context_telemetry_scoped, ContextApiErrorDto,
     ContextAssembleHttpRequest, ContextAssembleSuccessDto, ContextAssemblyCommand,
     ContextCompilerError, ContextErrorDetail, ContextTelemetryPageDto, ContextTelemetryQueryDto,
-    ModelProfile, PortalId, DEFAULT_MAX_IMAGE_TOKENS_PER_TURN,
+    Horizon, ModelProfile, PortalId, DEFAULT_MAX_IMAGE_TOKENS_PER_TURN,
 };
 use domain::HarnessError;
 use std::collections::HashSet;
@@ -109,6 +109,27 @@ fn validate_idempotency_key(headers: &HeaderMap) -> Result<String, &'static str>
     Ok(parsed.to_string())
 }
 
+fn parse_portal_id_strict(raw: &str) -> Option<PortalId> {
+    match raw {
+        "SuperAdmin" => Some(PortalId::SuperAdmin),
+        "TenantAdmin" => Some(PortalId::TenantAdmin),
+        "SalesApp" => Some(PortalId::SalesApp),
+        "MarketingWeb" => Some(PortalId::MarketingWeb),
+        "DeveloperPortal" => Some(PortalId::DeveloperPortal),
+        "Presentation" => Some(PortalId::Presentation),
+        _ => None,
+    }
+}
+
+fn parse_model_profile_strict(raw: &str) -> Option<ModelProfile> {
+    match raw {
+        "A" => Some(ModelProfile::A),
+        "B" => Some(ModelProfile::B),
+        "C" => Some(ModelProfile::C),
+        _ => None,
+    }
+}
+
 fn enforce_portal_role_guard(
     headers: &HeaderMap,
     requested_portal: &mut Option<PortalId>,
@@ -126,7 +147,7 @@ fn enforce_portal_role_guard(
                 request_id.to_string(),
             ));
         };
-        let Ok(hp) = serde_json::from_str::<PortalId>(&format!("\"{}\"", raw_hdr.trim())) else {
+        let Some(hp) = parse_portal_id_strict(raw_hdr.trim()) else {
             return Err(error_response(
                 StatusCode::FORBIDDEN,
                 "CROSS_PORTAL_LEAK_BLOCKED",
@@ -200,29 +221,53 @@ fn storage_or_busy_response(msg: &str, request_id: &str) -> Response {
 fn resolve_authorized_project_tenant(
     state: &DaemonAppState,
     project_id: Uuid,
+    caller: Option<&VerifiedLegacyIngress>,
+    headers: &HeaderMap,
+    anti_idor_superadmin: bool,
     request_id: &str,
-) -> Result<String, Response> {
+) -> Result<(String, bool), Response> {
     let conn = state
         .registry
         .pool()
         .connection()
         .map_err(|err| storage_or_busy_response(&err.to_string(), request_id))?;
-    match conn.query_row(
+    let tenant_id = match conn.query_row(
         "SELECT tenant_id FROM projects WHERE id = ?1 AND trash_deleted_at IS NULL",
         rusqlite::params![project_id.to_string()],
         |r| r.get::<_, String>(0),
     ) {
-        Ok(tenant_id) => Ok(tenant_id),
-        Err(rusqlite::Error::QueryReturnedNoRows) => Err(error_response(
-            StatusCode::FORBIDDEN,
-            "PROJECT_TENANT_MISMATCH",
-            "contextMeter.errors.projectTenantMismatch",
-            None,
-            false,
-            request_id.to_string(),
-        )),
-        Err(err) => Err(storage_or_busy_response(&err.to_string(), request_id)),
+        Ok(tenant_id) => tenant_id,
+        Err(rusqlite::Error::QueryReturnedNoRows) => {
+            return Err(error_response(
+                StatusCode::FORBIDDEN,
+                "PROJECT_TENANT_MISMATCH",
+                "contextMeter.errors.projectTenantMismatch",
+                None,
+                false,
+                request_id.to_string(),
+            ))
+        }
+        Err(err) => return Err(storage_or_busy_response(&err.to_string(), request_id)),
+    };
+    let is_superadmin = is_valid_superadmin_bearer(headers)
+        || caller.is_some_and(|v| matches!(v.kind, LegacyAuthKind::Bearer) && anti_idor_superadmin);
+    if let Some(verified) = caller {
+        if matches!(
+            verified.kind,
+            LegacyAuthKind::HmacV2 | LegacyAuthKind::SessionToken
+        ) && verified.principal.tenant_id.trim() != tenant_id.trim()
+        {
+            return Err(error_response(
+                StatusCode::FORBIDDEN,
+                "PROJECT_TENANT_MISMATCH",
+                "contextMeter.errors.projectTenantMismatch",
+                None,
+                false,
+                request_id.to_string(),
+            ));
+        }
     }
+    Ok((tenant_id, is_superadmin))
 }
 
 fn validate_unique_sources(req: &ContextAssembleHttpRequest) -> Result<(), (String, String)> {
@@ -342,7 +387,7 @@ pub(crate) async fn handle_context_assemble(
         Ok(r) => r,
         Err(resp) => return resp,
     };
-    let (scoped_registry, _, is_superadmin) = match verify_anti_idor_with_caller(
+    let (scoped_registry, _, anti_idor_superadmin) = match verify_anti_idor_with_caller(
         &state.registry,
         req.project_id,
         &headers,
@@ -351,16 +396,23 @@ pub(crate) async fn handle_context_assemble(
         Ok(tuple) => tuple,
         Err(err) => return idor_error_response(err, request_id),
     };
+    let (tenant_id, is_superadmin) = match resolve_authorized_project_tenant(
+        &state,
+        req.project_id,
+        caller.as_deref(),
+        &headers,
+        anti_idor_superadmin,
+        &request_id,
+    ) {
+        Ok(pair) => pair,
+        Err(resp) => return resp,
+    };
     let mut portal_check = Some(req.portal_id);
     if let Err(resp) =
         enforce_portal_role_guard(&headers, &mut portal_check, is_superadmin, &request_id)
     {
         return resp;
     }
-    let tenant_id = match resolve_authorized_project_tenant(&state, req.project_id, &request_id) {
-        Ok(tid) => tid,
-        Err(resp) => return resp,
-    };
     let cmd = build_context_command(req, tenant_id, idem_key);
     let out =
         tokio::task::spawn_blocking(move || assemble_and_record(&scoped_registry, &cmd)).await;
@@ -417,13 +469,18 @@ fn percent_decode(raw: &str) -> Result<String, ()> {
 fn parse_telemetry_query(raw_query: Option<&str>) -> Result<ContextTelemetryQueryDto, String> {
     let mut project_id: Option<Uuid> = None;
     let mut portal_id: Option<PortalId> = None;
+    let mut horizon: Option<Horizon> = None;
     let mut model_profile: Option<ModelProfile> = None;
     let mut cursor: Option<String> = None;
     let mut limit: Option<usize> = None;
+    let mut seen_keys = std::collections::HashSet::new();
     let query_str = raw_query.unwrap_or("");
     for pair in query_str.split('&').filter(|p| !p.is_empty()) {
         let (raw_k, raw_v) = pair.split_once('=').unwrap_or((pair, ""));
         let k = percent_decode(raw_k).map_err(|_| raw_k.to_string())?;
+        if !seen_keys.insert(k.clone()) {
+            return Err(k);
+        }
         let v = percent_decode(raw_v).map_err(|_| k.clone())?;
         match k.as_str() {
             "projectId" => {
@@ -431,14 +488,15 @@ fn parse_telemetry_query(raw_query: Option<&str>) -> Result<ContextTelemetryQuer
             }
             "portalId" => {
                 portal_id = Some(
-                    serde_json::from_str(&format!("\"{v}\""))
-                        .map_err(|_| "portalId".to_string())?,
+                    parse_portal_id_strict(&v).ok_or_else(|| "portalId".to_string())?,
                 );
+            }
+            "horizon" => {
+                horizon = Some(Horizon::parse_strict(&v).ok_or_else(|| "horizon".to_string())?);
             }
             "modelProfile" => {
                 model_profile = Some(
-                    serde_json::from_str(&format!("\"{v}\""))
-                        .map_err(|_| "modelProfile".to_string())?,
+                    parse_model_profile_strict(&v).ok_or_else(|| "modelProfile".to_string())?,
                 );
             }
             "cursor" => cursor = Some(v),
@@ -458,6 +516,7 @@ fn parse_telemetry_query(raw_query: Option<&str>) -> Result<ContextTelemetryQuer
     Ok(ContextTelemetryQueryDto {
         project_id: pid,
         portal_id,
+        horizon,
         model_profile,
         cursor,
         limit,
@@ -484,7 +543,7 @@ pub(crate) async fn handle_get_context_telemetry(
             );
         }
     };
-    let (scoped_registry, _, is_superadmin) = match verify_anti_idor_with_caller(
+    let (scoped_registry, _, anti_idor_superadmin) = match verify_anti_idor_with_caller(
         &state.registry,
         query.project_id,
         &headers,
@@ -493,15 +552,22 @@ pub(crate) async fn handle_get_context_telemetry(
         Ok(tuple) => tuple,
         Err(err) => return idor_error_response(err, request_id),
     };
+    let (tenant_id, is_superadmin) = match resolve_authorized_project_tenant(
+        &state,
+        query.project_id,
+        caller.as_deref(),
+        &headers,
+        anti_idor_superadmin,
+        &request_id,
+    ) {
+        Ok(pair) => pair,
+        Err(resp) => return resp,
+    };
     if let Err(resp) =
         enforce_portal_role_guard(&headers, &mut query.portal_id, is_superadmin, &request_id)
     {
         return resp;
     }
-    let tenant_id = match resolve_authorized_project_tenant(&state, query.project_id, &request_id) {
-        Ok(tid) => tid,
-        Err(resp) => return resp,
-    };
     let out = tokio::task::spawn_blocking(move || {
         list_context_telemetry_scoped(scoped_registry.pool(), &tenant_id, &query, is_superadmin)
     })

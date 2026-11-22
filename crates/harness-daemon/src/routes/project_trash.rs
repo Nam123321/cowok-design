@@ -61,7 +61,8 @@ pub(crate) fn provision_project_workspace_root(
         fs_jail::validate_managed_slug(ms)?;
     }
     if let Some(ws_str) = workspace_root.map(str::trim).filter(|s| !s.is_empty()) {
-        let anchor = fs_jail::inspect_path_jail(Path::new(ws_str))?;
+        let expanded_ws = fs_jail::expand_home_tilde(ws_str)?;
+        let anchor = fs_jail::inspect_path_jail(&expanded_ws)?;
         fs_jail::ensure_writable_target_not_home(&anchor.canonical_path)?;
         if anchor.canonical_path != canon_reg {
             let prov = fs_jail::provision_dir_zero_toctou_checked(

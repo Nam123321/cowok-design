@@ -43,9 +43,9 @@ export type CraftSkillSlug = z.infer<typeof CraftSkillSlugSchema>;
 
 export const SsotComponentsQuerySchema = z
   .object({
-    projectId: z.string().min(1).max(MAX_ID_LEN),
+    projectId: z.string().trim().min(1).max(MAX_ID_LEN),
     portalId: SsotPortalIdSchema,
-    cursor: z.string().max(MAX_CURSOR_LEN).optional(),
+    cursor: z.string().trim().max(MAX_CURSOR_LEN).optional(),
     limit: z.coerce.number().int().min(1).max(MAX_LIMIT).default(DEFAULT_LIMIT),
   })
   .strict();
@@ -54,15 +54,15 @@ export type SsotComponentsQuery = z.infer<typeof SsotComponentsQuerySchema>;
 
 export const AppShellLockRequestSchema = z
   .object({
-    projectId: z.string().min(1).max(MAX_ID_LEN),
+    projectId: z.string().trim().min(1).max(MAX_ID_LEN),
     portalId: SsotPortalIdSchema,
     action: z.enum(["ACQUIRE", "RENEW", "RELEASE", "TRANSFER"]),
-    lockOwnerId: z.string().min(1).max(MAX_ID_LEN).optional(),
+    lockOwnerId: z.string().trim().min(1).max(MAX_ID_LEN).optional(),
     expectedRevision: z.number().int().min(0),
     expectedFencingToken: z.number().int().min(0).nullable().default(null),
-    lockedSlots: z.array(z.string().min(1).max(MAX_SLOT_NAME_LEN)).max(MAX_LOCKED_SLOTS).default([]),
+    lockedSlots: z.array(z.string().trim().min(1).max(MAX_SLOT_NAME_LEN)).max(MAX_LOCKED_SLOTS).default([]),
     ttlMs: z.number().int().min(MIN_LOCK_TTL_MS).max(MAX_LOCK_TTL_MS).default(DEFAULT_LOCK_TTL_MS),
-    forceTransferReason: z.string().min(1).max(MAX_TRANSFER_REASON_LEN).optional(),
+    forceTransferReason: z.string().trim().min(1).max(MAX_TRANSFER_REASON_LEN).optional(),
   })
   .strict();
 
@@ -70,7 +70,7 @@ export type AppShellLockRequest = z.infer<typeof AppShellLockRequestSchema>;
 
 export const SsotExportRequestSchema = z
   .object({
-    projectId: z.string().min(1).max(MAX_ID_LEN),
+    projectId: z.string().trim().min(1).max(MAX_ID_LEN),
     portalId: SsotPortalIdSchema,
     formats: z
       .array(z.enum(["markdown", "json"]))
@@ -85,8 +85,8 @@ export type SsotExportRequest = z.infer<typeof SsotExportRequestSchema>;
 
 export const SkillRouteRequestSchema = z
   .object({
-    projectId: z.string().min(1).max(MAX_ID_LEN),
-    intentSummary: z.string().min(1).max(MAX_INTENT_LEN),
+    projectId: z.string().trim().min(1).max(MAX_ID_LEN),
+    intentSummary: z.string().trim().min(1).max(MAX_INTENT_LEN),
     portalId: SsotPortalIdSchema,
     requestedSlugs: z.array(CraftSkillSlugSchema).max(MAX_CRAFT_SKILLS).optional(),
     maxSpineTokens: z.number().int().min(1).max(MAX_SPINE_TOKENS).default(MAX_SPINE_TOKENS),
@@ -103,7 +103,11 @@ export const ComponentPatternDtoSchema = z
     patternSlug: z.string().min(1),
     componentName: z.string().min(1),
     sourcePath: z.string().nullable(),
-    astSignatureSha256: z.string().length(SHA256_HEX_LEN),
+    astSignatureSha256: z
+      .string()
+      .refine((v) => v.length === 0 || v.length === SHA256_HEX_LEN, {
+        message: "astSignatureSha256 must be 64 hex chars or empty when quarantined before first sync",
+      }),
     dedupMarkerSha256: z.string(),
     sourceRevision: z.number().int().min(0),
     lastSyncSource: z.enum(["oxc_reverse_sync", "manual", "export_sync"]),
@@ -115,7 +119,11 @@ export const ComponentPatternDtoSchema = z
     createdAt: z.number().int().min(0),
     updatedAt: z.number().int().min(0),
   })
-  .strict();
+  .strict()
+  .refine(
+    (d) => d.astSignatureSha256.length === SHA256_HEX_LEN || d.driftStatus === "quarantined_drift",
+    { message: "Synced component patterns must include a 64-char astSignatureSha256" }
+  );
 
 export type ComponentPatternDto = z.infer<typeof ComponentPatternDtoSchema>;
 
@@ -139,8 +147,8 @@ export type AppShellLockDto = z.infer<typeof AppShellLockDtoSchema>;
 
 export const AppShellLockConflictDetailsSchema = z
   .object({
-    currentRevision: z.number().int().min(1),
-    currentFencingToken: z.number().int().min(1),
+    currentRevision: z.number().int().min(0),
+    currentFencingToken: z.number().int().min(0),
     expiresAt: z.number().int().min(0),
     isExpired: z.boolean(),
   })
@@ -188,12 +196,23 @@ export const SsotExportResponseSchema = z
         revision: z.number().int().min(1),
         portalId: SsotPortalIdSchema,
         generatedAt: z.number().int().min(0),
-        markdownPath: z.string().min(1),
-        markdownSha256: z.string().length(SHA256_HEX_LEN),
-        jsonPath: z.string().min(1),
-        jsonSha256: z.string().length(SHA256_HEX_LEN),
+        markdownPath: z.string(),
+        markdownSha256: z
+          .string()
+          .refine((v) => v.length === 0 || v.length === SHA256_HEX_LEN, {
+            message: "markdownSha256 must be empty or 64 hex chars",
+          }),
+        jsonPath: z.string(),
+        jsonSha256: z
+          .string()
+          .refine((v) => v.length === 0 || v.length === SHA256_HEX_LEN, {
+            message: "jsonSha256 must be empty or 64 hex chars",
+          }),
       })
-      .strict(),
+      .strict()
+      .refine((d) => d.markdownPath.length > 0 || d.jsonPath.length > 0, {
+        message: "At least one export format artifact must be generated",
+      }),
     requestId: z.string().min(1),
   })
   .strict();

@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "Conversa",
     "githubUrlPlaceholder": "Informe a URL do repositório (https://github.com/...)",
     "standaloneChatAck": "Prompt registrado na conversa independente",
-    "oauthCliFallback": "Acesso OAuth/CLI"
+    "oauthCliFallback": "Acesso OAuth/CLI",
+    "pickerPathPlaceholder": "~/Desktop/meu-projeto ou /Users/...",
+    "pickerGoBtn": "Ir",
+    "pickerOpenDirBtn": "Abrir",
+    "pickerNewSubfolderLabel": "Nova subpasta (opcional):",
+    "pickerNewSubfolderPlaceholder": "Ex.: meu-novo-app (deixe vazio para usar a pasta selecionada)",
+    "pickerInvalidSubfolderError": "Nome de subpasta inválido (não pode conter '/', '\\\\' nem começar com '.')",
+    "pickerHomeRootBlockedHint": "Não é possível vincular um projeto diretamente à pasta raiz Home (~). Selecione uma subpasta ou informe um novo nome.",
+    "pickerSelectedTargetPrefix": "Pasta de destino:",
+    "pickerNativeFinderBtn": "Abrir Finder...",
+    "pickerNativeFinderOpening": "Abrindo Finder...",
+    "pickerNativeFinderPrompt": "Selecione uma pasta local do projeto"
   },
   "chat": {
     "agentTitle": "Agente Cowok",
@@ -1196,7 +1207,10 @@
       "daemonContractViolation": "O daemon retornou um contrato de contexto inválido.",
       "invalidSources": "A lista sourceIds deve conter entre 1 e 100 itens.",
       "duplicateSourceId": "A lista sourceIds não pode conter entradas duplicadas.",
-      "storage": "Erro de armazenamento de contexto."
+      "storage": "Erro de armazenamento de contexto.",
+      "unauthorized": "Autenticação obrigatória.",
+      "forbidden": "Permissão negada.",
+      "requestRejected": "Solicitação rejeitada."
     }
   },
   "ssot": {
@@ -1210,7 +1224,7 @@
     },
     "export": {
       "busy": "Exportando...",
-      "cta": "Exportar SSOT"
+      "cta": "Exportar kit de design"
     },
     "patterns": {
       "title": "Padrões de design",
@@ -1222,6 +1236,15 @@
       "synced": "Sincronizado",
       "empty": "Nenhum componente salvo neste portal.",
       "button": "Padrões"
+    },
+    "toast": {
+      "loadFailed": "Não foi possível carregar os padrões do espaço.",
+      "lockAcquired": "Estrutura bloqueada para este espaço.",
+      "lockReleased": "Estrutura desbloqueada.",
+      "lockConflict": "Bloqueado por outra sessão. Atualize para sincronizar.",
+      "lockFailed": "Não foi possível atualizar o bloqueio.",
+      "exportSuccess": "Kit de design exportado (#{rev}).",
+      "exportFailed": "Não foi possível exportar o kit de design agora."
     }
   }
 }

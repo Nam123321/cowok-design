@@ -44,7 +44,7 @@ export const SsotExportButton: React.FC<SsotExportButtonProps> = ({
       }}
     >
       <BrandIcon name="deploy" size={EXPORT_ICON_SIZE} strokeWidth={EXPORT_ICON_STROKE} color="currentColor" />
-      <span>{isExporting ? t("ssot.export.busy", "Exporting...") : t("ssot.export.cta", "Export SSOT")}</span>
+      <span>{isExporting ? t("ssot.export.busy", "Exporting...") : t("ssot.export.cta", "Export Design Kit")}</span>
     </button>
   );
 };

@@ -16,6 +16,10 @@ import {
   DeleteSpecResponseSchema,
   FsBrowseResponse,
   FsBrowseResponseSchema,
+  FsNativePickInput,
+  FsNativePickInputSchema,
+  FsNativePickResponse,
+  FsNativePickResponseSchema,
   IssuePathTokenInput,
   IssuePathTokenInputSchema,
   PathTokenResponse,
@@ -215,6 +219,14 @@ export class HarnessDaemonClient extends HarnessDaemonTransport {
     const trimmed = targetPath?.trim();
     const query = trimmed ? `?path=${encodeURIComponent(trimmed)}` : "";
     return this.request(`/api/fs/browse${query}`, FsBrowseResponseSchema, { method: "GET" });
+  }
+
+  pickNativeFolder(input: FsNativePickInput = {}): Promise<FsNativePickResponse> {
+    const validated = FsNativePickInputSchema.parse(input);
+    return this.request("/api/fs/pick-native", FsNativePickResponseSchema, {
+      method: "POST",
+      body: JSON.stringify(validated),
+    });
   }
 
   verifyPathToken(projectId: string, input: VerifyPathTokenInput): Promise<VerifyPathTokenResponse> {

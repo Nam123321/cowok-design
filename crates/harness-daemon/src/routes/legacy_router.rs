@@ -227,6 +227,7 @@ fn legacy_snapshot_session_routes() -> Router<DaemonAppState> {
                 .delete(handle_delete_chat_session),
         )
         .route("/api/v1/fs/browse", get(fs_jail::handle_fs_browse))
+        .route("/api/v1/fs/pick-native", post(fs_jail::handle_fs_pick_native))
         .route(
             "/api/v1/projects/:id/path-token",
             post(handle_issue_path_token),

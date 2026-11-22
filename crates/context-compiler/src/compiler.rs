@@ -6,7 +6,9 @@ use crate::portal_guard::{
     validate_portal_isolation,
 };
 use crate::profile_adapter::{adapt_for_profile, AdaptedProfileResult};
-use crate::telemetry::{record_idempotent_or_replay, verify_project_tenant_for_pool};
+use crate::telemetry::{
+    lookup_idempotent_replay, record_idempotent_or_replay, verify_project_tenant_for_pool,
+};
 use crate::types::{
     BlockFormat, CompiledContextBundle, ContextAssembleDataDto, ContextAssemblyCommand,
     ContextCompilerError, ContextReasonCode, Horizon, InspectPromptPayload, ModelProfile,
@@ -15,7 +17,7 @@ use crate::types::{
 use chrono::Utc;
 use domain::{
     estimate_tokens, truncate_utf8_to_tokens, CanonicalSpecKey, CompilationInput,
-    DeterministicPromptCompiler, Portal, TaskHorizonRouter, VisibilityPolicy, TOKEN_BUDGET_CEILING,
+    DeterministicPromptCompiler, Portal, VisibilityPolicy, TOKEN_BUDGET_CEILING,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -82,13 +84,36 @@ fn is_html_tag_open_at(s: &str) -> bool {
     true
 }
 
+fn find_html_tag_close(slice: &str) -> Option<usize> {
+    let bytes = slice.as_bytes();
+    let mut i = 1usize;
+    let mut quote: Option<u8> = None;
+    while i < bytes.len() {
+        let b = bytes[i];
+        match quote {
+            Some(q) if b == q => quote = None,
+            Some(_) => {}
+            None if b == b'"' || b == b'\'' => quote = Some(b),
+            None if b == b'>' => return Some(i),
+            None => {}
+        }
+        i += 1;
+    }
+    None
+}
+
 fn has_balanced_html_tags(raw: &str) -> bool {
     let mut stack: Vec<String> = Vec::new();
     let mut idx = 0usize;
     let bytes = raw.as_bytes();
     while idx < bytes.len() {
-        if bytes[idx] == b'<' && is_html_tag_open_at(&raw[idx..]) {
-            let Some(end_rel) = raw[idx..].find('>') else {
+        if raw[idx..].starts_with("<!--") {
+            let Some(comment_end) = raw[idx + 4..].find("-->") else {
+                return false;
+            };
+            idx += 4 + comment_end + 3;
+        } else if bytes[idx] == b'<' && is_html_tag_open_at(&raw[idx..]) {
+            let Some(end_rel) = find_html_tag_close(&raw[idx..]) else {
                 return false;
             };
             let tag_inner = raw[idx + 1..idx + end_rel].trim();
@@ -200,19 +225,32 @@ fn validate_and_fit_atomic_spec(
     None
 }
 
+fn fence_marker(trimmed: &str) -> Option<(char, usize)> {
+    let first = trimmed.chars().next()?;
+    if first != '`' && first != '~' {
+        return None;
+    }
+    let count = trimmed.chars().take_while(|&c| c == first).count();
+    if count >= 3 {
+        Some((first, count))
+    } else {
+        None
+    }
+}
+
 fn collect_fenced_unit(
     lines: &[&str],
     start: usize,
     field: Option<&str>,
 ) -> Result<(String, usize), ContextCompilerError> {
-    let lang = lines[start]
-        .trim()
-        .trim_start_matches('`')
-        .trim()
-        .to_ascii_lowercase();
+    let opener = lines[start].trim();
+    let (fence_ch, open_len) = fence_marker(opener).unwrap_or(('`', 3));
+    let lang = opener[open_len..].trim().to_ascii_lowercase();
     let Some(end) = ((start + 1)..lines.len()).find(|&idx| {
         let t = lines[idx].trim();
-        t.starts_with("```") && t.trim_start_matches('`').trim().is_empty()
+        fence_marker(t).is_some_and(|(ch, len)| {
+            ch == fence_ch && len >= open_len && t[len..].trim().is_empty()
+        })
     }) else {
         return Err(invalid_spec_structure_err(
             "spec contains unclosed fenced code block",
@@ -280,7 +318,7 @@ fn parse_markdown_units(
         let trimmed = lines[idx].trim();
         if trimmed.is_empty() {
             idx += 1;
-        } else if trimmed.starts_with("```") {
+        } else if fence_marker(trimmed).is_some() {
             let (block, next) = collect_fenced_unit(&lines, idx, field)?;
             units.push((block, true));
             idx = next;
@@ -603,6 +641,8 @@ fn map_harness_error(err: domain::HarnessError) -> ContextCompilerError {
 }
 
 fn resolve_untruncated_slice_content(
+    reg: &SpecRegistry,
+    project_id: Uuid,
     workspace_root: &Path,
     portal: Portal,
     sl: &domain::SpecSlice,
@@ -615,6 +655,21 @@ fn resolve_untruncated_slice_content(
         .ok_or_else(|| ContextCompilerError::TelemetryStorageUnavailable {
             reason: format!("spec file missing on disk ({})", sl.spec_key.as_str()),
         })?;
+    let conn = reg.pool().connection().map_err(map_harness_error)?;
+    let expected_sha: Option<String> = conn
+        .query_row(
+            "SELECT content_sha256 FROM project_specs WHERE project_id = ?1 AND spec_key = ?2 AND status != 'FILE_DELETED'",
+            rusqlite::params![project_id.to_string(), sl.spec_key.as_str()],
+            |r| r.get(0),
+        )
+        .map_err(map_sqlite_error)?;
+    if let Some(sha) = expected_sha.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        if compute_sha256_hex(&bytes) != sha {
+            return Err(ContextCompilerError::TelemetryStorageUnavailable {
+                reason: format!("spec digest mismatch on disk ({})", sl.spec_key.as_str()),
+            });
+        }
+    }
     let raw = String::from_utf8_lossy(&bytes);
     VisibilityPolicy::apply_terminal_redaction(&raw, portal).map_err(map_harness_error)
 }
@@ -628,27 +683,26 @@ fn collect_spec_lines(
     let horizon = map_horizon(cmd.horizon);
     let (allowed, denied_pairs) = VisibilityPolicy::evaluate(dept, portal);
     let denied: Vec<CanonicalSpecKey> = denied_pairs.into_iter().map(|(k, _)| k).collect();
-    let _classified =
-        TaskHorizonRouter::classify(intent, Some(horizon), cmd.dom_outline_nodes.len());
     let (mut lines, explicit_count) =
         validate_requested_sources_policy(registry, cmd, portal, &allowed, &denied)?;
-    if let Some(reg) = registry {
-        let req = domain::ContextSliceRequest {
-            task_input: intent.to_string(),
-            override_horizon: Some(horizon),
-            department: dept,
-            portal,
-            affected_artifacts: Vec::new(),
-        };
-        let sliced = ContextSlicer::new(reg)
-            .slice_context(cmd.project_id, &req)
-            .map_err(map_harness_error)?;
-        if cmd.source_ids.is_none() {
+    if cmd.source_ids.is_none() {
+        if let Some(reg) = registry {
+            let req = domain::ContextSliceRequest {
+                task_input: intent.to_string(),
+                override_horizon: Some(horizon),
+                department: dept,
+                portal,
+                affected_artifacts: Vec::new(),
+            };
+            let sliced = ContextSlicer::new(reg)
+                .slice_context(cmd.project_id, &req)
+                .map_err(map_harness_error)?;
             let workspace_root = reg
                 .verify_project_scope(cmd.project_id)
                 .map_err(map_harness_error)?;
             for sl in sliced.slices {
-                let full_content = resolve_untruncated_slice_content(&workspace_root, portal, &sl)?;
+                let full_content =
+                    resolve_untruncated_slice_content(reg, cmd.project_id, &workspace_root, portal, &sl)?;
                 scan_text_for_portal(cmd.portal_id, "spec_slice", &full_content)?;
                 let excerpt =
                     format_structured_spec_excerpt(&full_content, SPEC_SNIPPET_MAX_TOKENS, None)?;
@@ -708,12 +762,11 @@ fn build_tail_string(
 fn validate_command_preconditions(
     cmd: &ContextAssemblyCommand,
 ) -> Result<String, ContextCompilerError> {
-    if cmd.requested_image_tokens > cmd.max_image_tokens_per_turn
-        || cmd.requested_image_tokens > MAX_IMAGE_TOKENS_CEILING
-    {
+    let effective_cap = cmd.max_image_tokens_per_turn.min(MAX_IMAGE_TOKENS_CEILING);
+    if cmd.requested_image_tokens > effective_cap {
         return Err(ContextCompilerError::ImageTokenBudgetExceeded {
             requested: cmd.requested_image_tokens,
-            cap: cmd.max_image_tokens_per_turn,
+            cap: effective_cap,
         });
     }
     validate_all_portal_inputs(cmd)?;
@@ -996,6 +1049,20 @@ pub fn assemble_and_record(
     registry: &SpecRegistry,
     cmd: &ContextAssemblyCommand,
 ) -> Result<CompiledContextBundle, ContextCompilerError> {
+    validate_command_preconditions(cmd)?;
+    if let Some(replayed) = lookup_idempotent_replay(registry.pool(), cmd)? {
+        let (static_prefix, _) = build_static_prefix(cmd, &cmd.extra_constraints);
+        return Ok(CompiledContextBundle {
+            downgraded_to_micro_tools: matches!(replayed.model_profile, ModelProfile::B),
+            adapted_tool_count: 0,
+            offline_fallback_active: matches!(replayed.model_profile, ModelProfile::C),
+            adapted_tools: Vec::new(),
+            static_prefix,
+            dynamic_tail: String::new(),
+            outline: String::new(),
+            data: replayed,
+        });
+    }
     let compiled = compile_context_only(Some(registry), cmd)?;
     let data = record_idempotent_or_replay(registry.pool(), cmd, &compiled.data)?;
     Ok(CompiledContextBundle { data, ..compiled })
@@ -1096,15 +1163,18 @@ pub fn inspect_prompt_from_args(args: &[String], default_root: &Path) -> Result<
         let next = args.get(idx + 1).map(|s| s.as_str());
         match (key, next) {
             ("--portal", Some(val)) => {
-                portal = serde_json::from_str(&format!("\"{val}\"")).map_err(|e| e.to_string())?;
+                portal = PortalId::parse_strict(val)
+                    .ok_or_else(|| format!("unsupported --portal value: {val}"))?;
                 idx += 2;
             }
             ("--horizon", Some(val)) => {
-                horizon = serde_json::from_str(&format!("\"{val}\"")).map_err(|e| e.to_string())?;
+                horizon = Horizon::parse_strict(val)
+                    .ok_or_else(|| format!("unsupported --horizon value: {val}"))?;
                 idx += 2;
             }
             ("--profile", Some(val)) => {
-                profile = serde_json::from_str(&format!("\"{val}\"")).map_err(|e| e.to_string())?;
+                profile = ModelProfile::parse_strict(val)
+                    .ok_or_else(|| format!("unsupported --profile value: {val}"))?;
                 idx += 2;
             }
             ("--intent", Some(val)) => {

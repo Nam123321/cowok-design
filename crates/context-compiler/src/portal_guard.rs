@@ -20,6 +20,8 @@ const PRIVILEGED_MARKERS: &[&str] = &[
     "p6_security_internal",
     "06_security_spec",
     "08_deployment_spec",
+    "08-security-tenancy",
+    "09-deployment-ops",
     "cross_tenant_admin",
     "root_vault_keys",
 ];
@@ -36,6 +38,8 @@ const COLLAPSED_MARKERS: &[&str] = &[
     "p6securityinternal",
     "06securityspec",
     "08deploymentspec",
+    "08securitytenancy",
+    "09deploymentops",
     "crosstenantadmin",
     "rootvaultkeys",
 ];
@@ -159,10 +163,15 @@ fn is_ignored_security_char(c: char) -> bool {
         c,
         '\u{200B}'..='\u{200F}'
             | '\u{2060}'..='\u{206F}'
+            | '\u{FE00}'..='\u{FE0F}'
             | '\u{FEFF}'
             | '\u{00AD}'
             | '\u{034F}'
+            | '\u{115F}'
+            | '\u{1160}'
             | '\u{180E}'
+            | '\u{3164}'
+            | '\u{FFA0}'
             | '\u{0300}'..='\u{036F}'
     ) || (c.is_control() && c != '\n' && c != '\r' && c != '\t')
 }
@@ -201,7 +210,51 @@ fn fold_fullwidth_and_accented(c: char) -> char {
     }
 }
 
+fn fold_math_alphanumeric(c: char) -> Option<char> {
+    let cp = c as u32;
+    const MATH_UPPER_BASES: [u32; 13] = [
+        0x1D400, 0x1D434, 0x1D468, 0x1D49C, 0x1D4D0, 0x1D504, 0x1D538, 0x1D56C, 0x1D5A0, 0x1D5D4,
+        0x1D608, 0x1D63C, 0x1D670,
+    ];
+    for base in MATH_UPPER_BASES {
+        if (base..base + 26).contains(&cp) {
+            return char::from_u32(('a' as u32) + (cp - base));
+        }
+        let lower_base = base + 26;
+        if (lower_base..lower_base + 26).contains(&cp) {
+            return char::from_u32(('a' as u32) + (cp - lower_base));
+        }
+    }
+    const MATH_DIGIT_BASES: [u32; 5] = [0x1D7CE, 0x1D7D8, 0x1D7E2, 0x1D7EC, 0x1D7F6];
+    for base in MATH_DIGIT_BASES {
+        if (base..base + 10).contains(&cp) {
+            return char::from_u32(('0' as u32) + (cp - base));
+        }
+    }
+    match cp {
+        0x210E => Some('h'),
+        0x2102 | 0x212D => Some('c'),
+        0x210B | 0x210C | 0x210D => Some('h'),
+        0x2110 | 0x2111 => Some('i'),
+        0x2112 => Some('l'),
+        0x2115 => Some('n'),
+        0x2119 => Some('p'),
+        0x211A => Some('q'),
+        0x211B | 0x211C | 0x211D => Some('r'),
+        0x2124 | 0x2128 => Some('z'),
+        0x212C => Some('b'),
+        0x2130 => Some('e'),
+        0x2131 => Some('f'),
+        0x2133 => Some('m'),
+        0x2134 => Some('o'),
+        _ => None,
+    }
+}
+
 fn map_confusable_ascii(c: char) -> char {
+    if let Some(math_ascii) = fold_math_alphanumeric(c) {
+        return math_ascii;
+    }
     let folded = fold_fullwidth_and_accented(c);
     match folded {
         '\u{0430}' | '\u{03B1}' => 'a',
@@ -307,7 +360,8 @@ pub fn scan_text_for_portal(
             ),
         });
     }
-    VisibilityPolicy::apply_terminal_redaction(text, Portal::MarketingWeb).map_err(|err| {
+    let (domain_portal, _) = map_portal_and_department(portal_id);
+    VisibilityPolicy::apply_terminal_redaction(text, domain_portal).map_err(|err| {
         ContextCompilerError::CrossPortalLeakBlocked {
             reason: format!("{label}: {err}"),
         }

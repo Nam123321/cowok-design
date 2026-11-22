@@ -52,7 +52,32 @@ function nextUuidV4(): string {
   throw new Error("CSPRNG crypto.randomUUID/getRandomValues unavailable");
 }
 
+const HTTP_UNAUTHORIZED = 401;
+const HTTP_FORBIDDEN = 403;
+
 function makeContractError(status: number, fallbackMsg?: string): ContextApiError {
+  if (status === HTTP_UNAUTHORIZED) {
+    return {
+      ok: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: fallbackMsg || "contextMeter.errors.unauthorized",
+        retryable: false,
+      },
+      requestId: nextUuidV4(),
+    };
+  }
+  if (status === HTTP_FORBIDDEN) {
+    return {
+      ok: false,
+      error: {
+        code: "FORBIDDEN",
+        message: fallbackMsg || "contextMeter.errors.forbidden",
+        retryable: false,
+      },
+      requestId: nextUuidV4(),
+    };
+  }
   return {
     ok: false,
     error: {
@@ -128,6 +153,7 @@ export class ContextClient extends HarnessDaemonTransport {
     const validated = parsedQuery.data;
     const qs = new URLSearchParams({ projectId: validated.projectId });
     if (validated.portalId) qs.set("portalId", validated.portalId);
+    if (validated.horizon) qs.set("horizon", validated.horizon);
     if (validated.modelProfile) qs.set("modelProfile", validated.modelProfile);
     if (validated.cursor) qs.set("cursor", validated.cursor);
     qs.set("limit", String(validated.limit));

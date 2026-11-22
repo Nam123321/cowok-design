@@ -261,6 +261,7 @@ fn ac04_persists_telemetry_idempotency_replay_cursor_pagination_and_cli_inspect(
         &ContextTelemetryQueryDto {
             project_id: proj_id,
             portal_id: Some(PortalId::DeveloperPortal),
+            horizon: None,
             model_profile: Some(ModelProfile::C),
             cursor: None,
             limit: Some(1),
@@ -278,6 +279,7 @@ fn ac04_persists_telemetry_idempotency_replay_cursor_pagination_and_cli_inspect(
             &ContextTelemetryQueryDto {
                 project_id: proj_id,
                 portal_id: Some(PortalId::MarketingWeb),
+                horizon: None,
                 model_profile: Some(ModelProfile::C),
                 cursor: Some(next.clone()),
                 limit: Some(1),
@@ -293,6 +295,7 @@ fn ac04_persists_telemetry_idempotency_replay_cursor_pagination_and_cli_inspect(
         &ContextTelemetryQueryDto {
             project_id: proj_id,
             portal_id: Some(PortalId::DeveloperPortal),
+            horizon: None,
             model_profile: Some(ModelProfile::C),
             cursor: Some(next),
             limit: Some(1),
@@ -493,6 +496,7 @@ fn remediation_r1_fts5_nfc_homoglyph_void_html_inspect_only_and_priority_zero() 
     let sa_query = ContextTelemetryQueryDto {
         project_id: proj_id,
         portal_id: Some(PortalId::SuperAdmin),
+        horizon: None,
         model_profile: None,
         cursor: None,
         limit: Some(5),

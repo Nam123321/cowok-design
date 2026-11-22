@@ -131,7 +131,7 @@ describe("Story 02.4 UI: AppShellLockPanel, SsotExportButton & PatternRegistryDr
 
     fireEvent.click(screen.getByTestId("ssot-export-trigger"));
     await waitFor(() => {
-      expect(screen.getByTestId("ssot-export-toast").textContent).toContain("SSOT exported cleanly");
+      expect(screen.getByTestId("ssot-export-toast").textContent).toMatch(/Design kit exported|Đã xuất bộ thiết kế/);
     });
 
     fireEvent.click(screen.getByTestId("ssot-patterns-trigger"));

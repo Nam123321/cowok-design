@@ -289,4 +289,70 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
       })
     );
   });
+
+  it("SEC-IDOR-03 & HIGH-01: rejects duplicate query params (422), whitespace X-Cowok-Portal (403), and cross-tenant mismatch (403)", async () => {
+    const editor = makeSession("editor", "tenant-alpha");
+    const dupResp = await componentsRoute.GET(
+      makeReq(
+        "/api/v1/ssot/components?projectId=proj-1&portalId=DeveloperPortal&portalId=SalesApp",
+        "GET",
+        editor.sessionToken
+      ),
+      { params: Promise.resolve({}) }
+    );
+    expect(dupResp.status).toBe(422);
+
+    const blankPortalReq = new Request(
+      "http://127.0.0.1:3000/api/v1/ssot/components?projectId=proj-1&portalId=DeveloperPortal",
+      {
+        method: "GET",
+        headers: {
+          host: "127.0.0.1:3000",
+          "x-cowok-session-token": editor.sessionToken,
+          "x-cowok-portal": "   ",
+        },
+      }
+    );
+    const blankPortalResp = await componentsRoute.GET(blankPortalReq, { params: Promise.resolve({}) });
+    expect(blankPortalResp.status).toBe(403);
+
+    vi.spyOn(daemonClient, "forwardToDaemonFlow").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: "PROJECT_TENANT_MISMATCH",
+            message: "Cross-tenant project access forbidden",
+            field: "projectId",
+            requestId: "req-idor-1",
+          },
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    const crossTenant = await componentsRoute.GET(
+      makeReq(
+        "/api/v1/ssot/components?projectId=proj-tenant-beta&portalId=DeveloperPortal",
+        "GET",
+        editor.sessionToken
+      ),
+      { params: Promise.resolve({}) }
+    );
+    expect(crossTenant.status).toBe(403);
+    const errBody = (await crossTenant.json()) as { error: { code: string } };
+    expect(errBody.error.code).toBe("PROJECT_TENANT_MISMATCH");
+
+    const admin = makeSession("admin");
+    const adminEmptyReason = await lockRoute.POST(
+      makeReq("/api/v1/ssot/appshell/lock", "POST", admin.sessionToken, {
+        projectId: "proj-1",
+        portalId: "DeveloperPortal",
+        action: "TRANSFER",
+        expectedRevision: 1,
+        expectedFencingToken: 1,
+        forceTransferReason: "   ",
+      }),
+      { params: Promise.resolve({}) }
+    );
+    expect(adminEmptyReason.status).toBe(422);
+  });
 });

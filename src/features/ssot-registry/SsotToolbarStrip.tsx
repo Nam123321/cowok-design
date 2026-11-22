@@ -40,7 +40,7 @@ const PatternsTriggerButton: React.FC<{
       <BrandIcon name="layers" size={TRIGGER_ICON_SIZE} strokeWidth={TRIGGER_ICON_STROKE} color="currentColor" />
       <span>{t("ssot.patterns.button", "Patterns")}</span>
       {quarantinedCount > 0 && (
-        <span style={{ fontSize: "10px", fontWeight: SEMIBOLD_WEIGHT, padding: "0 4px", borderRadius: "999px", backgroundColor: "var(--state-warning-soft)", color: "var(--state-warning)" }}>
+        <span style={{ fontSize: "10px", fontWeight: SEMIBOLD_WEIGHT, padding: "0 4px", borderRadius: "var(--radius-pill)", backgroundColor: "var(--state-warning-soft)", color: "var(--state-warning)" }}>
           {quarantinedCount}
         </span>
       )}
@@ -63,12 +63,12 @@ export const SsotToolbarStrip: React.FC<SsotToolbarStripProps> = ({
   return (
     <>
       <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-        <AppShellLockPanel isLocked={ssot.isLocked} isBusy={ssot.isMutatingLock || ssot.isLoading} hasConflict={ssot.hasConflict} onToggleLock={() => void ssot.toggleLock()} onRefresh={() => void ssot.refresh()} />
+        <AppShellLockPanel isLocked={ssot.isLocked} isBusy={!projectId || ssot.isMutatingLock || ssot.isLoading} hasConflict={ssot.hasConflict} onToggleLock={() => void ssot.toggleLock()} onRefresh={() => void ssot.refresh()} />
         <SsotExportButton isExporting={ssot.isExporting} disabled={!projectId} onExport={() => void ssot.triggerExport()} />
         <PatternsTriggerButton drawerOpen={drawerOpen} quarantinedCount={ssot.quarantinedCount} onToggle={() => setDrawerOpen((prev) => !prev)} />
       </div>
 
-      <PatternRegistryDrawer isOpen={drawerOpen} portalId={ssot.portalId} patterns={ssot.patterns} quarantinedCount={ssot.quarantinedCount} isLoading={ssot.isLoading} onPortalChange={ssot.setPortalId} onRefresh={() => void ssot.refresh()} onClose={() => setDrawerOpen(false)} />
+      <PatternRegistryDrawer isOpen={drawerOpen} portalId={ssot.portalId} patterns={ssot.patterns} quarantinedCount={ssot.quarantinedCount} isLoading={ssot.isLoading} hasProject={Boolean(projectId)} onPortalChange={ssot.setPortalId} onRefresh={() => void ssot.refresh()} onClose={() => setDrawerOpen(false)} />
 
       {ssot.toast && <CowokToast tone={ssot.toast.tone} message={ssot.toast.message} testId="ssot-export-toast" onDismiss={ssot.dismissToast} />}
     </>

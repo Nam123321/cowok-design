@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "チャット",
     "githubUrlPlaceholder": "リポジトリURLを入力 (https://github.com/...)",
     "standaloneChatAck": "スタンドアロン会話として記録しました",
-    "oauthCliFallback": "OAuth/CLI 認証"
+    "oauthCliFallback": "OAuth/CLI 認証",
+    "pickerPathPlaceholder": "~/Desktop/my-project または /Users/...",
+    "pickerGoBtn": "移動",
+    "pickerOpenDirBtn": "開く",
+    "pickerNewSubfolderLabel": "新規サブフォルダ（任意）:",
+    "pickerNewSubfolderPlaceholder": "例: my-new-app（空欄の場合は選択中フォルダを使用）",
+    "pickerInvalidSubfolderError": "サブフォルダ名が無効です（'/' や '\\\\' を含める、または '.' で始めることはできません）",
+    "pickerHomeRootBlockedHint": "ホームルート（~）直下にはプロジェクトを作成できません。サブフォルダを選択するか新規名を入力してください。",
+    "pickerSelectedTargetPrefix": "対象フォルダ:",
+    "pickerNativeFinderBtn": "Finder を開く...",
+    "pickerNativeFinderOpening": "Finder を起動中...",
+    "pickerNativeFinderPrompt": "ローカルのプロジェクトフォルダを選択"
   },
   "chat": {
     "agentTitle": "Cowok エージェント",
@@ -1196,7 +1207,10 @@
       "daemonContractViolation": "デーモンが不正な契約ペイロードを返しました。",
       "invalidSources": "指定する sourceIds は 1〜100 件である必要があります。",
       "duplicateSourceId": "指定する sourceIds に重複を含めることはできません。",
-      "storage": "コンテキスト保存エラーが発生しました。"
+      "storage": "コンテキスト保存エラーが発生しました。",
+      "unauthorized": "認証が必要です。",
+      "forbidden": "権限がありません。",
+      "requestRejected": "リクエストが拒否されました。"
     }
   },
   "ssot": {
@@ -1210,7 +1224,7 @@
     },
     "export": {
       "busy": "書き出し中...",
-      "cta": "SSOT書き出し"
+      "cta": "デザインキットを出力"
     },
     "patterns": {
       "title": "デザインパターン",
@@ -1222,6 +1236,15 @@
       "synced": "同期済み",
       "empty": "このポータルにはまだ保存されたコンポーネントがありません。",
       "button": "パターン"
+    },
+    "toast": {
+      "loadFailed": "ワークスペースのパターンを読み込めませんでした。",
+      "lockAcquired": "このワークスペースのシェルをロックしました。",
+      "lockReleased": "シェルのロックを解除しました。",
+      "lockConflict": "別セッションによりロック中です。更新して同期してください。",
+      "lockFailed": "シェルロックを更新できませんでした。",
+      "exportSuccess": "デザインキットを出力しました (#{rev})。",
+      "exportFailed": "現在デザインキットを出力できません。"
     }
   }
 }

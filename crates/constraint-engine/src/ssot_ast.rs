@@ -38,64 +38,121 @@ struct ComponentCollector {
 }
 
 fn collect_css_vars_from_str(text: &str, out: &mut BTreeSet<String>) {
-    let mut rest = text;
-    while let Some(idx) = rest.find("--") {
-        let after = &rest[idx..];
-        let token: String = after
-            .chars()
-            .take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
-            .collect();
-        if token.len() > 2 {
-            out.insert(token);
+    let bytes = text.as_bytes();
+    let mut pos = 0;
+    while pos + 2 < bytes.len() {
+        let Some(rel) = text[pos..].find("--") else {
+            break;
+        };
+        let idx = pos + rel;
+        let preceded_by_ident = idx > 0
+            && text[..idx]
+                .chars()
+                .next_back()
+                .is_some_and(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        if !preceded_by_ident {
+            let after = &text[idx..];
+            let token: String = after
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+                .collect();
+            if token.len() > 2
+                && token[2..]
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_alphabetic())
+            {
+                out.insert(token);
+            }
         }
-        rest = &after[2..];
+        pos = idx + 2;
+    }
+}
+
+fn jsx_member_expr_to_string(member: &oxc_ast::ast::JSXMemberExpression<'_>) -> String {
+    let obj = match &member.object {
+        oxc_ast::ast::JSXMemberExpressionObject::IdentifierReference(id) => {
+            id.name.as_str().to_string()
+        }
+        oxc_ast::ast::JSXMemberExpressionObject::MemberExpression(nested) => {
+            jsx_member_expr_to_string(nested)
+        }
+        oxc_ast::ast::JSXMemberExpressionObject::ThisExpression(_) => "this".to_string(),
+    };
+    format!("{obj}.{}", member.property.name.as_str())
+}
+
+fn collect_jsx_children(children: &[JSXChild<'_>], out: &mut ComponentCollector) {
+    for child in children {
+        match child {
+            JSXChild::Element(nested) => collect_jsx_element(nested, out),
+            JSXChild::Fragment(frag) => collect_jsx_children(&frag.children, out),
+            JSXChild::ExpressionContainer(expr_box) => {
+                collect_css_vars_from_jsx_expr(&expr_box.expression, out);
+            }
+            JSXChild::Spread(spread) => collect_from_expr(&spread.expression, out),
+            _ => {}
+        }
     }
 }
 
 fn collect_jsx_element(el: &JSXElement<'_>, out: &mut ComponentCollector) {
-    if let oxc_ast::ast::JSXElementName::Identifier(ident) = &el.opening_element.name {
-        out.jsx_tags.insert(ident.name.as_str().to_string());
-    } else if let oxc_ast::ast::JSXElementName::IdentifierReference(ident) =
-        &el.opening_element.name
-    {
-        out.jsx_tags.insert(ident.name.as_str().to_string());
+    match &el.opening_element.name {
+        oxc_ast::ast::JSXElementName::Identifier(ident) => {
+            out.jsx_tags.insert(ident.name.as_str().to_string());
+        }
+        oxc_ast::ast::JSXElementName::IdentifierReference(ident) => {
+            out.jsx_tags.insert(ident.name.as_str().to_string());
+        }
+        oxc_ast::ast::JSXElementName::MemberExpression(member) => {
+            out.jsx_tags.insert(jsx_member_expr_to_string(member));
+        }
+        oxc_ast::ast::JSXElementName::NamespacedName(ns) => {
+            out.jsx_tags
+                .insert(format!("{}:{}", ns.namespace.name.as_str(), ns.name.name.as_str()));
+        }
+        oxc_ast::ast::JSXElementName::ThisExpression(_) => {}
     }
 
     for attr in &el.opening_element.attributes {
-        if let JSXAttributeItem::Attribute(a) = attr {
-            let attr_name = match &a.name {
-                JSXAttributeName::Identifier(id) => id.name.as_str(),
-                JSXAttributeName::NamespacedName(ns) => ns.name.name.as_str(),
-            };
-            if let Some(JSXAttributeValue::StringLiteral(lit)) = &a.value {
-                if let Some(s) = lit.value.as_str() {
-                    if attr_name == "data-ff-id" || attr_name == "data-testid" {
-                        out.ff_ids.insert(s.to_string());
+        match attr {
+            JSXAttributeItem::Attribute(a) => {
+                let attr_name = match &a.name {
+                    JSXAttributeName::Identifier(id) => id.name.as_str(),
+                    JSXAttributeName::NamespacedName(ns) => ns.name.name.as_str(),
+                };
+                if let Some(JSXAttributeValue::StringLiteral(lit)) = &a.value {
+                    if let Some(s) = lit.value.as_str() {
+                        if attr_name == "data-ff-id" || attr_name == "data-testid" {
+                            out.ff_ids.insert(s.to_string());
+                        }
+                        collect_css_vars_from_str(s, &mut out.css_variables);
                     }
-                    collect_css_vars_from_str(s, &mut out.css_variables);
+                } else if let Some(JSXAttributeValue::ExpressionContainer(expr_box)) = &a.value {
+                    if (attr_name == "data-ff-id" || attr_name == "data-testid")
+                        && matches!(
+                            expr_box.expression.as_expression(),
+                            Some(Expression::StringLiteral(_))
+                        )
+                    {
+                        if let Some(Expression::StringLiteral(lit)) =
+                            expr_box.expression.as_expression()
+                        {
+                            if let Some(s) = lit.value.as_str() {
+                                out.ff_ids.insert(s.to_string());
+                            }
+                        }
+                    }
+                    collect_css_vars_from_jsx_expr(&expr_box.expression, out);
                 }
-            } else if let Some(JSXAttributeValue::ExpressionContainer(expr_box)) = &a.value {
-                collect_css_vars_from_jsx_expr(&expr_box.expression, out);
+            }
+            JSXAttributeItem::SpreadAttribute(spread) => {
+                collect_from_expr(&spread.argument, out);
             }
         }
     }
 
-    for child in &el.children {
-        match child {
-            JSXChild::Element(nested) => collect_jsx_element(nested, out),
-            JSXChild::Fragment(frag) => {
-                for fc in &frag.children {
-                    if let JSXChild::Element(nested) = fc {
-                        collect_jsx_element(nested, out);
-                    }
-                }
-            }
-            JSXChild::ExpressionContainer(expr_box) => {
-                collect_css_vars_from_jsx_expr(&expr_box.expression, out);
-            }
-            _ => {}
-        }
-    }
+    collect_jsx_children(&el.children, out);
 }
 
 fn collect_css_vars_from_jsx_expr(expr: &JSXExpression<'_>, out: &mut ComponentCollector) {
@@ -115,40 +172,54 @@ fn collect_from_expr(expr: &Expression<'_>, out: &mut ComponentCollector) {
             for q in &tpl.quasis {
                 collect_css_vars_from_str(q.value.raw.as_str(), &mut out.css_variables);
             }
+            for e in &tpl.expressions {
+                collect_from_expr(e, out);
+            }
+        }
+        Expression::TaggedTemplateExpression(tagged) => {
+            collect_from_expr(&tagged.tag, out);
+            for q in &tagged.quasi.quasis {
+                collect_css_vars_from_str(q.value.raw.as_str(), &mut out.css_variables);
+            }
+            for e in &tagged.quasi.expressions {
+                collect_from_expr(e, out);
+            }
         }
         Expression::JSXElement(el) => collect_jsx_element(el, out),
-        Expression::JSXFragment(frag) => {
-            for fc in &frag.children {
-                if let JSXChild::Element(nested) = fc {
-                    collect_jsx_element(nested, out);
+        Expression::JSXFragment(frag) => collect_jsx_children(&frag.children, out),
+        Expression::ArrowFunctionExpression(arrow) => match &arrow.body {
+            oxc_ast::ast::ArrowFunctionBody::FunctionBody(b) => {
+                collect_from_statements(&b.statements, out);
+            }
+            _ => {
+                if let Some(expr) = arrow.body.as_expression() {
+                    collect_from_expr(expr, out);
                 }
             }
-        }
-        Expression::ArrowFunctionExpression(arrow) => {
-            for param in &arrow.params.items {
-                collect_props_from_pattern(&param.pattern, &mut out.prop_names);
-            }
-            match &arrow.body {
-                oxc_ast::ast::ArrowFunctionBody::FunctionBody(b) => {
-                    collect_from_statements(&b.statements, out);
-                }
-                _ => {
-                    if let Some(expr) = arrow.body.as_expression() {
-                        collect_from_expr(expr, out);
-                    }
-                }
-            }
-        }
+        },
         Expression::FunctionExpression(func) => {
-            for param in &func.params.items {
-                collect_props_from_pattern(&param.pattern, &mut out.prop_names);
-            }
             if let Some(body) = &func.body {
                 collect_from_statements(&body.statements, out);
             }
         }
         Expression::ParenthesizedExpression(p) => collect_from_expr(&p.expression, out),
+        Expression::TSAsExpression(ts) => collect_from_expr(&ts.expression, out),
+        Expression::TSSatisfiesExpression(ts) => collect_from_expr(&ts.expression, out),
+        Expression::TSNonNullExpression(ts) => collect_from_expr(&ts.expression, out),
+        Expression::TSTypeAssertion(ts) => collect_from_expr(&ts.expression, out),
+        Expression::AwaitExpression(aw) => collect_from_expr(&aw.argument, out),
+        Expression::UnaryExpression(u) => collect_from_expr(&u.argument, out),
+        Expression::BinaryExpression(b) => {
+            collect_from_expr(&b.left, out);
+            collect_from_expr(&b.right, out);
+        }
+        Expression::SequenceExpression(seq) => {
+            for e in &seq.expressions {
+                collect_from_expr(e, out);
+            }
+        }
         Expression::ConditionalExpression(c) => {
+            collect_from_expr(&c.test, out);
             collect_from_expr(&c.consequent, out);
             collect_from_expr(&c.alternate, out);
         }
@@ -158,19 +229,24 @@ fn collect_from_expr(expr: &Expression<'_>, out: &mut ComponentCollector) {
         }
         Expression::ObjectExpression(obj) => {
             for prop in &obj.properties {
-                if let ObjectPropertyKind::ObjectProperty(p) = prop {
-                    match &p.key {
-                        PropertyKey::StaticIdentifier(id) => {
-                            collect_css_vars_from_str(id.name.as_str(), &mut out.css_variables);
-                        }
-                        PropertyKey::StringLiteral(s) => {
-                            if let Some(raw) = s.value.as_str() {
-                                collect_css_vars_from_str(raw, &mut out.css_variables);
+                match prop {
+                    ObjectPropertyKind::ObjectProperty(p) => {
+                        match &p.key {
+                            PropertyKey::StaticIdentifier(id) => {
+                                collect_css_vars_from_str(id.name.as_str(), &mut out.css_variables);
                             }
+                            PropertyKey::StringLiteral(s) => {
+                                if let Some(raw) = s.value.as_str() {
+                                    collect_css_vars_from_str(raw, &mut out.css_variables);
+                                }
+                            }
+                            _ => {}
                         }
-                        _ => {}
+                        collect_from_expr(&p.value, out);
                     }
-                    collect_from_expr(&p.value, out);
+                    ObjectPropertyKind::SpreadProperty(sp) => {
+                        collect_from_expr(&sp.argument, out);
+                    }
                 }
             }
         }
@@ -225,6 +301,25 @@ fn collect_from_stmt(stmt: &Statement<'_>, out: &mut ComponentCollector) {
                 collect_from_stmt(alt, out);
             }
         }
+        Statement::SwitchStatement(sw) => {
+            for case in &sw.cases {
+                collect_from_statements(&case.consequent, out);
+            }
+        }
+        Statement::TryStatement(tr) => {
+            collect_from_statements(&tr.block.body, out);
+            if let Some(handler) = &tr.handler {
+                collect_from_statements(&handler.body.body, out);
+            }
+            if let Some(fin) = &tr.finalizer {
+                collect_from_statements(&fin.body, out);
+            }
+        }
+        Statement::ForStatement(fs) => collect_from_stmt(&fs.body, out),
+        Statement::ForInStatement(fs) => collect_from_stmt(&fs.body, out),
+        Statement::ForOfStatement(fs) => collect_from_stmt(&fs.body, out),
+        Statement::WhileStatement(ws) => collect_from_stmt(&ws.body, out),
+        Statement::DoWhileStatement(dw) => collect_from_stmt(&dw.body, out),
         _ => {}
     }
 }
@@ -293,6 +388,54 @@ fn build_signature(
     }
 }
 
+fn collect_top_level_component_props(expr: &Expression<'_>, props: &mut BTreeSet<String>) {
+    match expr {
+        Expression::ArrowFunctionExpression(arrow) => {
+            for param in &arrow.params.items {
+                collect_props_from_pattern(&param.pattern, props);
+            }
+        }
+        Expression::FunctionExpression(func) => {
+            for param in &func.params.items {
+                collect_props_from_pattern(&param.pattern, props);
+            }
+        }
+        Expression::ParenthesizedExpression(p) => {
+            collect_top_level_component_props(&p.expression, props);
+        }
+        Expression::TSAsExpression(ts) => {
+            collect_top_level_component_props(&ts.expression, props);
+        }
+        Expression::TSSatisfiesExpression(ts) => {
+            collect_top_level_component_props(&ts.expression, props);
+        }
+        Expression::CallExpression(call) => {
+            if let Some(first_expr) = call.arguments.first().and_then(|a| a.as_expression()) {
+                collect_top_level_component_props(first_expr, props);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn is_callable_component_init(expr: &Expression<'_>) -> bool {
+    match expr {
+        Expression::ArrowFunctionExpression(_)
+        | Expression::FunctionExpression(_)
+        | Expression::JSXElement(_)
+        | Expression::JSXFragment(_) => true,
+        Expression::ParenthesizedExpression(p) => is_callable_component_init(&p.expression),
+        Expression::TSAsExpression(ts) => is_callable_component_init(&ts.expression),
+        Expression::TSSatisfiesExpression(ts) => is_callable_component_init(&ts.expression),
+        Expression::CallExpression(call) => call
+            .arguments
+            .first()
+            .and_then(|a| a.as_expression())
+            .is_some_and(is_callable_component_init),
+        _ => false,
+    }
+}
+
 fn process_var_decl(
     decl: &VariableDeclarator<'_>,
     source_path: &str,
@@ -309,10 +452,17 @@ fn process_var_decl(
         .chars()
         .next()
         .map(|c| c.is_ascii_uppercase())
-        .unwrap_or(false);
+        .unwrap_or(false)
+        && !name
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_');
     let mut collector = ComponentCollector::default();
+    collect_top_level_component_props(init, &mut collector.prop_names);
     collect_from_expr(init, &mut collector);
-    if is_component_name || !collector.jsx_tags.is_empty() || !collector.ff_ids.is_empty() {
+    if (is_component_name && is_callable_component_init(init))
+        || !collector.jsx_tags.is_empty()
+        || !collector.ff_ids.is_empty()
+    {
         out.push(build_signature(&name, source_path, collector));
     }
 }
@@ -432,6 +582,25 @@ pub fn check_appshell_lock_constraint(
     active_expires_at: Option<i64>,
     now_ms: i64,
 ) -> Option<ConstraintViolation> {
+    check_appshell_lock_constraint_with_slots(
+        pattern_key,
+        active_lock_owner,
+        caller_actor,
+        active_expires_at,
+        now_ms,
+        &[],
+    )
+}
+
+/// Evaluates an active `app_shell_lock` including its declared `locked_slots`.
+pub fn check_appshell_lock_constraint_with_slots(
+    pattern_key: &str,
+    active_lock_owner: Option<&str>,
+    caller_actor: &str,
+    active_expires_at: Option<i64>,
+    now_ms: i64,
+    locked_slots: &[String],
+) -> Option<ConstraintViolation> {
     let owner = active_lock_owner.unwrap_or("").trim();
     if owner.is_empty() {
         return None;
@@ -443,12 +612,17 @@ pub fn check_appshell_lock_constraint(
     if owner == caller_actor.trim() {
         return None;
     }
+    let slots_note = if locked_slots.is_empty() {
+        String::new()
+    } else {
+        format!(" [lockedSlots: {}]", locked_slots.join(", "))
+    };
 
     Some(ConstraintViolation {
         rule_code: "APPSHELL_LOCK_QUARANTINE".to_string(),
         severity: ConstraintSeverity::Blocker.as_str().to_string(),
         message: format!(
-            "Pattern `{pattern_key}` is actively locked by `{owner}` until {expires_at}; reverse sync from `{caller_actor}` must be quarantined."
+            "Pattern `{pattern_key}` is actively locked by `{owner}` until {expires_at}{slots_note}; reverse sync from `{caller_actor}` must be quarantined."
         ),
         line: None,
         column: None,

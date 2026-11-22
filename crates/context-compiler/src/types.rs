@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-pub const HTTP_BAD_REQUEST: u16 = 400;
 pub const HTTP_FORBIDDEN: u16 = 403;
 pub const HTTP_CONFLICT: u16 = 409;
 pub const HTTP_UNPROCESSABLE_ENTITY: u16 = 422;
@@ -31,6 +30,18 @@ impl PortalId {
             Self::Presentation => "Presentation",
         }
     }
+
+    pub fn parse_strict(raw: &str) -> Option<Self> {
+        match raw {
+            "SuperAdmin" => Some(Self::SuperAdmin),
+            "TenantAdmin" => Some(Self::TenantAdmin),
+            "SalesApp" => Some(Self::SalesApp),
+            "MarketingWeb" => Some(Self::MarketingWeb),
+            "DeveloperPortal" => Some(Self::DeveloperPortal),
+            "Presentation" => Some(Self::Presentation),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -47,6 +58,15 @@ impl Horizon {
             Self::Short => "short",
             Self::Mid => "mid",
             Self::Long => "long",
+        }
+    }
+
+    pub fn parse_strict(raw: &str) -> Option<Self> {
+        match raw {
+            "short" => Some(Self::Short),
+            "mid" => Some(Self::Mid),
+            "long" => Some(Self::Long),
+            _ => None,
         }
     }
 }
@@ -67,6 +87,15 @@ impl ModelProfile {
             Self::A => "A",
             Self::B => "B",
             Self::C => "C",
+        }
+    }
+
+    pub fn parse_strict(raw: &str) -> Option<Self> {
+        match raw {
+            "A" | "ProfileA_Frontier" => Some(Self::A),
+            "B" | "ProfileB_LocalSmall" => Some(Self::B),
+            "C" | "ProfileC_OfflineFTS5" => Some(Self::C),
+            _ => None,
         }
     }
 
@@ -102,6 +131,8 @@ impl AdapterMode {
 pub enum ContextReasonCode {
     AtomicComplete,
     PrunedByBudget,
+    CrossPortalLeakBlocked,
+    AtomicBlockOverBudget,
 }
 
 impl ContextReasonCode {
@@ -109,6 +140,8 @@ impl ContextReasonCode {
         match self {
             Self::AtomicComplete => "atomic_complete",
             Self::PrunedByBudget => "pruned_by_budget",
+            Self::CrossPortalLeakBlocked => "cross_portal_leak_blocked",
+            Self::AtomicBlockOverBudget => "atomic_block_over_budget",
         }
     }
 }
@@ -119,6 +152,16 @@ pub enum BlockFormat {
     Html,
     Json,
     Text,
+}
+
+impl BlockFormat {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Html => "html",
+            Self::Json => "json",
+            Self::Text => "text",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -281,6 +324,8 @@ pub struct ContextTelemetryQueryDto {
     pub project_id: Uuid,
     #[serde(default)]
     pub portal_id: Option<PortalId>,
+    #[serde(default)]
+    pub horizon: Option<Horizon>,
     #[serde(default)]
     pub model_profile: Option<ModelProfile>,
     #[serde(default)]

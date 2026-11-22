@@ -181,6 +181,7 @@ describe("ContextMeterWidget", () => {
       expect(screen.queryByText("640 / 1500")).toBeNull();
       expect(screen.queryByText(/Mã SHA: cccccccccc|SHA: cccccccccc/)).toBeNull();
       expect(screen.getByText("0 / 1500")).toBeDefined();
+      expect(screen.getByRole("alert").textContent).toContain("CROSS_PORTAL_LEAK_BLOCKED");
     });
   });
 });

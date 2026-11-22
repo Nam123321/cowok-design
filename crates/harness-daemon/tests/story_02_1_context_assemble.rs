@@ -359,10 +359,10 @@ async fn story_02_1_daemon_assemble_idempotency_portal_guard_and_telemetry_curso
     .await;
     assert_eq!(st_sa_tel, StatusCode::FORBIDDEN);
 
-    // SuperAdmin session on a different tenant can assemble SuperAdmin portal and resolve authoritative tenant
-    let admin_tok = format!("sess-admin-{}", Uuid::new_v4());
+    // Cross-tenant admin session WITHOUT COWOK_SUPERADMIN_SECRET must be blocked (403 PROJECT_TENANT_MISMATCH)
+    let foreign_admin_tok = format!("sess-foreign-admin-{}", Uuid::new_v4());
     state.auth.insert_session(
-        admin_tok.clone(),
+        foreign_admin_tok.clone(),
         FlowPrincipal {
             tenant_id: "root-admin-tenant".into(),
             user_id: "root-admin".into(),
@@ -370,40 +370,112 @@ async fn story_02_1_daemon_assemble_idempotency_portal_guard_and_telemetry_curso
         },
         Utc::now().timestamp() + 3600,
     );
-    let (st_sa_ok, res_sa_ok) = send_json(
+    let (st_foreign_adm, res_foreign_adm) = send_json(
         &router,
         "POST",
         "/api/v1/context/assemble",
-        &admin_tok,
+        &foreign_admin_tok,
         Some(&Uuid::new_v4().to_string()),
         Some(json!({
             "projectId": proj_id,
             "portalId": "SuperAdmin",
             "horizon": "short",
             "modelProfile": "A",
-            "intent": "Assemble executive telemetry summary",
-            "requestedImageTokens": 0,
-            "domOutlineNodes": [
-                { "ffId": "wb-header", "tag": "header", "role": "banner", "summary": "Top Nav" },
-                { "ffId": "wb-meter", "tag": "button", "role": "button", "summary": "Context Meter" }
-            ]
+            "intent": "Attempt cross-tenant admin SuperAdmin escalation",
+            "requestedImageTokens": 0
         })),
     )
     .await;
+    assert_eq!(st_foreign_adm, StatusCode::FORBIDDEN);
+    assert_eq!(res_foreign_adm["error"]["code"], "PROJECT_TENANT_MISMATCH");
+
+    let (st_foreign_tel, res_foreign_tel) = send_json(
+        &router,
+        "GET",
+        &format!("/api/v1/context/telemetry?projectId={proj_id}&limit=5"),
+        &foreign_admin_tok,
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(st_foreign_tel, StatusCode::FORBIDDEN);
+    assert_eq!(res_foreign_tel["error"]["code"], "PROJECT_TENANT_MISMATCH");
+
+    // Verified SuperAdmin Bearer (`COWOK_SUPERADMIN_SECRET`) can assemble SuperAdmin portal and read SuperAdmin telemetry,
+    // while a foreign-tenant SessionToken STILL cannot bypass tenant isolation even if SuperAdmin Bearer is also attached.
+    let superadmin_secret = format!("sa-secret-{}", Uuid::new_v4());
+    std::env::set_var("COWOK_SUPERADMIN_SECRET", &superadmin_secret);
+    let foreign_with_sa_hdr = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/v1/context/telemetry?projectId={proj_id}&limit=5"))
+                .header("host", "127.0.0.1:4170")
+                .header("x-cowok-session-token", &foreign_admin_tok)
+                .header("authorization", format!("Bearer {superadmin_secret}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(foreign_with_sa_hdr.status(), StatusCode::FORBIDDEN);
+    let sa_assemble_body = serde_json::to_vec(&json!({
+        "projectId": proj_id,
+        "portalId": "SuperAdmin",
+        "horizon": "short",
+        "modelProfile": "A",
+        "intent": "Assemble executive telemetry summary",
+        "requestedImageTokens": 0,
+        "domOutlineNodes": [
+            { "ffId": "wb-header", "tag": "header", "role": "banner", "summary": "Top Nav" },
+            { "ffId": "wb-meter", "tag": "button", "role": "button", "summary": "Context Meter" }
+        ]
+    }))
+    .unwrap();
+    let sa_resp = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/context/assemble")
+                .header("host", "127.0.0.1:4170")
+                .header("authorization", format!("Bearer {superadmin_secret}"))
+                .header("idempotency-key", Uuid::new_v4().to_string())
+                .header("content-type", "application/json")
+                .body(Body::from(sa_assemble_body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let st_sa_ok = sa_resp.status();
+    let res_sa_ok: serde_json::Value =
+        serde_json::from_slice(&sa_resp.into_body().collect().await.unwrap().to_bytes()).unwrap();
     assert_eq!(st_sa_ok, StatusCode::OK);
     let outline_tok = res_sa_ok["data"]["tokenUsage"]["outline"].as_u64().unwrap();
     assert!(outline_tok > 0 && outline_tok <= 350);
 
-    // Percent-encoded query parameter values decode cleanly
-    let (st_enc, res_enc) = send_json(
-        &router,
-        "GET",
-        &format!("/api/v1/context/telemetry?projectId={proj_id}&portalId=Super%41dmin&limit=5"),
-        &admin_tok,
-        None,
-        None,
-    )
-    .await;
+    // Percent-encoded query parameter values + horizon filter decode cleanly
+    let sa_enc_resp = router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!(
+                    "/api/v1/context/telemetry?projectId={proj_id}&portalId=Super%41dmin&horizon=short&limit=5"
+                ))
+                .header("host", "127.0.0.1:4170")
+                .header("authorization", format!("Bearer {superadmin_secret}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let st_enc = sa_enc_resp.status();
+    let res_enc: serde_json::Value =
+        serde_json::from_slice(&sa_enc_resp.into_body().collect().await.unwrap().to_bytes())
+            .unwrap();
+    std::env::remove_var("COWOK_SUPERADMIN_SECRET");
     assert_eq!(st_enc, StatusCode::OK);
     assert_eq!(res_enc["data"]["items"].as_array().unwrap().len(), 1);
 

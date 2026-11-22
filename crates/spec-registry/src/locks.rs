@@ -90,6 +90,7 @@ pub enum SsotLockError {
     NotFound { code: &'static str, message: String },
     FencingConflict(AppShellLockConflictDetails),
     StorageBusy { details: String, retry_after_secs: u64 },
+    Internal { code: &'static str, message: String },
 }
 
 impl std::fmt::Display for SsotLockError {
@@ -97,7 +98,8 @@ impl std::fmt::Display for SsotLockError {
         match self {
             SsotLockError::Validation { code, message }
             | SsotLockError::Forbidden { code, message }
-            | SsotLockError::NotFound { code, message } => write!(f, "{code}: {message}"),
+            | SsotLockError::NotFound { code, message }
+            | SsotLockError::Internal { code, message } => write!(f, "{code}: {message}"),
             SsotLockError::FencingConflict(c) => write!(
                 f,
                 "LOCK_FENCING_CONFLICT: currentRevision={}, currentFencingToken={}",
@@ -111,10 +113,10 @@ impl std::fmt::Display for SsotLockError {
 impl std::error::Error for SsotLockError {}
 
 pub fn current_epoch_ms() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0)
+    match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(d) => i64::try_from(d.as_millis()).unwrap_or(i64::MAX),
+        Err(_) => 1,
+    }
 }
 
 /// Computes deterministic per-(tenant, project, portal, attempt) SHA-256 jitter backoff in ms.
@@ -180,9 +182,26 @@ where
                 std::thread::sleep(Duration::from_millis(sleep_ms));
             }
             Err(err) => {
+                let is_constraint = matches!(
+                    err,
+                    rusqlite::Error::SqliteFailure(
+                        rusqlite::ffi::Error {
+                            code: rusqlite::ffi::ErrorCode::ConstraintViolation
+                                | rusqlite::ffi::ErrorCode::TypeMismatch,
+                            ..
+                        },
+                        _
+                    )
+                );
                 let mapped = map_sqlite_error(err, context);
-                return Err(SsotLockError::Validation {
-                    code: "INVALID_REQUEST",
+                if is_constraint {
+                    return Err(SsotLockError::Validation {
+                        code: "INVALID_REQUEST",
+                        message: mapped.to_string(),
+                    });
+                }
+                return Err(SsotLockError::Internal {
+                    code: "INTERNAL_ERROR",
                     message: mapped.to_string(),
                 });
             }
@@ -245,7 +264,7 @@ fn verify_project_exists_in_tenant(
 ) -> Result<bool, rusqlite::Error> {
     let found: Option<i64> = tx
         .query_row(
-            "SELECT 1 FROM projects WHERE id = ?1 AND tenant_id = ?2",
+            "SELECT 1 FROM projects WHERE id = ?1 AND tenant_id = ?2 AND trash_deleted_at IS NULL",
             params![project_id, tenant_id],
             |row| row.get(0),
         )
@@ -408,8 +427,8 @@ pub fn mutate_appshell_lock(
                     )?
                     else {
                         return Ok(TxOutcome::Conflict(AppShellLockConflictDetails {
-                            current_revision: 1,
-                            current_fencing_token: 1,
+                            current_revision: 0,
+                            current_fencing_token: 0,
                             expires_at: 0,
                             is_expired: true,
                         }));
@@ -504,9 +523,9 @@ pub fn mutate_appshell_lock(
                     let expected_tok = cmd.expected_fencing_token.unwrap_or(-1);
                     let updated = tx.execute(
                         "UPDATE app_shell_locks \
-                         SET lock_owner_id = '', expires_at = 0, revision = revision + 1, updated_at = ?1 \
+                         SET lock_owner_id = '', locked_slots_json = '[]', expires_at = 0, revision = revision + 1, updated_at = ?1 \
                          WHERE tenant_id = ?2 AND project_id = ?3 AND portal_id = ?4 \
-                           AND lock_owner_id = ?5 AND fencing_token = ?6 AND revision = ?7",
+                           AND lock_owner_id = ?5 AND fencing_token = ?6 AND revision = ?7 AND expires_at > ?1",
                         params![
                             now_ms,
                             cmd.tenant_id,
@@ -595,7 +614,10 @@ pub fn mutate_appshell_lock(
                 }
             }
         },
-    )?;
+    );
+
+    let _ = conn.busy_timeout(Duration::from_millis(5000));
+    let outcome = outcome?;
 
     match outcome {
         TxOutcome::Ok(res) => Ok(res),
@@ -627,7 +649,7 @@ pub fn get_appshell_lock_for_portal(
         |row| map_lock_row(row, now),
     )
     .optional()
-    .map_err(|e| SsotLockError::Validation {
+    .map_err(|e| SsotLockError::Internal {
         code: "INTERNAL_ERROR",
         message: map_sqlite_error(e, "get_appshell_lock_for_portal").to_string(),
     })

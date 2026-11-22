@@ -3,12 +3,17 @@
 import React from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "../../../hooks/useTranslation";
-import type { FsBrowseEntry, FsBrowseResponse } from "../../../lib/validations/harness-daemon";
 import { useDaemonPickerState } from "../hooks/useDaemonPickerState";
 import {
   extractDaemonErrorMessage,
   MANAGED_SLUG_REGEX,
+  toManagedSlug,
 } from "../hooks/useProjectTrashAndBrowse";
+import {
+  DaemonBrowseFsView,
+  resolveBrowseTargetPath,
+  validateSubfolderName,
+} from "./DaemonBrowseFsView";
 
 export interface DaemonFolderPickerDialogProps {
   isOpen: boolean;
@@ -16,13 +21,13 @@ export interface DaemonFolderPickerDialogProps {
   projectId?: string;
   initialSlug?: string;
   initialTab?: "managed" | "browse";
+  initialPath?: string;
   onClose: () => void;
   onSelectForCreate?: (selectedPath: string | null, managedSlug: string) => void;
   onConfirmPromote?: (projectId: string, targetDirectory: string) => Promise<void>;
 }
 
 const PICKER_Z_INDEX = 10000;
-const FOLDER_ICON_SIZE = 14;
 const HEADER_ICON_SIZE = 15;
 const SEMIBOLD_WEIGHT = 600;
 const MEDIUM_WEIGHT = 500;
@@ -58,75 +63,17 @@ const ManagedSlugTabView: React.FC<{
   );
 };
 
-const BrowseFsEntryRow: React.FC<{
-  entry: FsBrowseEntry;
-  isSelected: boolean;
-  onSelect: () => void;
-  onOpen: () => void;
-}> = ({ entry, isSelected, onSelect, onOpen }) => {
-  const { t } = useTranslation();
-  return (
-    <div
-      role="button"
-      onClick={onSelect}
-      onDoubleClick={onOpen}
-      data-testid={`fs-entry-${entry.name}`}
-      style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 8px", borderRadius: "var(--radius-xs)",
-        cursor: "pointer", backgroundColor: isSelected ? "var(--bg-selected)" : "transparent",
-        border: isSelected ? "1px solid var(--action-primary)" : "1px solid transparent",
-      }}
-    >
-      <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-primary)" }}>
-        <BrandIcon name={entry.is_git_repo ? "folder-git" : "folder"} size={FOLDER_ICON_SIZE} color="var(--action-primary)" />
-        <span>{entry.name}</span>
-      </span>
-      {entry.is_git_repo && <span className="ff-metric-line">{t("workbench.pickerGitRepoBadge", "Git")}</span>}
-    </div>
-  );
-};
-
-const BrowseFsTabView: React.FC<{
-  browseData: FsBrowseResponse | null;
-  selectedPath: string;
-  isLoading: boolean;
-  onNavigate: (path?: string) => void;
-  onSelectEntry: (path: string) => void;
-}> = ({ browseData, selectedPath, isLoading, onNavigate, onSelectEntry }) => {
-  const { t } = useTranslation();
-  const entries = browseData?.entries ?? [];
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
-        <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {browseData?.current_path || t("workbench.pickerLoading", "Đang đọc thư mục qua Daemon...")}
-        </span>
-        <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-          <button type="button" disabled={!browseData?.parent_path || isLoading} onClick={() => browseData?.parent_path && onNavigate(browseData.parent_path)} className="cowok-btn cowok-btn-secondary" style={{ fontSize: "11px", padding: "3px 8px" }}>
-            {t("workbench.pickerParentBtn", "Lên cấp")}
-          </button>
-          <button type="button" disabled={isLoading} onClick={() => onNavigate(undefined)} className="cowok-btn cowok-btn-secondary" style={{ fontSize: "11px", padding: "3px 8px" }}>
-            {t("workbench.pickerResetRootBtn", "Quay về ~/CowokProjects")}
-          </button>
-        </div>
-      </div>
-      <div style={{ maxHeight: "210px", overflowY: "auto", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-xs)", backgroundColor: "var(--bg-workspace)", padding: "4px" }}>
-        {isLoading && <div style={{ padding: "12px", fontSize: "11.5px", color: "var(--text-muted)" }}>{t("workbench.pickerLoading", "Đang đọc thư mục qua Daemon...")}</div>}
-        {!isLoading && browseData && entries.length === 0 && (
-          <div style={{ padding: "12px", fontSize: "11.5px", color: "var(--text-muted)" }}>{t("workbench.pickerEmptyDir", "Thư mục trống — có thể chọn trực tiếp làm Workspace")}</div>
-        )}
-        {!isLoading && entries.map((entry) => (
-          <BrowseFsEntryRow key={entry.path} entry={entry} isSelected={selectedPath === entry.path} onSelect={() => onSelectEntry(entry.path)} onOpen={() => onNavigate(entry.path)} />
-        ))}
-      </div>
-    </div>
-  );
-};
-
 function resolvePickedDirectory(s: ReturnType<typeof useDaemonPickerState>): string | null {
   const slug = s.slugInput.trim();
   if (s.activeTab === "managed") return s.browseData?.managed_root ? `${s.browseData.managed_root}/${slug}` : null;
-  return s.selectedPath || s.browseData?.current_path || null;
+  return resolveBrowseTargetPath(s.browseData, s.selectedPath, s.newSubfolderName);
+}
+
+function isExactHomeTarget(pickedDir: string | null, homeDir: string | null | undefined): boolean {
+  if (!pickedDir || !homeDir) return false;
+  const normPicked = pickedDir.replace(/\/+$/, "");
+  const normHome = homeDir.replace(/\/+$/, "");
+  return normPicked === normHome;
 }
 
 const PickerErrorBanner: React.FC<{ errorMsg: string; onResetRoot: () => void }> = ({ errorMsg, onResetRoot }) => {
@@ -164,6 +111,53 @@ const PickerHeaderAndTabs: React.FC<{
   );
 };
 
+const PickerFooterButtons: React.FC<{
+  mode: "create" | "promote";
+  canSubmit: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}> = ({ mode, canSubmit, onClose, onConfirm }) => {
+  const { t } = useTranslation();
+  return (
+    <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
+      <button type="button" onClick={onClose} className="cowok-btn cowok-btn-secondary" style={{ padding: "6px 12px", fontSize: "12px" }}>
+        {t("workbench.cancelBtn", "Hủy")}
+      </button>
+      <button id="confirmFolderPromoteBtn" type="button" disabled={!canSubmit} onClick={onConfirm} className="cowok-btn cowok-btn-primary" style={{ padding: "6px 14px", fontSize: "12px", fontWeight: SEMIBOLD_WEIGHT, backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)" }}>
+        {mode === "create" ? t("workbench.pickerConfirmCreateBtn", "Chọn thư mục này") : t("workbench.pickerConfirmPromoteBtn", "Xác nhận & Gắn PathToken")}
+      </button>
+    </div>
+  );
+};
+
+async function runPickerConfirm(args: {
+  props: DaemonFolderPickerDialogProps;
+  s: ReturnType<typeof useDaemonPickerState>;
+  isManagedTab: boolean;
+  pickedDir: string | null;
+  t: (k: string, f: string) => string;
+}) {
+  const { props, s, isManagedTab, pickedDir, t } = args;
+  s.setErrorMsg(null);
+  if (props.mode === "create") {
+    const slugToPass = isManagedTab
+      ? s.slugInput.trim()
+      : toManagedSlug(pickedDir?.split("/").filter(Boolean).pop() || s.slugInput);
+    props.onSelectForCreate?.(pickedDir, slugToPass);
+    props.onClose();
+    return;
+  }
+  if (!props.projectId || !props.onConfirmPromote || !pickedDir) return;
+  s.setIsSubmitting(true);
+  try {
+    await props.onConfirmPromote(props.projectId, pickedDir);
+  } catch (err: unknown) {
+    s.setErrorMsg(extractDaemonErrorMessage(err, t("workbench.daemonActionError", "Lỗi đồng bộ Daemon SQLite V7")));
+  } finally {
+    s.setIsSubmitting(false);
+  }
+}
+
 export const DaemonFolderPickerDialog: React.FC<DaemonFolderPickerDialogProps> = (props) => {
   const { t } = useTranslation();
   const s = useDaemonPickerState(props);
@@ -171,36 +165,33 @@ export const DaemonFolderPickerDialog: React.FC<DaemonFolderPickerDialogProps> =
 
   const isManagedTab = s.activeTab === "managed";
   const pickedDir = resolvePickedDirectory(s);
-  const canSubmit = !s.isSubmitting && (isManagedTab ? MANAGED_SLUG_REGEX.test(s.slugInput.trim()) : Boolean(pickedDir));
-
-  const handleConfirm = async () => {
-    if (!canSubmit) return;
-    s.setErrorMsg(null);
-    if (props.mode === "create") {
-      props.onSelectForCreate?.(pickedDir, s.slugInput.trim());
-      props.onClose();
-      return;
-    }
-    if (!props.projectId || !props.onConfirmPromote || !pickedDir) return;
-    s.setIsSubmitting(true);
-    try { await props.onConfirmPromote(props.projectId, pickedDir); } catch (err: unknown) {
-      s.setErrorMsg(extractDaemonErrorMessage(err, t("workbench.daemonActionError", "Lỗi đồng bộ Daemon SQLite V7")));
-    } finally { s.setIsSubmitting(false); }
-  };
+  const subfolderError = isManagedTab ? null : validateSubfolderName(s.newSubfolderName);
+  const isHomeRootBlocked = !isManagedTab && isExactHomeTarget(pickedDir, s.browseData?.home_dir);
+  const canSubmitBrowse = Boolean(pickedDir) && !subfolderError && !isHomeRootBlocked;
+  const canSubmit = !s.isSubmitting && (isManagedTab ? MANAGED_SLUG_REGEX.test(s.slugInput.trim()) : canSubmitBrowse);
 
   return (
     <div id="daemonFolderPickerDialog" role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, zIndex: PICKER_Z_INDEX, backgroundColor: "var(--bg-overlay)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-      <div style={{ width: "100%", maxWidth: "540px", backgroundColor: "var(--bg-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--border-default)", boxShadow: "var(--shadow-lg)", overflow: "hidden" }}>
+      <div style={{ width: "100%", maxWidth: "560px", backgroundColor: "var(--bg-surface)", borderRadius: "var(--radius-lg)", border: "1px solid var(--border-default)", boxShadow: "var(--shadow-lg)", overflow: "hidden" }}>
         <PickerHeaderAndTabs isManagedTab={isManagedTab} onSelectTab={s.setActiveTab} onClose={props.onClose} />
         <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
           {s.errorMsg && <PickerErrorBanner errorMsg={s.errorMsg} onResetRoot={() => void s.loadDirectory(undefined)} />}
-          {isManagedTab ? <ManagedSlugTabView slugInput={s.slugInput} managedRoot={s.browseData?.managed_root || "~/CowokProjects"} onChangeSlug={s.setSlugInput} /> : <BrowseFsTabView browseData={s.browseData} selectedPath={s.selectedPath} isLoading={s.isLoading} onNavigate={(p) => void s.loadDirectory(p)} onSelectEntry={s.setSelectedPath} />}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
-            <button type="button" onClick={props.onClose} className="cowok-btn cowok-btn-secondary" style={{ padding: "6px 12px", fontSize: "12px" }}>{t("workbench.cancelBtn", "Hủy")}</button>
-            <button id="confirmFolderPromoteBtn" type="button" disabled={!canSubmit} onClick={() => void handleConfirm()} className="cowok-btn cowok-btn-primary" style={{ padding: "6px 14px", fontSize: "12px", fontWeight: SEMIBOLD_WEIGHT, backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)" }}>
-              {props.mode === "create" ? t("workbench.pickerConfirmCreateBtn", "Chọn thư mục này") : t("workbench.pickerConfirmPromoteBtn", "Xác nhận & Gắn PathToken")}
-            </button>
-          </div>
+          {isManagedTab ? (
+            <ManagedSlugTabView slugInput={s.slugInput} managedRoot={s.browseData?.managed_root || "~/CowokProjects"} onChangeSlug={s.setSlugInput} />
+          ) : (
+            <DaemonBrowseFsView
+              browseData={s.browseData} selectedPath={s.selectedPath} pathInput={s.pathInput}
+              newSubfolderName={s.newSubfolderName} pickedDir={pickedDir} subfolderError={subfolderError}
+              isHomeRootBlocked={isHomeRootBlocked} isLoading={s.isLoading} isPickingNative={s.isPickingNative}
+              onChangePathInput={s.setPathInput} onSubmitPath={s.navigateToPathInput}
+              onChangeSubfolder={s.setNewSubfolderName} onNavigate={(p) => void s.loadDirectory(p)}
+              onSelectEntry={s.setSelectedPath} onOpenNativeFinder={() => void s.openNativeFinder()}
+            />
+          )}
+          <PickerFooterButtons
+            mode={props.mode} canSubmit={canSubmit} onClose={props.onClose}
+            onConfirm={() => { if (canSubmit) void runPickerConfirm({ props, s, isManagedTab, pickedDir, t }); }}
+          />
         </div>
       </div>
     </div>

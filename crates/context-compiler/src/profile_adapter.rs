@@ -7,7 +7,7 @@ use domain::{
     ModelProfileTier, ModelToolDefinition, VisibilityPolicy,
 };
 use rusqlite::{params, Connection};
-use spec_registry::read_jailed_spec_bytes;
+use spec_registry::{compute_sha256_hex, read_jailed_spec_bytes};
 use std::collections::HashSet;
 use std::path::Path;
 use uuid::Uuid;
@@ -95,19 +95,27 @@ fn resolve_spec_body(
     spec_key: &str,
     summary_digest: &str,
     sha256: &str,
-) -> String {
+) -> Result<String, ContextCompilerError> {
     if let (Some(ws), Some(canonical)) = (workspace_root, CanonicalSpecKey::parse(spec_key).ok()) {
-        if let Ok(Some(bytes)) = read_jailed_spec_bytes(ws, canonical) {
-            let decoded = String::from_utf8_lossy(&bytes);
-            let compact: String = decoded.chars().take(MAX_SNIPPET_BODY_CHARS).collect();
-            if !compact.trim().is_empty() {
-                return compact;
+        if let Some(bytes) = read_jailed_spec_bytes(ws, canonical).map_err(|err| {
+            ContextCompilerError::TelemetryStorageUnavailable {
+                reason: err.to_string(),
+            }
+        })? {
+            if !sha256.trim().is_empty() && compute_sha256_hex(&bytes) != sha256.trim() {
+                return Err(ContextCompilerError::TelemetryStorageUnavailable {
+                    reason: format!("spec digest mismatch on disk for offline FTS5 ({spec_key})"),
+                });
+            }
+            let decoded = String::from_utf8_lossy(&bytes).into_owned();
+            if !decoded.trim().is_empty() {
+                return Ok(decoded);
             }
         }
     }
     let digest_part = summary_digest.trim();
     let sha_part: String = sha256.chars().take(8).collect();
-    format!("{spec_key} {digest_part} {sha_part}")
+    Ok(format!("{spec_key} {digest_part} {sha_part}"))
 }
 
 fn storage_err(e: rusqlite::Error) -> ContextCompilerError {
@@ -131,7 +139,7 @@ fn collect_offline_fts_snippets(
         .prepare(
             "SELECT spec_key, content_sha256, summary_digest
              FROM project_specs
-             WHERE project_id = ?1
+             WHERE project_id = ?1 AND status != 'FILE_DELETED'
              ORDER BY spec_key ASC",
         )
         .map_err(storage_err)?;
@@ -156,10 +164,11 @@ fn collect_offline_fts_snippets(
         if portal != PortalId::SuperAdmin && !allowed_set.contains(spec_key.as_str()) {
             continue;
         }
-        let body = resolve_spec_body(workspace_root, &spec_key, &summary, &sha);
-        if scan_text_for_portal(portal, "offline_spec", &body).is_err() {
+        let full_body = resolve_spec_body(workspace_root, &spec_key, &summary, &sha)?;
+        if scan_text_for_portal(portal, "offline_spec", &full_body).is_err() {
             continue;
         }
+        let body: String = full_body.chars().take(MAX_SNIPPET_BODY_CHARS).collect();
         fts_conn
             .execute(
                 "INSERT INTO spec_fts (spec_key, body) VALUES (?1, ?2)",
@@ -229,7 +238,7 @@ pub fn adapt_for_profile(
     let offline_snippets = if matches!(profile, ModelProfile::C) {
         match conn {
             Some(c) => collect_offline_fts_snippets(c, workspace_root, project_id, portal, intent)?,
-            None => vec!["offline_fts5:local_cache".to_string()],
+            None => Vec::new(),
         }
     } else {
         Vec::new()

@@ -104,3 +104,4 @@ Hợp nhất toàn bộ phạm vi Slicer, Static-Prefix Compiler và 3-Profile A
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 02.1 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
 | 2026-11-20 | 2.0.0 | [refactor-story] Đồng bộ hoàn chỉnh phần thân Story 02.1 hợp nhất 02.1 + 02.2 + 02.3 (KV-Cache Static-Prefix/Dynamic-Tail <=1,500 tok, Outline <=350 tok, 3-Profile Adapter, Context Meter & --inspect-prompt) với dependencies ["01.2", "01.3"] | /refactor-story |
+| 2026-11-22 | 2.1.0 | Đồng bộ kết quả `/audit-360` + `/party-mode` 4 lượt CLEAN (siết BPE `cl100k_base` & `max_image_tokens_per_turn`, khóa portal guard, idempotency hash & BFF telemetry bounds) | /ssot-reconciliation-skill |

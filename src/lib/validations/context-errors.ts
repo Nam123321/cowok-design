@@ -44,6 +44,8 @@ export function isUuidV4(val: string): boolean {
 
 export const ContextApiErrorCodeSchema = z.enum([
   "INVALID_REQUEST",
+  "UNAUTHORIZED",
+  "FORBIDDEN",
   "INVALID_IDEMPOTENCY_KEY",
   "INVALID_CURSOR",
   "PROJECT_TENANT_MISMATCH",

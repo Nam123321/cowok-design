@@ -30,6 +30,38 @@ export type SsotSdkOutcome<T> =
   | { ok: true; data: T }
   | { ok: false; status: number; error: SsotApiError["error"]; retryAfterSeconds?: number };
 
+const HTTP_UNAUTHORIZED = 401;
+const HTTP_FORBIDDEN = 403;
+
+function mergePortalHeaders(initHeaders: HeadersInit | undefined, portalId: string): Record<string, string> {
+  const merged = new Headers(initHeaders);
+  merged.set("x-cowok-portal", portalId);
+  const out: Record<string, string> = {};
+  merged.forEach((value, key) => {
+    out[key] = value;
+  });
+  return out;
+}
+
+function classifyFallbackSsotError(
+  status: number,
+  raw: unknown
+): SsotApiError["error"] {
+  const fallbackMsg =
+    typeof raw === "object" &&
+    raw !== null &&
+    typeof (raw as { message?: unknown }).message === "string"
+      ? (raw as { message: string }).message
+      : `HTTP ${status}`;
+  let code: SsotApiError["error"]["code"] = "INTERNAL_ERROR";
+  if (status === HTTP_UNAUTHORIZED) {
+    code = "UNAUTHORIZED";
+  } else if (status === HTTP_FORBIDDEN) {
+    code = "AUTH_FORBIDDEN";
+  }
+  return { code, message: fallbackMsg, requestId: "client-fallback" };
+}
+
 export class SsotRegistryApiClient extends HarnessDaemonTransport {
   constructor(config: HarnessDaemonClientConfig = {}) {
     super(config);
@@ -43,10 +75,7 @@ export class SsotRegistryApiClient extends HarnessDaemonTransport {
   ): Promise<SsotSdkOutcome<T>> {
     const res = await this.fetchAuthedResponse(path, {
       ...init,
-      headers: {
-        "x-cowok-portal": portalId,
-        ...(init.headers as Record<string, string> | undefined),
-      },
+      headers: mergePortalHeaders(init.headers, portalId),
     });
     const raw = await res.json().catch(() => null);
     if (res.ok) {
@@ -67,11 +96,7 @@ export class SsotRegistryApiClient extends HarnessDaemonTransport {
     return {
       ok: false,
       status: res.status,
-      error: {
-        code: "INTERNAL_ERROR",
-        message: `HTTP ${res.status}`,
-        requestId: "client-fallback",
-      },
+      error: classifyFallbackSsotError(res.status, raw),
     };
   }
 

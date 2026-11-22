@@ -107,6 +107,7 @@ export const ContextTelemetryQuerySchema = z
   .object({
     projectId: z.string().uuid(),
     portalId: PortalIdSchema.optional(),
+    horizon: TaskHorizonSchema.optional(),
     modelProfile: ContextModelProfileSchema.optional(),
     cursor: z.string().min(1).max(CONTEXT_LIMITS.MAX_CURSOR_LEN).optional(),
     limit: z

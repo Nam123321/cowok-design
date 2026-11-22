@@ -1062,8 +1062,8 @@ fn verify_anti_idor_with_caller_inner(
         match verified.kind {
             crate::daemon_auth::LegacyAuthKind::HmacV2
             | crate::daemon_auth::LegacyAuthKind::SessionToken => {
-                is_superadmin = verified.principal.role == "admin";
-                if !is_superadmin && verified.principal.tenant_id.trim() != project_tenant.trim() {
+                is_superadmin = crate::daemon_auth::is_valid_superadmin_bearer(headers);
+                if verified.principal.tenant_id.trim() != project_tenant.trim() {
                     return Err(HarnessError::BoundaryViolation {
                         reason: format!(
                             "TENANT_ISOLATION_BREACH: Tenant '{}' cannot access project {project_id} owned by '{}'",

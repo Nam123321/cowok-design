@@ -1,10 +1,10 @@
 // @story 02.4
 // @implements AC-02, AC-04
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 use std::time::{Duration, Instant};
 
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
@@ -25,29 +25,83 @@ use crate::reverse_sync::ComponentPatternDto;
 pub const EXPORT_RETENTION_KEEP_COUNT: usize = 5;
 pub const EXPORT_RETENTION_GRACE_MS: i64 = 60_000;
 
-static EXPORT_MUTEX_MAP: OnceLock<Mutex<HashMap<String, Arc<Mutex<()>>>>> = OnceLock::new();
+static EXPORT_MUTEX_MAP: OnceLock<Mutex<HashMap<String, Weak<Mutex<()>>>>> = OnceLock::new();
 
-fn get_export_process_mutex(tenant_id: &str, project_id: &str) -> Arc<Mutex<()>> {
+fn get_export_process_mutex(workspace_root: &Path) -> Arc<Mutex<()>> {
     let map = EXPORT_MUTEX_MAP.get_or_init(|| Mutex::new(HashMap::new()));
-    let key = format!("{tenant_id}\0{project_id}");
+    let key = workspace_root.to_string_lossy().into_owned();
     let mut guard = map.lock().unwrap_or_else(|e| e.into_inner());
-    guard
-        .entry(key)
-        .or_insert_with(|| Arc::new(Mutex::new(())))
-        .clone()
+    guard.retain(|_, weak| weak.strong_count() > 0);
+    if let Some(existing) = guard.get(&key).and_then(Weak::upgrade) {
+        return existing;
+    }
+    let fresh = Arc::new(Mutex::new(()));
+    guard.insert(key, Arc::downgrade(&fresh));
+    fresh
+}
+
+struct TempPathGuard {
+    path: PathBuf,
+    is_dir: bool,
+    armed: bool,
+}
+
+impl TempPathGuard {
+    fn file(path: PathBuf) -> Self {
+        Self {
+            path,
+            is_dir: false,
+            armed: true,
+        }
+    }
+
+    fn dir(path: PathBuf) -> Self {
+        Self {
+            path,
+            is_dir: true,
+            armed: true,
+        }
+    }
+
+    fn disarm(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for TempPathGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            if self.is_dir {
+                let _ = fs::remove_dir_all(&self.path);
+            } else {
+                let _ = fs::remove_file(&self.path);
+            }
+        }
+    }
+}
+
+fn scope_manifest_filename(tenant_id: &str, project_id: &str, portal_id: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(tenant_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(project_id.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(portal_id.as_bytes());
+    let hex = format!("{:x}", hasher.finalize());
+    format!("latest-manifest.{}.json", &hex[..16])
 }
 
 fn with_export_lock<R, F>(
     workspace_root: &Path,
-    tenant_id: &str,
-    project_id: &str,
+    _tenant_id: &str,
+    _project_id: &str,
     timeout: Duration,
     f: F,
 ) -> Result<R, SsotExportError>
 where
     F: FnOnce() -> Result<R, SsotExportError>,
 {
-    let mutex = get_export_process_mutex(tenant_id, project_id);
+    let mutex = get_export_process_mutex(workspace_root);
     let _in_proc = mutex.lock().unwrap_or_else(|e| e.into_inner());
 
     verify_no_symlink_in_path(workspace_root, Path::new(".cowok-locks"))?;
@@ -58,10 +112,8 @@ where
     })?;
 
     let mut hasher = Sha256::new();
-    hasher.update(b"ssot_export\0");
-    hasher.update(tenant_id.as_bytes());
-    hasher.update(b"\0");
-    hasher.update(project_id.as_bytes());
+    hasher.update(b"ssot_export_root\0");
+    hasher.update(workspace_root.to_string_lossy().as_bytes());
     let lock_path = locks_dir.join(format!("export-{:x}.lock", hasher.finalize()));
 
     if let Ok(meta) = fs::symlink_metadata(&lock_path) {
@@ -333,6 +385,7 @@ fn write_atomic_file(target: &Path, bytes: &[u8]) -> Result<(), SsotExportError>
             .unwrap_or("file")
     );
     let tmp_path = parent.join(tmp_name);
+    let mut tmp_guard = TempPathGuard::file(tmp_path.clone());
     let mut opts = OpenOptions::new();
     opts.write(true).create_new(true);
     #[cfg(unix)]
@@ -350,10 +403,12 @@ fn write_atomic_file(target: &Path, bytes: &[u8]) -> Result<(), SsotExportError>
         code: "INTERNAL_ERROR",
         message: format!("Failed to fsync staged file: {e}"),
     })?;
+    drop(file);
     fs::rename(&tmp_path, target).map_err(|e| SsotExportError::Io {
         code: "INTERNAL_ERROR",
         message: format!("Failed to rename staged file: {e}"),
     })?;
+    tmp_guard.disarm();
     Ok(())
 }
 
@@ -385,7 +440,7 @@ pub fn allocate_export_snapshot(
         });
     }
 
-    let idemp_key = format!("export_rev:{project_id}");
+    let idemp_key = format!("export_rev:{project_id}:{portal_id}");
     let _ = conn.busy_timeout(Duration::from_millis(250));
 
     enum Outcome {
@@ -402,7 +457,7 @@ pub fn allocate_export_snapshot(
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
             let project_exists: Option<i64> = tx
                 .query_row(
-                    "SELECT 1 FROM projects WHERE id = ?1 AND tenant_id = ?2",
+                    "SELECT 1 FROM projects WHERE id = ?1 AND tenant_id = ?2 AND trash_deleted_at IS NULL",
                     params![project_id, tenant_id],
                     |r| r.get(0),
                 )
@@ -411,7 +466,8 @@ pub fn allocate_export_snapshot(
                 return Ok(Outcome::ProjectNotFound);
             }
 
-            let prev_rev: i64 = tx
+            let legacy_key = format!("export_rev:{project_id}");
+            let scoped_rev: i64 = tx
                 .query_row(
                     "SELECT lease_expires_at FROM idempotency_records \
                      WHERE tenant_id = ?1 AND actor_id = '__ssot_export__' AND idempotency_key = ?2",
@@ -420,6 +476,16 @@ pub fn allocate_export_snapshot(
                 )
                 .optional()?
                 .unwrap_or(0);
+            let legacy_rev: i64 = tx
+                .query_row(
+                    "SELECT lease_expires_at FROM idempotency_records \
+                     WHERE tenant_id = ?1 AND actor_id = '__ssot_export__' AND idempotency_key = ?2",
+                    params![tenant_id, legacy_key],
+                    |r| r.get(0),
+                )
+                .optional()?
+                .unwrap_or(0);
+            let prev_rev = scoped_rev.max(legacy_rev);
             let next_rev = prev_rev.saturating_add(1);
 
             tx.execute(
@@ -511,10 +577,15 @@ pub fn allocate_export_snapshot(
                 locks,
             }))
         },
-    )
-    .map_err(|e| match e {
+    );
+
+    let _ = conn.busy_timeout(Duration::from_millis(5000));
+    let res = res.map_err(|e| match e {
         crate::locks::SsotLockError::StorageBusy { details, .. } => {
             SsotExportError::StorageBusy { details }
+        }
+        crate::locks::SsotLockError::Internal { code, message } => {
+            SsotExportError::Io { code, message }
         }
         other => SsotExportError::Validation {
             code: "INVALID_REQUEST",
@@ -600,8 +671,26 @@ fn parse_revision_from_gen_id(gen_id: &str) -> i64 {
         .unwrap_or(0)
 }
 
+fn collect_all_active_manifest_generations(export_root: &Path) -> HashSet<String> {
+    let mut active = HashSet::new();
+    if let Ok(entries) = fs::read_dir(export_root) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if !(name == "latest-manifest.json"
+                || (name.starts_with("latest-manifest.") && name.ends_with(".json")))
+            {
+                continue;
+            }
+            if let Ok(m) = read_manifest_path_no_verify(&entry.path()) {
+                active.insert(m.generation_id);
+            }
+        }
+    }
+    active
+}
+
 /// Prunes old export generation folders under `<export_root>/generations` while strictly preserving:
-/// 1) active `latest-manifest.json` target,
+/// 1) ALL active `latest-manifest*.json` targets (across every project & portal),
 /// 2) newest 5 committed generations,
 /// 3) any generation `< 60_000` ms old,
 /// 4) any generation with an active `.reader-lease-*`.
@@ -614,9 +703,7 @@ pub fn prune_export_generations(
         return Ok(Vec::new());
     }
 
-    let active_gen_id = read_manifest_raw_no_verify(export_root)
-        .ok()
-        .map(|m| m.generation_id);
+    let active_gen_ids = collect_all_active_manifest_generations(export_root);
     let leased = active_leased_generations(export_root, now_ms);
 
     let mut committed: Vec<(i64, i64, String, PathBuf)> = Vec::new();
@@ -651,7 +738,7 @@ pub fn prune_export_generations(
         if idx < EXPORT_RETENTION_KEEP_COUNT {
             continue;
         }
-        if active_gen_id.as_deref() == Some(gen_id.as_str()) {
+        if active_gen_ids.contains(&gen_id) {
             continue;
         }
         if leased.contains(&gen_id) {
@@ -668,11 +755,10 @@ pub fn prune_export_generations(
     Ok(pruned)
 }
 
-fn read_manifest_raw_no_verify(export_root: &Path) -> Result<ExportManifest, SsotExportError> {
-    let manifest_path = export_root.join("latest-manifest.json");
+fn read_manifest_path_no_verify(manifest_path: &Path) -> Result<ExportManifest, SsotExportError> {
     let mut attempt = 0;
     let file = loop {
-        match open_file_nofollow_read(&manifest_path) {
+        match open_file_nofollow_read(manifest_path) {
             Ok(f) => break f,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound && attempt == 0 => {
                 attempt += 1;
@@ -703,6 +789,10 @@ fn read_manifest_raw_no_verify(export_root: &Path) -> Result<ExportManifest, Sso
             reason: format!("Corrupted latest-manifest.json: {e}"),
         })?;
     Ok(manifest)
+}
+
+fn read_manifest_raw_no_verify(export_root: &Path) -> Result<ExportManifest, SsotExportError> {
+    read_manifest_path_no_verify(&export_root.join("latest-manifest.json"))
 }
 
 /// Reads and cryptographically verifies `latest-manifest.json` + all listed bundle files via `O_NOFOLLOW`.
@@ -840,11 +930,24 @@ pub fn commit_export_snapshot(
         &req.project_id,
         Duration::from_secs(5),
         || {
-            if let Ok(current) = read_manifest_raw_no_verify(&export_root) {
-                if current.tenant_id == req.tenant_id
-                    && current.project_id == req.project_id
-                    && snapshot.export_revision <= current.export_revision
-                {
+            let scoped_manifest_path = export_root.join(scope_manifest_filename(
+                &req.tenant_id,
+                &req.project_id,
+                &req.portal_id,
+            ));
+            let prior_scope_manifest = read_manifest_path_no_verify(&scoped_manifest_path)
+                .ok()
+                .or_else(|| {
+                    read_manifest_raw_no_verify(&export_root)
+                        .ok()
+                        .filter(|m| {
+                            m.tenant_id == req.tenant_id
+                                && m.project_id == req.project_id
+                                && m.portal_id == req.portal_id
+                        })
+                });
+            if let Some(current) = prior_scope_manifest {
+                if snapshot.export_revision <= current.export_revision {
                     return Err(SsotExportError::ExportSuperseded {
                         attempted_revision: snapshot.export_revision,
                         latest_revision: current.export_revision,
@@ -874,30 +977,43 @@ pub fn commit_export_snapshot(
                 code: "INTERNAL_ERROR",
                 message: format!("Failed to create stage dir: {e}"),
             })?;
+            let mut stage_guard = TempPathGuard::dir(stage_dir.clone());
 
+            let want_json = req.formats.iter().any(|f| f == "json");
+            let want_markdown = req.formats.iter().any(|f| f == "markdown");
             let mut file_map: BTreeMap<String, Vec<u8>> = BTreeMap::new();
-            let bundle_payload = serde_json::json!({
-                "exportId": export_id,
-                "exportRevision": snapshot.export_revision,
-                "tenantId": req.tenant_id,
-                "projectId": req.project_id,
-                "portalId": req.portal_id,
-                "formats": req.formats,
-                "patterns": snapshot.patterns,
-                "appShellLocks": snapshot.locks,
-            });
-            let json_bytes = serde_json::to_vec_pretty(&bundle_payload).map_err(|e| {
-                SsotExportError::Io {
-                    code: "INTERNAL_ERROR",
-                    message: format!("Failed to serialize ssot bundle: {e}"),
-                }
-            })?;
-            let json_sha256 = sha256_hex(&json_bytes);
-            file_map.insert("ssot-bundle.json".to_string(), json_bytes);
+            let json_sha256 = if want_json {
+                let bundle_payload = serde_json::json!({
+                    "exportId": export_id,
+                    "exportRevision": snapshot.export_revision,
+                    "tenantId": req.tenant_id,
+                    "projectId": req.project_id,
+                    "portalId": req.portal_id,
+                    "formats": req.formats,
+                    "patterns": snapshot.patterns,
+                    "appShellLocks": snapshot.locks,
+                });
+                let json_bytes = serde_json::to_vec_pretty(&bundle_payload).map_err(|e| {
+                    SsotExportError::Io {
+                        code: "INTERNAL_ERROR",
+                        message: format!("Failed to serialize ssot bundle: {e}"),
+                    }
+                })?;
+                let sha = sha256_hex(&json_bytes);
+                file_map.insert("ssot-bundle.json".to_string(), json_bytes);
+                sha
+            } else {
+                String::new()
+            };
 
-            let markdown_bytes = render_human_markdown_export(req, &snapshot).into_bytes();
-            let markdown_sha256 = sha256_hex(&markdown_bytes);
-            file_map.insert("ssot-report.md".to_string(), markdown_bytes);
+            let markdown_sha256 = if want_markdown {
+                let markdown_bytes = render_human_markdown_export(req, &snapshot).into_bytes();
+                let sha = sha256_hex(&markdown_bytes);
+                file_map.insert("ssot-report.md".to_string(), markdown_bytes);
+                sha
+            } else {
+                String::new()
+            };
 
             let mut file_entries = Vec::with_capacity(file_map.len());
             let mut digest_lines = Vec::with_capacity(file_map.len());
@@ -914,8 +1030,25 @@ pub fn commit_export_snapshot(
 
             let checksum_sha256 = sha256_hex(digest_lines.join("\n").as_bytes());
             let generation_rel_dir = format!("generations/{gen_id}");
-            let markdown_rel_path = format!(".cowok-design/exports/{generation_rel_dir}/ssot-report.md");
-            let json_rel_path = format!(".cowok-design/exports/{generation_rel_dir}/ssot-bundle.json");
+            let rel_prefix = match req
+                .relative_export_subdir
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
+                Some(sub) => format!(".cowok-design/exports/{}", sub.trim_matches('/')),
+                None => ".cowok-design/exports".to_string(),
+            };
+            let markdown_rel_path = if want_markdown {
+                format!("{rel_prefix}/{generation_rel_dir}/ssot-report.md")
+            } else {
+                String::new()
+            };
+            let json_rel_path = if want_json {
+                format!("{rel_prefix}/{generation_rel_dir}/ssot-bundle.json")
+            } else {
+                String::new()
+            };
 
             let manifest = ExportManifest {
                 export_id: export_id.clone(),
@@ -947,7 +1080,9 @@ pub fn commit_export_snapshot(
                 code: "INTERNAL_ERROR",
                 message: format!("Failed to promote staged generation: {e}"),
             })?;
+            stage_guard.disarm();
 
+            write_atomic_file(&scoped_manifest_path, &manifest_bytes)?;
             write_atomic_file(&export_root.join("latest-manifest.json"), &manifest_bytes)?;
             let _ = prune_export_generations(&export_root, now_ms)?;
 
@@ -973,7 +1108,9 @@ pub fn export_hidden_ssot_bundle(
     workspace_root: &Path,
     req: &SsotExportRequest,
 ) -> Result<SsotExportResult, SsotExportError> {
+    let unique_formats: HashSet<&str> = req.formats.iter().map(String::as_str).collect();
     if req.formats.is_empty()
+        || req.formats.len() != unique_formats.len()
         || !req
             .formats
             .iter()
@@ -981,7 +1118,7 @@ pub fn export_hidden_ssot_bundle(
     {
         return Err(SsotExportError::Validation {
             code: "INVALID_REQUEST",
-            message: "formats must contain 1..=2 items from ['markdown', 'json']".to_string(),
+            message: "formats must contain 1..=2 unique items from ['markdown', 'json']".to_string(),
         });
     }
     let now_ms = req.now_ms.unwrap_or_else(current_epoch_ms);

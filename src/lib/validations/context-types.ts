@@ -25,5 +25,10 @@ export const ContextAdapterModeSchema = z.enum([
 ]);
 export type ContextAdapterMode = z.infer<typeof ContextAdapterModeSchema>;
 
-export const ContextReasonCodeSchema = z.enum(["atomic_complete", "pruned_by_budget"]);
+export const ContextReasonCodeSchema = z.enum([
+  "atomic_complete",
+  "pruned_by_budget",
+  "cross_portal_leak_blocked",
+  "atomic_block_over_budget",
+]);
 export type ContextReasonCode = z.infer<typeof ContextReasonCodeSchema>;

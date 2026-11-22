@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "Chat",
     "githubUrlPlaceholder": "Enter repository URL (https://github.com/...)",
     "standaloneChatAck": "Recorded standalone chat prompt",
-    "oauthCliFallback": "OAuth/CLI"
+    "oauthCliFallback": "OAuth/CLI",
+    "pickerPathPlaceholder": "~/Desktop/my-project or /Users/...",
+    "pickerGoBtn": "Go",
+    "pickerOpenDirBtn": "Open",
+    "pickerNewSubfolderLabel": "New subfolder (optional):",
+    "pickerNewSubfolderPlaceholder": "e.g. my-new-app (leave blank to use selected folder)",
+    "pickerInvalidSubfolderError": "Invalid subfolder name (cannot contain '/', '\\\\', or start with '.')",
+    "pickerHomeRootBlockedHint": "Cannot bind a project directly to Home (~). Select a subfolder or enter a new subfolder name.",
+    "pickerSelectedTargetPrefix": "Target folder:",
+    "pickerNativeFinderBtn": "Open Finder...",
+    "pickerNativeFinderOpening": "Opening Finder...",
+    "pickerNativeFinderPrompt": "Select a local project folder"
   },
   "chat": {
     "agentTitle": "cowok Agent",
@@ -1196,7 +1207,10 @@
       "daemonContractViolation": "Daemon returned a malformed context contract payload.",
       "invalidSources": "Requested context sourceIds must contain 1 to 100 entries.",
       "duplicateSourceId": "Requested context sourceIds must not contain duplicates.",
-      "storage": "Context storage error occurred."
+      "storage": "Context storage error occurred.",
+      "unauthorized": "Authentication required.",
+      "forbidden": "Permission denied.",
+      "requestRejected": "Request rejected."
     }
   },
   "ssot": {
@@ -1210,7 +1224,7 @@
     },
     "export": {
       "busy": "Exporting...",
-      "cta": "Export SSOT"
+      "cta": "Export Design Kit"
     },
     "patterns": {
       "title": "Design patterns",
@@ -1222,6 +1236,15 @@
       "synced": "Synced",
       "empty": "No saved components in this portal yet.",
       "button": "Patterns"
+    },
+    "toast": {
+      "loadFailed": "Could not load workspace patterns.",
+      "lockAcquired": "Shell locked for this workspace.",
+      "lockReleased": "Shell unlocked.",
+      "lockConflict": "Locked by another session. Refresh to sync.",
+      "lockFailed": "Could not update shell lock.",
+      "exportSuccess": "Design kit exported (#{rev}).",
+      "exportFailed": "Could not export design kit right now."
     }
   }
 }

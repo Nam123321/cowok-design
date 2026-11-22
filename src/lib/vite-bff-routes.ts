@@ -38,6 +38,7 @@ import * as projectSessionsRoute from "../app/api/projects/[id]/sessions/route";
 import * as singleSessionRoute from "../app/api/projects/[id]/sessions/[sessionId]/route";
 import * as pathTokenRoute from "../app/api/projects/[id]/path-token/route";
 import * as fsBrowseRoute from "../app/api/fs/browse/route";
+import * as fsPickNativeRoute from "../app/api/fs/pick-native/route";
 import * as projectRestoreRoute from "../app/api/projects/[id]/restore/route";
 import * as verifyPathTokenRoute from "../app/api/projects/[id]/verify-path-token/route";
 import * as projectPromoteRoute from "../app/api/projects/[id]/promote/route";
@@ -121,6 +122,7 @@ const ROUTE_TABLE: RouteEntry[] = [
 
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/path-token$/, extractParams: idOnly, resolveHandler: () => pathTokenRoute.POST },
   { method: "GET", pattern: /^\/api\/fs\/browse$/, extractParams: noParams, resolveHandler: () => fsBrowseRoute.GET },
+  { method: "POST", pattern: /^\/api\/fs\/pick-native$/, extractParams: noParams, resolveHandler: () => fsPickNativeRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/restore$/, extractParams: idOnly, resolveHandler: () => projectRestoreRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/verify-path-token$/, extractParams: idOnly, resolveHandler: () => verifyPathTokenRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/promote$/, extractParams: idOnly, resolveHandler: () => projectPromoteRoute.POST },

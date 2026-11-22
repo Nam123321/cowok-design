@@ -8,6 +8,7 @@ import {
   assembleForwardHeaders,
   buildCanonicalHmacHeaders,
   relayDaemonResponse,
+  seedProjectsToDaemon,
   stripSpoofedHeaders,
   type DaemonLockRecord,
 } from "./daemon-hmac";
@@ -135,20 +136,7 @@ function buildSeedProjects() {
 }
 
 async function seedDefaultProjects(lock: DaemonLockRecord): Promise<void> {
-  for (const proj of buildSeedProjects()) {
-    const rawBody = JSON.stringify({
-      ...proj,
-      workspace_root: null,
-      inherit_brand_from_project_id: null,
-    });
-    const headers = buildCanonicalHmacHeaders({
-      daemonNonce: lock.daemon_nonce, hmacKeyHex: lock.hmac_key_hex,
-      method: "POST", canonicalPath: "/api/v1/projects", rawQuery: "",
-      principal: { tenantId: "local-default", userId: "bff-bootstrap", role: "editor" },
-      rawBody, correlationId: crypto.randomUUID(),
-    });
-    await fetch(`http://127.0.0.1:${lock.port}/api/v1/projects`, { method: "POST", headers, body: rawBody }).catch(() => undefined);
-  }
+  await seedProjectsToDaemon(lock, buildSeedProjects());
 }
 
 async function verifyHealthAndSeedDefaultProject(lock: DaemonLockRecord, workspaceRoot: string): Promise<void> {
@@ -237,7 +225,7 @@ async function resolveHumanSessionHeader(
     body: JSON.stringify({
       tenantId: opts.principal.tenantId,
       userId: opts.principal.userId,
-      role: opts.principal.role === "admin" ? "admin" : "editor",
+      role: "editor",
     }),
   });
   if (!res.ok) {
@@ -308,16 +296,21 @@ async function fetchDaemonOnce(params: {
   });
 }
 
+function resolveForwardRawBody(opts: DaemonForwardOpts): string | Uint8Array {
+  if (opts.rawBodyBytes !== undefined) {
+    return opts.rawBodyBytes;
+  }
+  if (opts.body !== undefined) {
+    return JSON.stringify(opts.body);
+  }
+  return "";
+}
+
 export async function forwardToDaemonFlow(opts: DaemonForwardOpts): Promise<Response> {
   const safeInbound = opts.inboundHeaders ? stripSpoofedHeaders(opts.inboundHeaders) : {};
   const lock = await ensureRunningDaemon();
   const rawQuery = (opts.rawQuery || "").replace(/^\?/, "");
-  const rawBody: string | Uint8Array =
-    opts.rawBodyBytes !== undefined
-      ? opts.rawBodyBytes
-      : opts.body !== undefined
-        ? JSON.stringify(opts.body)
-        : "";
+  const rawBody = resolveForwardRawBody(opts);
   const correlationId = opts.correlationId || crypto.randomUUID();
   let upstream = await fetchDaemonOnce({ lock, opts, safeInbound, rawQuery, rawBody, correlationId });
   if (

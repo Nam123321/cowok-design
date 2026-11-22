@@ -95,8 +95,11 @@ async function fetchLatestHistorySnapshot(params: {
   | { ok: false; error: ContextApiError["error"] }
 > {
   const out = await getContextTelemetry({
-    projectId: params.projectId, portalId: params.portalId,
-    modelProfile: params.modelProfile, limit: DEFAULT_HISTORY_LIMIT,
+    projectId: params.projectId,
+    portalId: params.portalId,
+    horizon: params.horizon,
+    modelProfile: params.modelProfile,
+    limit: DEFAULT_HISTORY_LIMIT,
   });
   if (!out.ok) return { ok: false, error: out.error };
   const items = out.data.items;
@@ -184,7 +187,10 @@ export function useContextMeter(projectId?: string) {
     setHistoryCount(res.count); setSnapshot(res.snapshot); setStatus(res.snapshot ? "ready" : "empty");
   }, [clearSnapshotState, hasValidProject, horizon, modelProfile, portalId, projectId]);
 
-  useEffect(() => { void loadHistory(); }, [loadHistory]);
+  useEffect(() => {
+    void loadHistory();
+    return () => { requestSeqRef.current += 1; };
+  }, [loadHistory]);
 
   const assembleNow = useCallback(async (intentText?: string) => {
     const seq = ++requestSeqRef.current;
@@ -192,13 +198,11 @@ export function useContextMeter(projectId?: string) {
     setStatus("loading"); setError(null);
     const res = await executeContextAssemble({ projectId, portalId, horizon, modelProfile, intentText });
     if (seq !== requestSeqRef.current) return;
-    if (!res.ok) { setStatus("error"); return setError(res.error); }
+    if (!res.ok) { setSnapshot(null); setStatus("error"); return setError(res.error); }
     setSnapshot(res.snapshot); setHistoryCount((c) => c + 1); setStatus("ready");
   }, [hasValidProject, horizon, modelProfile, portalId, projectId]);
 
-  const scopedSnapshot = isSnapshotInScope(snapshot, { projectId, portalId, horizon, modelProfile })
-    ? snapshot
-    : null;
+  const scopedSnapshot = isSnapshotInScope(snapshot, { projectId, portalId, horizon, modelProfile }) ? snapshot : null;
   return {
     status, portalId, setPortalId, horizon, setHorizon, modelProfile, setModelProfile,
     snapshot: scopedSnapshot, historyCount, error, hasValidProject, refreshTelemetry: loadHistory, assembleNow,

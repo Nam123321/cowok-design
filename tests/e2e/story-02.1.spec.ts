@@ -20,6 +20,9 @@ test.describe("Story 02.1 Context Meter Widget & Context Assembly E2E", () => {
       await expect(wizardHeading).toBeHidden({ timeout: 10000 });
     }
 
+    const pageErrors: string[] = [];
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+
     const trigger = page.locator("[data-ff-id='context-meter-trigger']").first();
     await expect(trigger).toBeVisible({ timeout: 10000 });
     await trigger.click();
@@ -29,7 +32,28 @@ test.describe("Story 02.1 Context Meter Widget & Context Assembly E2E", () => {
     await expect(page.locator("[data-ff-id='context-meter-portal-select']")).toBeVisible();
     await expect(page.locator("[data-ff-id='context-meter-profile-select']")).toBeVisible();
 
+    const telemetryReq = page.waitForResponse(
+      (resp) => resp.url().includes("/api/v1/context/telemetry") && resp.status() < 500,
+      { timeout: 10000 }
+    );
     await page.locator("[data-ff-id='context-meter-profile-select']").selectOption("B");
     await expect(trigger).toContainText("B");
+    const telemetryResp = await telemetryReq;
+    expect(telemetryResp.status()).toBeLessThan(500);
+
+    const assembleBtn = page.locator("[data-ff-id='context-meter-refresh-btn']");
+    if (await assembleBtn.isEnabled()) {
+      const assembleReq = page.waitForResponse(
+        (resp) => resp.url().includes("/api/v1/context/assemble") && resp.request().method() === "POST",
+        { timeout: 10000 }
+      );
+      await assembleBtn.click();
+      const assembleResp = await assembleReq;
+      expect(assembleResp.status()).toBeLessThan(500);
+    }
+
+    await page.keyboard.press("Escape");
+    await expect(popover).toBeHidden({ timeout: 3000 });
+    expect(pageErrors).toEqual([]);
   });
 });

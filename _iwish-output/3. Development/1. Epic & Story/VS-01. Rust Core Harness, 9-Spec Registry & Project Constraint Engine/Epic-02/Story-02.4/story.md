@@ -51,7 +51,7 @@ contract_manifest:
 
 - **FR Covered:** [FR-32: Hidden Dual-Use SSOT, AppShell Lock & cowok-design-opt 7 Craft Skills](file:///Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 02: JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills](../epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context
@@ -69,10 +69,10 @@ Giải quyết triệt để vấn đề "dự án càng nhiều màn hình càn
 - **AC-05 ([EDGE-CASE] Multi-Agent AppShell Conflict & Monotonic Lock Recovery):** Chặn ghi đè `app_shell_locks` khi thiếu hoặc sai monotonic `fencing_token` và dùng CAS chuyển nhượng lock an toàn sau timeout mà không mất thay đổi hợp lệ.
 
 ## 4. Tasks
-- [ ] **Task 02.4.1**: Thêm migration `V18__story_02_4_hidden_ssot.sql` (`component_patterns`, `app_shell_locks`, `CURRENT_SCHEMA_VERSION = 18`, `DAEMON_MIN_SCHEMA_VERSION = 18`) và triển khai Single Lock Owner + `oxc` reverse sync trong `crates/spec-registry` & `crates/constraint-engine` (thỏa mãn `AC-01`, `AC-04`).
-- [ ] **Task 02.4.2**: Đóng gói `cowok-design-opt` (`<=250 tok`) + 7 Craft Skills 3 tầng + `<15ms` 3-Zone `CachePreservingSkillRouter` qua `/api/v1/skills/route` (thỏa mãn `AC-02`, `AC-03`).
-- [ ] **Task 02.4.3**: Xây dựng `AppShell`/Pattern Lock UI + Export `.cowok-design/exports/` & nối `packages/ui-shell` (thỏa mãn `AC-01`).
-- [ ] **Task 02.4.4**: Viết benchmark đo `<15ms` router, `>= +25%` `lib-audit` lift, `confusion_risk < 0.35` và test `[EDGE-CASE]` lock collision (thỏa mãn `AC-03`, `AC-05`).
+- [x] **Task 02.4.1**: Thêm migration `V18__story_02_4_hidden_ssot.sql` (`component_patterns`, `app_shell_locks`, `CURRENT_SCHEMA_VERSION = 18`, `DAEMON_MIN_SCHEMA_VERSION = 18`) và triển khai Single Lock Owner + `oxc` reverse sync trong `crates/spec-registry` & `crates/constraint-engine` (thỏa mãn `AC-01`, `AC-04`).
+- [x] **Task 02.4.2**: Đóng gói `cowok-design-opt` (`<=250 tok`) + 7 Craft Skills 3 tầng + `<15ms` 3-Zone `CachePreservingSkillRouter` qua `/api/v1/skills/route` (thỏa mãn `AC-02`, `AC-03`).
+- [x] **Task 02.4.3**: Xây dựng `AppShell`/Pattern Lock UI + Export `.cowok-design/exports/` & nối `packages/ui-shell` (thỏa mãn `AC-01`).
+- [x] **Task 02.4.4**: Viết benchmark đo `<15ms` router, `>= +25%` `lib-audit` lift, `confusion_risk < 0.35` và test `[EDGE-CASE]` lock collision (thỏa mãn `AC-03`, `AC-05`).
 
 ## 5. AC-to-Task Traceability Matrix
 
@@ -117,3 +117,4 @@ Giải quyết triệt để vấn đề "dự án càng nhiều màn hình càn
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-20 | 1.0 | Khởi tạo Story 02.4 (hợp nhất 02.4+02.5+13.2) chuẩn 5 lớp Post-PR #14 | /make-story |
+| 2026-11-22 | 1.1 | Đồng bộ kết quả `/audit-360` + `/party-mode` 4 lượt CLEAN (hardening tenant/lock/export revision & Clean-Code/BFF Zod gates) và chỉnh plain UX wording nút xuất thành `Xuất bộ thiết kế` (`Export Design Kit`) trên `SsotExportButton` & 9 bộ locale | /ssot-reconciliation-skill |

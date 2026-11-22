@@ -1,6 +1,6 @@
 // @story 02.4
 // @implements AC-02, AC-04
-use constraint_engine::{check_appshell_lock_constraint, extract_component_signatures};
+use constraint_engine::{check_appshell_lock_constraint_with_slots, extract_component_signatures};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -146,12 +146,12 @@ pub fn list_component_patterns(
 
     let project_exists: Option<i64> = conn
         .query_row(
-            "SELECT 1 FROM projects WHERE id = ?1 AND tenant_id = ?2",
+            "SELECT 1 FROM projects WHERE id = ?1 AND tenant_id = ?2 AND trash_deleted_at IS NULL",
             params![project_id, tenant_id],
             |r| r.get(0),
         )
         .optional()
-        .map_err(|e| SsotLockError::Validation {
+        .map_err(|e| SsotLockError::Internal {
             code: "INTERNAL_ERROR",
             message: map_sqlite_error(e, "list_component_patterns.project").to_string(),
         })?;
@@ -199,7 +199,7 @@ pub fn list_component_patterns(
                  ORDER BY updated_at DESC, id DESC \
                  LIMIT ?6",
             )
-            .map_err(|e| SsotLockError::Validation {
+            .map_err(|e| SsotLockError::Internal {
                 code: "INTERNAL_ERROR",
                 message: map_sqlite_error(e, "list_component_patterns.cursor_prepare").to_string(),
             })?;
@@ -208,12 +208,12 @@ pub fn list_component_patterns(
                 params![tenant_id, project_id, portal_id, c_ts, c_id, fetch_limit],
                 row_mapper,
             )
-            .map_err(|e| SsotLockError::Validation {
+            .map_err(|e| SsotLockError::Internal {
                 code: "INTERNAL_ERROR",
                 message: map_sqlite_error(e, "list_component_patterns.cursor_query").to_string(),
             })?;
         for r in rows {
-            patterns.push(r.map_err(|e| SsotLockError::Validation {
+            patterns.push(r.map_err(|e| SsotLockError::Internal {
                 code: "INTERNAL_ERROR",
                 message: map_sqlite_error(e, "list_component_patterns.row").to_string(),
             })?);
@@ -230,18 +230,18 @@ pub fn list_component_patterns(
                  ORDER BY updated_at DESC, id DESC \
                  LIMIT ?4",
             )
-            .map_err(|e| SsotLockError::Validation {
+            .map_err(|e| SsotLockError::Internal {
                 code: "INTERNAL_ERROR",
                 message: map_sqlite_error(e, "list_component_patterns.prepare").to_string(),
             })?;
         let rows = stmt
             .query_map(params![tenant_id, project_id, portal_id, fetch_limit], row_mapper)
-            .map_err(|e| SsotLockError::Validation {
+            .map_err(|e| SsotLockError::Internal {
                 code: "INTERNAL_ERROR",
                 message: map_sqlite_error(e, "list_component_patterns.query").to_string(),
             })?;
         for r in rows {
-            patterns.push(r.map_err(|e| SsotLockError::Validation {
+            patterns.push(r.map_err(|e| SsotLockError::Internal {
                 code: "INTERNAL_ERROR",
                 message: map_sqlite_error(e, "list_component_patterns.row").to_string(),
             })?);
@@ -264,7 +264,7 @@ pub fn list_component_patterns(
             params![tenant_id, project_id, portal_id],
             |r| r.get(0),
         )
-        .map_err(|e| SsotLockError::Validation {
+        .map_err(|e| SsotLockError::Internal {
             code: "INTERNAL_ERROR",
             message: map_sqlite_error(e, "list_component_patterns.quarantined_count").to_string(),
         })?;
@@ -312,12 +312,16 @@ pub fn reverse_sync_tsx_components(
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
             let now_ms = req.now_ms.unwrap_or_else(current_epoch_ms);
 
-            let active_lock: Option<(String, i64)> = tx
+            let active_lock: Option<(String, i64, Vec<String>)> = tx
                 .query_row(
-                    "SELECT lock_owner_id, expires_at FROM app_shell_locks \
+                    "SELECT lock_owner_id, expires_at, locked_slots_json FROM app_shell_locks \
                      WHERE tenant_id = ?1 AND project_id = ?2 AND portal_id = ?3",
                     params![req.tenant_id, req.project_id, req.portal_id],
-                    |r| Ok((r.get(0)?, r.get(1)?)),
+                    |r| {
+                        let slots_raw: String = r.get(2)?;
+                        let slots: Vec<String> = serde_json::from_str(&slots_raw).unwrap_or_default();
+                        Ok((r.get(0)?, r.get(1)?, slots))
+                    },
                 )
                 .optional()?;
 
@@ -386,21 +390,36 @@ pub fn reverse_sync_tsx_components(
                     )
                     .optional()?;
 
-                let lock_violation = match &active_lock {
-                    Some((owner, expires_at)) => check_appshell_lock_constraint(
-                        &pattern_slug,
-                        Some(owner.as_str()),
-                        &req.caller_actor,
-                        Some(*expires_at),
-                        now_ms,
+                let (lock_violation, locked_slots_ref): (_, &[String]) = match &active_lock {
+                    Some((owner, expires_at, slots)) => (
+                        check_appshell_lock_constraint_with_slots(
+                            &pattern_slug,
+                            Some(owner.as_str()),
+                            &req.caller_actor,
+                            Some(*expires_at),
+                            now_ms,
+                            slots,
+                        ),
+                        slots.as_slice(),
                     ),
-                    None => None,
+                    None => (None, &[]),
                 };
 
                 if let Some(mut existing) = existing_row {
-                    if existing.dedup_marker_sha256 == dedup_marker
-                        && (existing.drift_status == "synced" || lock_violation.is_some())
-                    {
+                    let existing_quarantined_marker =
+                        serde_json::from_str::<serde_json::Value>(&existing.quarantined_diff_json)
+                            .ok()
+                            .and_then(|v| {
+                                v.get("incomingDedupMarkerSha256")
+                                    .and_then(|s| s.as_str())
+                                    .map(str::to_string)
+                            });
+                    let is_canonical_noop = existing.dedup_marker_sha256 == dedup_marker
+                        && (existing.drift_status == "synced" || lock_violation.is_some());
+                    let is_quarantined_noop = lock_violation.is_some()
+                        && existing.drift_status == "quarantined_drift"
+                        && existing_quarantined_marker.as_deref() == Some(dedup_marker.as_str());
+                    if is_canonical_noop || is_quarantined_noop {
                         results.push(ReverseSyncPatternResult {
                             disposition: ReverseSyncDisposition::SuppressedNoOp,
                             pattern: existing,
@@ -412,7 +431,9 @@ pub fn reverse_sync_tsx_components(
                         let quarantine_payload = serde_json::json!({
                             "ruleCode": violation.rule_code,
                             "message": violation.message,
+                            "lockedSlots": locked_slots_ref,
                             "incomingAstSha256": sig.ast_signature_sha256,
+                            "incomingDedupMarkerSha256": dedup_marker,
                             "incomingTokensSnapshot": tokens_snapshot_json,
                             "callerActor": req.caller_actor,
                         })
@@ -422,13 +443,11 @@ pub fn reverse_sync_tsx_components(
                             "UPDATE component_patterns \
                              SET drift_status = 'quarantined_drift', \
                                  quarantined_diff_json = ?1, \
-                                 dedup_marker_sha256 = ?2, \
                                  revision = revision + 1, \
-                                 updated_at = ?3 \
-                             WHERE id = ?4 AND tenant_id = ?5",
+                                 updated_at = ?2 \
+                             WHERE id = ?3 AND tenant_id = ?4",
                             params![
                                 quarantine_payload,
-                                dedup_marker,
                                 now_ms,
                                 existing.id,
                                 req.tenant_id
@@ -437,7 +456,6 @@ pub fn reverse_sync_tsx_components(
 
                         existing.drift_status = "quarantined_drift".to_string();
                         existing.quarantined_diff_json = quarantine_payload;
-                        existing.dedup_marker_sha256 = dedup_marker;
                         existing.revision += 1;
                         existing.updated_at = now_ms;
                         results.push(ReverseSyncPatternResult {
@@ -496,27 +514,45 @@ pub fn reverse_sync_tsx_components(
                     });
                 } else {
                     let new_id = Uuid::new_v4().to_string();
-                    let (drift_status, quarantine_json, disposition) =
-                        if let Some(violation) = lock_violation {
-                            let q = serde_json::json!({
-                                "ruleCode": violation.rule_code,
-                                "message": violation.message,
-                                "incomingAstSha256": sig.ast_signature_sha256,
-                                "callerActor": req.caller_actor,
-                            })
-                            .to_string();
-                            (
-                                "quarantined_drift".to_string(),
-                                q,
-                                ReverseSyncDisposition::QuarantinedDrift,
-                            )
-                        } else {
-                            (
-                                "synced".to_string(),
-                                "{}".to_string(),
-                                ReverseSyncDisposition::Synced,
-                            )
-                        };
+                    let (
+                        drift_status,
+                        quarantine_json,
+                        disposition,
+                        stored_ast_sha,
+                        stored_dedup_marker,
+                        stored_tokens,
+                        stored_doc,
+                    ) = if let Some(violation) = lock_violation {
+                        let q = serde_json::json!({
+                            "ruleCode": violation.rule_code,
+                            "message": violation.message,
+                            "lockedSlots": locked_slots_ref,
+                            "incomingAstSha256": sig.ast_signature_sha256,
+                            "incomingDedupMarkerSha256": dedup_marker,
+                            "incomingTokensSnapshot": tokens_snapshot_json,
+                            "callerActor": req.caller_actor,
+                        })
+                        .to_string();
+                        (
+                            "quarantined_drift".to_string(),
+                            q,
+                            ReverseSyncDisposition::QuarantinedDrift,
+                            String::new(),
+                            String::new(),
+                            "{}".to_string(),
+                            String::new(),
+                        )
+                    } else {
+                        (
+                            "synced".to_string(),
+                            "{}".to_string(),
+                            ReverseSyncDisposition::Synced,
+                            sig.ast_signature_sha256.clone(),
+                            dedup_marker,
+                            tokens_snapshot_json,
+                            doc_markdown,
+                        )
+                    };
 
                     tx.execute(
                         "INSERT INTO component_patterns \
@@ -533,10 +569,10 @@ pub fn reverse_sync_tsx_components(
                             pattern_slug,
                             sig.display_name,
                             sig.source_path,
-                            sig.ast_signature_sha256,
-                            dedup_marker,
-                            tokens_snapshot_json,
-                            doc_markdown,
+                            stored_ast_sha,
+                            stored_dedup_marker,
+                            stored_tokens,
+                            stored_doc,
                             drift_status,
                             quarantine_json,
                             now_ms
@@ -552,12 +588,12 @@ pub fn reverse_sync_tsx_components(
                             pattern_slug,
                             component_name: sig.display_name.clone(),
                             source_path: Some(sig.source_path.clone()),
-                            ast_signature_sha256: sig.ast_signature_sha256.clone(),
-                            dedup_marker_sha256: dedup_marker,
+                            ast_signature_sha256: stored_ast_sha,
+                            dedup_marker_sha256: stored_dedup_marker,
                             source_revision: 1,
                             last_sync_source: "oxc_reverse_sync".to_string(),
-                            tokens_snapshot_json,
-                            doc_markdown,
+                            tokens_snapshot_json: stored_tokens,
+                            doc_markdown: stored_doc,
                             drift_status,
                             quarantined_diff_json: quarantine_json,
                             revision: 1,

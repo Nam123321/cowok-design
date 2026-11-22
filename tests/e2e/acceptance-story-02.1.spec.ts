@@ -209,18 +209,31 @@ test.describe("Story 02.1 Live Browser Acceptance (HAR + Nonce + Screenshots)", 
       expect(apiResults.histStatus).toBe(200);
       expect(apiResults.histJson.data.items.length).toBeGreaterThanOrEqual(1);
 
+      const consoleErrors: string[] = [];
+      page.on("console", (msg) => {
+        if (msg.type() === "error") consoleErrors.push(msg.text());
+      });
+
       const trigger = page.locator("[data-ff-id='context-meter-trigger']").first();
       await expect(trigger).toBeVisible({ timeout: 10000 });
       await trigger.click();
-      await expect(page.locator("[data-ff-id='context-meter-popover']").first()).toBeVisible({ timeout: 5000 });
+      const popover = page.locator("[data-ff-id='context-meter-popover']").first();
+      await expect(popover).toBeVisible({ timeout: 5000 });
       await page.locator("[data-ff-id='context-meter-profile-select']").selectOption("C");
+      const assembleRespPromise = page.waitForResponse(
+        (resp) => resp.url().includes("/api/v1/context/assemble") && resp.request().method() === "POST",
+        { timeout: 10000 }
+      );
       await page.locator("[data-ff-id='context-meter-refresh-btn']").click();
-      await page.waitForTimeout(300);
+      const assembleResp = await assembleRespPromise;
+      expect(assembleResp.status()).toBeLessThan(500);
+      await expect(trigger).toContainText("C");
 
       fs.writeFileSync(path.join(EVIDENCE_DIR, "dom-snapshot.html"), await page.content(), "utf8");
       await page.screenshot({ path: path.join(EVIDENCE_DIR, "screenshot-final.png"), fullPage: false });
 
       expect(pageErrors).toEqual([]);
+      expect(consoleErrors).toEqual([]);
       expect(server500s).toEqual([]);
     } finally {
       await context.close();

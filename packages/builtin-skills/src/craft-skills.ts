@@ -220,6 +220,47 @@ function inferSlugsFromIntent(portalId: string, intent: string): CraftSkillSlug[
   return Array.from(inferred).sort() as CraftSkillSlug[];
 }
 
+const MAX_CRAFT_SKILLS_COUNT = 7;
+const MAX_PROJECT_ID_LEN = 128;
+const MAX_INTENT_SUMMARY_LEN = 1000;
+const ALLOWED_SSOT_PORTALS = new Set([
+  "SuperAdmin",
+  "TenantAdmin",
+  "SalesApp",
+  "MarketingWeb",
+  "DeveloperPortal",
+  "Presentation",
+]);
+
+function validateSkillRouteInput(input: {
+  projectId: string;
+  portalId: string;
+  intentSummary: string;
+  requestedSlugs?: CraftSkillSlug[];
+  maxSpineTokens?: number;
+}): { maxSpine: number; trimmedIntent: string } {
+  if (!input.projectId.trim() || input.projectId.length > MAX_PROJECT_ID_LEN) {
+    throw new Error(`INVALID_REQUEST: projectId must be 1..=${MAX_PROJECT_ID_LEN} chars`);
+  }
+  if (!ALLOWED_SSOT_PORTALS.has(input.portalId)) {
+    throw new Error(`INVALID_REQUEST: Unsupported portalId: ${input.portalId}`);
+  }
+  const trimmedIntent = input.intentSummary.trim();
+  if (!trimmedIntent || input.intentSummary.length > MAX_INTENT_SUMMARY_LEN) {
+    throw new Error(`INVALID_REQUEST: intentSummary must be 1..=${MAX_INTENT_SUMMARY_LEN} characters`);
+  }
+  const maxSpine = input.maxSpineTokens ?? COWOK_DESIGN_OPT_SPINE_MAX_TOKENS;
+  if (!Number.isInteger(maxSpine) || maxSpine < 1 || maxSpine > COWOK_DESIGN_OPT_SPINE_MAX_TOKENS) {
+    throw new Error(
+      `SPINE_TOKEN_BUDGET_EXCEEDED: maxSpineTokens must be between 1 and ${COWOK_DESIGN_OPT_SPINE_MAX_TOKENS}`
+    );
+  }
+  if (input.requestedSlugs && input.requestedSlugs.length > MAX_CRAFT_SKILLS_COUNT) {
+    throw new Error(`INVALID_REQUEST: requestedSlugs exceeds maximum of ${MAX_CRAFT_SKILLS_COUNT}`);
+  }
+  return { maxSpine, trimmedIntent };
+}
+
 export function routeCraftSkillsDeterministic(input: {
   projectId: string;
   portalId: string;
@@ -228,33 +269,25 @@ export function routeCraftSkillsDeterministic(input: {
   maxSpineTokens?: number;
 }): LocalSkillRouteResult {
   const start = performance.now();
-  const maxSpine = input.maxSpineTokens ?? COWOK_DESIGN_OPT_SPINE_MAX_TOKENS;
+  const { maxSpine, trimmedIntent } = validateSkillRouteInput(input);
   const spineTokens = countCl100kBpeTokens(COWOK_DESIGN_OPT_SPINE);
   if (spineTokens > maxSpine || spineTokens > COWOK_DESIGN_OPT_SPINE_MAX_TOKENS) {
     throw new Error(`SPINE_TOKEN_BUDGET_EXCEEDED: ${spineTokens} > ${maxSpine}`);
   }
-
-  const candidateSlugs = input.requestedSlugs ?? inferSlugsFromIntent(input.portalId, input.intentSummary);
+  const candidateSlugs = input.requestedSlugs ?? inferSlugsFromIntent(input.portalId, trimmedIntent);
   for (const slug of candidateSlugs) {
     if (!Object.prototype.hasOwnProperty.call(CRAFT_SKILLS_3TIER_REGISTRY, slug)) {
-      throw new Error(`UNKNOWN_CRAFT_SKILL: ${slug}`);
+      throw new Error(`INVALID_REQUEST: Unknown craft skill slug: ${slug}`);
     }
   }
   const uniqueSorted = Array.from(new Set(candidateSlugs)).sort((a, b) =>
     a < b ? -1 : a > b ? 1 : 0
   ) as CraftSkillSlug[];
-
   const zone2CraftPrefix = uniqueSorted
-    .map((slug) => {
-      const def = CRAFT_SKILLS_3TIER_REGISTRY[slug];
-      return `${def.tier1Rule}\n${def.tier2Guide}`;
-    })
+    .map((slug) => `${CRAFT_SKILLS_3TIER_REGISTRY[slug].tier1Rule}\n${CRAFT_SKILLS_3TIER_REGISTRY[slug].tier2Guide}`)
     .join("\n---\n");
-
   const prefixSha256 = computeLengthPrefixedPrefixSha256(COWOK_DESIGN_OPT_SPINE, zone2CraftPrefix);
-  const zone3IntentTail = `portal=${input.portalId} | projectId=${input.projectId} | intent=${input.intentSummary.trim()}`;
-  const latencyMs = Math.max(0, performance.now() - start);
-
+  const zone3IntentTail = `portal=${input.portalId} | projectId=${input.projectId} | intent=${trimmedIntent}`;
   return {
     portalId: input.portalId,
     spineTokens,
@@ -263,6 +296,6 @@ export function routeCraftSkillsDeterministic(input: {
     zone1Spine: COWOK_DESIGN_OPT_SPINE,
     zone2CraftPrefix,
     zone3IntentTail,
-    latencyMs,
+    latencyMs: Math.max(0, performance.now() - start),
   };
 }

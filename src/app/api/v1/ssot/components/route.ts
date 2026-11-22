@@ -14,10 +14,44 @@ import {
 
 const HTTP_UNPROCESSABLE = 422;
 
+function findDuplicateQueryKey(params: URLSearchParams): string | null {
+  const seen = new Set<string>();
+  for (const key of params.keys()) {
+    if (seen.has(key)) return key;
+    seen.add(key);
+  }
+  return null;
+}
+
+function buildCanonicalComponentsQuery(data: {
+  projectId: string;
+  portalId: string;
+  cursor?: string;
+  limit: number;
+}): string {
+  const canonical = new URLSearchParams({
+    projectId: data.projectId,
+    portalId: data.portalId,
+    limit: String(data.limit),
+  });
+  if (data.cursor) canonical.set("cursor", data.cursor);
+  return canonical.toString();
+}
+
 export const GET = guardedRoute(
   async (req, ctx) => {
     const requestId = resolveRequestCorrelationId(ctx);
     const url = new URL(req.url, "http://127.0.0.1");
+    const dupKey = findDuplicateQueryKey(url.searchParams);
+    if (dupKey) {
+      return buildSsotErrorResponse({
+        status: HTTP_UNPROCESSABLE,
+        code: "INVALID_REQUEST",
+        message: "Duplicate query parameter is not permitted",
+        requestId,
+        field: dupKey,
+      });
+    }
     const limitRaw = url.searchParams.get("limit");
     if (limitRaw !== null && !/^\d+$/.test(limitRaw)) {
       return buildSsotErrorResponse({
@@ -43,7 +77,7 @@ export const GET = guardedRoute(
     return proxyAndValidateSsotDaemon({
       method: "GET",
       daemonPath: "/api/v1/ssot/components",
-      rawQuery: url.search.slice(1),
+      rawQuery: buildCanonicalComponentsQuery(parsed.data),
       req,
       ctx,
       requestId,

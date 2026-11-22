@@ -1368,9 +1368,24 @@ pub async fn legacy_project_auth_middleware(
             .or_else(|| auth.get_valid_session(tok))
         {
             Some(mut principal) => {
-                let role = resolve_role(&parts.headers, Some(tok));
-                if role == "viewer" {
-                    principal.role = "viewer".to_string();
+                if let Some(hdr_role) = parts
+                    .headers
+                    .get("x-cowok-role")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.trim().to_ascii_lowercase())
+                {
+                    if hdr_role == "viewer" {
+                        principal.role = "viewer".to_string();
+                    } else if hdr_role == "editor" && principal.role == "admin" {
+                        principal.role = "editor".to_string();
+                    } else if hdr_role != "editor" && hdr_role != "admin" {
+                        principal.role = "viewer".to_string();
+                    }
+                } else {
+                    let role = resolve_role(&parts.headers, Some(tok));
+                    if role == "viewer" {
+                        principal.role = "viewer".to_string();
+                    }
                 }
                 Some(VerifiedLegacyIngress {
                     principal,
@@ -1451,7 +1466,7 @@ pub async fn legacy_project_auth_middleware(
         }
     }
 
-    if parts.uri.path() == "/api/v1/fs/browse" {
+    if parts.uri.path() == "/api/v1/fs/browse" || parts.uri.path() == "/api/v1/fs/pick-native" {
         if let Some(ref caller) = verified {
             if caller.kind == LegacyAuthKind::Bearer && !is_valid_superadmin_bearer(&parts.headers)
             {

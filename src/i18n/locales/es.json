@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "Charla",
     "githubUrlPlaceholder": "Ingresa URL del repositorio (https://github.com/...)",
     "standaloneChatAck": "Prompt registrado en sesión independiente",
-    "oauthCliFallback": "Acceso OAuth/CLI"
+    "oauthCliFallback": "Acceso OAuth/CLI",
+    "pickerPathPlaceholder": "~/Desktop/mi-proyecto o /Users/...",
+    "pickerGoBtn": "Ir",
+    "pickerOpenDirBtn": "Abrir",
+    "pickerNewSubfolderLabel": "Nueva subcarpeta (opcional):",
+    "pickerNewSubfolderPlaceholder": "Ej.: mi-nueva-app (déjalo vacío para usar la carpeta seleccionada)",
+    "pickerInvalidSubfolderError": "Nombre de subcarpeta no válido (no puede contener '/', '\\\\' ni empezar por '.')",
+    "pickerHomeRootBlockedHint": "No se puede vincular un proyecto directamente a la carpeta raíz Home (~). Selecciona una subcarpeta o escribe un nombre nuevo.",
+    "pickerSelectedTargetPrefix": "Carpeta de destino:",
+    "pickerNativeFinderBtn": "Abrir Finder...",
+    "pickerNativeFinderOpening": "Abriendo Finder...",
+    "pickerNativeFinderPrompt": "Selecciona una carpeta local del proyecto"
   },
   "chat": {
     "agentTitle": "Agente Cowok",
@@ -1196,7 +1207,10 @@
       "daemonContractViolation": "El daemon devolvió un contrato de contexto inválido.",
       "invalidSources": "La lista de sourceIds debe tener entre 1 y 100 elementos.",
       "duplicateSourceId": "La lista de sourceIds no debe contener duplicados.",
-      "storage": "Error de almacenamiento de contexto."
+      "storage": "Error de almacenamiento de contexto.",
+      "unauthorized": "Autenticación requerida.",
+      "forbidden": "Permiso denegado.",
+      "requestRejected": "Solicitud rechazada."
     }
   },
   "ssot": {
@@ -1210,7 +1224,7 @@
     },
     "export": {
       "busy": "Exportando...",
-      "cta": "Exportar SSOT"
+      "cta": "Exportar kit de diseño"
     },
     "patterns": {
       "title": "Patrones de diseño",
@@ -1222,6 +1236,15 @@
       "synced": "Sincronizado",
       "empty": "Aún no hay componentes guardados.",
       "button": "Patrones"
+    },
+    "toast": {
+      "loadFailed": "No se pudieron cargar los patrones del espacio.",
+      "lockAcquired": "Marco bloqueado para este espacio.",
+      "lockReleased": "Marco desbloqueado.",
+      "lockConflict": "Bloqueado por otra sesión. Actualiza para sincronizar.",
+      "lockFailed": "No se pudo actualizar el bloqueo del marco.",
+      "exportSuccess": "Kit de diseño exportado (#{rev}).",
+      "exportFailed": "No se pudo exportar el kit de diseño ahora."
     }
   }
 }

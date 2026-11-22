@@ -134,7 +134,9 @@ const MeterStatsSection: React.FC<{
   const { t } = useTranslation();
   const textUsed = snapshot?.textTotalTokens ?? 0;
   const outlineUsed = snapshot?.outlineTokens ?? 0;
-  const ratioPct = Math.round((snapshot?.ssotDomRatio ?? 1) * PERCENT_FULL);
+  const ratioLabel = snapshot
+    ? `${Math.round(snapshot.ssotDomRatio * PERCENT_FULL)}%`
+    : "—";
   const textPct = Math.min(
     PERCENT_FULL,
     Math.round((textUsed / CONTEXT_LIMITS.MAX_TEXT_BPE_TOKENS) * PERCENT_FULL)
@@ -151,7 +153,7 @@ const MeterStatsSection: React.FC<{
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
         <span>{t("contextMeter.outlineLabel", "DOM Outline")}: {outlineUsed}/{CONTEXT_LIMITS.MAX_OUTLINE_BPE_TOKENS}</span>
-        <span>{t("contextMeter.ssotLabel", "SSOT")}: {ratioPct}%</span>
+        <span>{t("contextMeter.ssotLabel", "SSOT")}: {ratioLabel}</span>
       </div>
       {snapshot && (
         <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "var(--font-mono)", fontSize: "10px", color: "var(--text-secondary)", paddingTop: "4px", borderTop: "1px solid var(--border-subtle)" }}>

@@ -60,7 +60,6 @@ export function buildCanonicalHmacHeaders(params: {
     .digest("hex");
   return {
     "Content-Type": params.contentType || "application/json",
-    Host: "127.0.0.1",
     "X-Correlation-Id": params.correlationId,
     "X-Cowok-Timestamp": timestamp,
     "X-Cowok-Nonce": requestNonce,
@@ -89,6 +88,39 @@ export function assembleForwardHeaders(
     }
   }
   return Object.assign(headers, signedHeaders);
+}
+
+const HTTP_CONFLICT = 409;
+
+export async function seedProjectsToDaemon(
+  lock: DaemonLockRecord,
+  projects: Array<{ id: string; slug: string; name: string; product_brief: string }>
+): Promise<void> {
+  for (const proj of projects) {
+    const rawBody = JSON.stringify({
+      ...proj,
+      workspace_root: null,
+      inherit_brand_from_project_id: null,
+    });
+    const headers = buildCanonicalHmacHeaders({
+      daemonNonce: lock.daemon_nonce,
+      hmacKeyHex: lock.hmac_key_hex,
+      method: "POST",
+      canonicalPath: "/api/v1/projects",
+      rawQuery: "",
+      principal: { tenantId: "local-default", userId: "bff-bootstrap", role: "editor" },
+      rawBody,
+      correlationId: crypto.randomUUID(),
+    });
+    const res = await fetch(`http://127.0.0.1:${lock.port}/api/v1/projects`, {
+      method: "POST",
+      headers,
+      body: rawBody,
+    });
+    if (!res.ok && res.status !== HTTP_CONFLICT) {
+      throw new Error(`Seed project '${proj.slug}' failed (${res.status})`);
+    }
+  }
 }
 
 export async function relayDaemonResponse(

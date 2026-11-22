@@ -346,31 +346,42 @@ impl SqlitePool {
 
         if is_genesis_empty {
             let db_bytes = Self::cached_genesis_db_bytes(&parent_dir)?;
+            let tmp_path = parent_dir.join(format!(".genesis-init-{}.tmp", uuid::Uuid::new_v4()));
             #[cfg(unix)]
             {
                 use std::os::unix::fs::OpenOptionsExt;
-                let mut f = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .custom_flags(libc::O_NOFOLLOW)
-                    .mode(0o600)
-                    .open(&config.db_path)
-                    .map_err(|e| HarnessError::ValidationFailed {
+                let write_res = (|| -> Result<(), std::io::Error> {
+                    let mut f = OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .custom_flags(libc::O_NOFOLLOW)
+                        .mode(0o600)
+                        .open(&tmp_path)?;
+                    f.write_all(db_bytes)?;
+                    f.sync_all()?;
+                    Ok(())
+                })();
+                if let Err(e) = write_res {
+                    let _ = fs::remove_file(&tmp_path);
+                    return Err(HarnessError::ValidationFailed {
                         reason: format!("GENESIS_WRITE_FAILED: {e}"),
-                    })?;
-                f.write_all(db_bytes)
-                    .map_err(|e| HarnessError::ValidationFailed {
-                        reason: format!("GENESIS_WRITE_FAILED: {e}"),
-                    })?;
+                    });
+                }
             }
             #[cfg(not(unix))]
             {
-                fs::write(&config.db_path, db_bytes).map_err(|e| {
-                    HarnessError::ValidationFailed {
+                if let Err(e) = fs::write(&tmp_path, db_bytes) {
+                    let _ = fs::remove_file(&tmp_path);
+                    return Err(HarnessError::ValidationFailed {
                         reason: format!("GENESIS_WRITE_FAILED: {e}"),
-                    }
-                })?;
+                    });
+                }
+            }
+            if let Err(e) = fs::rename(&tmp_path, &config.db_path) {
+                let _ = fs::remove_file(&tmp_path);
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!("GENESIS_WRITE_FAILED: {e}"),
+                });
             }
             let _conn = Self::connect_with_pragmas_opts(&config, true)?;
         } else {

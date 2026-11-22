@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "对话",
     "githubUrlPlaceholder": "输入仓库 URL (https://github.com/...)",
     "standaloneChatAck": "已记录独立会话提示",
-    "oauthCliFallback": "OAuth/CLI 授权"
+    "oauthCliFallback": "OAuth/CLI 授权",
+    "pickerPathPlaceholder": "~/Desktop/my-project 或 /Users/...",
+    "pickerGoBtn": "前往",
+    "pickerOpenDirBtn": "打开",
+    "pickerNewSubfolderLabel": "新建子文件夹（可选）：",
+    "pickerNewSubfolderPlaceholder": "例如：my-new-app（留空则使用当前选中目录）",
+    "pickerInvalidSubfolderError": "子文件夹名称无效（不能包含 '/'、'\\\\' 或以 '.' 开头）",
+    "pickerHomeRootBlockedHint": "无法直接将项目绑定到主目录根目录（~）。请选择一个子文件夹或输入新建子文件夹名称。",
+    "pickerSelectedTargetPrefix": "目标目录：",
+    "pickerNativeFinderBtn": "打开访达 (Finder)...",
+    "pickerNativeFinderOpening": "正在打开访达...",
+    "pickerNativeFinderPrompt": "选择本地项目文件夹"
   },
   "chat": {
     "agentTitle": "Cowok 智能体",
@@ -1196,7 +1207,10 @@
       "daemonContractViolation": "后台服务返回了畸形的上下文契约响应。",
       "invalidSources": "请求的 sourceIds 必须包含 1 到 100 项。",
       "duplicateSourceId": "请求的 sourceIds 不能包含重复项。",
-      "storage": "上下文存储发生错误。"
+      "storage": "上下文存储发生错误。",
+      "unauthorized": "需要身份验证。",
+      "forbidden": "权限不足。",
+      "requestRejected": "请求被拒绝。"
     }
   },
   "ssot": {
@@ -1210,7 +1224,7 @@
     },
     "export": {
       "busy": "导出中...",
-      "cta": "导出 SSOT"
+      "cta": "导出设计包"
     },
     "patterns": {
       "title": "设计模式",
@@ -1222,6 +1236,15 @@
       "synced": "已同步",
       "empty": "该门户暂无已保存组件。",
       "button": "设计模式"
+    },
+    "toast": {
+      "loadFailed": "无法加载工作区组件模式。",
+      "lockAcquired": "已锁定当前工作区框架。",
+      "lockReleased": "已解锁框架。",
+      "lockConflict": "已被其他会话锁定，请刷新同步。",
+      "lockFailed": "无法更新框架锁定状态。",
+      "exportSuccess": "设计包导出成功 (#{rev})。",
+      "exportFailed": "当前无法完成设计包导出。"
     }
   }
 }

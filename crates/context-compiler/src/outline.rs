@@ -30,22 +30,31 @@ pub fn compress_dom_outline(nodes: &[DomOutlineNode], max_tokens: usize) -> (Str
     }
     let mut sorted = nodes.to_vec();
     sorted.sort_by(|a, b| a.ff_id.cmp(&b.ff_id).then_with(|| a.tag.cmp(&b.tag)));
-    let mut kept_lines = Vec::new();
+    let mut outline_text = String::new();
+    let mut outline_tokens = 0usize;
     let mut included = 0usize;
     for node in &sorted {
-        let candidate_line = format_outline_line(node);
-        let mut probe = kept_lines.join("\n");
-        if !probe.is_empty() {
-            probe.push('\n');
+        if outline_tokens >= cap {
+            break;
         }
-        probe.push_str(&candidate_line);
-        if estimate_tokens(&probe) <= cap {
-            kept_lines.push(candidate_line);
+        let candidate_line = format_outline_line(node);
+        let line_tokens = estimate_tokens(&candidate_line);
+        if outline_tokens + line_tokens > cap + 1 {
+            continue;
+        }
+        let prev_len = outline_text.len();
+        if prev_len > 0 {
+            outline_text.push('\n');
+        }
+        outline_text.push_str(&candidate_line);
+        let next_tokens = estimate_tokens(&outline_text);
+        if next_tokens <= cap {
+            outline_tokens = next_tokens;
             included += 1;
+        } else {
+            outline_text.truncate(prev_len);
         }
     }
-    let outline_text = kept_lines.join("\n");
-    let outline_tokens = estimate_tokens(&outline_text);
     (outline_text, outline_tokens, included)
 }
 

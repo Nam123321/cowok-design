@@ -13,11 +13,11 @@ start_date: '2026-07-24'
 "Story 01.3 - Xây dựng crates/harness-daemon (Axum + Tokio) & 9-Spec Synthesis Pipeline": completed
 
 # Epic 02: JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills
-"Epic 02 - JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills": in-progress
+"Epic 02 - JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills": completed
 "Story 02.1 - Portal-Safe Context Slicing, KV-Cache Static-Prefix Prompt Compiler & 3-Profile Live Execution": completed
 "Story 02.2 - Token Budget Governor (<= 1,500 Input Tokens) & Deterministic Prompt Compiler": cancelled
 "Story 02.3 - Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter)": cancelled
-"Story 02.4 - Hidden Dual-Use SSOT (V16), AppShell & Component Registry, cowok-design-opt Spine, 7 Craft Skills & 3-Zone Router": refactored
+"Story 02.4 - Hidden Dual-Use SSOT (V16), AppShell & Component Registry, cowok-design-opt Spine, 7 Craft Skills & 3-Zone Router": completed
 
 # Epic 03: Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher
 "Epic 03 - Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher": completed

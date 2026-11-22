@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "Discussion",
     "githubUrlPlaceholder": "Saisissez l'URL du dépôt (https://github.com/...)",
     "standaloneChatAck": "Invite enregistrée dans la session autonome",
-    "oauthCliFallback": "Accès OAuth/CLI"
+    "oauthCliFallback": "Accès OAuth/CLI",
+    "pickerPathPlaceholder": "~/Desktop/mon-projet ou /Users/...",
+    "pickerGoBtn": "Aller",
+    "pickerOpenDirBtn": "Ouvrir",
+    "pickerNewSubfolderLabel": "Nouveau sous-dossier (facultatif) :",
+    "pickerNewSubfolderPlaceholder": "Ex. : mon-app (laisser vide pour utiliser le dossier sélectionné)",
+    "pickerInvalidSubfolderError": "Nom de sous-dossier invalide (ne doit pas contenir '/', '\\\\' ni commencer par '.')",
+    "pickerHomeRootBlockedHint": "Impossible de lier un projet directement au dossier racine Home (~). Sélectionnez un sous-dossier ou saisissez un nom.",
+    "pickerSelectedTargetPrefix": "Dossier cible :",
+    "pickerNativeFinderBtn": "Ouvrir Finder...",
+    "pickerNativeFinderOpening": "Ouverture de Finder...",
+    "pickerNativeFinderPrompt": "Sélectionnez un dossier de projet local"
   },
   "chat": {
     "agentTitle": "Agent Cowok",
@@ -1196,7 +1207,10 @@
       "daemonContractViolation": "Le démon a retourné un contrat de contexte invalide.",
       "invalidSources": "La liste sourceIds doit contenir entre 1 et 100 éléments.",
       "duplicateSourceId": "La liste sourceIds ne doit pas contenir de doublons.",
-      "storage": "Erreur de stockage du contexte."
+      "storage": "Erreur de stockage du contexte.",
+      "unauthorized": "Authentification requise.",
+      "forbidden": "Autorisation refusée.",
+      "requestRejected": "Requête rejetée."
     }
   },
   "ssot": {
@@ -1210,7 +1224,7 @@
     },
     "export": {
       "busy": "Exportation...",
-      "cta": "Exporter SSOT"
+      "cta": "Exporter le kit design"
     },
     "patterns": {
       "title": "Modèles UI",
@@ -1222,6 +1236,15 @@
       "synced": "Synchronisé",
       "empty": "Aucun composant enregistré ici.",
       "button": "Modèles"
+    },
+    "toast": {
+      "loadFailed": "Impossible de charger les motifs de cet espace.",
+      "lockAcquired": "Structure verrouillée pour cet espace.",
+      "lockReleased": "Structure déverrouillée.",
+      "lockConflict": "Verrouillé par une autre session. Actualisez pour synchroniser.",
+      "lockFailed": "Impossible de mettre à jour le verrouillage.",
+      "exportSuccess": "Kit design exporté (#{rev}).",
+      "exportFailed": "Impossible d'exporter le kit design pour le moment."
     }
   }
 }

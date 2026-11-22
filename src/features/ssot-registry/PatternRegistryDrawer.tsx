@@ -101,9 +101,10 @@ const PatternDrawerHeader: React.FC<{ quarantinedCount: number; onClose: () => v
 const PatternPortalToolbar: React.FC<{
   portalId: SsotPortalId;
   isLoading: boolean;
+  hasProject: boolean;
   onPortalChange: (portal: SsotPortalId) => void;
   onRefresh: () => void;
-}> = ({ portalId, isLoading, onPortalChange, onRefresh }) => {
+}> = ({ portalId, isLoading, hasProject, onPortalChange, onRefresh }) => {
   const { t } = useTranslation();
   return (
     <div style={TOOLBAR_STYLE}>
@@ -112,7 +113,7 @@ const PatternPortalToolbar: React.FC<{
           <option key={pid} value={pid}>{pid}</option>
         ))}
       </select>
-      <button type="button" data-testid="pattern-refresh-btn" disabled={isLoading} onClick={onRefresh} style={refreshBtnStyle(isLoading)}>
+      <button type="button" data-testid="pattern-refresh-btn" disabled={isLoading || !hasProject} onClick={onRefresh} style={refreshBtnStyle(isLoading)}>
         <BrandIcon name="refresh-cw" size={SMALL_ICON_SIZE} strokeWidth={ICON_STROKE} color="currentColor" />
         <span>{t("ssot.patterns.refresh", "Refresh")}</span>
       </button>
@@ -149,6 +150,7 @@ export interface PatternRegistryDrawerProps {
   patterns: ComponentPatternDto[];
   quarantinedCount: number;
   isLoading: boolean;
+  hasProject?: boolean;
   onPortalChange: (portal: SsotPortalId) => void;
   onRefresh: () => void;
   onClose: () => void;
@@ -160,6 +162,7 @@ export const PatternRegistryDrawer: React.FC<PatternRegistryDrawerProps> = ({
   patterns,
   quarantinedCount,
   isLoading,
+  hasProject = true,
   onPortalChange,
   onRefresh,
   onClose,
@@ -180,7 +183,7 @@ export const PatternRegistryDrawer: React.FC<PatternRegistryDrawerProps> = ({
   return (
     <aside role="dialog" aria-label={t("ssot.patterns.title", "Design patterns")} data-ff-id="pattern-registry-drawer" data-testid="pattern-registry-drawer" style={DRAWER_STYLE}>
       <PatternDrawerHeader quarantinedCount={quarantinedCount} onClose={onClose} />
-      <PatternPortalToolbar portalId={portalId} isLoading={isLoading} onPortalChange={onPortalChange} onRefresh={onRefresh} />
+      <PatternPortalToolbar portalId={portalId} isLoading={isLoading} hasProject={hasProject} onPortalChange={onPortalChange} onRefresh={onRefresh} />
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px" }}>
         {patterns.length === 0 ? (
           <p style={{ margin: 0, fontSize: "12px", color: "var(--text-secondary)" }}>

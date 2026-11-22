@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-02"
 title: "Epic 02: JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills"
-status: in-progress
+status: completed
 track: "Stream-1"
 wave: 1
 provides: ["Portal-Safe ContextSlicer (<=350 tok outline)", "Static-Prefix/Dynamic-Tail KV-Cache Compiler (<=1,500 tok + max_image_tokens_per_turn)", "3-Profile Live Adapter", "Hidden Dual-Use SSOT V18 (component_patterns, app_shell_locks)", "cowok-design-opt (<=250 tok) + 7 Craft Skills + <15ms 3-Zone CachePreservingSkillRouter"]
@@ -29,7 +29,7 @@ links_to:
 ## 3. Scope / Scope Boundaries
 - **In-Scope:**
   - `Story 02.1` (`completed` — hợp nhất `02.2 + 02.3`): Portal-Safe Context Slicing, KV-Cache Static-Prefix Prompt Compiler & 3-Profile Live Execution.
-  - `Story 02.4` (`refactored` / active slice): Hidden Dual-Use SSOT (`V18`, `58` tables), `AppShell` & Component Registry, `cowok-design-opt` Spine, 7 Craft Skills & 3-Zone Router.
+  - `Story 02.4` (`completed`): Hidden Dual-Use SSOT (`V18`, `58` tables), `AppShell` & Component Registry, `cowok-design-opt` Spine, 7 Craft Skills & 3-Zone Router.
   - `Story 02.2`, `Story 02.3`: `[DEPRECATED]` / `cancelled` (superseded by `Story 02.1`, giữ lịch sử audit).
 - **Out-of-Scope:**
   - Built-in DE tools, Tool Jail & `LEARN` loop (thuộc `Story 08.5`).
@@ -39,7 +39,7 @@ links_to:
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
 | [Story-02.1](./Story-02.1/story.md) | Portal-Safe Context Slicing, KV-Cache Static-Prefix Prompt Compiler & 3-Profile Live Execution *(Consolidated)* | `completed` | `3` | `['01.2', '01.3']` |
-| [Story-02.4](./Story-02.4/story.md) | Hidden Dual-Use SSOT (`V18`), `AppShell` & Component Registry, `cowok-design-opt` Spine, 7 Craft Skills & 3-Zone Router | `refactored` | `3` | `['01.3', '02.1', '03.1']` |
+| [Story-02.4](./Story-02.4/story.md) | Hidden Dual-Use SSOT (`V18`), `AppShell` & Component Registry, `cowok-design-opt` Spine, 7 Craft Skills & 3-Zone Router | `completed` | `3` | `['01.3', '02.1', '03.1']` |
 | [Story-02.2](./Story-02.2/story.md) | *(Superseded by `Story 02.1`)* Token Budget Governor & Deterministic Prompt Compiler | `cancelled` | `2` | `['02.1']` |
 | [Story-02.3](./Story-02.3/story.md) | *(Superseded by `Story 02.1`)* 3-Profile Model Capability Adapter | `cancelled` | `2` | `['02.2']` |
 
@@ -48,7 +48,7 @@ links_to:
 | Axis | Score | Notes |
 | :--- | :---: | :--- |
 | **1. Functional Correctness** | `9.5/10` | Phủ trọn `FR-14`, `FR-27`, `FR-32` theo lát cắt dọc 5 lớp |
-| **2. Data Integrity & State** | `9.5/10` | SQLite `V16 component_patterns, app_shell_locks` & single lock owner |
+| **2. Data Integrity & State** | `9.5/10` | SQLite `V18 component_patterns, app_shell_locks` (`58` tables) & single lock owner |
 | **3. Security & Validation** | `9.6/10` | Zero cross-portal leakage & AST `oxc` reverse sync |
 | **4. Performance & Scalability** | `9.6/10` | KV-cache static prefix & `<15ms` 3-Zone `CachePreservingSkillRouter` |
 | **5. Error Handling & Recovery** | `9.4/10` | Graceful image/text budget clamp & telemetry |

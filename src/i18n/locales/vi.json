@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "Hội thoại",
     "githubUrlPlaceholder": "Nhập URL repository (https://github.com/...)",
     "standaloneChatAck": "Đã ghi nhận trao đổi trong phiên độc lập",
-    "oauthCliFallback": "Tài khoản OAuth/CLI"
+    "oauthCliFallback": "Tài khoản OAuth/CLI",
+    "pickerPathPlaceholder": "~/Desktop/my-project hoặc /Users/...",
+    "pickerGoBtn": "Đi tới",
+    "pickerOpenDirBtn": "Mở",
+    "pickerNewSubfolderLabel": "Tạo thư mục con (tùy chọn):",
+    "pickerNewSubfolderPlaceholder": "Ví dụ: my-new-app (bỏ trống để chọn thư mục đang chọn)",
+    "pickerInvalidSubfolderError": "Tên thư mục con không hợp lệ (không chứa '/', '\\\\' hoặc bắt đầu bằng '.')",
+    "pickerHomeRootBlockedHint": "Không thể đặt dự án trực tiếp tại thư mục gốc Home (~). Hãy chọn một thư mục con hoặc nhập tên thư mục con mới.",
+    "pickerSelectedTargetPrefix": "Thư mục đích:",
+    "pickerNativeFinderBtn": "Mở Finder...",
+    "pickerNativeFinderOpening": "Đang mở Finder...",
+    "pickerNativeFinderPrompt": "Chọn thư mục dự án trên máy"
   },
   "chat": {
     "agentTitle": "Trợ lý Cowok",
@@ -1196,7 +1207,10 @@
       "daemonContractViolation": "Daemon trả về cấu trúc hợp đồng ngữ cảnh sai.",
       "invalidSources": "Danh sách sourceIds phải có từ 1 đến 100 mục.",
       "duplicateSourceId": "Danh sách sourceIds không được chứa phần tử trùng lặp.",
-      "storage": "Lỗi lưu trữ ngữ cảnh."
+      "storage": "Lỗi lưu trữ ngữ cảnh.",
+      "unauthorized": "Cần xác thực phiên làm việc.",
+      "forbidden": "Không có quyền truy cập.",
+      "requestRejected": "Yêu cầu bị từ chối."
     }
   },
   "ssot": {
@@ -1210,7 +1224,7 @@
     },
     "export": {
       "busy": "Đang xuất...",
-      "cta": "Xuất SSOT"
+      "cta": "Xuất bộ thiết kế"
     },
     "patterns": {
       "title": "Mẫu thiết kế",
@@ -1222,6 +1236,15 @@
       "synced": "Đã đồng bộ",
       "empty": "Chưa có thành phần nào cho cổng này.",
       "button": "Mẫu UI"
+    },
+    "toast": {
+      "loadFailed": "Không thể tải danh sách mẫu giao diện.",
+      "lockAcquired": "Đã khóa khung ứng dụng cho không gian làm việc.",
+      "lockReleased": "Đã mở khóa khung ứng dụng.",
+      "lockConflict": "Đang bị khóa bởi phiên khác. Hãy làm mới để đồng bộ.",
+      "lockFailed": "Không thể cập nhật trạng thái khóa khung.",
+      "exportSuccess": "Đã xuất bộ thiết kế (#{rev}).",
+      "exportFailed": "Chưa thể hoàn tất xuất bộ thiết kế lúc này."
     }
   }
 }

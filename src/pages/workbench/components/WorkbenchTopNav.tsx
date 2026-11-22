@@ -21,7 +21,7 @@ export interface WorkbenchTopNavProps {
   onToggleSidebar?: () => void;
   isChatCollapsed?: boolean;
   onToggleChat?: () => void;
-  metrics?: any;
+  metrics?: Record<string, unknown>;
   onThemeChange?: (theme: ThemeMode) => void;
 }
 
@@ -30,9 +30,6 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
   projectName,
   activeSessionTitle,
   isStandaloneConversation = false,
-  isDraftDirty = false,
-  onDeployDraft,
-  onDiscardDraft,
 }) => {
   const { t } = useTranslation();
   const pluginCenterHref = projectId ? `/plugins?projectId=${encodeURIComponent(projectId)}` : "/plugins";
