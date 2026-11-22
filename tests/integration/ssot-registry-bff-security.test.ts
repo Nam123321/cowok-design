@@ -51,7 +51,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
   it("IT-BFF-02: blocks unauthenticated requests (401) and viewer write mutations (403)", async () => {
     const unauth = await componentsRoute.GET(
       makeReq("/api/v1/ssot/components?projectId=proj-1&portalId=DeveloperPortal", "GET"),
-      { params: Promise.resolve({}) }
+      { params: {} }
     );
     expect(unauth.status).toBe(401);
 
@@ -64,7 +64,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
         lockOwnerId: "viewer-user",
         expectedRevision: 0,
       }),
-      { params: Promise.resolve({}) }
+      { params: {} }
     );
     expect(viewerLock.status).toBe(403);
 
@@ -73,7 +73,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
         projectId: "proj-1",
         portalId: "DeveloperPortal",
       }),
-      { params: Promise.resolve({}) }
+      { params: {} }
     );
     expect(viewerExport.status).toBe(403);
   });
@@ -89,7 +89,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
         expectedRevision: 1,
         forceTransferReason: "takeover",
       }),
-      { params: Promise.resolve({}) }
+      { params: {} }
     );
     expect(nonAdminTransfer.status).toBe(403);
     const errJson = (await nonAdminTransfer.json()) as { error: { code: string } };
@@ -105,7 +105,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
         "GET",
         editor.sessionToken
       ),
-      { params: Promise.resolve({}) }
+      { params: {} }
     );
     expect(badPortal.status).toBe(422);
 
@@ -116,7 +116,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
         intentSummary: "Build KPI cards",
         unexpectedExtraField: true,
       }),
-      { params: Promise.resolve({}) }
+      { params: {} }
     );
     expect(extraKey.status).toBe(422);
 
@@ -127,7 +127,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
         intentSummary: "Build KPI cards",
         maxSpineTokens: 999,
       }),
-      { params: Promise.resolve({}) }
+      { params: {} }
     );
     expect(badSpine.status).toBe(422);
   });
@@ -162,7 +162,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
         action: "ACQUIRE",
         expectedRevision: 0,
       }),
-      { params: Promise.resolve({}) }
+      { params: {} }
     );
     expect(proxySpy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -194,7 +194,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
         projectId: "proj-1",
         portalId: "DeveloperPortal",
       }),
-      { params: Promise.resolve({}) }
+      { params: {} }
     );
     expect(busyResp.status).toBe(503);
     expect(busyResp.headers.get("retry-after")).toBe("1");
@@ -281,7 +281,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
       }),
     });
 
-    const resp = await skillsRoute.POST(req, { params: Promise.resolve({}) });
+    const resp = await skillsRoute.POST(req, { params: {} });
     expect(resp.status).toBe(403);
     expect(fwdSpy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -298,7 +298,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
         "GET",
         editor.sessionToken
       ),
-      { params: Promise.resolve({}) }
+      { params: {} }
     );
     expect(dupResp.status).toBe(422);
 
@@ -313,7 +313,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
         },
       }
     );
-    const blankPortalResp = await componentsRoute.GET(blankPortalReq, { params: Promise.resolve({}) });
+    const blankPortalResp = await componentsRoute.GET(blankPortalReq, { params: {} });
     expect(blankPortalResp.status).toBe(403);
 
     vi.spyOn(daemonClient, "forwardToDaemonFlow").mockResolvedValueOnce(
@@ -335,7 +335,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
         "GET",
         editor.sessionToken
       ),
-      { params: Promise.resolve({}) }
+      { params: {} }
     );
     expect(crossTenant.status).toBe(403);
     const errBody = (await crossTenant.json()) as { error: { code: string } };
@@ -351,7 +351,7 @@ describe("Story 02.4 BFF & Security Contracts (IT-BFF-01..06 & SEC-IDOR-03)", ()
         expectedFencingToken: 1,
         forceTransferReason: "   ",
       }),
-      { params: Promise.resolve({}) }
+      { params: {} }
     );
     expect(adminEmptyReason.status).toBe(422);
   });
