@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "대화",
     "githubUrlPlaceholder": "저장소 URL 입력 (https://github.com/...)",
     "standaloneChatAck": "독립 대화 프롬프트가 기록되었습니다",
-    "oauthCliFallback": "OAuth/CLI 인증"
+    "oauthCliFallback": "OAuth/CLI 인증",
+    "pickerPathPlaceholder": "~/Desktop/my-project 또는 /Users/...",
+    "pickerGoBtn": "이동",
+    "pickerOpenDirBtn": "열기",
+    "pickerNewSubfolderLabel": "새 하위 폴더(선택 사항):",
+    "pickerNewSubfolderPlaceholder": "예: my-new-app (비워 두면 선택한 폴더 사용)",
+    "pickerInvalidSubfolderError": "잘못된 하위 폴더 이름입니다 ('/', '\\\\' 포함 또는 '.' 시작 불가)",
+    "pickerHomeRootBlockedHint": "홈 루트(~)에는 직접 프로젝트를 연결할 수 없습니다. 하위 폴더를 선택하거나 새 하위 폴더 이름을 입력하세요.",
+    "pickerSelectedTargetPrefix": "대상 폴더:",
+    "pickerNativeFinderBtn": "Finder 열기...",
+    "pickerNativeFinderOpening": "Finder 여는 중...",
+    "pickerNativeFinderPrompt": "로컬 프로젝트 폴더 선택"
   },
   "chat": {
     "agentTitle": "Cowok 에이전트",
@@ -167,7 +178,9 @@
     "sseEventCompleted": "이벤트 {{event}}이(가) 완료되었습니다.",
     "proposalCompileWarning": "지금은 ChangeProposal을 생성할 수 없습니다. 입력값을 확인하세요.",
     "intentStatusLabel": "상태",
-    "forkFromHere": "여기에서 대화 분기"
+    "forkFromHere": "여기에서 대화 분기",
+    "persistFailed": "SQLite 기록에 메시지를 저장할 수 없습니다.",
+    "vaultComposerPlaceholder": "cowok Agent에게 질문하거나 API 키를 붙여넣으세요..."
   },
   "canvas": {
     "userflowLens": "사용자 흐름 (Userflow)",
@@ -1143,5 +1156,95 @@
     },
     "commentsDrawerTitle": "고정된 댓글",
     "overlaysRegionLabel": "공간 인터랙션 오버레이"
+  },
+  "cas": {
+    "uploadFailed": "CAS 스토리지에 파일을 업로드하지 못했습니다.",
+    "uploading": "CAS에 바이너리 자산 업로드 중...",
+    "prompt": "첨부 .csv / .tsv / .xlsx / .fig / .pdf / .png / .svg / .txt"
+  },
+  "vault": {
+    "onboardingTitle": "Decision Engine API 키 등록 (Zero-Leak 볼트)",
+    "onboardingDesc": "Google AI Studio 또는 TypeSafe JEV에서 API 키를 발급받아 채팅에 붙여넣으세요. 저장 전에 암호화됩니다.",
+    "localOnlyLabel": "엔터프라이즈 로컬 전용 잠금 (외부 프로브 없음)",
+    "googleAiStudioKey": "Google AI Studio 키",
+    "typesafeJevKey": "TypeSafe JEV 키",
+    "replacePlaceholder": "새 API 키 입력",
+    "confirm": "저장 확인",
+    "replace": "교체",
+    "revoke": "해지",
+    "localOnlyBadge": "로컬 전용",
+    "highEntropyBadge": "고엔트로피 키",
+    "onboardingToggle": "API 보관함",
+    "ingestFailed": "보안 볼트에 인증 키를 저장하지 못했습니다."
+  },
+  "contextMeter": {
+    "triggerLabel": "컨텍스트 예산 미터",
+    "popoverTitle": "KV-캐시 및 포털 컨텍스트 텔레메트리",
+    "portalLabel": "대상 포털",
+    "horizonLabel": "작업 범위",
+    "profileLabel": "모델 프로필",
+    "textBudgetLabel": "BPE 텍스트",
+    "outlineLabel": "DOM 개요",
+    "ssotLabel": "SSOT 비율",
+    "shaLabel": "SHA 해시",
+    "loading": "포털 컨텍스트를 조립하는 중...",
+    "emptyState": "프로젝트를 선택하거나 조립을 눌러 예산을 검사하세요.",
+    "assembleButton": "컨텍스트 조립",
+    "errors": {
+      "invalidRequest": "컨텍스트 조립 요청이 유효하지 않습니다.",
+      "invalidIdempotencyKey": "Idempotency-Key UUIDv4 헤더가 없거나 유효하지 않습니다.",
+      "invalidCursor": "텔레메트리 페이지 커서가 유효하지 않거나 만료되었습니다.",
+      "projectTenantMismatch": "현재 테넌트에 대한 프로젝트 접근이 거부되었습니다.",
+      "crossPortalLeak": "포털 간 권한 컨텍스트 유출이 차단되었습니다.",
+      "imageBudgetExceeded": "요청한 이미지 토큰이 턴 제한을 초과합니다.",
+      "atomicBlockOverBudget": "원자적 HTML/JSON 블록이 토큰 상한을 초과했습니다.",
+      "ssotRatioBelowMinimum": "SSOT/DOM 비율이 최소 60% 기준선 미만입니다.",
+      "idempotencyKeyReused": "다른 요청 본문에 멱등성 키가 재사용되었습니다.",
+      "projectReferenceInvalid": "대상 프로젝트 참조가 존재하지 않습니다.",
+      "telemetryConflict": "텔레메트리 영속성 충돌이 발생했습니다.",
+      "telemetryWriteBusy": "SQLite 텔레메트리 기록기가 일시적으로 사용 중입니다.",
+      "telemetryStorageUnavailable": "컨텍스트 텔레메트리 저장소를 사용할 수 없습니다.",
+      "daemonContractViolation": "데몬이 잘못된 컨텍스트 계약 페이로드를 반환했습니다.",
+      "invalidSources": "요청한 sourceIds 항목은 1개에서 100개 사이여야 합니다.",
+      "duplicateSourceId": "요청한 sourceIds 목록에 중복 항목이 없어야 합니다.",
+      "storage": "컨텍스트 저장소 오류가 발생했습니다.",
+      "unauthorized": "인증이 필요합니다.",
+      "forbidden": "권한이 거부되었습니다.",
+      "requestRejected": "요청이 거부되었습니다."
+    }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "다른 세션에서 잠금",
+      "refresh": "새로고침",
+      "locked": "셸 잠금됨",
+      "unlock": "잠금 해제",
+      "unlocked": "잠금 해제됨",
+      "lock": "잠금"
+    },
+    "export": {
+      "busy": "내보내는 중...",
+      "cta": "디자인 키트 내보내기"
+    },
+    "patterns": {
+      "title": "디자인 패턴",
+      "pendingSuffix": "건 검토 대기",
+      "close": "패턴 닫기",
+      "portalSelect": "작업 포털",
+      "refresh": "새로고침",
+      "pending": "검토 대기",
+      "synced": "동기화됨",
+      "empty": "이 포털에 저장된 컴포넌트가 아직 없습니다.",
+      "button": "패턴"
+    },
+    "toast": {
+      "loadFailed": "워크스페이스 패턴을 불러올 수 없습니다.",
+      "lockAcquired": "이 워크스페이스의 셸을 잠갔습니다.",
+      "lockReleased": "셸 잠금을 해제했습니다.",
+      "lockConflict": "다른 세션에서 잠겨 있습니다. 새로고침해 동기화하세요.",
+      "lockFailed": "셸 잠금을 업데이트할 수 없습니다.",
+      "exportSuccess": "디자인 키트를 내보냈습니다 (#{rev}).",
+      "exportFailed": "지금은 디자인 키트를 내보낼 수 없습니다."
+    }
   }
 }

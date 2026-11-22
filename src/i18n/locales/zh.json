@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "对话",
     "githubUrlPlaceholder": "输入仓库 URL (https://github.com/...)",
     "standaloneChatAck": "已记录独立会话提示",
-    "oauthCliFallback": "OAuth/CLI 授权"
+    "oauthCliFallback": "OAuth/CLI 授权",
+    "pickerPathPlaceholder": "~/Desktop/my-project 或 /Users/...",
+    "pickerGoBtn": "前往",
+    "pickerOpenDirBtn": "打开",
+    "pickerNewSubfolderLabel": "新建子文件夹（可选）：",
+    "pickerNewSubfolderPlaceholder": "例如：my-new-app（留空则使用当前选中目录）",
+    "pickerInvalidSubfolderError": "子文件夹名称无效（不能包含 '/'、'\\\\' 或以 '.' 开头）",
+    "pickerHomeRootBlockedHint": "无法直接将项目绑定到主目录根目录（~）。请选择一个子文件夹或输入新建子文件夹名称。",
+    "pickerSelectedTargetPrefix": "目标目录：",
+    "pickerNativeFinderBtn": "打开访达 (Finder)...",
+    "pickerNativeFinderOpening": "正在打开访达...",
+    "pickerNativeFinderPrompt": "选择本地项目文件夹"
   },
   "chat": {
     "agentTitle": "Cowok 智能体",
@@ -167,7 +178,9 @@
     "sseEventCompleted": "事件 {{event}} 已完成。",
     "proposalCompileWarning": "暂时无法生成变更提案 (ChangeProposal)，请检查输入参数。",
     "intentStatusLabel": "状态",
-    "forkFromHere": "从此分支对话"
+    "forkFromHere": "从此分支对话",
+    "persistFailed": "无法将消息保存到 SQLite 历史记录。",
+    "vaultComposerPlaceholder": "向 cowok Agent 提问或粘贴 API 密钥..."
   },
   "canvas": {
     "userflowLens": "用户流程 (Userflow)",
@@ -1143,5 +1156,95 @@
     },
     "commentsDrawerTitle": "固定评论",
     "overlaysRegionLabel": "空间交互浮层"
+  },
+  "cas": {
+    "uploadFailed": "上传文件到 CAS 存储失败。",
+    "uploading": "正在将二进制资源上传到 CAS...",
+    "prompt": "附件 .csv / .tsv / .xlsx / .fig / .pdf / .png / .svg / .txt"
+  },
+  "vault": {
+    "onboardingTitle": "Decision Engine API 密钥引导 (Zero-Leak 密钥库)",
+    "onboardingDesc": "从 Google AI Studio 或 TypeSafe JEV 获取 API 密钥并粘贴到聊天框，密钥在存储前会自动加密。",
+    "localOnlyLabel": "企业仅本地锁定 (禁止外部探测)",
+    "googleAiStudioKey": "Google AI Studio 密钥",
+    "typesafeJevKey": "TypeSafe JEV 密钥",
+    "replacePlaceholder": "输入替换的 API 密钥",
+    "confirm": "确认保存",
+    "replace": "替换",
+    "revoke": "吊销",
+    "localOnlyBadge": "仅限本地",
+    "highEntropyBadge": "高熵密钥",
+    "onboardingToggle": "API 密钥库",
+    "ingestFailed": "无法将密钥保存到安全密钥库。"
+  },
+  "contextMeter": {
+    "triggerLabel": "上下文预算计量表",
+    "popoverTitle": "KV-Cache 与门户上下文遥测",
+    "portalLabel": "目标门户",
+    "horizonLabel": "任务范围",
+    "profileLabel": "模型配置",
+    "textBudgetLabel": "BPE 文本",
+    "outlineLabel": "DOM 大纲",
+    "ssotLabel": "SSOT 比例",
+    "shaLabel": "SHA 摘要",
+    "loading": "正在装配门户上下文...",
+    "emptyState": "选择项目或点击装配以查看 Token 预算。",
+    "assembleButton": "装配上下文",
+    "errors": {
+      "invalidRequest": "上下文装配请求无效。",
+      "invalidIdempotencyKey": "缺少或无效的 Idempotency-Key UUIDv4 请求头。",
+      "invalidCursor": "遥测分页游标无效或已过期。",
+      "projectTenantMismatch": "当前租户无权访问该项目。",
+      "crossPortalLeak": "已阻止跨门户特权上下文泄漏。",
+      "imageBudgetExceeded": "请求的图像 Token 超出单轮上限。",
+      "atomicBlockOverBudget": "原子 HTML/JSON 块超出 Token 上限。",
+      "ssotRatioBelowMinimum": "SSOT/DOM 比例低于 60% 下限。",
+      "idempotencyKeyReused": "幂等键被用于不同的请求内容。",
+      "projectReferenceInvalid": "目标项目引用不存在。",
+      "telemetryConflict": "遥测写入发生冲突。",
+      "telemetryWriteBusy": "SQLite 遥测写入器正忙。",
+      "telemetryStorageUnavailable": "上下文遥测存储不可用。",
+      "daemonContractViolation": "后台服务返回了畸形的上下文契约响应。",
+      "invalidSources": "请求的 sourceIds 必须包含 1 到 100 项。",
+      "duplicateSourceId": "请求的 sourceIds 不能包含重复项。",
+      "storage": "上下文存储发生错误。",
+      "unauthorized": "需要身份验证。",
+      "forbidden": "权限不足。",
+      "requestRejected": "请求被拒绝。"
+    }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "已被其他会话锁定",
+      "refresh": "刷新",
+      "locked": "外框已锁定",
+      "unlock": "解锁",
+      "unlocked": "未锁定",
+      "lock": "锁定"
+    },
+    "export": {
+      "busy": "导出中...",
+      "cta": "导出设计包"
+    },
+    "patterns": {
+      "title": "设计模式",
+      "pendingSuffix": "项待审",
+      "close": "关闭模式列表",
+      "portalSelect": "当前门户",
+      "refresh": "刷新",
+      "pending": "待审核",
+      "synced": "已同步",
+      "empty": "该门户暂无已保存组件。",
+      "button": "设计模式"
+    },
+    "toast": {
+      "loadFailed": "无法加载工作区组件模式。",
+      "lockAcquired": "已锁定当前工作区框架。",
+      "lockReleased": "已解锁框架。",
+      "lockConflict": "已被其他会话锁定，请刷新同步。",
+      "lockFailed": "无法更新框架锁定状态。",
+      "exportSuccess": "设计包导出成功 (#{rev})。",
+      "exportFailed": "当前无法完成设计包导出。"
+    }
   }
 }

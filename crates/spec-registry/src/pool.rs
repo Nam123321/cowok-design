@@ -141,6 +141,31 @@ pub fn v15_migration_checksum() -> String {
     static CACHE: OnceLock<String> = OnceLock::new();
     cached_migration_sha256(&CACHE, V15_MIGRATION_SQL)
 }
+
+pub const V16_MIGRATION_SQL: &str = include_str!("../migrations/V16__story_04_6_cas_blobs.sql");
+pub const V16_MIGRATION_NAME: &str = "V16__story_04_6_cas_blobs.sql";
+
+pub fn v16_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V16_MIGRATION_SQL)
+}
+
+pub const V17_MIGRATION_SQL: &str =
+    include_str!("../migrations/V17__story_02_1_context_telemetry.sql");
+pub const V17_MIGRATION_NAME: &str = "V17__story_02_1_context_telemetry.sql";
+
+pub fn v17_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V17_MIGRATION_SQL)
+}
+
+pub const V18_MIGRATION_SQL: &str = include_str!("../migrations/V18__story_02_4_hidden_ssot.sql");
+pub const V18_MIGRATION_NAME: &str = "V18__story_02_4_hidden_ssot.sql";
+
+pub fn v18_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V18_MIGRATION_SQL)
+}
 /// Configuration for the embedded SQLite WAL connection pool.
 #[derive(Debug, Clone)]
 pub struct SqliteWalConfig {
@@ -320,31 +345,42 @@ impl SqlitePool {
 
         if is_genesis_empty {
             let db_bytes = Self::cached_genesis_db_bytes(&parent_dir)?;
+            let tmp_path = parent_dir.join(format!(".genesis-init-{}.tmp", uuid::Uuid::new_v4()));
             #[cfg(unix)]
             {
                 use std::os::unix::fs::OpenOptionsExt;
-                let mut f = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .custom_flags(libc::O_NOFOLLOW)
-                    .mode(0o600)
-                    .open(&config.db_path)
-                    .map_err(|e| HarnessError::ValidationFailed {
+                let write_res = (|| -> Result<(), std::io::Error> {
+                    let mut f = OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .custom_flags(libc::O_NOFOLLOW)
+                        .mode(0o600)
+                        .open(&tmp_path)?;
+                    f.write_all(db_bytes)?;
+                    f.sync_all()?;
+                    Ok(())
+                })();
+                if let Err(e) = write_res {
+                    let _ = fs::remove_file(&tmp_path);
+                    return Err(HarnessError::ValidationFailed {
                         reason: format!("GENESIS_WRITE_FAILED: {e}"),
-                    })?;
-                f.write_all(db_bytes)
-                    .map_err(|e| HarnessError::ValidationFailed {
-                        reason: format!("GENESIS_WRITE_FAILED: {e}"),
-                    })?;
+                    });
+                }
             }
             #[cfg(not(unix))]
             {
-                fs::write(&config.db_path, db_bytes).map_err(|e| {
-                    HarnessError::ValidationFailed {
+                if let Err(e) = fs::write(&tmp_path, db_bytes) {
+                    let _ = fs::remove_file(&tmp_path);
+                    return Err(HarnessError::ValidationFailed {
                         reason: format!("GENESIS_WRITE_FAILED: {e}"),
-                    }
-                })?;
+                    });
+                }
+            }
+            if let Err(e) = fs::rename(&tmp_path, &config.db_path) {
+                let _ = fs::remove_file(&tmp_path);
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!("GENESIS_WRITE_FAILED: {e}"),
+                });
             }
             let _conn = Self::connect_with_pragmas_opts(&config, true)?;
         } else {
@@ -404,6 +440,9 @@ impl SqlitePool {
             Self::apply_v13_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v14_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v15_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v16_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v17_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v18_migration_if_needed(&mut conn, &config.db_path)?;
         }
         harden_sqlite_files(&config.db_path)?;
 
@@ -1035,6 +1074,10 @@ impl SqlitePool {
         Ok(())
     }
 
+    fn apply_v16_columns(tx: &Connection) -> Result<(), HarnessError> {
+        Self::ensure_columns_idempotent(tx, "chat_messages", &[("seq_no", "BIGINT")][..])
+    }
+
     fn cached_genesis_db_bytes(parent_dir: &Path) -> Result<&'static [u8], HarnessError> {
         static GENESIS_BYTES: OnceLock<Vec<u8>> = OnceLock::new();
         static GENESIS_INIT_LOCK: OnceLock<std::sync::Mutex<()>> = OnceLock::new();
@@ -1164,6 +1207,13 @@ impl SqlitePool {
         crate::presentation_repo::backfill_missing_slide_uids(&tx)?;
         tx.execute_batch(V15_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "genesis_v15"))?;
+        Self::apply_v16_columns(&tx)?;
+        tx.execute_batch(V16_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v16"))?;
+        tx.execute_batch(V17_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v17"))?;
+        tx.execute_batch(V18_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v18"))?;
 
         let now = Utc::now().timestamp_millis();
         for (version, name, sha) in [
@@ -1180,6 +1230,9 @@ impl SqlitePool {
             (13i64, V13_MIGRATION_NAME, v13_migration_checksum()),
             (14i64, V14_MIGRATION_NAME, v14_migration_checksum()),
             (15i64, V15_MIGRATION_NAME, v15_migration_checksum()),
+            (16i64, V16_MIGRATION_NAME, v16_migration_checksum()),
+            (17i64, V17_MIGRATION_NAME, v17_migration_checksum()),
+            (18i64, V18_MIGRATION_NAME, v18_migration_checksum()),
         ] {
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
@@ -2167,6 +2220,143 @@ impl SqlitePool {
         .map_err(|e| map_sqlite_error(e, "insert_v15_schema_migration"))?;
         tx.commit()
             .map_err(|e| map_sqlite_error(e, "commit_v15_migration"))?;
+        Ok(())
+    }
+
+    fn apply_v16_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v16_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 16",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v16_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V16]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            Self::apply_v16_columns(conn)?;
+            return Ok(());
+        }
+
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v16"))?;
+        Self::apply_v16_columns(&tx)?;
+        tx.execute_batch(V16_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v16_sql"))?;
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (16, ?1, ?2, ?3)",
+            params![
+                V16_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
+        )
+        .map_err(|e| map_sqlite_error(e, "insert_v16_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v16_migration"))?;
+        Ok(())
+    }
+
+    fn apply_v17_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v17_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 17",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v17_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V17]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v17"))?;
+        tx.execute_batch(V17_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v17_sql"))?;
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (17, ?1, ?2, ?3)",
+            params![
+                V17_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
+        )
+        .map_err(|e| map_sqlite_error(e, "insert_v17_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v17_migration"))?;
+        Ok(())
+    }
+
+    fn apply_v18_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v18_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 18",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v18_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V18]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v18"))?;
+        tx.execute_batch(V18_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v18_sql"))?;
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (18, ?1, ?2, ?3)",
+            params![
+                V18_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
+        )
+        .map_err(|e| map_sqlite_error(e, "insert_v18_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v18_migration"))?;
         Ok(())
     }
 

@@ -203,6 +203,26 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  // Mirror pool.rs apply_v16_columns idempotent guard prior to V16 SQL
+  db.exec("ALTER TABLE chat_messages ADD COLUMN seq_no BIGINT;");
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V16__story_04_6_cas_blobs.sql"),
+      "utf-8"
+    )
+  );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V17__story_02_1_context_telemetry.sql"),
+      "utf-8"
+    )
+  );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V18__story_02_4_hidden_ssot.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
@@ -262,10 +282,19 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
     expect(mappedTables).toContain("knowledge_cards");
     expect(mappedTables).toContain("learn_consumed_nonces");
     expect(mappedTables).toContain("plugin_cron_schedules");
-    expect(mappedTables).toHaveLength(49);
+    expect(mappedTables).toContain("cas_blobs");
+    expect(mappedTables).toContain("cas_attachments");
+    expect(mappedTables).toContain("tenant_cas_blob_usage");
+    expect(mappedTables).toContain("cas_upload_ingress");
+    expect(mappedTables).toContain("cas_command_idempotency");
+    expect(mappedTables).toContain("vault_command_idempotency");
+    expect(mappedTables).toContain("context_assembly_telemetry");
+    expect(mappedTables).toContain("component_patterns");
+    expect(mappedTables).toContain("app_shell_locks");
+    expect(mappedTables).toHaveLength(58);
   });
 
-  it("UT-DB-02: executes V1-V15 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V18 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 
@@ -503,5 +532,127 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
         .all() as { name: string }[]
     ).map((r) => r.name);
     expect(idxNames).toContain("deck_slides_slide_uid_key");
+  });
+
+  it("UT-DB-08: verifies Story 04.6 V16 chat seq_no, CAS/quota/idempotency separation, FK cascade, and Prisma parity", () => {
+    const db = openMigratedMemoryDb();
+    const schemaText = fs.readFileSync(schemaPath, "utf-8");
+
+    const chatCols = (db.prepare("PRAGMA table_info(chat_messages)").all() as Array<{ name: string }>).map(
+      (r) => r.name
+    );
+    expect(chatCols).toContain("seq_no");
+    expect(schemaText).toContain('@map("seq_no")');
+
+    const tableModelPairs: Array<[string, string]> = [
+      ["cas_blobs", "CasBlob"],
+      ["cas_attachments", "CasAttachment"],
+      ["tenant_cas_blob_usage", "TenantCasBlobUsage"],
+      ["cas_upload_ingress", "CasUploadIngress"],
+      ["cas_command_idempotency", "CasCommandIdempotency"],
+      ["vault_command_idempotency", "VaultCommandIdempotency"],
+    ];
+    for (const [tableName, modelName] of tableModelPairs) {
+      const pragmaRows = db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>;
+      const sqliteCols = pragmaRows.map((r) => r.name).sort();
+      const prismaCols = parsePrismaModelColumns(schemaText, modelName);
+      expect(sqliteCols, `Column parity for ${tableName} <-> ${modelName}`).toEqual(prismaCols);
+    }
+
+    const attachmentCols = (db.prepare("PRAGMA table_info(cas_attachments)").all() as Array<{ name: string }>).map(
+      (r) => r.name
+    );
+    const ingressCols = (db.prepare("PRAGMA table_info(cas_upload_ingress)").all() as Array<{ name: string }>).map(
+      (r) => r.name
+    );
+    expect(attachmentCols).not.toContain("expires_at");
+    expect(ingressCols).not.toContain("expires_at");
+
+    const fks = db.prepare("PRAGMA foreign_key_list(cas_command_idempotency)").all() as Array<{
+      table: string;
+      from: string;
+      on_delete: string;
+    }>;
+    expect(
+      fks.some(
+        (fk) =>
+          fk.table === "cas_attachments" &&
+          fk.from === "attachment_id" &&
+          fk.on_delete.toUpperCase() === "CASCADE"
+      )
+    ).toBe(true);
+  });
+
+  it("UT-DB-09: verifies Story 02.1 V17 context_assembly_telemetry Prisma parity, indexes, and project cascade", () => {
+    const db = openMigratedMemoryDb();
+    const schemaText = fs.readFileSync(schemaPath, "utf-8");
+
+    const pragmaRows = db
+      .prepare("PRAGMA table_info(context_assembly_telemetry)")
+      .all() as Array<{ name: string }>;
+    const sqliteCols = pragmaRows.map((r) => r.name).sort();
+    const prismaCols = parsePrismaModelColumns(schemaText, "ContextAssemblyTelemetry");
+    expect(sqliteCols).toEqual(prismaCols);
+
+    const fks = db
+      .prepare("PRAGMA foreign_key_list(context_assembly_telemetry)")
+      .all() as Array<{ table: string; from: string; on_delete: string }>;
+    expect(
+      fks.some(
+        (fk) =>
+          fk.table === "projects" &&
+          fk.from === "project_id" &&
+          fk.on_delete.toUpperCase() === "CASCADE"
+      )
+    ).toBe(true);
+
+    const idxRows = db
+      .prepare("PRAGMA index_list(context_assembly_telemetry)")
+      .all() as Array<{ name: string }>;
+    const idxNames = idxRows.map((r) => r.name);
+    expect(idxNames).toContain("idx_ctx_telemetry_proj_portal");
+    expect(idxNames).toContain("idx_ctx_telemetry_tenant_proj");
+    expect(idxNames).toContain("uq_ctx_telemetry_idem");
+  });
+
+  it("UT-DB-10: verifies Story 02.4 V18 component_patterns & app_shell_locks Prisma parity, composite FK cascade, and indexes", () => {
+    const db = openMigratedMemoryDb();
+    const schemaText = fs.readFileSync(schemaPath, "utf-8");
+
+    for (const [modelName, tableName] of [
+      ["ComponentPattern", "component_patterns"],
+      ["AppShellLock", "app_shell_locks"],
+    ] as const) {
+      const pragmaRows = db
+        .prepare(`PRAGMA table_info(${tableName})`)
+        .all() as Array<{ name: string }>;
+      const sqliteCols = pragmaRows.map((r) => r.name).sort();
+      const prismaCols = parsePrismaModelColumns(schemaText, modelName);
+      expect(sqliteCols).toEqual(prismaCols);
+
+      const fks = db
+        .prepare(`PRAGMA foreign_key_list(${tableName})`)
+        .all() as Array<{ table: string; from: string; to: string; on_delete: string }>;
+      const projFks = fks.filter(
+        (fk) => fk.table === "projects" && fk.on_delete.toUpperCase() === "CASCADE"
+      );
+      expect(projFks.some((fk) => fk.from === "project_id" && fk.to === "id")).toBe(true);
+      expect(projFks.some((fk) => fk.from === "tenant_id" && fk.to === "tenant_id")).toBe(true);
+    }
+
+    const cpIdx = (
+      db.prepare("PRAGMA index_list(component_patterns)").all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    expect(cpIdx).toContain("idx_component_patterns_proj_portal");
+
+    const lockIdx = (
+      db.prepare("PRAGMA index_list(app_shell_locks)").all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    expect(lockIdx).toContain("idx_app_shell_locks_proj_portal");
+
+    const projIdx = (
+      db.prepare("PRAGMA index_list(projects)").all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    expect(projIdx).toContain("uq_projects_id_tenant");
   });
 });

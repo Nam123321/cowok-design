@@ -4,10 +4,11 @@ id: "07.3"
 title: "Story 07.3: Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)"
 description: "Đóng gói toàn bộ bài thuyết trình/báo cáo thành 1 file .html độc lập duy nhất (nhúng sẵn CSS tokens, SVG icons, dữ liệu biểu đồ) hoặc kết xuất ra file .pdf vector chuẩn tỷ lệ 16:9."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-07/Story-07.3/story.md"
-status: refactored
+status: cancelled
+superseded_by: "07.2"
 risk_tier: 2
 delivery: core
-timestamp: "2026-11-12T16:30:00+07:00"
+timestamp: "2026-11-20T20:50:00+07:00"
 tags:
   - "story-07.3"
   - "epic-07"
@@ -17,7 +18,7 @@ links_to:
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md"
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.5.%20architecture.md"
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.2.%20database-spec.md"
-dependencies: ["07.1", "06.3"]
+dependencies: ["07.1", "06.5"]
 provides_apis:
   - "internal:epic-07/story-07.3"
 consumes_apis: []
@@ -27,21 +28,21 @@ consumes_apis: []
 
 - **FR Covered:** [FR-18: Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 07: 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-07/epic.md)
-- **Status:** `planned`
+- **Status:** `cancelled` *(Superseded by `Story 07.2`)*
 - **Risk Tier:** `2`
 
 ## 1. Story Description & Context
-Đóng gói toàn bộ bài thuyết trình/báo cáo thành 1 file .html độc lập duy nhất (nhúng sẵn CSS tokens, SVG icons, dữ liệu biểu đồ) hoặc kết xuất ra file .pdf vector chuẩn tỷ lệ 16:9.
+`[DEPRECATED — CONSOLIDATED]` Phạm vi Self-Contained Offline HTML Bundle, Vector PDF (`1920x1080`) và Plugin `.pptx` đã được chuyển gọn thành **`Story 07.2`** sau khi `07.2` (Overlay & Auto-Fix) hợp nhất vào **`Story 07.1`**.
 
 ## 2. Plan-Tune Heuristic & Complexity Score
-- **Complexity Score (CS):** `CS = 4` (Scope=1, Data=1, Integration=1, UI=0.5, Security=0.5, Unknowns=0 $\rightarrow$ `CS = 4 < 7`, đạt ngưỡng an toàn, không cần tách nhỏ Story).
+- **Complexity Score (CS):** `CS = 4` (`[DEPRECATED]` — superseded by `Story 07.2`).
 
 ## 3. Acceptance Criteria (AC)
-- **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
-- **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
-- **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Đảm bảo các biểu đồ động và SVG icons hiển thị sắc nét 100% khi mở file .html ở chế độ hoàn toàn không có mạng Internet.
-- **AC-04 (Dual Editable .pptx Exporter with Footer-Rail Guarantee & Motion Video — GAP-17):** Bổ sung xuất file PowerPoint `.pptx` chỉnh sửa được (kết hợp `domToPptx` với thuật toán kiểm định đường biên dọc `Footer-Rail` đảm bảo 0% tràn chữ xuống chân slide) và xuất video trình diễn `.mp4`.
-- **AC-05 (Shareable Interactive Stakeholder Review Bundle — GAP-15):** Cho phép xuất 1 gói Prototype HTML Tương tác Độc lập (gồm bản đồ hành trình + màn hình bấm chuyển trang thật + chuyển đổi Desktop/Mobile + chế độ ghi chú nhận xét cho khách hàng/sếp mà không cần cài đặt công cụ lập trình).
+- **[DEPRECATED] AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon. *(Moved to `Story 07.2 AC-02, AC-03`.)*
+- **[DEPRECATED] AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`. *(Moved to `Story 07.2`.)*
+- **[DEPRECATED] AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Đảm bảo các biểu đồ động và SVG icons hiển thị sắc nét 100% khi mở file .html ở chế độ hoàn toàn không có mạng Internet. *(Moved to `Story 07.2 AC-04`.)*
+- **[DEPRECATED] AC-04 (Dual Editable .pptx Exporter with Footer-Rail Guarantee & Motion Video — GAP-17):** Bổ sung xuất file PowerPoint `.pptx` chỉnh sửa được (kết hợp `domToPptx` với thuật toán kiểm định đường biên dọc `Footer-Rail` đảm bảo 0% tràn chữ xuống chân slide) và xuất video trình diễn `.mp4`. *(Moved to `Story 07.2 AC-03` under `TDR-006` plugin boundary.)*
+- **[DEPRECATED] AC-05 (Shareable Interactive Stakeholder Review Bundle — GAP-15):** Cho phép xuất 1 gói Prototype HTML Tương tác Độc lập (gồm bản đồ hành trình + màn hình bấm chuyển trang thật + chuyển đổi Desktop/Mobile + chế độ ghi chú nhận xét cho khách hàng/sếp mà không cần cài đặt công cụ lập trình). *(Moved to `Story 07.2 AC-01, AC-02`.)*
 
 ## 4. Tasks
 - [ ] **Task 07.3.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)" (thỏa mãn `AC-01`).
@@ -93,4 +94,5 @@ consumes_apis: []
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 07.3 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
+| 2026-11-20 | 2.0.0 | [ac_removal] Đánh dấu [DEPRECATED] & superseded_by Story 07.2 (Reason: Post-PR #14 Vertical Slice Consolidation) | /refactor-story |
 | 2026-11-12 | 2.0.0 | [refactor-story] Bổ sung AC-04 Editable PPTX (GAP-17) & AC-05 Interactive Prototype Review Bundle (GAP-15) theo Master Plan | /refactor-story |

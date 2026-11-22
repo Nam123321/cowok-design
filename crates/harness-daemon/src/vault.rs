@@ -631,6 +631,24 @@ impl VaultStore {
         }
     }
 
+    pub fn contains_secret_scoped(
+        &self,
+        tenant_id: &str,
+        provider_id: &str,
+        master_passphrase: Option<&str>,
+    ) -> Result<bool, String> {
+        let _guard = learn_ring_mutex()
+            .lock()
+            .map_err(|_| "Vault read mutex poisoned".to_string())?;
+        if !self.vault_path.exists() {
+            return Ok(false);
+        }
+        let pid = provider_id.trim().to_ascii_lowercase();
+        let scoped = Self::scoped_key(tenant_id, &pid);
+        let secrets = self.unseal_secrets(master_passphrase)?;
+        Ok(secrets.contains_key(&scoped))
+    }
+
     pub fn delete_secret(
         &self,
         provider_id: &str,

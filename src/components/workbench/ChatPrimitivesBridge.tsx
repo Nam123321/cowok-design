@@ -5,6 +5,10 @@ import { BrandIcon } from "@/components/ui/BrandIcon";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useSyncedDefaultModel } from "@/hooks/useDoctorProvidersUsage";
 import { loadPersistedSettings, savePersistedSettings } from "@/utils/workbench-settings-storage";
+import {
+  ALLOWED_CHAT_ATTACHMENT_ACCEPT,
+  readSelectedChatFiles,
+} from "@/features/chat-vault/read-selected-chat-files";
 import { AVAILABLE_CHAT_MODELS, ChatStreamItem, type ChatMessage } from "./ChatStreamPrimitives";
 import { ModelPickerQuotaPopover } from "./ModelPickerQuotaPopover";
 
@@ -18,6 +22,7 @@ export interface AgentChatComposerProps {
   onRemoveAttachmentChip?: (chip: string) => void;
   onAttachClick?: () => void;
   onAttachFiles?: (fileNames: string[], snippetsByName?: Record<string, string>) => void;
+  onPasteBinaryFiles?: (files: File[]) => void;
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
   placeholder?: string;
   testIdPrefix?: string;
@@ -28,8 +33,6 @@ const COMPOSER_MIN_HEIGHT_PX = 38;
 const COMPOSER_MAX_HEIGHT_PX = 144;
 const ICON_PLUS_SIZE = 13;
 const ICON_SEND_SIZE = 12;
-const MAX_TEXT_SNIPPET_CHARS = 8000;
-const TEXT_READABLE_EXT_RE = /\.(md|txt|html|htm|css|json|svg|ts|tsx|js|jsx|yaml|yml)$/i;
 
 const TEXTAREA_STYLE: React.CSSProperties = {
   width: "100%",
@@ -51,23 +54,6 @@ function syncTextareaHeight(el: HTMLTextAreaElement | null): void {
   if (!el) return;
   el.style.height = "auto";
   el.style.height = `${Math.min(Math.max(el.scrollHeight, COMPOSER_MIN_HEIGHT_PX), COMPOSER_MAX_HEIGHT_PX)}px`;
-}
-
-async function readSelectedChatFiles(files: File[]): Promise<{ names: string[]; snippets: Record<string, string> }> {
-  const names = files.map((file) => file.name);
-  const snippets: Record<string, string> = {};
-  await Promise.all(
-    files.map(async (file) => {
-      if (!TEXT_READABLE_EXT_RE.test(file.name) || typeof file.text !== "function") return;
-      try {
-        const text = await file.text();
-        if (text.trim()) snippets[file.name] = text.slice(0, MAX_TEXT_SNIPPET_CHARS);
-      } catch {
-        // Ignore unreadable text slice cleanly while preserving filename chip
-      }
-    })
-  );
-  return { names, snippets };
 }
 
 const AttachmentChipList: React.FC<{
@@ -134,17 +120,25 @@ function ComposerTextareaField(opts: {
   placeholder: string;
   isComposingRef: React.MutableRefObject<boolean>;
   onInputChange: (val: string) => void;
+  onPasteFiles?: (files: File[]) => void;
   onSend: () => void;
 }) {
-  const { textareaRef, prefix, inputValue, placeholder, isComposingRef, onInputChange, onSend } = opts;
+  const { textareaRef, prefix, inputValue, placeholder, isComposingRef, onInputChange, onPasteFiles, onSend } = opts;
   return (
     <textarea
       ref={textareaRef}
+      data-ff-id="chat-composer-input"
       data-testid={`${prefix}-textarea`}
       value={inputValue}
       onCompositionStart={() => { isComposingRef.current = true; }}
       onCompositionEnd={() => { isComposingRef.current = false; }}
       onChange={(e) => { onInputChange(e.target.value); syncTextareaHeight(e.currentTarget); }}
+      onPaste={(e) => {
+        const files = Array.from(e.clipboardData?.files || []);
+        if (files.length === 0) return;
+        e.preventDefault();
+        onPasteFiles?.(files);
+      }}
       onKeyDown={(e) => {
         if (e.key !== "Enter" || e.shiftKey) return;
         if (e.nativeEvent.isComposing || e.keyCode === IME_COMPOSITION_KEYCODE || isComposingRef.current || e.repeat) return;
@@ -183,17 +177,32 @@ export const AgentChatComposer: React.FC<AgentChatComposerProps> = (props) => {
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files ? Array.from(e.target.files) : [];
     e.target.value = "";
-    if (selected.length > 0 && props.onAttachFiles) {
-      void readSelectedChatFiles(selected).then(({ names, snippets }) => props.onAttachFiles?.(names, snippets));
+    if (selected.length > 0 && (props.onAttachFiles || props.onPasteBinaryFiles)) {
+      void readSelectedChatFiles(selected).then(({ names, snippets, binaryFiles }) => {
+        if (binaryFiles.length > 0) props.onPasteBinaryFiles?.(binaryFiles);
+        if (names.length > 0) props.onAttachFiles?.(names, snippets);
+      });
     }
   };
 
   return (
     <div data-testid={`${prefix}-wrapper`} style={{ padding: props.compact ? "6px 10px 10px 10px" : "8px 12px 12px 12px", backgroundColor: "var(--bg-canvas)", borderTop: "none" }}>
-      <input ref={fileInputRef} type="file" multiple data-testid={`${prefix}-file-input`} accept=".md,.txt,.pdf,.html,.htm,.css,.json,.png,.jpg,.jpeg,.webp,.svg" onChange={handleFileInputChange} style={{ display: "none" }} />
+      <input ref={fileInputRef} type="file" multiple data-testid={`${prefix}-file-input`} accept={ALLOWED_CHAT_ATTACHMENT_ACCEPT} onChange={handleFileInputChange} style={{ display: "none" }} />
       <div className="chat-composer-capsule" style={{ backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", padding: "8px 10px", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column", gap: "6px" }}>
         <AttachmentChipList chips={props.attachmentChips} onRemove={props.onRemoveAttachmentChip} />
-        <ComposerTextareaField textareaRef={textareaRef} prefix={prefix} inputValue={props.inputValue} placeholder={placeholder} isComposingRef={isComposingRef} onInputChange={props.onInputChange} onSend={handleSend} />
+        <ComposerTextareaField
+          textareaRef={textareaRef}
+          prefix={prefix}
+          inputValue={props.inputValue}
+          placeholder={placeholder}
+          isComposingRef={isComposingRef}
+          onInputChange={props.onInputChange}
+          onPasteFiles={(files) => {
+            props.onPasteBinaryFiles?.(files);
+            void readSelectedChatFiles(files).then(({ names, snippets }) => props.onAttachFiles?.(names, snippets));
+          }}
+          onSend={handleSend}
+        />
         <ComposerFooterBar selectedModel={selectedModel} onSelectModel={setSelectedModel} isSendDisabled={isSendDisabled} onSend={handleSend} onAttachClick={handleAttachButtonClick} onOpenSettings={props.onOpenSettings} />
       </div>
     </div>

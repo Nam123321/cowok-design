@@ -1,6 +1,8 @@
 // cowok-design — Canonical Workbench Top Window Bar (DESIGN.md v4.3-OS & Section 9.3 / Hình 2 & Hình 5)
 import React from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
+import { ContextMeterWidget } from "../../../features/context-meter/ContextMeterWidget";
+import { SsotToolbarStrip } from "../../../features/ssot-registry";
 import { useTranslation } from "../../../hooks/useTranslation";
 
 export type ThemeMode = "warm" | "dim" | "night" | "night-low" | "monochrome";
@@ -19,7 +21,7 @@ export interface WorkbenchTopNavProps {
   onToggleSidebar?: () => void;
   isChatCollapsed?: boolean;
   onToggleChat?: () => void;
-  metrics?: any;
+  metrics?: Record<string, unknown>;
   onThemeChange?: (theme: ThemeMode) => void;
 }
 
@@ -28,9 +30,6 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
   projectName,
   activeSessionTitle,
   isStandaloneConversation = false,
-  isDraftDirty = false,
-  onDeployDraft,
-  onDiscardDraft,
 }) => {
   const { t } = useTranslation();
   const pluginCenterHref = projectId ? `/plugins?projectId=${encodeURIComponent(projectId)}` : "/plugins";
@@ -194,6 +193,8 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
 
       {/* Right Zone: Clean Global Window Context (Tab-specific DAG/Slide controls are strictly scoped inside the active tab) */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <ContextMeterWidget projectId={projectId} />
+        <SsotToolbarStrip projectId={projectId} />
         <a
           href={pluginCenterHref}
           data-testid="nav-plugin-center"

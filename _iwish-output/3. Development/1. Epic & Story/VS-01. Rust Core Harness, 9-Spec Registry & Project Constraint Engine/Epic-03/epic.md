@@ -83,3 +83,8 @@ links_to:
 | [Story-03.1](./Story-03.1/story.md) | Động cơ Ràng buộc Cấu hình theo Dự án (PROJECT_CONSTRAINTS) & oxc AST Linter | 01.2 | ready-for-dev |
 | [Story-03.2](./Story-03.2/story.md) | Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons) | 03.1 | completed |
 | [Story-03.3](./Story-03.3/story.md) | Deterministic data-ff-id AST Injector & <1ms Surgical Patcher | 03.1 | completed |
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-03.1](./Story-03.1/story.md) | Động cơ Ràng buộc Cấu hình theo Dự án (PROJECT_CONSTRAINTS) & oxc AST Linter | 01.2 | completed |
+| [Story-03.2](./Story-03.2/story.md) | Trình kiểm duyệt Iconology, Typography & Component Registry theo Dự án (Flagship Preset 143 Icons) | 03.1 | completed |
+| [Story-03.3](./Story-03.3/story.md) | Deterministic data-ff-id AST Injector & <1ms Surgical Patcher | 03.1 | completed |

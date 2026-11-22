@@ -1,0 +1,105 @@
+{
+  "schema_version": "epic-evaluation-passport/v1",
+  "epic_id": "Epic-10",
+  "feature_group": "VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution",
+  "created_at": "2026-11-20T13:44:30Z",
+  "updated_at": "2026-11-20T13:44:30Z",
+  "context_digest": "41a8511d62a6f98723215ea2f394ecf82c5652c0bcf48c887b57d7001e263e4b",
+  "context_files": [
+    {
+      "path": "_iwish-output/2. Product Planning/2.1. product-brief-or-prd.md",
+      "sha256": "8e5e51b576c5feed8e5abf3aba7e210c79a707173d602004c3b230c13ffdf151"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.4. epics-and-stories.md",
+      "sha256": "8c59b9963c551b33a6173528784b0e9b3700e10ddfaaf05fc06fc238ef0f5add"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.6. feature-hierarchy.md",
+      "sha256": "8cbd53e1a8ceb2be4504e1251326dd10d03e1197ab2bbfaa7a892812ef2dafd6"
+    },
+    {
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-10/epic.md",
+      "sha256": "67fd01e06fac74c727bcadd9397ca6a1b8ddfdfde55c594ca18d6221c6c6820e"
+    }
+  ],
+  "evaluation_integrity": "VERIFIED",
+  "epic_readiness": "READY",
+  "story_creation_envelope": {
+    "max_phase": "IMPLEMENT",
+    "allowed_story_ids": [
+      "10.1",
+      "10.2",
+      "10.3"
+    ],
+    "blocked_story_ids": [],
+    "remediation_lane": true
+  },
+  "party_mode": {
+    "mode": "deep",
+    "rounds": 2,
+    "roles": [
+      "PM",
+      "Architect",
+      "Review",
+      "Dev",
+      "UX"
+    ],
+    "transcript_ref": "_iwish-output/epic-evaluations/Epic-10/party-mode-transcript.md",
+    "consensus_summary": "Post-PR #14 reconciliation verified Epic-10 under 20-Slice Vertical Master Plan with TDR-006/007.",
+    "pushback_patterns": [
+      "Zero horizontal-only stories; 5-layer E2E slice enforcement and immutable completed baseline."
+    ]
+  },
+  "unknowns": {
+    "depth": "full",
+    "quadrants": [
+      "known_unknowns",
+      "unknown_unknowns",
+      "assumptions",
+      "blind_spots"
+    ],
+    "critical_open": [],
+    "macro_open": [],
+    "report_ref": "_iwish-output/unknowns/reports/unknowns-report-epic-10.md"
+  },
+  "evidence_receipts": [
+    {
+      "id": "epic-10-party-mode-transcript",
+      "path": "_iwish-output/epic-evaluations/Epic-10/party-mode-transcript.md",
+      "sha256": "e44158fc65ebccd81779d72ffccb8383178953bcce59b452ae05e5344c116ba6"
+    },
+    {
+      "id": "epic-10-unknowns-report",
+      "path": "_iwish-output/unknowns/reports/unknowns-report-epic-10.md",
+      "sha256": "c7cd8eab7070c1827c45b9957d8817aefb08f6d64da7837103bdab4a83438e76"
+    },
+    {
+      "id": "epic-10-evaluation-report",
+      "path": "_iwish-output/epic-evaluations/Epic-10/evaluation-report.md",
+      "sha256": "59d4f7718f31f3e189b835afb86969f3819dbc6f1b117e239d0d2d222e535711"
+    },
+    {
+      "id": "epic-10-plugin-boundary-review",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-10/plugin-boundary-review.md",
+      "sha256": "59726eca091ec919417662f5b71ab0cb22a288c7908f79a42bea7bbc5781b97b"
+    },
+    {
+      "id": "epic-10-agent-surface-map",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-10/agent-surface-map.md",
+      "sha256": "11dc11c54eacc5dfb92c4362029c010e107ecf58f874d3776720a5aeba73e10d"
+    },
+    {
+      "id": "epic-10-coherence-report",
+      "path": "_iwish-output/adhoc-workspace/scratch/coherence-report-Epic-10.json",
+      "sha256": "26f92021337516093f15b6e17fe95437914c4de6f20ee8fa923b5b9f288b2358"
+    }
+  ],
+  "approval": {
+    "approved": true,
+    "approved_by": "User",
+    "approved_at": "2026-11-20T20:26:51+07:00",
+    "context_digest": "41a8511d62a6f98723215ea2f394ecf82c5652c0bcf48c887b57d7001e263e4b"
+  },
+  "has_ui_stories": true
+}

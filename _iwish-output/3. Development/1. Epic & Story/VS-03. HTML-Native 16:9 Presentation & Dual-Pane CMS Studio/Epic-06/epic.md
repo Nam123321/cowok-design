@@ -1,12 +1,12 @@
 ---
 type: I-Wish Epic
 id: "Epic-06"
-title: "Epic 06: Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench"
-status: completed
+title: "Epic 06: Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen"
+status: in-progress
 track: "Stream-3"
 wave: 2
-provides: ["16:9 HTML Slide Stage", "Dual-Pane <16ms CMS Editor", "Contextual Slide Copilot & Offline 2D Charts", "Dual-Screen Presenter Mode"]
-consumes: ["Epic 03", "Epic 04"]
+provides: ["16:9 HTML Slide Stage", "Dual-Pane <16ms CMS Editor", "Contextual Slide Copilot & Offline 2D Charts", "Dual-Screen Presenter Mode", "End-to-End AI Multi-Slide Deck Generation & CSV/PDF->ChartSpecV12"]
+consumes: ["Epic 03", "Epic 04", "Epic 09", "Epic 11"]
 links_to:
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md"
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.5.%20architecture.md"
@@ -44,6 +44,8 @@ Epic 06 xây dựng bộ máy trình chiếu & báo cáo điều hành HTML-Nati
   - Contextual Copilot cho từng `SLIDE-01..N` với pre-flush trước stream & lease `60s` TTL, biểu đồ 2D zero-CDN SVG/`<canvas>` có ngưỡng DoS (`MAX_SERIES=12`, `MAX_POINTS=200`, `MAX_SVG_PRIMITIVES=2000`, `<= 1e6`) và validator theo loại biểu đồ.
 - **Dual-Screen Presenter Screen Mode (`Story 06.4` — tách từ `06.3`):**
   - Host-mediated `BroadcastChannel` (`sessionSecret` out-of-band qua `window.opener`/`MessageChannel`), `SYNC_FULL_STATE`, Tauri parity, Inline Split Night fallback (`#0B1220`/`#172033`), Speaker Notes, pace timer `tabular-nums`, slide kế tiếp, blackout `B`/`W`, single-`Esc` (`fullscreenchange`), khóa read-only `SNAP-*`, telemetry P10.
+- **AI Multi-Slide Deck Generation & CSV/PDF-to-`ChartSpecV12` (`Story 06.5` — Post-PR #14 Delta):**
+  - Gỡ bỏ echo stub `presentation_copilot.rs:1767-1782` (`prompt.chars().take(160)` & số `Q1..Q3` giả), nối sinh deck đa slide qua `crates/bot-fleet` + 5-Stage Sandwich (`09.2`) + `stageshow-slide-craft` (`<Stage>/<Window>/<Phone>`, `3–7` word budget, `<=30` words/slide), chuẩn hóa `.csv/.tsv/.pdf -> ChartSpecV12` (cân tỷ trọng `100 ± 0.05` giữ đơn vị gốc).
 
 ### Out-of-Scope
 - **`3D widget` trong `FR-17`:** Tạm hoãn khỏi `Epic 06` (chỉ hỗ trợ 2D SVG/`<canvas>` charts để giữ `CSP-B` & giới hạn phức tạp).
@@ -60,6 +62,7 @@ Epic 06 xây dựng bộ máy trình chiếu & báo cáo điều hành HTML-Nati
 | **Story 06.2** | Dual-Pane Slide-Over CMS Workbench (`inert`), Two-Tier `<16ms` Non-Reloading Sync, `lol_html` + `html5ever` mXSS & Crash Recovery | `completed` | `3` | `['06.1', '03.3']` |
 | **Story 06.3** | Contextual Slide Copilot (`KeyedParallelCoordinator` Lease) & Offline CSP-B 2D Live Interactive Charts | `completed` | `3` | `['06.2', '04.4']` |
 | **Story 06.4** | Dual-Screen Presenter Mode, Out-of-Band `BroadcastChannel` Security, Pace Timer & Fallback Modes | `completed` | `3` | `['06.1', '06.2']` |
+| **Story 06.5** | End-to-End AI Multi-Slide Deck Generation, CSV/PDF-to-`ChartSpecV12` Normalizer & `<Stage>/<Window>/<Phone>` (`stageshow`) Flow | `refactored` | `3` | `['06.1', '06.3', '09.2', '11.1']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 
@@ -81,20 +84,18 @@ Epic 06 xây dựng bộ máy trình chiếu & báo cáo điều hành HTML-Nati
 
 
 <!-- BEGIN AUTO-ROADMAP: DO NOT EDIT -->
-## 3-Sprint Integrated Development Roadmap (Synchronized Phasing)
+## 2-Sprint Integrated Development Roadmap (Synchronized Phasing)
 
-> **Mục tiêu**: Tự động hóa phân kỳ và phân bổ tuần tự/song song cho toàn bộ **4 Story Active** trên nền tảng **0 Story Baseline đã `completed`**, loại bỏ chu trình phụ thuộc (No Dependency Cycles) và tuân thủ giới hạn tải tối đa 3 Sprints.
+> **Mục tiêu**: Tự động hóa phân kỳ và phân bổ tuần tự/song song cho toàn bộ **1 Story Active** trên nền tảng **4 Story Baseline đã `completed`**, loại bỏ chu trình phụ thuộc (No Dependency Cycles) và tuân thủ giới hạn tải tối đa 2 Sprints.
 
 ---
 
 ### 1. Phân tích Hiện trạng & Chiến lược Phân kỳ Mới (Phasing Rationalization)
 
-- **Baseline Nền tảng (0 Stories `completed` / `cancelled`)**: Đóng vai trò Enabler, cung cấp mock data, schemas và các dịch vụ tiền đề.
-- **Phạm vi Active Delta (4 Stories)**: Được phân bổ thành 3 Sprint thực thi kế tiếp.
+- **Baseline Nền tảng (4 Stories `completed` / `cancelled`)**: Đóng vai trò Enabler, cung cấp mock data, schemas và các dịch vụ tiền đề.
+- **Phạm vi Active Delta (1 Stories)**: Được phân bổ thành 1 Sprint thực thi kế tiếp.
 - **Khả năng Chạy Song Song (Parallel Execution Lanes)**:
-  - **Sprint 1**: Tuần tự (Sequential) — `Story-06.1`
-  - **Sprint 2**: Tuần tự (Sequential) — `Story-06.2`
-  - **Sprint 3**: Song song (Parallel) — `Story-06.3`, `Story-06.4`
+  - **Sprint 1**: Tuần tự (Sequential) — `Story-06.5`
 
 ---
 
@@ -104,37 +105,34 @@ Epic 06 xây dựng bộ máy trình chiếu & báo cáo điều hành HTML-Nati
 |---|---|---|---|:---:|---|
 | **Story-06.1** | `completed` | Cung cấp schema `V12` (`presentation_decks`, `deck_slides`, `wording_slots`), `layout_kind` template | consumes_apis: | ✅ Có (Zod Schema) | Tuân thủ Zero-Trust Category A |
 | **Story-06.2** | `completed` | description: "Cung cấp ngăn kéo trượt ngang CMS trong #structureSubPane (bọc inert/aria-hidden, form | consumes_apis: | ✅ Có (Zod Schema) | Tuân thủ Zero-Trust Category A |
-| **Story-06.3** | `completed` | Cung cấp Live 2D Charts và Copilot edits đồng bộ vào `wording_slots` cho `Story 06.4` (Presenter Scr | consumes_apis: | ✅ Có (Zod Schema) | Tuân thủ Zero-Trust Category A |
+| **Story-06.3** | `completed` | Cung cấp Live 2D Charts và Copilot edits đồng bộ vào `wording_slots` cho `Story 06.4` (Presenter Scr | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
 | **Story-06.4** | `completed` | Chức năng Story 06.4: Dual-Screen Presenter Mode,  | consumes_apis: | ✅ Có (Zod Schema) | Tuân thủ Zero-Trust Category A |
+| **Story-06.5** | `refactored` | Chức năng Story 06.5: End-to-End AI Multi-Slide De | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
 
 ---
 
-### 3. Sơ đồ Thực thi DAG 3 Sprint (Phased DAG Execution Roadmap)
+### 3. Sơ đồ Thực thi DAG 2 Sprint (Phased DAG Execution Roadmap)
 
 ```mermaid
 flowchart TD
+    subgraph S0["Sprint Baseline (Đã Hoàn Thành)"]
+        Story_06_1["Story-06.1 (Completed)"]
+        Story_06_2["Story-06.2 (Completed)"]
+        Story_06_3["Story-06.3 (Completed)"]
+        Story_06_4["Story-06.4 (Completed)"]
+    end
+
     subgraph S1["Sprint 1: Phân kỳ Thực thi"]
-        Story_06_1["Story-06.1 (Completed)<br>Story 06.1: Khung trình chiếu HTML Slide Engi"]
-    end
-
-    subgraph S2["Sprint 2: Phân kỳ Thực thi"]
-        Story_06_2["Story-06.2 (Completed)<br>Story 06.2: Dual-Pane Slide-Over CMS Workbenc"]
-    end
-
-    subgraph S3["Sprint 3: Phân kỳ Thực thi"]
-        Story_06_3["Story-06.3 (Completed)<br>Story 06.3: Contextual Slide Copilot KeyedPar"]
-        Story_06_4["Story-06.4 (Completed)<br>Story 06.4: Dual-Screen Presenter Mode, Out-o"]
+        Story_06_5["Story-06.5 (Refactored)<br>Story 06.5: End-to-End AI Multi-Slide Deck Ge"]
     end
 
     E2E_GATE["E2E Platform Gate<br>Zero-Trust Verification"]
-    Story_06_1 --> Story_06_2
-    Story_06_2 --> Story_06_3
-    Story_06_1 --> Story_06_4
-    Story_06_2 --> Story_06_4
-    Story_06_3 --> E2E_GATE
-    Story_06_4 --> E2E_GATE
+    Story_06_1 --> Story_06_5
+    Story_06_3 --> Story_06_5
+    Story_06_5 --> E2E_GATE
 
     classDef completed fill:#dcfce7,stroke:#16a34a,stroke-width:2px;
+    classDef refactored fill:#fef3c7,stroke:#d97706,stroke-width:2px;
     classDef backlog fill:#f1f5f9,stroke:#64748b,stroke-width:2px;
     classDef gate fill:#ffe4e6,stroke:#e11d48,stroke-width:2px;
     class E2E_GATE gate;
@@ -147,24 +145,7 @@ flowchart TD
 #### Sprint 1: Phân kỳ Tác vụ
 - **Mô hình**: Các câu chuyện được phát triển **tuần tự (Sequential)**.
 - **Phạm vi thực thi**:
-  1. **`Story-06.1`** (completed): Story 06.1: Khung trình chiếu HTML Slide Engine (16:9/16:10/Auto), 8 Layout Templates, V12 Schema Foundation & HostRuntimeContract
-- **Tiêu chí Hoàn thành (Sprint Done Criteria)**:
-  - Toàn bộ Zod schemas và Unit tests cho các story trong sprint vượt qua 100%.
-  - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
-
-#### Sprint 2: Phân kỳ Tác vụ
-- **Mô hình**: Các câu chuyện được phát triển **tuần tự (Sequential)**.
-- **Phạm vi thực thi**:
-  1. **`Story-06.2`** (completed): Story 06.2: Dual-Pane Slide-Over CMS Workbench (inert-Guarded), Two-Tier <16ms Non-Reloading Sync, lol_html + html5ever mXSS & Crash Recovery
-- **Tiêu chí Hoàn thành (Sprint Done Criteria)**:
-  - Toàn bộ Zod schemas và Unit tests cho các story trong sprint vượt qua 100%.
-  - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
-
-#### Sprint 3: Phân kỳ Tác vụ
-- **Mô hình**: Các câu chuyện trong Sprint này độc lập với nhau, có thể **phát triển song song (Parallel)**.
-- **Phạm vi thực thi**:
-  1. **`Story-06.3`** (completed): Story 06.3: Contextual Slide Copilot (KeyedParallelCoordinator Lease) & Offline CSP-B 2D Live Interactive Charts
-  2. **`Story-06.4`** (completed): Story 06.4: Dual-Screen Presenter Mode, Out-of-Band BroadcastChannel Security, Pace Timer & Fallback Modes
+  1. **`Story-06.5`** (refactored): Story 06.5: End-to-End AI Multi-Slide Deck Generation, CSV/PDF-to-ChartSpecV12 Normalizer & <Stage>/<Window>/<Phone> (stageshow) Flow
 - **Tiêu chí Hoàn thành (Sprint Done Criteria)**:
   - Toàn bộ Zod schemas và Unit tests cho các story trong sprint vượt qua 100%.
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
@@ -176,9 +157,18 @@ flowchart TD
 | [Story-06.2](./Story-06.2/story.md) | Dual-Pane Slide-Over CMS Workbench (inert-Guarded), Two-Tier <16ms Non-Reloading Sync, lol_html + html5ever mXSS & Crash Recovery | 06.1, 03.3 | completed |
 | [Story-06.3](./Story-06.3/story.md) | Contextual Slide Copilot (KeyedParallelCoordinator Lease) & Offline CSP-B 2D Live Interactive Charts | 06.2, 04.4 | completed |
 | [Story-06.4](./Story-06.4/story.md) | Dual-Screen Presenter Mode, Out-of-Band BroadcastChannel Security, Pace Timer & Fallback Modes | 06.1, 06.2 | completed |
+| [Story-06.5](./Story-06.5/story.md) | End-to-End AI Multi-Slide Deck Generation, CSV/PDF-to-ChartSpecV12 Normalizer & `<Stage>/<Window>/<Phone>` (`stageshow`) Flow | 06.1, 06.3, 09.2, 11.1 | refactored |
 
 ## Layer Documents
 - [Layer-Epic-FE](./layer-epic-fe.md)
 - [Layer-Epic-DB](./layer-epic-db.md)
 - [Layer-Epic-API](./layer-epic-api.md)
 - [Contract Claims](./contract_claims.yaml)
+
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-06.1](./Story-06.1/story.md) | Khung trình chiếu HTML Slide Engine (16:9/16:10/Auto), 8 Layout Templates, V12 Schema Foundation & HostRuntimeContract | 03.2, 04.1 | completed |
+| [Story-06.2](./Story-06.2/story.md) | Dual-Pane Slide-Over CMS Workbench (inert-Guarded), Two-Tier <16ms Non-Reloading Sync, lol_html + html5ever mXSS & Crash Recovery | 06.1, 03.3 | completed |
+| [Story-06.3](./Story-06.3/story.md) | Contextual Slide Copilot (KeyedParallelCoordinator Lease) & Offline CSP-B 2D Live Interactive Charts | 06.2, 04.4 | completed |
+| [Story-06.4](./Story-06.4/story.md) | Dual-Screen Presenter Mode, Out-of-Band BroadcastChannel Security, Pace Timer & Fallback Modes | 06.1, 06.2 | completed |
+| [Story-06.5](./Story-06.5/story.md) | End-to-End AI Multi-Slide Deck Generation, CSV/PDF-to-ChartSpecV12 Normalizer & `<Stage>/<Window>/<Phone>` (`stageshow`) Flow | 06.1, 06.3, 09.2, 11.1 | refactored |

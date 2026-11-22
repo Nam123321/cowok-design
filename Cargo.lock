@@ -369,9 +369,28 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror",
  "ts-rs",
+ "uuid",
+]
+
+[[package]]
+name = "context-compiler"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "domain",
+ "libc",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "spec-registry",
+ "tempfile",
+ "thiserror",
  "uuid",
 ]
 
@@ -828,6 +847,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "constraint-engine",
+ "context-compiler",
  "croner",
  "domain",
  "flow-graph",

@@ -1121,3 +1121,204 @@ async fn wave1b_ram_only_vault_viewer_browse_and_ttl_clamping() {
     .await;
     assert_eq!(as_st, StatusCode::BAD_REQUEST, "{as_val}");
 }
+
+#[tokio::test]
+async fn test_fs_browse_home_local_folders_and_tilde_expansion() {
+    struct HomeEnvGuard {
+        prev_home: Option<String>,
+        prev_managed: Option<String>,
+    }
+    impl Drop for HomeEnvGuard {
+        fn drop(&mut self) {
+            if let Some(ref h) = self.prev_home {
+                std::env::set_var("HOME", h);
+            } else {
+                std::env::remove_var("HOME");
+            }
+            if let Some(ref m) = self.prev_managed {
+                std::env::set_var("COWOK_PROJECTS_ROOT", m);
+            } else {
+                std::env::remove_var("COWOK_PROJECTS_ROOT");
+            }
+        }
+    }
+
+    let _g = ENV_LOCK.lock().await;
+    let _guard = HomeEnvGuard {
+        prev_home: std::env::var("HOME").ok(),
+        prev_managed: std::env::var("COWOK_PROJECTS_ROOT").ok(),
+    };
+
+    let tmp = tempfile::tempdir().unwrap();
+    let fake_home = tmp.path().join("fake-home");
+    fs::create_dir_all(fake_home.join("Desktop")).unwrap();
+    fs::create_dir_all(fake_home.join("Projects").join("my-local-app").join(".git")).unwrap();
+    fs::create_dir_all(fake_home.join("Library").join("Caches")).unwrap();
+    fs::create_dir_all(fake_home.join(".ssh")).unwrap();
+    std::env::remove_var("COWOK_PROJECTS_ROOT");
+    std::env::set_var("HOME", &fake_home);
+    let fake_home_canon = fs::canonicalize(&fake_home).unwrap();
+
+    let (_s, router, tok_a, _) = setup_daemon(&tmp);
+
+    // Default browse starts at ~/CowokProjects and exposes parent_path == $HOME
+    let (st_def, val_def) = send_req(
+        &router,
+        "GET",
+        "/api/v1/fs/browse",
+        &[("x-cowok-session-token", &tok_a)],
+        None,
+    )
+    .await;
+    assert_eq!(st_def, StatusCode::OK, "{val_def}");
+    let browse_def: FsBrowseResponse = serde_json::from_value(val_def).unwrap();
+    assert_eq!(
+        browse_def.parent_path.as_deref(),
+        Some(fake_home_canon.to_string_lossy().as_ref())
+    );
+    assert_eq!(
+        browse_def.home_dir.as_deref(),
+        Some(fake_home_canon.to_string_lossy().as_ref())
+    );
+    assert!(browse_def.quick_roots.iter().any(|r| r.label == "Home (~)"));
+    assert!(browse_def.quick_roots.iter().any(|r| r.label == "Desktop"));
+    assert!(browse_def.quick_roots.iter().any(|r| r.label == "Projects"));
+
+    // Browsing ~ lists user folders but hides Library and .ssh
+    let (st_home, val_home) = send_req(
+        &router,
+        "GET",
+        "/api/v1/fs/browse?path=~",
+        &[("x-cowok-session-token", &tok_a)],
+        None,
+    )
+    .await;
+    assert_eq!(st_home, StatusCode::OK, "{val_home}");
+    let browse_home: FsBrowseResponse = serde_json::from_value(val_home).unwrap();
+    let home_names: Vec<&str> = browse_home
+        .entries
+        .iter()
+        .map(|e| e.name.as_str())
+        .collect();
+    assert!(home_names.contains(&"Desktop"), "{home_names:?}");
+    assert!(home_names.contains(&"Projects"), "{home_names:?}");
+    assert!(
+        !home_names.contains(&"Library"),
+        "Library leaked: {home_names:?}"
+    );
+    assert!(!home_names.contains(&".ssh"), ".ssh leaked: {home_names:?}");
+
+    // Browsing ~/Projects detects local git repo outside ~/CowokProjects
+    let (st_proj, val_proj) = send_req(
+        &router,
+        "GET",
+        "/api/v1/fs/browse?path=~/Projects",
+        &[("x-cowok-session-token", &tok_a)],
+        None,
+    )
+    .await;
+    assert_eq!(st_proj, StatusCode::OK, "{val_proj}");
+    let browse_proj: FsBrowseResponse = serde_json::from_value(val_proj).unwrap();
+    assert!(browse_proj
+        .entries
+        .iter()
+        .any(|e| e.name == "my-local-app" && e.is_git_repo));
+
+    // Sensitive paths & foreign home roots stay strictly forbidden
+    for denied in ["~/Library", "~/.ssh", "~otheruser", "/Users", "/etc"] {
+        let (st_den, val_den) = send_req(
+            &router,
+            "GET",
+            &format!("/api/v1/fs/browse?path={denied}"),
+            &[("x-cowok-session-token", &tok_a)],
+            None,
+        )
+        .await;
+        assert_eq!(
+            st_den,
+            StatusCode::FORBIDDEN,
+            "expected 403 for {denied}, got {val_den}"
+        );
+    }
+
+    // Creating a folder-backed project directly at ~ root is rejected
+    let (st_home_create, _) = send_req(
+        &router,
+        "POST",
+        "/api/v1/projects",
+        &[("x-cowok-session-token", &tok_a)],
+        Some(json!({
+            "slug": "bad-home-root",
+            "name": "Bad Home Root",
+            "product_brief": "Should fail",
+            "workspace_root": "~"
+        })),
+    )
+    .await;
+    assert_eq!(st_home_create, StatusCode::FORBIDDEN);
+
+    // Creating a folder-backed project at a custom local folder outside ~/CowokProjects succeeds
+    let (st_local, val_local) = send_req(
+        &router,
+        "POST",
+        "/api/v1/projects",
+        &[("x-cowok-session-token", &tok_a)],
+        Some(json!({
+            "slug": "custom-local-proj",
+            "name": "Custom Local Project",
+            "product_brief": "Outside managed root",
+            "workspace_root": "~/Projects/new-local-proj"
+        })),
+    )
+    .await;
+    assert_eq!(st_local, StatusCode::CREATED, "{val_local}");
+    assert_eq!(val_local["provenance"], json!("folder-backed"));
+    assert!(fake_home_canon
+        .join("Projects")
+        .join("new-local-proj")
+        .is_dir());
+
+    // Native Finder picker endpoint enforces same non-superadmin Bearer scope rejection
+    let (st_pick_auth, val_pick_auth) = send_req(
+        &router,
+        "POST",
+        "/api/v1/fs/pick-native",
+        &[("authorization", "Bearer single-tok")],
+        Some(json!({})),
+    )
+    .await;
+    assert_eq!(st_pick_auth, StatusCode::FORBIDDEN, "{val_pick_auth}");
+    assert!(val_pick_auth.to_string().contains("AUTH_SCOPE_MISMATCH"));
+
+    // Post-pick Zero-Trust validator allows user folders under HOME & detects .git, blocks HOME root & sensitive paths
+    let managed_canon = fs::canonicalize(fake_home.join("CowokProjects")).unwrap();
+    let local_git_dir = fake_home_canon.join("Projects").join("my-local-app");
+    let (picked_canon, is_git) = harness_daemon::routes::fs_jail::validate_native_picked_path(
+        &local_git_dir,
+        &managed_canon,
+        Some(&fake_home_canon),
+        &[],
+    )
+    .expect("local folder under HOME should pass native picker jail");
+    assert_eq!(picked_canon, local_git_dir);
+    assert!(is_git);
+
+    for blocked in [
+        fake_home_canon.as_path(),
+        fake_home_canon.join("Library").as_path(),
+        fake_home_canon.join(".ssh").as_path(),
+        std::path::Path::new("/etc"),
+    ] {
+        assert!(
+            harness_daemon::routes::fs_jail::validate_native_picked_path(
+                blocked,
+                &managed_canon,
+                Some(&fake_home_canon),
+                &[],
+            )
+            .is_err(),
+            "expected native picker jail to reject {}",
+            blocked.display()
+        );
+    }
+}

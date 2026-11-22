@@ -1,18 +1,9 @@
 # Edge Case Guardian & Adversarial Review Report — Story 10.3
 
-- **Story:** Story 10.3 — Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode)
-- **Epic:** Epic 10 (cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design Tournament)
-- **Reviewer:** Review Agent (Edge Case Guardian Skill)
-- **Verdict:** APPROVED (PASS)
+- **Story:** `Story 10.3` — Anti-Slop Design Tournament (`CMP-07`, 4 Axes `<=15s`, AST Distance `<=0.78`, `RubricShield`), Cross-Variant Borrow & `advisor` 6-Step Loop
+- **Epic:** `Epic 10` (`cowok` Master Orchestrator, `advisor` Meta-Agent, OPC Execution Fleet & Design Tournament)
+- **Reviewer:** Review Agent (`573b2485-b673-4d45-a4ca-014bf9e375c3`, Edge Case Guardian Skill)
+- **Verdict Notes (`2026-11-20`):** Added kernel deny-guard forbidding `advisor` from touching `tests/eval/sealed/` (`13.1`) and requiring `08.3/08.4 Staging + HUMAN_ONLY` approval on `SKILL.md` patches; added dependent CSS extraction on `Cross-Variant Borrow`, `min_variants >= 2` timeout fallback, `generation fencing` & `V18b` slot (`EC-E10-06`).
 
-## 1. FMEA & Boundary Evaluation
-- **Identified Edge Case:** Mọi bản vá SKILL.md do advisor sinh ra phải vượt qua bài kiểm thử hồi quy trước khi được kích hoạt chính thức cho toàn đội hình.
-- **Mitigation Verified:** Embedded into `[EDGE-CASE]` Acceptance Criterion `AC-03` and mapped to `Task 10.3.3`.
-- **Complexity Score (CS):** `4/10` (< 7 threshold — No story split required).
-
-## 2. Final Verdict
+## Final Verdict
 **VERDICT: PASS / APPROVED**
----
-
-## 3. Formal-verify candidates Triage
-- **Formal-verify candidates:** Stage 1/3A deferred triage (story not yet implemented): `AdvisorPatchPromotionGate` (staged SKILL patch regression gate before activation) to be evaluated at Stage 3A.

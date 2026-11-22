@@ -22,6 +22,7 @@ import {
   validateUserHtmlPayload,
 } from "./html-sandbox-sanitizer";
 import { buildPreviewDocumentHtml, type PreviewDocumentLabels } from "./html-preview-document";
+import { getStartupDesignCdnCspAllowlist, parseDesignCdnCspAllowlist } from "./html-sandbox-svg-policy";
 
 export {
   HostToIframeMessageSchema,
@@ -41,11 +42,18 @@ export const IFRAME_SANDBOX_PERMISSIONS = "allow-scripts allow-forms" as const;
 const DOM_ANCHOR_HASH_LEN = 16;
 const SAFE_CSP_NONCE_RE = /^[a-zA-Z0-9_-]{1,128}$/;
 
-export function buildStrictOfflineCsp(scriptNonce: string): string {
+export function buildStrictOfflineCspWithAllowlist(scriptNonce: string, allowlistRaw?: string): string {
   if (!SAFE_CSP_NONCE_RE.test(scriptNonce)) {
     throw new Error("Invalid CSP script nonce");
   }
-  return `default-src 'none'; base-uri 'none'; connect-src 'none'; form-action 'none'; style-src 'nonce-${scriptNonce}'; img-src data: blob:; font-src data:; script-src 'nonce-${scriptNonce}';`;
+  const origins =
+    allowlistRaw !== undefined ? parseDesignCdnCspAllowlist(allowlistRaw) : getStartupDesignCdnCspAllowlist();
+  const extra = origins.length > 0 ? ` ${origins.join(" ")}` : "";
+  return `default-src 'none'; base-uri 'none'; connect-src 'none'; form-action 'none'; style-src 'nonce-${scriptNonce}'${extra}; img-src data: blob:${extra}; font-src data:${extra}; script-src 'nonce-${scriptNonce}';`;
+}
+
+export function buildStrictOfflineCsp(scriptNonce: string): string {
+  return buildStrictOfflineCspWithAllowlist(scriptNonce);
 }
 
 export const STRICT_OFFLINE_CSP =

@@ -558,4 +558,22 @@ Hệ thống khóa cố định 4 theme chủ đạo theo triết lý công thá
    - Các nút chức năng thuộc riêng về tab **DAG Userflow / Slide Deck - HTML** (bao gồm nút ẩn/hiện cột cấu trúc trái, ẩn/hiện cột Live HTML Preview phải, huy hiệu `● DRAFT`, nút `Triển khai Draft (Gửi JSON → Agent)` và `Hủy Draft`) **bắt buộc nằm gọn bên trong phạm vi không gian của tab đó** (`#dagDraftBar`, `.structure-pane-header`, `.html-pane-toolbar`).
    - **Tuyệt đối cấm** đưa các nút chức năng nội bộ của tab DAG/Slide/HTML lên thanh điều hướng đỉnh của toàn Workbench (`WorkbenchTopNav.tsx`) hoặc thanh chứa danh sách tab chung (`.canvas-tab-bar` của `CompanionCanvasTab.tsx`). Thanh `.canvas-tab-bar` chỉ chứa các thẻ tab đang mở và nút `+` mở/tạo tab mới.
 
+---
+
+## 14. Post-PR #14 UX Pattern & Skin Registry (`sketch-paper`, Vault Cards, `CMP-07` Tournament & Split Export)
+
+1. **`data-stage-skin="sketch-paper"` -> Brand Swap (`Story 05.4`):**
+   - Token CSS đơn sắc wireframe mặc định trong giai đoạn khám phá ý tưởng (`--stage-paper-bg`, `--stage-ink-line`, `--stage-placeholder-surface`), giữ trọn vẹn cấu trúc grid/layout `data-ff-id` không đổi DOM tree khi người dùng bật toggle `[Sketch | Brand Color]` (`<16ms` + auto OKLCH contrast check).
+2. **In-Chat Trust & Vault Components (`Story 04.6`):**
+   - **`DecisionEngineOnboardingCard`**: Card hướng dẫn lấy key tại `aistudio.google.com/app/apikey` và `console.typesafe.ai`, hỗ trợ dán trực tiếp vào chat (`redact_secrets` ngay trước khi render lịch sử/SSE).
+   - **`VaultReceiptCard`**: Thay thế tin nhắn chứa key gốc trên giao diện, tích hợp Presenter Mask, nút `[Replace/Revoke]`, pill trạng thái `429 Rate-Limit Fallback`, cảnh báo high-entropy string, và công tắc `Enterprise Local-Only Lock`.
+3. **Interactive Manipulation & Flow Edge-Case Lens (`Story 05.4`, `05.5`):**
+   - **`SteeringChipsBar`** (`impeccable` chips điều hướng sắc thái thiết kế nhanh) & **`DesignerTalkOverlay`** (nối tọa độ live `bridge.elementRects` + `window.__jevFast` + `elementFromPoint`, hiển thị `LockedRuleChangeReceipt` khi chạm rule bị khóa).
+   - **`EdgeCaseFlowLens`** trên `DagCanvas2D`: mặc định giới hạn `<=8` happy-path nodes/cluster; công tắc `[Show Edge-Case Flows]` mở luồng lỗi và 4-SubState pills (`DEFAULT/LOADING/EMPTY/ERROR`).
+4. **Anti-Clone Tournament (`CMP-07`), QC Overlay & Split Export (`Story 07.1`, `07.2`, `10.3`, `13.1`):**
+   - **`CMP-07 DesignTournamentArena`**: Bao gồm **`Blind Wipe`** split slider desktop/mobile, **`Cross-Variant Borrow`** element picker (`reconcile_ff_ids`), và nút **`/crystallize`**.
+   - **`VisualQcOverlay`**: Gắn badge `lib-audit` / `slides-check` (`Pooled 1-Chromium CDP` hoặc `UNVERIFIED_NO_BROWSER`) kèm nút `1-Click Auto-Fix`.
+   - **Split `ExportBundleModal` / `ExportActionDropdown`**: Tab mặc định **`Share & Present`** (1-file Offline HTML, Vector PDF `1920x1080`, plugin `.pptx`) tách rạch ròi với tab **`Developer Handoff`**.
+   - **`M1..M5 Certification Drawer`**: Hiển thị trạng thái 25 ca `/simulate-user` (`UC-01..UC-25`) và kết quả `uiux-os eval run`.
+
 

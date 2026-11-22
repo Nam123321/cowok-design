@@ -4,10 +4,11 @@ id: "02.3"
 title: "Story 02.3: Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter)"
 description: "Tự động biến đổi định dạng ngữ cảnh, danh sách công cụ và chiến lược suy luận tương ứng với Profile A (Frontier Reasoning), Profile B (Standard Fast Coding), và Profile C (Compact/Specialized 3D-Motion)."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-02/Story-02.3/story.md"
-status: planned
+status: cancelled
+superseded_by: "02.1"
 risk_tier: 2
 delivery: core
-timestamp: "2026-11-02T13:30:00+07:00"
+timestamp: "2026-11-20T20:50:00+07:00"
 tags:
   - "story-02.3"
   - "epic-02"
@@ -17,7 +18,7 @@ links_to:
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md"
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.5.%20architecture.md"
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.2.%20database-spec.md"
-dependencies: ["02.2"]
+dependencies: ["02.1"]
 provides_apis:
   - "internal:epic-02/story-02.3"
 consumes_apis: []
@@ -27,19 +28,19 @@ consumes_apis: []
 
 - **FR Covered:** [FR-27: Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 02: JIT Prompt Assembler & 3-Profile Model Capability Adapter](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine/Epic-02/epic.md)
-- **Status:** `planned`
+- **Status:** `cancelled` *(Superseded by `Story 02.1`)*
 - **Risk Tier:** `2`
 
 ## 1. Story Description & Context
-Tự động biến đổi định dạng ngữ cảnh, danh sách công cụ và chiến lược suy luận tương ứng với Profile A (Frontier Reasoning), Profile B (Standard Fast Coding), và Profile C (Compact/Specialized 3D-Motion).
+`[DEPRECATED — CONSOLIDATED]` Phạm vi 3-Profile Model Capability Adapter đã được hợp nhất thành lát cắt dọc 5 lớp tại `Story 02.1`.
 
 ## 2. Plan-Tune Heuristic & Complexity Score
-- **Complexity Score (CS):** `CS = 4` (Scope=1, Data=1, Integration=1, UI=0.5, Security=0.5, Unknowns=0 $\rightarrow$ `CS = 4 < 7`, đạt ngưỡng an toàn, không cần tách nhỏ Story).
+- **Complexity Score (CS):** `CS = 4` (`[DEPRECATED]` — merged into `Story 02.1`).
 
 ## 3. Acceptance Criteria (AC)
-- **AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter)" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon.
-- **AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`.
-- **AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Tự động hạ cấp xuống Profile B với micro-tools định sẵn nếu model nhỏ gặp lỗi cú pháp khi gọi tool phức tạp.
+- **[DEPRECATED] AC-01 (Core Capability):** Triển khai đầy đủ chức năng "Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter)" tuân thủ hợp đồng kiểu dữ liệu trong `crates/domain` và kiến trúc Rust Core Daemon. *(Merged into `Story 02.1 AC-03`.)*
+- **[DEPRECATED] AC-02 (Integration & Constraints):** Tích hợp đồng bộ với SQLite WAL (`crates/spec-registry`), tuân thủ cấu hình ràng buộc dự án (`PROJECT_CONSTRAINTS`) và bộ điều phối `cowok` / `advisor`. *(Merged into `Story 02.1 AC-03`.)*
+- **[DEPRECATED] AC-03 ([EDGE-CASE] Resilience & Boundary Guard):** Tự động hạ cấp xuống Profile B với micro-tools định sẵn nếu model nhỏ gặp lỗi cú pháp khi gọi tool phức tạp. *(Merged into `Story 02.1 AC-04`.)*
 
 ## 4. Tasks
 - [ ] **Task 02.3.1**: Thiết kế và cài đặt mô-đun cốt lõi cho "Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter)" (thỏa mãn `AC-01`).
@@ -87,3 +88,4 @@ Tự động biến đổi định dạng ngữ cảnh, danh sách công cụ v�
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-02 | 1.0.0 | Khởi tạo Story 02.3 đồng bộ với PRD v2.0 và Kiến trúc cowok/advisor | cowok Orchestrator |
+| 2026-11-20 | 2.0.0 | [ac_removal] Đánh dấu [DEPRECATED] & superseded_by Story 02.1 (Reason: Post-PR #14 Vertical Slice Consolidation) | /refactor-story |

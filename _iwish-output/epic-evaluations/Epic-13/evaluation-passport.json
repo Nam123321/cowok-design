@@ -1,0 +1,103 @@
+{
+  "schema_version": "epic-evaluation-passport/v1",
+  "epic_id": "Epic-13",
+  "feature_group": "VS-06. Release Certification & Anti-Goodhart Evaluation",
+  "created_at": "2026-11-20T13:44:30Z",
+  "updated_at": "2026-11-20T13:44:30Z",
+  "context_digest": "956d9a5597fffdb625b2ee7dd986b5f48186a68e1f21af617eab55e41d0f8fdd",
+  "context_files": [
+    {
+      "path": "_iwish-output/2. Product Planning/2.1. product-brief-or-prd.md",
+      "sha256": "8e5e51b576c5feed8e5abf3aba7e210c79a707173d602004c3b230c13ffdf151"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.4. epics-and-stories.md",
+      "sha256": "8c59b9963c551b33a6173528784b0e9b3700e10ddfaaf05fc06fc238ef0f5add"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.6. feature-hierarchy.md",
+      "sha256": "8cbd53e1a8ceb2be4504e1251326dd10d03e1197ab2bbfaa7a892812ef2dafd6"
+    },
+    {
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-06. Release Certification & Anti-Goodhart Evaluation/Epic-13/epic.md",
+      "sha256": "8c3c7796a7383bc2c51519f49499b86734efeef883af803a30312bf7a04f5087"
+    }
+  ],
+  "evaluation_integrity": "VERIFIED",
+  "epic_readiness": "READY",
+  "story_creation_envelope": {
+    "max_phase": "IMPLEMENT",
+    "allowed_story_ids": [
+      "13.1"
+    ],
+    "blocked_story_ids": [],
+    "remediation_lane": true
+  },
+  "party_mode": {
+    "mode": "deep",
+    "rounds": 2,
+    "roles": [
+      "PM",
+      "Architect",
+      "Review",
+      "Dev",
+      "UX"
+    ],
+    "transcript_ref": "_iwish-output/epic-evaluations/Epic-13/party-mode-transcript.md",
+    "consensus_summary": "Post-PR #14 reconciliation verified Epic-13 under 20-Slice Vertical Master Plan with TDR-006/007.",
+    "pushback_patterns": [
+      "Zero horizontal-only stories; 5-layer E2E slice enforcement and immutable completed baseline."
+    ]
+  },
+  "unknowns": {
+    "depth": "full",
+    "quadrants": [
+      "known_unknowns",
+      "unknown_unknowns",
+      "assumptions",
+      "blind_spots"
+    ],
+    "critical_open": [],
+    "macro_open": [],
+    "report_ref": "_iwish-output/unknowns/reports/unknowns-report-epic-13.md"
+  },
+  "evidence_receipts": [
+    {
+      "id": "epic-13-party-mode-transcript",
+      "path": "_iwish-output/epic-evaluations/Epic-13/party-mode-transcript.md",
+      "sha256": "c2a32a7c5911af54b39ab429d179b382fc117da70630cb89dd545af1b3e92f61"
+    },
+    {
+      "id": "epic-13-unknowns-report",
+      "path": "_iwish-output/unknowns/reports/unknowns-report-epic-13.md",
+      "sha256": "e94afbec579888cfea6d0f37db6b3fe20b9fc98276016e90bf64d4358b4daa43"
+    },
+    {
+      "id": "epic-13-evaluation-report",
+      "path": "_iwish-output/epic-evaluations/Epic-13/evaluation-report.md",
+      "sha256": "b6fb5ada7401c76ba24da09d7afafe8170fd3e408a076516100d65d4bc50b89d"
+    },
+    {
+      "id": "epic-13-plugin-boundary-review",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-06. Release Certification & Anti-Goodhart Evaluation/Epic-13/plugin-boundary-review.md",
+      "sha256": "6659f3b128f5bd7e205868d8d829965354b2075ce11af4b463070d54f922cd3a"
+    },
+    {
+      "id": "epic-13-agent-surface-map",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-06. Release Certification & Anti-Goodhart Evaluation/Epic-13/agent-surface-map.md",
+      "sha256": "3b35fe489a608144fb4d2c771063de94d5ead3a4908a60c76de9b5a08d333135"
+    },
+    {
+      "id": "epic-13-coherence-report",
+      "path": "_iwish-output/adhoc-workspace/scratch/coherence-report-Epic-13.json",
+      "sha256": "41c224fedd0773fe6b56e4835de013ac1b76d883ba9982436c2c64aa2598762b"
+    }
+  ],
+  "approval": {
+    "approved": true,
+    "approved_by": "User",
+    "approved_at": "2026-11-20T20:26:51+07:00",
+    "context_digest": "956d9a5597fffdb625b2ee7dd986b5f48186a68e1f21af617eab55e41d0f8fdd"
+  },
+  "has_ui_stories": true
+}

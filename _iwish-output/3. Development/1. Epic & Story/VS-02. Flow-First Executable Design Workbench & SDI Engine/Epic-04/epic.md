@@ -1,7 +1,7 @@
 ---
 type: I-Wish Epic
 id: "Epic-04"
-title: "Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution"
+title: "Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, CAS Intake & In-Chat Vault"
 status: completed
 track: "Stream-2"
 wave: 2
@@ -11,6 +11,7 @@ provides:
   - "Day-0 Onboarding CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier (Story 04.3)"
   - "Persistent KeyedParallelCoordinator (Fencing + Lease Reaper), SSE Last-Event-ID & Multi-Node Chat v2 (Story 04.4)"
   - "State-Hydrated Live Preview (CompanionLiveHtmlRightPane), Option CSP-B Bridge & Element Comments (Story 04.5)"
+  - "SQLite V4/V16 Chat Persistence, CAS Binary/CSV Intake, <svg viewBox> Normalizer & In-Chat Zero-Leak Key Vault (Story 04.6)"
 consumes: ["Epic 01", "Epic 03"]
 links_to:
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md"
@@ -46,6 +47,7 @@ Epic 04 hiện thực hóa toàn bộ trải nghiệm thiết kế hướng lu�
 - **Story 04.3 (`HYBRID / EXTENSION_PLUGIN`):** Day-0 Onboarding Wizard `<60s` (`execFile` zero shell `<=1500ms` dò 16+ CLIs phân tách **`installed` vs `authenticated`**, MCP fallback), Live BYOK Verifier `<3s` có SSRF guard + redaction (thay stub `/api/doctor` trong `SettingsGeneralModelsPane`), OS Keychain / `0o600` `.cowok-design/vault.enc` -> explicit `COWOK_VAULT_MODE=ephemeral` (cấm tuyệt đối secrets/flags trong `localStorage`), tự động gắn `X-Cowok-Session-Token` qua `src/api/`.
 - **Story 04.4 (`HYBRID / CORE_COORDINATOR`):** SQLite V5 `node_execution_jobs` `KeyedParallelCoordinator` (CAS `fencing_token`, sửa pause slot leak `running + paused <= maxConcurrent`, `5s` lease heartbeat + Startup `daemon_nonce` orphan reaper, `Continue vs Steer`, xóa `setTimeout(..., 600)` giả), `/api/v1/events` SSE `execution_events(seq)` + `Last-Event-ID`, Multi-Node Floating Chat v2 (`360x480..900x850` + Pill `42px`), `MainSidebar` 3-Level Virtual Sub-Sessions + On-DAG Queue HUD.
 - **Story 04.5 (`CORE`):** Hợp nhất Live Preview vào `CompanionLiveHtmlRightPane.tsx` (`sandbox="allow-scripts allow-forms"`, responsive `desktop-1440`/`tablet-768`/`mobile-390`, `Auto/16:9/16:10`, Present, Inline `</>` Editor khóa dirty buffer, 4 Sub-States `Default/Loading/Empty/Error`), `Option CSP-B` `MessageChannel` (`epoch` + `artifactSha256` + `domAnchorHash`), 3-Way Spatial Feedback vào `#chatAttachmentTray` + V5 `element_comments` CAS `CommitAllowed` (`409 STALE_MAPPING`), thanh tẩy 100% Tailwind trong `src/features/comments/**` & nối `src/api/`.
+- **Story 04.6 (`CORE` + `ADR-006`):** SQLite `V4/V16` Chat Persistence (`chat_messages` + auto-provisioned session FK thay `sessionStorage`), CAS Binary/CSV/TSV/XLSX/Fig Intake (`.cowok-design/cas/<sha256>`, `onPaste`), `<svg viewBox>` auto-inference & `DESIGN_CDN_CSP` toggle, In-Chat Zero-Leak Key Vault (`DecisionEngineOnboardingCard`, `VaultReceiptCard`, Presenter Mask, `429` pill, `[Replace/Revoke]`, `Enterprise Local-Only Lock`, 3-Layer Secret Interceptor + `redact_secrets`).
 
 ### Out-of-Scope
 - Phân tích `DesignIntentV1`, Option 5 Vertical Storyboard, Sample Data Studio & Gap-Driven Discovery (thuộc phạm vi `Epic 05`).
@@ -56,11 +58,12 @@ Epic 04 hiện thực hóa toàn bộ trải nghiệm thiết kế hướng lu�
 
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
-| **Story 04.1** | Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation | `refactored` | `3` | `['01.3', '03.2']` |
-| **Story 04.2** | SQLite V7 Schema Convergence, Streaming Dual-Ingress Vite BFF & Managed Root / FS Jail | `refactored` | `3` | `['04.1']` |
-| **Story 04.3** | Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier | `refactored` | `3` | `['04.2']` |
-| **Story 04.4** | Persistent KeyedParallelCoordinator, Monotonic Fencing, SSE Last-Event-ID, Multi-Node Chat v2 & 3-Level Sidebar | `refactored` | `3` | `['04.2']` |
-| **Story 04.5** | State-Hydrated Live Preview (CompanionLiveHtmlRightPane), Option CSP-B Bridge & Persistent Element Comments (stale_mapping) | `refactored` | `3` | `['04.4', '03.3']` |
+| **Story 04.1** | Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation | `completed` | `3` | `['01.3', '03.2']` |
+| **Story 04.2** | SQLite V7 Schema Convergence, Streaming Dual-Ingress Vite BFF & Managed Root / FS Jail | `completed` | `3` | `['04.1']` |
+| **Story 04.3** | Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier | `completed` | `3` | `['04.2']` |
+| **Story 04.4** | Persistent KeyedParallelCoordinator, Monotonic Fencing, SSE Last-Event-ID, Multi-Node Chat v2 & 3-Level Sidebar | `completed` | `3` | `['04.2']` |
+| **Story 04.5** | State-Hydrated Live Preview (CompanionLiveHtmlRightPane), Option CSP-B Bridge & Persistent Element Comments (stale_mapping) | `completed` | `3` | `['04.4', '03.3']` |
+| **Story 04.6** | SQLite `V4/V16` Chat Persistence, CAS Binary/CSV Intake, `<svg viewBox>` Normalizer & In-Chat Zero-Leak Key Vault | `completed` | `3` | `['04.2', '04.3']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 
@@ -81,21 +84,18 @@ Epic 04 hiện thực hóa toàn bộ trải nghiệm thiết kế hướng lu�
 - [x] **Interface vs Implementation?** Yes
 
 <!-- BEGIN AUTO-ROADMAP: DO NOT EDIT -->
-## 4-Sprint Integrated Development Roadmap (Synchronized Phasing)
+## 2-Sprint Integrated Development Roadmap (Synchronized Phasing)
 
-> **Mục tiêu**: Tự động hóa phân kỳ và phân bổ tuần tự/song song cho toàn bộ **5 Story Active** trên nền tảng **0 Story Baseline đã `completed`**, loại bỏ chu trình phụ thuộc (No Dependency Cycles) và tuân thủ giới hạn tải tối đa 4 Sprints.
+> **Mục tiêu**: Tự động hóa phân kỳ và phân bổ tuần tự/song song cho toàn bộ **1 Story Active** trên nền tảng **3 Story Baseline đã `completed`**, loại bỏ chu trình phụ thuộc (No Dependency Cycles) và tuân thủ giới hạn tải tối đa 2 Sprints.
 
 ---
 
 ### 1. Phân tích Hiện trạng & Chiến lược Phân kỳ Mới (Phasing Rationalization)
 
-- **Baseline Nền tảng (0 Stories `completed` / `cancelled`)**: Đóng vai trò Enabler, cung cấp mock data, schemas và các dịch vụ tiền đề.
-- **Phạm vi Active Delta (5 Stories)**: Được phân bổ thành 4 Sprint thực thi kế tiếp.
+- **Baseline Nền tảng (3 Stories `completed` / `cancelled`)**: Đóng vai trò Enabler, cung cấp mock data, schemas và các dịch vụ tiền đề.
+- **Phạm vi Active Delta (1 Stories)**: Được phân bổ thành 1 Sprint thực thi kế tiếp.
 - **Khả năng Chạy Song Song (Parallel Execution Lanes)**:
-  - **Sprint 1**: Tuần tự (Sequential) — `Story-04.1`
-  - **Sprint 2**: Tuần tự (Sequential) — `Story-04.2`
-  - **Sprint 3**: Song song (Parallel) — `Story-04.3`, `Story-04.4`
-  - **Sprint 4**: Tuần tự (Sequential) — `Story-04.5`
+  - **Sprint 1**: Tuần tự (Sequential) — `Story-04.6`
 
 ---
 
@@ -103,42 +103,31 @@ Epic 04 hiện thực hóa toàn bộ trải nghiệm thiết kế hướng lu�
 
 | Story ID | Trạng thái Thực tế | Provides (Cung cấp) | Consumes (Tiêu thụ) | Zod Schema Status | Ghi chú & Rào chắn |
 |---|---|---|---|:---:|---|
-| **Story-04.1** | `refactored` | Cung cấp vỏ Workbench chuẩn (`MainSidebar`, `DualMainPanel`, `CompanionCanvasTab`, `CompanionLiveHtm | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
-| **Story-04.2** | `refactored` | Cung cấp tầng lưu trữ SQLite `V7`, Dual-Ingress Streaming BFF và Multi-Project Workspace / `O_NOFOLLOW` FS Jail | consumes_apis: | ⚠️ Zod Strict (`harness-daemon.ts` + `workbench-settings.ts`) | Tuân thủ Zero-Trust Category A |
-| **Story-04.3** | `refactored` | **AC-01 (Day-0 First-Run Onboarding Wizard `<60s` & Honest 16+ Local CLI Doctor via `execFile`):** C | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
-| **Story-04.4** | `refactored` | Cung cấp hạ tầng chạy song song đa màn hình không chồng chéo và dòng SSE bền vững cho `Story 04.5`,  | description: "Triển khai động cơ điều phối thực thi song song bền vững và hệ thống Chat đa màn hình  | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
-| **Story-04.5** | `refactored` | 1. **Một bề mặt Preview duy nhất (`CompanionLiveHtmlRightPane.tsx`):** Không duy trì 2 bộ iframe son | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
+| **Story-04.1** | `completed` | Cung cấp vỏ Workbench chuẩn (`MainSidebar`, `DualMainPanel`, `CompanionCanvasTab`, `CompanionLiveHtm | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
+| **Story-04.2** | `completed` | Cung cấp tầng lưu trữ SQLite `V7`, Dual-Ingress Streaming BFF (`Readable.fromWeb` + `DELETE/POST res | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
+| **Story-04.3** | `completed` | Cung cấp hạ tầng sẵn sàng kết nối AI (Local Coding CLI + MCP + Live BYOK Vault V7) cho `Story 04.4`  | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
+| **Story-04.6** | `refactored` | Khép kín hoàn toàn trải nghiệm khởi đầu trên khung chat cho người dùng non-tech qua lát cắt dọc 5 lớ | consumes_apis: | ⚠️ Chưa có (manual types) | Tuân thủ Zero-Trust Category A |
 
 ---
 
-### 3. Sơ đồ Thực thi DAG 4 Sprint (Phased DAG Execution Roadmap)
+### 3. Sơ đồ Thực thi DAG 2 Sprint (Phased DAG Execution Roadmap)
 
 ```mermaid
 flowchart TD
+    subgraph S0["Sprint Baseline (Đã Hoàn Thành)"]
+        Story_04_1["Story-04.1 (Completed)"]
+        Story_04_2["Story-04.2 (Completed)"]
+        Story_04_3["Story-04.3 (Completed)"]
+    end
+
     subgraph S1["Sprint 1: Phân kỳ Thực thi"]
-        Story_04_1["Story-04.1 (Refactored)<br>Story 04.1: Unified DualMainPanel Workbench, "]
-    end
-
-    subgraph S2["Sprint 2: Phân kỳ Thực thi"]
-        Story_04_2["Story-04.2 (Refactored)<br>Story 04.2: SQLite V7 Schema Convergence, Str"]
-    end
-
-    subgraph S3["Sprint 3: Phân kỳ Thực thi"]
-        Story_04_3["Story-04.3 (Refactored)<br>Story 04.3: Day-0 Onboarding Wizard, Honest 1"]
-        Story_04_4["Story-04.4 (Refactored)<br>Story 04.4: Persistent KeyedParallelCoordinat"]
-    end
-
-    subgraph S4["Sprint 4: Phân kỳ Thực thi"]
-        Story_04_5["Story-04.5 (Refactored)<br>Story 04.5: State-Hydrated Live Preview Compa"]
+        Story_04_6["Story-04.6 (Refactored)<br>Story 04.6: SQLite V4/V16 Chat Persistence, C"]
     end
 
     E2E_GATE["E2E Platform Gate<br>Zero-Trust Verification"]
-    Story_04_1 --> Story_04_2
-    Story_04_2 --> Story_04_3
-    Story_04_2 --> Story_04_4
-    Story_04_1 --> Story_04_5
-    Story_04_4 --> Story_04_5
-    Story_04_5 --> E2E_GATE
+    Story_04_2 --> Story_04_6
+    Story_04_3 --> Story_04_6
+    Story_04_6 --> E2E_GATE
 
     classDef completed fill:#dcfce7,stroke:#16a34a,stroke-width:2px;
     classDef refactored fill:#fef3c7,stroke:#d97706,stroke-width:2px;
@@ -154,32 +143,7 @@ flowchart TD
 #### Sprint 1: Phân kỳ Tác vụ
 - **Mô hình**: Các câu chuyện được phát triển **tuần tự (Sequential)**.
 - **Phạm vi thực thi**:
-  1. **`Story-04.1`** (refactored): Story 04.1: Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation
-- **Tiêu chí Hoàn thành (Sprint Done Criteria)**:
-  - Toàn bộ Zod schemas và Unit tests cho các story trong sprint vượt qua 100%.
-  - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
-
-#### Sprint 2: Phân kỳ Tác vụ
-- **Mô hình**: Các câu chuyện được phát triển **tuần tự (Sequential)**.
-- **Phạm vi thực thi**:
-  1. **`Story-04.2`** (completed): Story 04.2: SQLite V7 Schema Convergence, Streaming Dual-Ingress Vite BFF & Managed Root / FS Jail
-- **Tiêu chí Hoàn thành (Sprint Done Criteria)**:
-  - Toàn bộ Zod schemas và Unit tests cho các story trong sprint vượt qua 100%.
-  - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
-
-#### Sprint 3: Phân kỳ Tác vụ
-- **Mô hình**: Các câu chuyện trong Sprint này độc lập với nhau, có thể **phát triển song song (Parallel)**.
-- **Phạm vi thực thi**:
-  1. **`Story-04.3`** (refactored): Story 04.3: Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier
-  2. **`Story-04.4`** (refactored): Story 04.4: Persistent KeyedParallelCoordinator, Monotonic Fencing, SSE Last-Event-ID, Multi-Node Chat v2 & 3-Level Sidebar
-- **Tiêu chí Hoàn thành (Sprint Done Criteria)**:
-  - Toàn bộ Zod schemas và Unit tests cho các story trong sprint vượt qua 100%.
-  - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
-
-#### Sprint 4: Phân kỳ Tác vụ
-- **Mô hình**: Các câu chuyện được phát triển **tuần tự (Sequential)**.
-- **Phạm vi thực thi**:
-  1. **`Story-04.5`** (refactored): Story 04.5: State-Hydrated Live Preview (CompanionLiveHtmlRightPane), Option CSP-B Epoch/Hash Bridge & Persistent Element Comments (stale_mapping)
+  1. **`Story-04.6`** (refactored): Story 04.6: SQLite V4/V16 Chat Persistence, CAS Binary/CSV Intake, <svg viewBox> Normalizer & In-Chat Zero-Leak Key Vault
 - **Tiêu chí Hoàn thành (Sprint Done Criteria)**:
   - Toàn bộ Zod schemas và Unit tests cho các story trong sprint vượt qua 100%.
   - Kiểm thử tích hợp (Tracer Bullet) giữa các story song song không xảy ra tranh chấp dữ liệu (Race Condition).
@@ -190,12 +154,20 @@ flowchart TD
 |---|---|---|---|
 | [Story-04.1](./Story-04.1/story.md) | Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation | 01.3, 03.2 | completed |
 | [Story-04.2](./Story-04.2/story.md) | SQLite V7 Schema Convergence, Streaming Dual-Ingress Vite BFF & Managed Root / FS Jail | 04.1 | completed |
-| [Story-04.3](./Story-04.3/story.md) | Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier | 04.2 | refactored |
-| [Story-04.4](./Story-04.4/story.md) | Persistent KeyedParallelCoordinator, Monotonic Fencing, SSE Last-Event-ID, Multi-Node Chat v2 & 3-Level Sidebar | 04.2 | refactored |
-| [Story-04.5](./Story-04.5/story.md) | State-Hydrated Live Preview (CompanionLiveHtmlRightPane), Option CSP-B Epoch/Hash Bridge & Persistent Element Comments (stale_mapping) | 04.4, 03.3 | refactored |
+| [Story-04.3](./Story-04.3/story.md) | Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier | 04.2 | completed |
+| Story-04.4 *(completed baseline — merged on master)* | Persistent KeyedParallelCoordinator, Monotonic Fencing, SSE Last-Event-ID, Multi-Node Chat v2 & 3-Level Sidebar | 04.2 | completed |
+| Story-04.5 *(completed baseline — merged on master)* | State-Hydrated Live Preview (CompanionLiveHtmlRightPane), Option CSP-B Epoch/Hash Bridge & Persistent Element Comments (stale_mapping) | 04.4, 03.3 | completed |
+| [Story-04.6](./Story-04.6/story.md) | SQLite `V4/V16` Chat Persistence, CAS Binary/CSV Intake, `<svg viewBox>` Normalizer & In-Chat Zero-Leak Key Vault | 04.2, 04.3 | refactored |
 
 ## Layer Documents
 - [Layer-Epic-FE](./layer-epic-fe.md)
 - [Layer-Epic-DB](./layer-epic-db.md)
 - [Layer-Epic-API](./layer-epic-api.md)
 - [Contract Claims](./contract_claims.yaml)
+
+| Story ID | Title | Dependencies | Status |
+|---|---|---|---|
+| [Story-04.1](./Story-04.1/story.md) | Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation | 01.3, 03.2 | completed |
+| [Story-04.2](./Story-04.2/story.md) | SQLite V7 Schema Convergence, Streaming Dual-Ingress Vite BFF & Managed Root / FS Jail | 04.1 | completed |
+| [Story-04.3](./Story-04.3/story.md) | Day-0 Onboarding Wizard, Honest 16+ CLI Doctor (Extension), OS Keychain/0600 Vault & SSRF-Guarded BYOK Verifier | 04.2 | completed |
+| [Story-04.6](./Story-04.6/story.md) | SQLite `V4/V16` Chat Persistence, CAS Binary/CSV Intake, `<svg viewBox>` Normalizer & In-Chat Zero-Leak Key Vault | 04.2, 04.3 | completed |

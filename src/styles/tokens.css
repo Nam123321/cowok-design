@@ -45,6 +45,10 @@
   --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-pill: 9999px;
+  --hit-target-min: 44px;
+  --privacy-mask-filter: blur(4px);
+  --amber-500: #F59E0B;
+  --border-vault-verified: #169B62;
 
   /* Transitions & Motion (Ergonomic Spring Easing) */
   --duration-fast: 140ms;
@@ -501,6 +505,8 @@ html[data-theme="night"][data-focus="low"],
   --border-strong: #344761;
   --border-focus: #6C8FD9;
   --border-subtle: #26354D;
+  --border-vault-verified: #45C486;
+  --amber-500: #F59E0B;
   --border: var(--border-default);
 
   --human-accent: #65789E;

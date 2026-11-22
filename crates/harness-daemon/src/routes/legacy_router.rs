@@ -7,6 +7,8 @@ use axum::{
 };
 
 use crate::daemon_auth::legacy_project_auth_middleware;
+use crate::routes::chat_cas_vault::chat_cas_vault_routes;
+use crate::routes::context_assemble::{handle_context_assemble, handle_get_context_telemetry};
 use crate::routes::fs_jail;
 use crate::routes::github_ide_integrations::integration_routes;
 use crate::routes::legacy_proposals::{
@@ -36,6 +38,10 @@ use crate::routes::legacy_specs::{
 };
 use crate::routes::presentation::presentation_routes;
 use crate::routes::project_trash::handle_restore_project;
+use crate::routes::ssot_registry::{
+    handle_export_ssot, handle_get_ssot_components, handle_mutate_appshell_lock,
+    handle_route_skills,
+};
 use crate::routes::DaemonAppState;
 
 fn legacy_project_spec_routes() -> Router<DaemonAppState> {
@@ -83,6 +89,18 @@ fn legacy_project_spec_routes() -> Router<DaemonAppState> {
             post(handle_model_adapter),
         )
         .route("/api/v1/projects/:id/lint", post(handle_lint_source))
+        .route("/api/v1/context/assemble", post(handle_context_assemble))
+        .route(
+            "/api/v1/context/telemetry",
+            get(handle_get_context_telemetry),
+        )
+        .route("/api/v1/ssot/components", get(handle_get_ssot_components))
+        .route(
+            "/api/v1/ssot/appshell/lock",
+            post(handle_mutate_appshell_lock),
+        )
+        .route("/api/v1/ssot/export", post(handle_export_ssot))
+        .route("/api/v1/skills/route", post(handle_route_skills))
 }
 
 fn legacy_sdi_proposal_routes() -> Router<DaemonAppState> {
@@ -210,6 +228,10 @@ fn legacy_snapshot_session_routes() -> Router<DaemonAppState> {
         )
         .route("/api/v1/fs/browse", get(fs_jail::handle_fs_browse))
         .route(
+            "/api/v1/fs/pick-native",
+            post(fs_jail::handle_fs_pick_native),
+        )
+        .route(
             "/api/v1/projects/:id/path-token",
             post(handle_issue_path_token),
         )
@@ -224,6 +246,7 @@ pub(crate) fn build_protected_legacy_router(state: DaemonAppState) -> Router<Dae
         .merge(legacy_project_spec_routes())
         .merge(legacy_sdi_proposal_routes())
         .merge(legacy_snapshot_session_routes())
+        .merge(chat_cas_vault_routes())
         .merge(integration_routes())
         .merge(presentation_routes())
         .route_layer(middleware::from_fn_with_state(

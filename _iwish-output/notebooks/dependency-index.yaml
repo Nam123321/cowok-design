@@ -1,10 +1,10 @@
 version: '1.0'
-compiled_at: '2026-11-17T16:39:24.917374+00:00'
+compiled_at: '2026-11-20T14:16:03.778019+00:00'
 sources_used:
-  story_frontmatter: 39
-  epic_tables: 12
+  story_frontmatter: 45
+  epic_tables: 13
   cross_dependencies_md: true
-  data_specs: 17
+  data_specs: 15
 epics:
   Epic-09:
     upstream: []
@@ -19,6 +19,9 @@ epics:
     upstream: []
     downstream: []
   Epic-01:
+    upstream: []
+    downstream: []
+  Epic-13:
     upstream: []
     downstream: []
   Epic-07:
@@ -47,6 +50,7 @@ stories:
     declared_deps:
     - '03.1'
     - '08.2'
+    - '08.5'
     analyzed_deps: []
     merged_deps:
     - id: '03.1'
@@ -57,28 +61,77 @@ stories:
       confidence: 0.5
       evidence:
       - frontmatter
+    - id: '08.5'
+      confidence: 0.5
+      evidence:
+      - frontmatter
     conflicts: []
   Story-09.3:
     declared_deps:
     - '09.2'
+    - '05.4'
+    - '07.1'
     analyzed_deps: []
     merged_deps:
     - id: '09.2'
       confidence: 0.5
       evidence:
       - frontmatter
+    - id: '05.4'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '07.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
     conflicts: []
   Story-09.2:
     declared_deps:
-    - '03.2'
-    - '08.1'
+    - '02.1'
+    - '02.4'
+    - '04.6'
+    - '08.5'
     analyzed_deps: []
     merged_deps:
-    - id: '03.2'
+    - id: '02.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '02.4'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '04.6'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '08.5'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    conflicts: []
+  Story-08.4:
+    declared_deps:
+    - '04.3'
+    - '08.1'
+    - '08.2'
+    - '08.3'
+    analyzed_deps: []
+    merged_deps:
+    - id: '04.3'
       confidence: 0.5
       evidence:
       - frontmatter
     - id: '08.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '08.2'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '08.3'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -103,17 +156,47 @@ stories:
       evidence:
       - frontmatter
     conflicts: []
-  Story-08.1:
+  Story-08.5:
     declared_deps:
-    - '01.2'
-    - '02.1'
+    - '02.4'
+    - '08.1'
+    - '08.2'
+    - '08.3'
+    - '08.4'
     analyzed_deps: []
     merged_deps:
-    - id: '01.2'
+    - id: '02.4'
       confidence: 0.5
       evidence:
       - frontmatter
-    - id: '02.1'
+    - id: '08.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '08.2'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '08.3'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '08.4'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    conflicts: []
+  Story-08.1:
+    declared_deps:
+    - '01.1'
+    - '01.2'
+    analyzed_deps: []
+    merged_deps:
+    - id: '01.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '01.2'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -148,12 +231,32 @@ stories:
       evidence:
       - frontmatter
     conflicts: []
-  Story-02.3:
+  Story-02.4:
     declared_deps:
-    - '02.2'
+    - '01.3'
+    - '02.1'
+    - '03.1'
     analyzed_deps: []
     merged_deps:
-    - id: '02.2'
+    - id: '01.3'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '02.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '03.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    conflicts: []
+  Story-02.3:
+    declared_deps:
+    - '02.1'
+    analyzed_deps: []
+    merged_deps:
+    - id: '02.1'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -171,9 +274,14 @@ stories:
   Story-02.1:
     declared_deps:
     - '01.2'
+    - '01.3'
     analyzed_deps: []
     merged_deps:
     - id: '01.2'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '01.3'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -193,13 +301,59 @@ stories:
     analyzed_deps: []
     merged_deps: []
     conflicts: []
-  Story-07.1:
+  Story-13.1:
     declared_deps:
-    - '05.2'
-    - '06.2'
+    - '05.5'
+    - '07.1'
+    - '08.5'
+    - '09.2'
+    - '10.3'
+    - '12.1'
+    - '12.3'
     analyzed_deps: []
     merged_deps:
-    - id: '05.2'
+    - id: '05.5'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '07.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '08.5'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '09.2'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '10.3'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '12.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '12.3'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    conflicts: []
+  Story-07.1:
+    declared_deps:
+    - '05.4'
+    - '05.5'
+    - '06.2'
+    - '06.5'
+    analyzed_deps: []
+    merged_deps:
+    - id: '05.4'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '05.5'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -207,12 +361,26 @@ stories:
       confidence: 0.5
       evidence:
       - frontmatter
+    - id: '06.5'
+      confidence: 0.5
+      evidence:
+      - frontmatter
     conflicts: []
   Story-07.2:
     declared_deps:
+    - '06.1'
+    - '06.5'
     - '07.1'
     analyzed_deps: []
     merged_deps:
+    - id: '06.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '06.5'
+      confidence: 0.5
+      evidence:
+      - frontmatter
     - id: '07.1'
       confidence: 0.5
       evidence:
@@ -221,14 +389,14 @@ stories:
   Story-07.3:
     declared_deps:
     - '07.1'
-    - '06.3'
+    - '06.5'
     analyzed_deps: []
     merged_deps:
     - id: '07.1'
       confidence: 0.5
       evidence:
       - frontmatter
-    - id: '06.3'
+    - id: '06.5'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -244,6 +412,41 @@ stories:
       evidence:
       - frontmatter
     - id: '03.3'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    conflicts: []
+  Story-06.5:
+    declared_deps:
+    - '02.4'
+    - '04.6'
+    - '06.1'
+    - '06.3'
+    - '09.2'
+    - '11.1'
+    analyzed_deps: []
+    merged_deps:
+    - id: '02.4'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '04.6'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '06.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '06.3'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '09.2'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '11.1'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -295,15 +498,20 @@ stories:
     conflicts: []
   Story-11.2:
     declared_deps:
+    - '10.1'
     - '11.1'
-    - '10.3'
+    - '08.5'
     analyzed_deps: []
     merged_deps:
+    - id: '10.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
     - id: '11.1'
       confidence: 0.5
       evidence:
       - frontmatter
-    - id: '10.3'
+    - id: '08.5'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -311,45 +519,51 @@ stories:
   Story-11.3:
     declared_deps:
     - '11.1'
-    - '10.2'
+    - '11.2'
     analyzed_deps: []
     merged_deps:
     - id: '11.1'
       confidence: 0.5
       evidence:
       - frontmatter
-    - id: '10.2'
+    - id: '11.2'
       confidence: 0.5
       evidence:
       - frontmatter
     conflicts: []
   Story-11.1:
     declared_deps:
-    - '02.3'
-    - '09.3'
+    - '04.3'
+    - '04.4'
+    - '04.6'
+    - '02.1'
     analyzed_deps: []
     merged_deps:
-    - id: '02.3'
+    - id: '04.3'
       confidence: 0.5
       evidence:
       - frontmatter
-    - id: '09.3'
+    - id: '04.4'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '04.6'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '02.1'
       confidence: 0.5
       evidence:
       - frontmatter
     conflicts: []
   Story-10.1:
     declared_deps:
-    - '05.2'
-    - '08.2'
+    - '04.4'
     - '09.2'
+    - '11.1'
     analyzed_deps: []
     merged_deps:
-    - id: '05.2'
-      confidence: 0.5
-      evidence:
-      - frontmatter
-    - id: '08.2'
+    - id: '04.4'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -357,27 +571,46 @@ stories:
       confidence: 0.5
       evidence:
       - frontmatter
+    - id: '11.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
     conflicts: []
   Story-10.2:
     declared_deps:
     - '10.1'
-    - '09.3'
+    - '07.1'
+    - '08.5'
     analyzed_deps: []
     merged_deps:
     - id: '10.1'
       confidence: 0.5
       evidence:
       - frontmatter
-    - id: '09.3'
+    - id: '07.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '08.5'
       confidence: 0.5
       evidence:
       - frontmatter
     conflicts: []
   Story-10.3:
     declared_deps:
+    - '05.4'
+    - '09.2'
     - '10.2'
     analyzed_deps: []
     merged_deps:
+    - id: '05.4'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '09.2'
+      confidence: 0.5
+      evidence:
+      - frontmatter
     - id: '10.2'
       confidence: 0.5
       evidence:
@@ -386,18 +619,28 @@ stories:
   Story-12.2:
     declared_deps:
     - '12.1'
+    - '08.5'
     analyzed_deps: []
     merged_deps:
     - id: '12.1'
       confidence: 0.5
       evidence:
       - frontmatter
+    - id: '08.5'
+      confidence: 0.5
+      evidence:
+      - frontmatter
     conflicts: []
   Story-12.3:
     declared_deps:
+    - '07.1'
     - '12.1'
     analyzed_deps: []
     merged_deps:
+    - id: '07.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
     - id: '12.1'
       confidence: 0.5
       evidence:
@@ -405,15 +648,20 @@ stories:
     conflicts: []
   Story-12.1:
     declared_deps:
-    - '07.3'
-    - '11.3'
+    - '07.2'
+    - '11.1'
+    - '11.2'
     analyzed_deps: []
     merged_deps:
-    - id: '07.3'
+    - id: '07.2'
       confidence: 0.5
       evidence:
       - frontmatter
-    - id: '11.3'
+    - id: '11.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '11.2'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -433,22 +681,17 @@ stories:
       evidence:
       - frontmatter
     conflicts: []
-  Story-04.5:
+  Story-04.6:
     declared_deps:
-    - '04.1'
-    - '04.4'
-    - '03.3'
+    - '04.2'
+    - '04.3'
     analyzed_deps: []
     merged_deps:
-    - id: '04.1'
+    - id: '04.2'
       confidence: 0.5
       evidence:
       - frontmatter
-    - id: '04.4'
-      confidence: 0.5
-      evidence:
-      - frontmatter
-    - id: '03.3'
+    - id: '04.3'
       confidence: 0.5
       evidence:
       - frontmatter
@@ -473,22 +716,57 @@ stories:
       evidence:
       - frontmatter
     conflicts: []
-  Story-04.4:
-    declared_deps:
-    - '04.2'
-    analyzed_deps: []
-    merged_deps:
-    - id: '04.2'
-      confidence: 0.5
-      evidence:
-      - frontmatter
-    conflicts: []
   Story-05.2:
     declared_deps:
     - '05.1'
     analyzed_deps: []
     merged_deps:
     - id: '05.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    conflicts: []
+  Story-05.5:
+    declared_deps:
+    - '05.1'
+    - '05.4'
+    - '09.2'
+    analyzed_deps: []
+    merged_deps:
+    - id: '05.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '05.4'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '09.2'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    conflicts: []
+  Story-05.4:
+    declared_deps:
+    - '05.1'
+    - '05.2'
+    - '06.2'
+    - '02.4'
+    analyzed_deps: []
+    merged_deps:
+    - id: '05.1'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '05.2'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '06.2'
+      confidence: 0.5
+      evidence:
+      - frontmatter
+    - id: '02.4'
       confidence: 0.5
       evidence:
       - frontmatter

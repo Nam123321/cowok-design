@@ -113,13 +113,36 @@ export const FsBrowseEntrySchema = z.object({
 });
 export type FsBrowseEntry = z.infer<typeof FsBrowseEntrySchema>;
 
+export const FsBrowseQuickRootSchema = z.object({
+  label: z.string(),
+  path: z.string(),
+});
+export type FsBrowseQuickRoot = z.infer<typeof FsBrowseQuickRootSchema>;
+
 export const FsBrowseResponseSchema = z.object({
   current_path: z.string(),
   parent_path: z.string().nullable(),
   managed_root: z.string(),
+  home_dir: z.string().nullable().optional(),
+  quick_roots: z.array(FsBrowseQuickRootSchema).optional(),
   entries: z.array(FsBrowseEntrySchema),
 });
 export type FsBrowseResponse = z.infer<typeof FsBrowseResponseSchema>;
+
+const MAX_NATIVE_PICK_PROMPT_LEN = 160;
+
+export const FsNativePickInputSchema = z.object({
+  initial_path: z.string().trim().min(1).nullable().optional(),
+  prompt: z.string().trim().min(1).max(MAX_NATIVE_PICK_PROMPT_LEN).nullable().optional(),
+});
+export type FsNativePickInput = z.infer<typeof FsNativePickInputSchema>;
+
+export const FsNativePickResponseSchema = z.object({
+  cancelled: z.boolean(),
+  path: z.string().nullable(),
+  is_git_repo: z.boolean(),
+});
+export type FsNativePickResponse = z.infer<typeof FsNativePickResponseSchema>;
 
 export const ProjectBoundaryDtoSchema = z.object({
   project_id: z.string().uuid(),

@@ -99,3 +99,7 @@ Kế thừa triết lý **One-Person Company (OPC)** và nâng cấp toàn diệ
 4. **`window.__jevFast` + `elementFromPoint` Occlusion Guard:** Chụp bản đồ tọa độ DOM nguyên tử trong 1 lệnh IPC và kiểm tra che khuất điểm ảnh tâm phần tử, đảm bảo 0% click nhầm khi kiểm thử tự động.
 5. **`StalePage` / `StaleFile` Fingerprint OCC Guard:** Kiểm soát đồng thời lạc quan (Optimistic Concurrency Control) bằng mã băm SHA-256 khi nhiều Execution Agents cùng thao tác trên một dự án.
 6. **`3-Strike Monotonic Dead-Loop Circuit Breaker`:** Tự động ngắt mạch nếu một Agent thất bại 3 lần liên tiếp trên cùng một mã lỗi, chuyển quyền xử lý về cho `cowok` và `advisor`.
+
+## Post-PR #14 Addendum (2026-11-20): Converged Crates & Anti-Split-Brain Execution Flow
+- Hợp nhất 6 nguyên hàm điều phối & bảo vệ vào `crates/domain` + `crates/bot-fleet` (~450 LOC `DecisionCascadeClient`) và `crates/html-forge` / `crates/rea-bridge` thay vì sinh `crates/jev-engine` tách rời (`TDR-006`).
+- Toàn bộ hành trình từ Launchpad đến Execution Nodes bỏ hoàn toàn JSON/echo mock cũ (`ProjectLaunchpadModal`, `presentation_copilot.rs:1767-1782`, `dispatchNodeExecution.ts`), nối trực tiếp vào `crates/rea-bridge` + `crates/bot-fleet` với Post-Execution Normalizer (`oxc / lol_html -> reconcile_ff_ids -> TriangleLinter -> IconValidator`).

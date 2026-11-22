@@ -201,6 +201,12 @@ describe("Story 04.2: Source Security Invariants & BFF Routes", () => {
         if (url.endsWith("/restore")) {
           return new Response(JSON.stringify({ restored: true, project: SAMPLE_PROJECT_DTO }), { status: HTTP_OK });
         }
+        if (url.includes("/api/fs/pick-native")) {
+          return new Response(
+            JSON.stringify({ cancelled: false, path: "/Users/dev/Desktop", is_git_repo: false }),
+            { status: HTTP_OK }
+          );
+        }
         if (url.includes("/api/fs/browse")) {
           return new Response(
             JSON.stringify({ current_path: "/tmp/CowokProjects", parent_path: "/tmp", managed_root: "/tmp/CowokProjects", entries: [] }),
@@ -301,6 +307,101 @@ describe("Story 04.2: Workbench Slug, Daemon Picker, Trash Drawer & F5 Hydration
       />
     );
     await waitFor(() => expect(document.getElementById("confirmFolderPromoteBtn")).toBeTruthy());
+  });
+
+  it("allows browsing local disk outside ~/CowokProjects, guards HOME root, and binds custom subfolder path", async () => {
+    const onCreateNewProject = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes("/api/auth/local-session")) {
+          return new Response(JSON.stringify({ sessionToken: "test-tok" }), { status: HTTP_OK });
+        }
+        if (url.includes("/api/fs/pick-native")) {
+          return new Response(
+            JSON.stringify({ cancelled: false, path: "/Users/dev/Desktop", is_git_repo: false }),
+            { status: HTTP_OK }
+          );
+        }
+        if (url.includes("/api/fs/browse")) {
+          const parsedUrl = new URL(url, "http://127.0.0.1");
+          const qPath = parsedUrl.searchParams.get("path");
+          if (qPath === "/Users/dev/Desktop") {
+            return new Response(
+              JSON.stringify({
+                current_path: "/Users/dev/Desktop",
+                parent_path: "/Users/dev",
+                managed_root: "/Users/dev/CowokProjects",
+                home_dir: "/Users/dev",
+                quick_roots: [
+                  { label: "Home (~)", path: "/Users/dev" },
+                  { label: "Desktop", path: "/Users/dev/Desktop" },
+                  { label: "~/CowokProjects", path: "/Users/dev/CowokProjects" },
+                ],
+                entries: [{ name: "existing-app", path: "/Users/dev/Desktop/existing-app", is_dir: true, is_git_repo: true }],
+              }),
+              { status: HTTP_OK }
+            );
+          }
+          return new Response(
+            JSON.stringify({
+              current_path: "/Users/dev",
+              parent_path: null,
+              managed_root: "/Users/dev/CowokProjects",
+              home_dir: "/Users/dev",
+              quick_roots: [
+                { label: "Home (~)", path: "/Users/dev" },
+                { label: "Desktop", path: "/Users/dev/Desktop" },
+                { label: "~/CowokProjects", path: "/Users/dev/CowokProjects" },
+              ],
+              entries: [{ name: "Desktop", path: "/Users/dev/Desktop", is_dir: true, is_git_repo: false }],
+            }),
+            { status: HTTP_OK }
+          );
+        }
+        return new Response(JSON.stringify({}), { status: HTTP_OK });
+      })
+    );
+
+    render(
+      <NewConversationModal
+        isOpen
+        onClose={vi.fn()}
+        projects={[{ id: SAMPLE_PROJECT_DTO.id, name: SAMPLE_PROJECT_DTO.name, localPath: SAMPLE_PROJECT_DTO.workspace_root ?? undefined }]}
+        activeProjectId={SAMPLE_PROJECT_DTO.id}
+        onCreateInProject={vi.fn()}
+        onCreateNewProject={onCreateNewProject}
+        onCreateStandalone={vi.fn()}
+      />
+    );
+
+    fireEvent.click(document.getElementById("tab-new-project-btn")!);
+    fireEvent.click(screen.getByTestId("source-local-folder-card"));
+    await waitFor(() => expect(screen.getByTestId("daemon-picker-home-root-hint")).toBeTruthy());
+    expect((document.getElementById("confirmFolderPromoteBtn") as HTMLButtonElement).disabled).toBe(true);
+
+    // Click native macOS Finder button and verify it jumps directly to Finder-picked folder
+    fireEvent.click(screen.getByTestId("daemon-picker-native-finder-btn"));
+    await waitFor(() => expect(screen.getByTestId("fs-entry-existing-app")).toBeTruthy());
+    const subInput = screen.getByTestId("daemon-picker-new-subfolder-input") as HTMLInputElement;
+    fireEvent.change(subInput, { target: { value: "my-local-app" } });
+    expect(screen.getByTestId("daemon-picker-target-preview").textContent).toContain("/Users/dev/Desktop/my-local-app");
+
+    const confirmBtn = document.getElementById("confirmFolderPromoteBtn") as HTMLButtonElement;
+    expect(confirmBtn.disabled).toBe(false);
+    fireEvent.click(confirmBtn);
+    await waitFor(() => expect(document.getElementById("daemonFolderPickerDialog")).toBeNull());
+
+    fireEvent.submit(document.querySelector("form")!);
+    expect(onCreateNewProject).toHaveBeenCalledWith(
+      "my-local-app",
+      expect.any(String),
+      "folder-backed",
+      { localPath: "/Users/dev/Desktop/my-local-app" },
+      "fe-dag",
+      expect.objectContaining({ openMaterialLaunchpad: true })
+    );
   });
 
   it("renders SidebarTrashJournalDrawer with project_code badge and triggers 1-click restore", () => {

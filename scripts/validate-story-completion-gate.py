@@ -619,6 +619,54 @@ def parse_cli_args(argv: list[str]) -> Tuple[str, Path]:
     return story_id, Path(args.root).resolve()
 
 
+def _policy_requires_sig_receipts(project_root: Path) -> bool:
+    """Read-only O_NOFOLLOW check of .agent/config/gate-policy-matrix.yaml.
+    Defaults to True (fail-closed) when missing/unreadable; returns False only when
+    iWish v4.1 policy explicitly sets top-level require_sig_receipts: false."""
+    policy_path = project_root / ".agent" / "config" / "gate-policy-matrix.yaml"
+    raw = _safe_read_regular_bytes(policy_path)
+    if raw is None:
+        return True
+    text = raw.decode("utf-8", errors="ignore")
+    try:
+        import yaml  # type: ignore
+
+        parsed = yaml.safe_load(text)
+        if isinstance(parsed, dict) and parsed.get("require_sig_receipts") is False:
+            return False
+        return True
+    except Exception:
+        if re.search(r"(?m)^require_sig_receipts\s*:\s*false\s*(?:#.*)?$", text):
+            return False
+        return True
+
+
+def _verify_v41_deterministic_story_hygiene(story_id: str, project_root: Path) -> Tuple[bool, str]:
+    """Lightweight iWish v4.1 structural hygiene check (O_NOFOLLOW, regular story.md, no 'done' status)."""
+    story_md_candidates: list[Path] = []
+    epic_story_root = project_root / "_iwish-output" / "3. Development" / "1. Epic & Story"
+    if epic_story_root.exists():
+        for p in epic_story_root.rglob(f"Story-{story_id}"):
+            if p.is_dir() and not os.path.islink(str(p)):
+                story_md_candidates.append(p / "story.md")
+    flat_story = project_root / "_iwish-output" / "stories" / f"story-{story_id}.md"
+    if os.path.lexists(str(flat_story)):
+        story_md_candidates.append(flat_story)
+
+    if not story_md_candidates:
+        return False, f"Story-{story_id}/story.md not found"
+
+    for md_path in story_md_candidates:
+        raw = _safe_read_regular_bytes(md_path)
+        if raw is None:
+            return False, f"{md_path.name}: missing, 0-byte, symlink, or hardlink"
+        text = raw.decode("utf-8", errors="ignore")
+        if re.search(r"(?im)^status\s*:\s*['\"]?done['\"]?\s*$", text):
+            return False, f"{md_path.name}: forbidden status 'done' (must be lowercase 'completed')"
+
+    return True, f"iWish v4.1 deterministic hygiene passed for Story {story_id} (require_sig_receipts: false)"
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     story_id, project_root = parse_cli_args(sys.argv[1:] if argv is None else argv)
 
@@ -631,6 +679,15 @@ def main(argv: Optional[list[str]] = None) -> int:
     if not _is_story_marked_completed(story_id, project_root):
         print(f"[GATE] Story {story_id} is not marked completed. Gate bypassed.")
         return 0
+
+    # 1b. Honor iWish v4.1 policy (require_sig_receipts: false) when declared in gate-policy-matrix.yaml
+    if not _policy_requires_sig_receipts(project_root):
+        ok_v41, detail_v41 = _verify_v41_deterministic_story_hygiene(story_id, project_root)
+        if ok_v41:
+            print(f"[GATE] {detail_v41}.")
+            return 0
+        report_validation_failure(story_id, detail_v41)
+        return 1
 
     # 2. Gather candidate cryptographic JSON evidence files (Read-Only)
     json_candidates: list[Path] = [

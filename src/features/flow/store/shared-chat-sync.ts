@@ -1,6 +1,8 @@
-// @story 04.4
-// @implements AC-02, AC-04 (Dual-Surface Chat Store bridging Left-Open Chat, Floating Chat, SSE & Sub-Sessions)
+// @story 04.4, 04.6
+// @implements AC-01, AC-02, AC-04 (Dual-Surface SQLite-Backed Chat Store Replacing sessionStorage History)
+import { apiChatVault } from "@/api/chat-vault";
 import type { SdiClarificationCardData } from "@/components/workbench/ChatStreamPrimitives";
+import type { VaultReceiptDto } from "@/lib/validations/chat-vault";
 
 export interface SharedChatMessage {
   id: string;
@@ -12,6 +14,7 @@ export interface SharedChatMessage {
   jobId?: string;
   projectSeq?: number;
   fencingToken?: number;
+  vaultReceipt?: VaultReceiptDto | null;
   sdiClarification?: SdiClarificationCardData;
 }
 
@@ -44,51 +47,12 @@ export function toSessionChatKey(projectId: string | undefined, sessionId: strin
   return projectId ? `${projectId}::${sess}` : `default::${sess}`;
 }
 
-const SHARED_CHAT_STORAGE_KEY = "cowok:shared-chat:v1";
-const MAX_PERSISTED_MSGS_PER_SCOPE = 80;
-
-function readPersistedChatStore(): { messages: Record<string, SharedChatMessage[]>; drafts: Record<string, string> } {
-  if (typeof window === "undefined") return { messages: {}, drafts: {} };
-  try {
-    const raw = window.sessionStorage?.getItem(SHARED_CHAT_STORAGE_KEY);
-    if (!raw) return { messages: {}, drafts: {} };
-    const parsed = JSON.parse(raw) as { messages?: Record<string, SharedChatMessage[]>; drafts?: Record<string, string> };
-    return {
-      messages: parsed?.messages && typeof parsed.messages === "object" ? parsed.messages : {},
-      drafts: parsed?.drafts && typeof parsed.drafts === "object" ? parsed.drafts : {},
-    };
-  } catch {
-    return { messages: {}, drafts: {} };
-  }
-}
-
 class SharedChatSyncStore {
-  private messagesByScope: Map<string, SharedChatMessage[]>;
-  private draftByScope: Map<string, string>;
+  private messagesByScope = new Map<string, SharedChatMessage[]>();
+  private draftByScope = new Map<string, string>();
   private clearedScopes = new Set<string>();
   private listeners = new Set<() => void>();
   private snapshot: SharedChatSnapshot = { version: 0, subSessionsVersion: 0 };
-
-  constructor() {
-    const initial = readPersistedChatStore();
-    this.messagesByScope = new Map(Object.entries(initial.messages));
-    this.draftByScope = new Map(Object.entries(initial.drafts));
-  }
-
-  private persist(): void {
-    if (typeof window === "undefined") return;
-    try {
-      const messagesObj: Record<string, SharedChatMessage[]> = {};
-      for (const [k, list] of this.messagesByScope.entries()) {
-        if (list.length > 0) messagesObj[k] = list.slice(-MAX_PERSISTED_MSGS_PER_SCOPE);
-      }
-      const draftsObj: Record<string, string> = {};
-      for (const [k, v] of this.draftByScope.entries()) {
-        if (v) draftsObj[k] = v;
-      }
-      window.sessionStorage?.setItem(SHARED_CHAT_STORAGE_KEY, JSON.stringify({ messages: messagesObj, drafts: draftsObj }));
-    } catch { /* ignore storage quota errors */ }
-  }
 
   public subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -98,7 +62,6 @@ class SharedChatSyncStore {
   public getSnapshot = (): SharedChatSnapshot => this.snapshot;
 
   private emit(bumpSubSessions = false): void {
-    this.persist();
     this.snapshot = {
       version: this.snapshot.version + 1,
       subSessionsVersion: this.snapshot.subSessionsVersion + (bumpSubSessions ? 1 : 0),
@@ -106,6 +69,67 @@ class SharedChatSyncStore {
     for (const listener of this.listeners) {
       try { listener(); } catch { /* ignore listener errors */ }
     }
+  }
+
+  public async hydrateFromSqlite(
+    scopeKey: string,
+    sessionId: string,
+    formatTime: (v: number) => string
+  ): Promise<SharedChatMessage[]> {
+    const res = await apiChatVault.getMessages(sessionId);
+    const loaded: SharedChatMessage[] = res.messages.map((m) => ({
+      id: m.id,
+      sender: m.role === "user" ? "human" : "agent",
+      text: m.proseMarkdown,
+      timestamp: formatTime(m.createdAt),
+      createdAtMs: m.createdAt,
+      projectSeq: m.seqNo,
+      vaultReceipt: m.vaultReceipt ?? null,
+    }));
+    this.messagesByScope.set(scopeKey, loaded);
+    this.emit(false);
+    return loaded;
+  }
+
+  public async persistAndAppend(
+    scopeKey: string,
+    sessionId: string,
+    msg: SharedChatMessage,
+    projectId?: string
+  ): Promise<void> {
+    this.appendMessage(scopeKey, msg);
+    const saved = await apiChatVault.appendMessage(sessionId, {
+      role: msg.sender === "human" ? "user" : "assistant",
+      proseMarkdown: msg.text,
+      projectId: projectId ?? null,
+      vaultReceipt: msg.vaultReceipt ?? undefined,
+    });
+    const list = this.messagesByScope.get(scopeKey);
+    if (!list) return;
+    const deduped = list.filter((item) => item.id !== saved.id || item.id === msg.id);
+    const reconciled = deduped.map((item) =>
+      item.id === msg.id ? { ...item, id: saved.id, projectSeq: saved.seqNo } : item
+    );
+    this.messagesByScope.set(scopeKey, reconciled);
+    this.emit(false);
+  }
+
+  public updateVaultReceipt(
+    scopeKey: string,
+    receiptId: string,
+    nextReceipt: VaultReceiptDto | null
+  ): void {
+    const list = this.messagesByScope.get(scopeKey);
+    if (!list) return;
+    let changed = false;
+    const updated = list.map((item) => {
+      if (item.vaultReceipt?.receiptId !== receiptId) return item;
+      changed = true;
+      return { ...item, vaultReceipt: nextReceipt };
+    });
+    if (!changed) return;
+    this.messagesByScope.set(scopeKey, updated);
+    this.emit(false);
   }
 
   public getDraft(scopeKey: string): string {
@@ -190,9 +214,6 @@ class SharedChatSyncStore {
     this.messagesByScope.clear();
     this.draftByScope.clear();
     this.clearedScopes.clear();
-    if (typeof window !== "undefined") {
-      try { window.sessionStorage?.removeItem(SHARED_CHAT_STORAGE_KEY); } catch { /* ignore */ }
-    }
     this.emit(true);
   }
 }

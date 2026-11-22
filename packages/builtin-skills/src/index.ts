@@ -13,3 +13,4 @@ export * from "./registry";
 export * from "./repackager";
 export * from "./lifecycle";
 export * from "./breaking-diff";
+export * from "./craft-skills";

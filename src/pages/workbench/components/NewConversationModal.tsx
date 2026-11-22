@@ -176,6 +176,7 @@ export const NewConversationModal: React.FC<NewConversationModalProps> = (props)
       </div>
       <DaemonFolderPickerDialog
         isOpen={s.isDaemonPickerOpen} mode="create" initialSlug={s.managedSlug} initialTab={s.pickerInitialTab}
+        initialPath={s.localFolderPath || undefined}
         onClose={() => s.setIsDaemonPickerOpen(false)}
         onSelectForCreate={s.handleFolderPicked}
       />

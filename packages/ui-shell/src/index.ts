@@ -52,3 +52,31 @@ export function resolvePortalShellDescriptor(portal: unknown): PortalShellDescri
 export function listOrderedSpecKeys(): readonly CanonicalSpecKey[] {
   return CANONICAL_SPEC_KEYS;
 }
+
+export const SSOT_PORTAL_IDS = [
+  "SuperAdmin",
+  "TenantAdmin",
+  "SalesApp",
+  "MarketingWeb",
+  "DeveloperPortal",
+  "Presentation",
+] as const;
+
+export type SsotPortalId = (typeof SSOT_PORTAL_IDS)[number];
+
+export const APP_SHELL_LOCK_SLOTS = [
+  "TopBar",
+  "LeftNav",
+  "MainWorkspace",
+  "RightInspector",
+  "StatusBar",
+  "GlobalToast",
+] as const;
+
+export type AppShellLockSlot = (typeof APP_SHELL_LOCK_SLOTS)[number];
+
+export const SSOT_UI_PATTERN_REFERENCES = {
+  lockPanel: "ProjectConstraintBadge [5.10]",
+  patternDrawer: "RightDrawer [5.25]",
+  exportToast: "Toast [5.12]",
+} as const;

@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "Hội thoại",
     "githubUrlPlaceholder": "Nhập URL repository (https://github.com/...)",
     "standaloneChatAck": "Đã ghi nhận trao đổi trong phiên độc lập",
-    "oauthCliFallback": "Tài khoản OAuth/CLI"
+    "oauthCliFallback": "Tài khoản OAuth/CLI",
+    "pickerPathPlaceholder": "~/Desktop/my-project hoặc /Users/...",
+    "pickerGoBtn": "Đi tới",
+    "pickerOpenDirBtn": "Mở",
+    "pickerNewSubfolderLabel": "Tạo thư mục con (tùy chọn):",
+    "pickerNewSubfolderPlaceholder": "Ví dụ: my-new-app (bỏ trống để chọn thư mục đang chọn)",
+    "pickerInvalidSubfolderError": "Tên thư mục con không hợp lệ (không chứa '/', '\\\\' hoặc bắt đầu bằng '.')",
+    "pickerHomeRootBlockedHint": "Không thể đặt dự án trực tiếp tại thư mục gốc Home (~). Hãy chọn một thư mục con hoặc nhập tên thư mục con mới.",
+    "pickerSelectedTargetPrefix": "Thư mục đích:",
+    "pickerNativeFinderBtn": "Mở Finder...",
+    "pickerNativeFinderOpening": "Đang mở Finder...",
+    "pickerNativeFinderPrompt": "Chọn thư mục dự án trên máy"
   },
   "chat": {
     "agentTitle": "Trợ lý Cowok",
@@ -167,7 +178,9 @@
     "sseEventCompleted": "Sự kiện {{event}} đã hoàn tất.",
     "proposalCompileWarning": "Không thể tổng hợp Đề xuất thay đổi lúc này; vui lòng kiểm tra lại dữ liệu đầu vào.",
     "intentStatusLabel": "Trạng thái",
-    "forkFromHere": "Rẽ nhánh hội thoại từ đây"
+    "forkFromHere": "Rẽ nhánh hội thoại từ đây",
+    "persistFailed": "Không thể lưu tin nhắn vào lịch sử SQLite.",
+    "vaultComposerPlaceholder": "Hỏi cowok Agent hoặc dán API key..."
   },
   "canvas": {
     "userflowLens": "Luồng người dùng (Userflow)",
@@ -1143,5 +1156,95 @@
     },
     "commentsDrawerTitle": "Bình luận ghim",
     "overlaysRegionLabel": "Lớp phủ tương tác không gian"
+  },
+  "cas": {
+    "uploadFailed": "Tải tệp lên kho lưu trữ CAS thất bại.",
+    "uploading": "Đang tải tệp nhị phân lên CAS...",
+    "prompt": "Đính kèm .csv / .tsv / .xlsx / .fig / .pdf / .png / .svg / .txt"
+  },
+  "vault": {
+    "onboardingTitle": "Nạp khóa Decision Engine (Kho Zero-Leak)",
+    "onboardingDesc": "Lấy API key từ Google AI Studio hoặc TypeSafe JEV rồi dán vào khung chat. Khóa được mã hóa trước khi lưu.",
+    "localOnlyLabel": "Khóa Enterprise Chỉ Cục Bộ (không kiểm tra ra ngoài)",
+    "googleAiStudioKey": "Khóa Google AI Studio",
+    "typesafeJevKey": "Khóa TypeSafe JEV",
+    "replacePlaceholder": "Nhập API key thay thế",
+    "confirm": "Xác nhận lưu",
+    "replace": "Thay thế",
+    "revoke": "Thu hồi",
+    "localOnlyBadge": "Chỉ cục bộ",
+    "highEntropyBadge": "Khóa Entropy Cao",
+    "onboardingToggle": "Kho API Key",
+    "ingestFailed": "Không thể lưu khóa vào kho bảo mật."
+  },
+  "contextMeter": {
+    "triggerLabel": "Đồng hồ ngân sách ngữ cảnh",
+    "popoverTitle": "Thống kê KV-Cache & Cổng ngữ cảnh",
+    "portalLabel": "Cổng mục tiêu",
+    "horizonLabel": "Tầm tác vụ",
+    "profileLabel": "Hồ sơ mô hình",
+    "textBudgetLabel": "Văn bản BPE",
+    "outlineLabel": "Khung DOM",
+    "ssotLabel": "Chỉ số SSOT",
+    "shaLabel": "Mã SHA",
+    "loading": "Đang biên dịch ngữ cảnh cổng...",
+    "emptyState": "Chọn dự án hoặc bấm Biên dịch để xem ngân sách token.",
+    "assembleButton": "Biên dịch ngữ cảnh",
+    "errors": {
+      "invalidRequest": "Yêu cầu biên dịch ngữ cảnh không hợp lệ.",
+      "invalidIdempotencyKey": "Thiếu hoặc sai tiêu đề Idempotency-Key UUIDv4.",
+      "invalidCursor": "Con trỏ phân trang thống kê không hợp lệ.",
+      "projectTenantMismatch": "Không có quyền truy cập dự án ở tenant hiện tại.",
+      "crossPortalLeak": "Đã chặn rò rỉ dữ liệu đặc quyền chéo cổng.",
+      "imageBudgetExceeded": "Số token ảnh vượt quá giới hạn mỗi lượt.",
+      "atomicBlockOverBudget": "Khối HTML/JSON nguyên tử vượt trần ngân sách.",
+      "ssotRatioBelowMinimum": "Tỷ lệ SSOT/DOM thấp hơn ngưỡng tối thiểu 60%.",
+      "idempotencyKeyReused": "Khóa chống lặp bị tái sử dụng cho nội dung khác.",
+      "projectReferenceInvalid": "Tham chiếu dự án đích không tồn tại.",
+      "telemetryConflict": "Xảy ra xung đột khi ghi thống kê.",
+      "telemetryWriteBusy": "Kho ghi SQLite đang bận, vui lòng thử lại.",
+      "telemetryStorageUnavailable": "Dịch vụ lưu trữ thống kê tạm thời gián đoạn.",
+      "daemonContractViolation": "Daemon trả về cấu trúc hợp đồng ngữ cảnh sai.",
+      "invalidSources": "Danh sách sourceIds phải có từ 1 đến 100 mục.",
+      "duplicateSourceId": "Danh sách sourceIds không được chứa phần tử trùng lặp.",
+      "storage": "Lỗi lưu trữ ngữ cảnh.",
+      "unauthorized": "Cần xác thực phiên làm việc.",
+      "forbidden": "Không có quyền truy cập.",
+      "requestRejected": "Yêu cầu bị từ chối."
+    }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "Đang khóa ở phiên khác",
+      "refresh": "Làm mới",
+      "locked": "Đã khóa khung",
+      "unlock": "Mở khóa",
+      "unlocked": "Chưa khóa",
+      "lock": "Khóa khung"
+    },
+    "export": {
+      "busy": "Đang xuất...",
+      "cta": "Xuất bộ thiết kế"
+    },
+    "patterns": {
+      "title": "Mẫu thiết kế",
+      "pendingSuffix": "chờ duyệt",
+      "close": "Đóng danh sách mẫu",
+      "portalSelect": "Cổng đang xem",
+      "refresh": "Làm mới",
+      "pending": "Chờ duyệt",
+      "synced": "Đã đồng bộ",
+      "empty": "Chưa có thành phần nào cho cổng này.",
+      "button": "Mẫu UI"
+    },
+    "toast": {
+      "loadFailed": "Không thể tải danh sách mẫu giao diện.",
+      "lockAcquired": "Đã khóa khung ứng dụng cho không gian làm việc.",
+      "lockReleased": "Đã mở khóa khung ứng dụng.",
+      "lockConflict": "Đang bị khóa bởi phiên khác. Hãy làm mới để đồng bộ.",
+      "lockFailed": "Không thể cập nhật trạng thái khóa khung.",
+      "exportSuccess": "Đã xuất bộ thiết kế (#{rev}).",
+      "exportFailed": "Chưa thể hoàn tất xuất bộ thiết kế lúc này."
+    }
   }
 }

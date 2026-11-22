@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "Chatta",
     "githubUrlPlaceholder": "Inserisci URL repository (https://github.com/...)",
     "standaloneChatAck": "Prompt registrato nella sessione autonoma",
-    "oauthCliFallback": "Accesso OAuth/CLI"
+    "oauthCliFallback": "Accesso OAuth/CLI",
+    "pickerPathPlaceholder": "~/Desktop/mio-progetto o /Users/...",
+    "pickerGoBtn": "Vai",
+    "pickerOpenDirBtn": "Apri",
+    "pickerNewSubfolderLabel": "Nuova sottocartella (facoltativa):",
+    "pickerNewSubfolderPlaceholder": "Es.: mia-nuova-app (lascia vuoto per usare la cartella selezionata)",
+    "pickerInvalidSubfolderError": "Nome sottocartella non valido (non può contenere '/', '\\\\' o iniziare con '.')",
+    "pickerHomeRootBlockedHint": "Impossibile collegare un progetto direttamente alla cartella radice Home (~). Seleziona una sottocartella o inserisci un nuovo nome.",
+    "pickerSelectedTargetPrefix": "Cartella di destinazione:",
+    "pickerNativeFinderBtn": "Apri Finder...",
+    "pickerNativeFinderOpening": "Apertura di Finder...",
+    "pickerNativeFinderPrompt": "Seleziona una cartella locale del progetto"
   },
   "chat": {
     "agentTitle": "Agente Cowok",
@@ -167,7 +178,9 @@
     "sseEventCompleted": "Evento {{event}} completato.",
     "proposalCompileWarning": "Impossibile sintetizzare ChangeProposal ora; controlla i dati inseriti.",
     "intentStatusLabel": "Stato",
-    "forkFromHere": "Ramifica conversazione da qui"
+    "forkFromHere": "Ramifica conversazione da qui",
+    "persistFailed": "Impossibile salvare il messaggio nella cronologia SQLite.",
+    "vaultComposerPlaceholder": "Chiedi a cowok Agent o incolla la chiave API..."
   },
   "canvas": {
     "userflowLens": "Flusso utente (Userflow)",
@@ -1143,5 +1156,95 @@
     },
     "commentsDrawerTitle": "Commenti fissati",
     "overlaysRegionLabel": "Livelli di interazione spaziale"
+  },
+  "cas": {
+    "uploadFailed": "Caricamento del file nell'archivio CAS non riuscito.",
+    "uploading": "Caricamento della risorsa binaria su CAS...",
+    "prompt": "Allega .csv / .tsv / .xlsx / .fig / .pdf / .png / .svg / .txt"
+  },
+  "vault": {
+    "onboardingTitle": "Configurazione Chiave Decision Engine (Vault Zero-Leak)",
+    "onboardingDesc": "Ottieni una chiave API da Google AI Studio o TypeSafe JEV e incollala nella chat. Le chiavi vengono cifrate prima del salvataggio.",
+    "localOnlyLabel": "Blocco Solo Locale Aziendale (nessun probe in uscita)",
+    "googleAiStudioKey": "Chiave Google AI Studio",
+    "typesafeJevKey": "Chiave TypeSafe JEV",
+    "replacePlaceholder": "Inserisci la chiave API sostitutiva",
+    "confirm": "Conferma salvataggio",
+    "replace": "Sostituisci",
+    "revoke": "Revoca",
+    "localOnlyBadge": "Solo locale",
+    "highEntropyBadge": "Chiave ad alta entropia",
+    "onboardingToggle": "Vault API",
+    "ingestFailed": "Impossibile salvare la chiave nel vault sicuro."
+  },
+  "contextMeter": {
+    "triggerLabel": "Misuratore Budget Contesto",
+    "popoverTitle": "Telemetria KV-Cache e Contesto Portale",
+    "portalLabel": "Portale di destinazione",
+    "horizonLabel": "Orizzonte operativo",
+    "profileLabel": "Profilo modello",
+    "textBudgetLabel": "Testo BPE",
+    "outlineLabel": "Struttura DOM",
+    "ssotLabel": "Indice SSOT",
+    "shaLabel": "Codice SHA",
+    "loading": "Assemblaggio contesto del portale...",
+    "emptyState": "Seleziona un progetto o premi Assembla per ispezionare il budget.",
+    "assembleButton": "Assembla contesto",
+    "errors": {
+      "invalidRequest": "La richiesta di assemblaggio contesto non è valida.",
+      "invalidIdempotencyKey": "Intestazione Idempotency-Key UUIDv4 mancante o non valida.",
+      "invalidCursor": "Cursore di paginazione telemetrica non valido.",
+      "projectTenantMismatch": "Accesso al progetto negato per il tenant corrente.",
+      "crossPortalLeak": "Bloccata fuga di contesto privilegiato tra portali.",
+      "imageBudgetExceeded": "I token immagine richiesti superano il limite per turno.",
+      "atomicBlockOverBudget": "Blocco atomico HTML/JSON oltre il limite massimo.",
+      "ssotRatioBelowMinimum": "Rapporto SSOT/DOM inferiore alla soglia minima del 60%.",
+      "idempotencyKeyReused": "Chiave di idempotenza riutilizzata con carico diverso.",
+      "projectReferenceInvalid": "Riferimento al progetto di destinazione inesistente.",
+      "telemetryConflict": "Rilevato conflitto nella persistenza telemetrica.",
+      "telemetryWriteBusy": "Scrittura SQLite telemetria momentaneamente occupata.",
+      "telemetryStorageUnavailable": "Archivio telemetria non disponibile.",
+      "daemonContractViolation": "Il daemon ha restituito un contratto contesto errato.",
+      "invalidSources": "L'elenco sourceIds deve contenere da 1 a 100 voci.",
+      "duplicateSourceId": "L'elenco sourceIds non deve contenere duplicati.",
+      "storage": "Errore di archiviazione del contesto.",
+      "unauthorized": "Autenticazione richiesta.",
+      "forbidden": "Permesso negato.",
+      "requestRejected": "Richiesta respinta."
+    }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "Bloccato altrove",
+      "refresh": "Aggiorna",
+      "locked": "Struttura bloccata",
+      "unlock": "Sblocca",
+      "unlocked": "Sbloccato",
+      "lock": "Blocca"
+    },
+    "export": {
+      "busy": "Esportazione...",
+      "cta": "Esporta kit di design"
+    },
+    "patterns": {
+      "title": "Modelli di design",
+      "pendingSuffix": "in attesa",
+      "close": "Chiudi modelli",
+      "portalSelect": "Portale attivo",
+      "refresh": "Aggiorna",
+      "pending": "In revisione",
+      "synced": "Sincronizzato",
+      "empty": "Nessun componente salvato qui.",
+      "button": "Modelli"
+    },
+    "toast": {
+      "loadFailed": "Impossibile caricare i pattern dello spazio.",
+      "lockAcquired": "Struttura bloccata per questo spazio.",
+      "lockReleased": "Struttura sbloccata.",
+      "lockConflict": "Bloccato da un'altra sessione. Aggiorna per sincronizzare.",
+      "lockFailed": "Impossibile aggiornare il blocco.",
+      "exportSuccess": "Kit di design esportato (#{rev}).",
+      "exportFailed": "Impossibile esportare il kit di design ora."
+    }
   }
 }

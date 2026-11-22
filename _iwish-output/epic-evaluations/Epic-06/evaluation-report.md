@@ -2,8 +2,8 @@
 
 **Epic:** `Epic-06: Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench`  
 **Value Stream:** `VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio`  
-**Overall Verdict:** `CONDITIONAL` (`HOLD_REAUTHOR_BEFORE_MAKE_STORY`)  
-**Authorized Envelope (`story_creation_envelope.max_phase`):** `"INVESTIGATE"` (Technical Spikes & Spec Reconciliation authorized; **Implementation blocked** until Spike Exit Criteria pass and Stories `06.1`–`06.4` are re-authored via `/reconcile-change` + `/make-story`)
+**Overall Verdict:** `READY` (Post-PR #14 Update: `06.1..06.4` `completed`, `06.5` unlocked under `IMPLEMENT`)  
+**Authorized Envelope (`story_creation_envelope.max_phase`):** `"IMPLEMENT"` (`Story 06.5` End-to-End AI Deck Gen & `.csv/.pdf -> ChartSpecV12`; `06.1..06.4` immutable baseline)
 
 ---
 

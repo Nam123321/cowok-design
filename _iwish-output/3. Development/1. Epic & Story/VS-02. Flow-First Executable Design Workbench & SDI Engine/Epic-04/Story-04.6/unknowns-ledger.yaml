@@ -1,0 +1,59 @@
+story_id: "04.6"
+status: RESOLVED
+last_updated: "2026-11-20T20:45:00+07:00"
+epistemic_policy:
+  ucg_empty_result: "treated_as_non-evidence"
+  implementation_rule: "verify named contracts before modifying implementation paths"
+unknowns:
+  - id: U-046-01
+    question: "Migration slot canonical là V16 hay V16a?"
+    decision: "Dùng migration canonical V16a__cas_blobs và đăng ký alias/tương thích nếu registry gọi V16."
+    evidence:
+      - "story.md nhắc V16"
+      - "AC-02 và edge-case review nhắc V16a"
+    status: RESOLVED
+
+  - id: U-046-02
+    question: "V4 ChatMessage Prisma mapping đã tồn tại hay chưa?"
+    decision: "Audit schema trước code; tái sử dụng mapping V4 nếu có, chỉ thêm parity additive nếu thiếu."
+    evidence:
+      - "data-spec.md chỉ khai báo Prisma model CasBlob"
+      - "story.md xác định chat_messages là V4 existing aggregate"
+    status: RESOLVED
+
+  - id: U-046-03
+    question: "Định dạng thực tế của file .fig là gì?"
+    decision: "Không suy đoán theo extension; yêu cầu extension/MIME/magic-byte hợp lệ và từ chối payload không được hỗ trợ."
+    evidence:
+      - "AC-02 yêu cầu magic-byte validation"
+    status: RESOLVED
+
+  - id: U-046-04
+    question: "Noul probes vận hành theo thuật toán nào?"
+    decision: "Đặt sau SecretProviderProbe abstraction; cấm log input/output chứa secret và chuẩn hóa kết quả về VaultReceiptDto."
+    evidence:
+      - "data-spec.md nêu noul probes nhưng không nêu thuật toán"
+    status: RESOLVED
+
+  - id: U-046-05
+    question: "DESIGN_CDN_CSP ảnh hưởng preview thế nào?"
+    decision: "Dùng server-controlled allowlist toggle, mặc định deny-safe, kiểm thử cả hai trạng thái."
+    evidence:
+      - "AC-03 yêu cầu toggle an toàn theo TDR-003"
+    status: RESOLVED
+
+  - id: U-046-06
+    question: "Auto-provision session có thể tạo session sai tenant không?"
+    decision: "Owner/tenant lấy từ auth context; provisioning idempotent trong transaction và luôn có guardedRoute authorization."
+    evidence:
+      - "AC-01 yêu cầu auto-provisioned session FK"
+    status: RESOLVED
+
+  - id: U-046-07
+    question: "CSV formula/DDE neutralization có làm thay đổi CAS blob không?"
+    decision: "Không mutate blob gốc; neutralize chỉ tại preview/render/export boundary để giữ SHA-256 và dedupe integrity."
+    evidence:
+      - "AC-02 yêu cầu CAS content-addressable và CSV formula/DDE protection"
+    status: RESOLVED
+
+open_questions: []

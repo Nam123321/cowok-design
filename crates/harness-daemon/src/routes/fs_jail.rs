@@ -40,11 +40,34 @@ pub struct FsBrowseEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FsBrowseQuickRoot {
+    pub label: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FsBrowseResponse {
     pub current_path: String,
     pub parent_path: Option<String>,
     pub managed_root: String,
+    #[serde(default)]
+    pub home_dir: Option<String>,
+    #[serde(default)]
+    pub quick_roots: Vec<FsBrowseQuickRoot>,
     pub entries: Vec<FsBrowseEntry>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct FsNativePickRequest {
+    pub initial_path: Option<String>,
+    pub prompt: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FsNativePickResponse {
+    pub cancelled: bool,
+    pub path: Option<String>,
+    pub is_git_repo: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -108,6 +131,9 @@ pub fn is_sensitive_or_system_path(path: &Path) -> bool {
     let norm = raw.trim_end_matches('/');
     let norm = if norm.is_empty() { "/" } else { norm };
     let lower = norm.to_lowercase();
+    if is_sensitive_home_subdir(&lower) {
+        return true;
+    }
     if lower == "/private/tmp"
         || lower.starts_with("/private/tmp/")
         || lower == "/private/var/folders"
@@ -161,13 +187,7 @@ pub fn is_sensitive_or_system_path(path: &Path) -> bool {
             return true;
         }
     }
-    if lower.starts_with("/usr/") && !lower.starts_with("/usr/local/") {
-        return true;
-    }
-    if is_sensitive_home_subdir(&lower) {
-        return true;
-    }
-    false
+    lower.starts_with("/usr/") && !lower.starts_with("/usr/local/")
 }
 
 fn is_sensitive_home_subdir(lower: &str) -> bool {
@@ -581,7 +601,7 @@ pub fn provision_dir_zero_toctou_checked(
             }
         }
     }
-    let _ = fstat_dev_ino(&cur_fd)?;
+    let (final_dev, final_ino) = fstat_dev_ino(&cur_fd)?;
     let final_canon = fs::canonicalize(&walked).map_err(|e| HarnessError::BoundaryViolation {
         reason: format!(
             "FS_JAIL_VIOLATION: Failed canonicalizing provisioned path '{}': {e}",
@@ -602,8 +622,11 @@ pub fn provision_dir_zero_toctou_checked(
     }
     Ok(JailAnchor {
         canonical_path: final_canon,
+        ancestor_dev: final_dev,
+        ancestor_ino: final_ino,
+        ancestor_dev_ino: format!("{final_dev}:{final_ino}"),
         target_exists: true,
-        ..anchor
+        remaining_components: Vec::new(),
     })
 }
 
@@ -1163,15 +1186,89 @@ pub fn decode_and_verify_path_token(
     Ok(payload)
 }
 
+pub fn expand_home_tilde(raw: &str) -> Result<PathBuf, HarnessError> {
+    let trimmed = raw.trim();
+    if trimmed == "~" {
+        let home = std::env::var("HOME").map_err(|_| HarnessError::BoundaryViolation {
+            reason: "FS_JAIL_VIOLATION: HOME environment variable is unset".to_string(),
+        })?;
+        return Ok(PathBuf::from(home));
+    }
+    if let Some(rest) = trimmed.strip_prefix("~/") {
+        let home = std::env::var("HOME").map_err(|_| HarnessError::BoundaryViolation {
+            reason: "FS_JAIL_VIOLATION: HOME environment variable is unset".to_string(),
+        })?;
+        return Ok(PathBuf::from(home).join(rest));
+    }
+    if trimmed.starts_with('~') {
+        return Err(HarnessError::BoundaryViolation {
+            reason: format!("FS_JAIL_VIOLATION: Foreign home expansion '{trimmed}' is forbidden"),
+        });
+    }
+    Ok(PathBuf::from(trimmed))
+}
+
+fn resolve_home_canon() -> Option<PathBuf> {
+    let home = std::env::var("HOME").ok()?;
+    let trimmed = home.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    fs::canonicalize(trimmed).ok()
+}
+
+fn collect_quick_roots(
+    home_canon: Option<&Path>,
+    managed_root_canon: &Path,
+) -> Vec<FsBrowseQuickRoot> {
+    let mut roots: Vec<FsBrowseQuickRoot> = Vec::new();
+    let mut push_unique = |label: &str, path: &Path| {
+        let path_str = path.display().to_string();
+        if !roots.iter().any(|r| r.path == path_str) {
+            roots.push(FsBrowseQuickRoot {
+                label: label.to_string(),
+                path: path_str,
+            });
+        }
+    };
+    if let Some(home) = home_canon {
+        if !is_sensitive_or_system_path(home) {
+            push_unique("Home (~)", home);
+            for folder in [
+                "Desktop",
+                "Documents",
+                "Projects",
+                "Developer",
+                "Workspace",
+                "Downloads",
+            ] {
+                let candidate = home.join(folder);
+                let is_real_dir = fs::symlink_metadata(&candidate)
+                    .ok()
+                    .is_some_and(|m| m.file_type().is_dir());
+                if is_real_dir && !is_sensitive_or_system_path(&candidate) {
+                    push_unique(folder, &candidate);
+                }
+            }
+        }
+    }
+    push_unique("~/CowokProjects", managed_root_canon);
+    roots
+}
+
 fn is_browse_path_allowed(
     canon: &Path,
     managed_root_canon: &Path,
+    home_canon: Option<&Path>,
     registered_roots: &[PathBuf],
 ) -> bool {
     if is_sensitive_or_system_path(canon) {
         return false;
     }
     if canon.starts_with(managed_root_canon) {
+        return true;
+    }
+    if home_canon.is_some_and(|home| canon == home || canon.starts_with(home)) {
         return true;
     }
     if registered_roots.iter().any(|root| canon.starts_with(root)) {
@@ -1188,68 +1285,257 @@ fn is_browse_path_allowed(
     .any(|prefix| lower == *prefix || lower.starts_with(&format!("{prefix}/")))
 }
 
+fn authorize_host_fs_caller(
+    caller: Option<&Extension<VerifiedLegacyIngress>>,
+    headers: &HeaderMap,
+    action_label: &str,
+) -> Result<String, Response> {
+    match caller {
+        Some(Extension(ref verified)) => {
+            crate::daemon_auth::require_editor_role(&verified.principal)?;
+            if verified.kind == crate::daemon_auth::LegacyAuthKind::Bearer
+                && !crate::daemon_auth::is_valid_superadmin_bearer(headers)
+            {
+                return Err(map_error_to_response(HarnessError::BoundaryViolation {
+                    reason: format!(
+                        "AUTH_SCOPE_MISMATCH: {action_label} requires superadmin Bearer, session token, or verified loopback HMAC"
+                    ),
+                }));
+            }
+            Ok(verified.principal.tenant_id.clone())
+        }
+        None => Err(crate::routes::legacy_workbench_v6::json_err(
+            axum::http::StatusCode::UNAUTHORIZED,
+            "UNAUTHENTICATED",
+            format!("Missing caller verification for {action_label}"),
+        )),
+    }
+}
+
+fn load_tenant_registered_roots(
+    state: &DaemonAppState,
+    verified_tenant: &str,
+) -> Result<Vec<PathBuf>, Response> {
+    let conn = state
+        .registry
+        .pool()
+        .connection()
+        .map_err(map_error_to_response)?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT workspace_root FROM projects WHERE tenant_id = ?1 AND trash_deleted_at IS NULL",
+        )
+        .map_err(|e| {
+            map_error_to_response(HarnessError::ValidationFailed {
+                reason: format!("FS_BROWSE_DB_ERROR: {e}"),
+            })
+        })?;
+    let rows = stmt
+        .query_map(rusqlite::params![verified_tenant], |r| {
+            r.get::<_, String>(0)
+        })
+        .map_err(|e| {
+            map_error_to_response(HarnessError::ValidationFailed {
+                reason: format!("FS_BROWSE_DB_ERROR: {e}"),
+            })
+        })?;
+    let mut out = Vec::new();
+    for row_res in rows {
+        let raw_root = row_res.map_err(|e| {
+            map_error_to_response(HarnessError::ValidationFailed {
+                reason: format!("FS_BROWSE_DB_ERROR: {e}"),
+            })
+        })?;
+        let trimmed = raw_root.trim();
+        if !trimmed.is_empty() && trimmed != "." {
+            if let Ok(canon) = fs::canonicalize(trimmed) {
+                out.push(canon);
+            }
+        }
+    }
+    Ok(out)
+}
+
+pub fn validate_native_picked_path(
+    raw_path: &Path,
+    managed_root_canon: &Path,
+    home_canon: Option<&Path>,
+    registered_roots: &[PathBuf],
+) -> Result<(PathBuf, bool), HarnessError> {
+    let anchor = inspect_path_jail(raw_path)?;
+    if !is_browse_path_allowed(
+        &anchor.canonical_path,
+        managed_root_canon,
+        home_canon,
+        registered_roots,
+    ) {
+        return Err(HarnessError::BoundaryViolation {
+            reason: format!(
+                "FS_JAIL_VIOLATION: Selected folder '{}' is outside allowed roots",
+                anchor.canonical_path.display()
+            ),
+        });
+    }
+    ensure_writable_target_not_home(&anchor.canonical_path)?;
+    if !anchor.target_exists {
+        return Err(HarnessError::ValidationFailed {
+            reason: format!(
+                "DIR_NOT_FOUND: Selected directory '{}' does not exist",
+                anchor.canonical_path.display()
+            ),
+        });
+    }
+    let dir_fd = open_dir_abs_nofollow(&anchor.canonical_path)?;
+    let is_git_repo = check_child_non_symlink_in_dir_fd(&dir_fd, std::ffi::OsStr::new(".git"));
+    Ok((anchor.canonical_path, is_git_repo))
+}
+
+#[cfg(target_os = "macos")]
+fn invoke_os_folder_picker(
+    default_dir: Option<PathBuf>,
+    prompt: String,
+) -> Result<Option<PathBuf>, HarnessError> {
+    let script = r#"on run argv
+  set promptText to item 1 of argv
+  activate
+  if (count of argv) >= 2 then
+    set defaultLoc to POSIX file (item 2 of argv)
+    set chosenFolder to choose folder with prompt promptText default location defaultLoc
+  else
+    set chosenFolder to choose folder with prompt promptText
+  end if
+  return POSIX path of chosenFolder
+end run"#;
+    let mut cmd = std::process::Command::new("/usr/bin/osascript");
+    cmd.arg("-e").arg(script).arg("--").arg(prompt);
+    if let Some(dir) = default_dir {
+        cmd.arg(dir.display().to_string());
+    }
+    let output = cmd.output().map_err(|e| HarnessError::ValidationFailed {
+        reason: format!("NATIVE_PICKER_SPAWN_FAILED: Could not launch macOS Finder picker: {e}"),
+    })?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("-128") || stderr.to_lowercase().contains("user canceled") {
+            return Ok(None);
+        }
+        return Err(HarnessError::ValidationFailed {
+            reason: format!("NATIVE_PICKER_FAILED: {}", stderr.trim()),
+        });
+    }
+    let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if raw.is_empty() {
+        return Ok(None);
+    }
+    let trimmed = if raw.len() > 1 {
+        raw.trim_end_matches('/')
+    } else {
+        raw.as_str()
+    };
+    Ok(Some(PathBuf::from(trimmed)))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn invoke_os_folder_picker(
+    _default_dir: Option<PathBuf>,
+    _prompt: String,
+) -> Result<Option<PathBuf>, HarnessError> {
+    Err(HarnessError::ValidationFailed {
+        reason: "NATIVE_PICKER_UNSUPPORTED: Native Finder picker is only supported on macOS"
+            .to_string(),
+    })
+}
+
+pub(super) async fn handle_fs_pick_native(
+    State(state): State<DaemonAppState>,
+    caller: Option<Extension<VerifiedLegacyIngress>>,
+    headers: HeaderMap,
+    payload: Option<Json<FsNativePickRequest>>,
+) -> Result<Json<FsNativePickResponse>, Response> {
+    let verified_tenant = authorize_host_fs_caller(
+        caller.as_ref(),
+        &headers,
+        "Opening native Finder folder picker",
+    )?;
+    let registered_roots = load_tenant_registered_roots(&state, &verified_tenant)?;
+    let managed_root = default_managed_root().map_err(map_error_to_response)?;
+    let managed_anchor = provision_dir_zero_toctou(&managed_root).map_err(map_error_to_response)?;
+    let home_canon = resolve_home_canon();
+
+    let req = payload.map(|Json(v)| v).unwrap_or_default();
+    let default_dir = req
+        .initial_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .and_then(|raw| expand_home_tilde(raw).ok())
+        .and_then(|exp| inspect_path_jail(&exp).ok())
+        .filter(|a| {
+            a.target_exists
+                && is_browse_path_allowed(
+                    &a.canonical_path,
+                    &managed_anchor.canonical_path,
+                    home_canon.as_deref(),
+                    &registered_roots,
+                )
+        })
+        .map(|a| a.canonical_path)
+        .or_else(|| home_canon.clone())
+        .or_else(|| Some(managed_anchor.canonical_path.clone()));
+
+    let prompt = req
+        .prompt
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| s.chars().take(160).collect::<String>())
+        .unwrap_or_else(|| "Select project folder for cowok-design".to_string());
+
+    let picked_opt =
+        tokio::task::spawn_blocking(move || invoke_os_folder_picker(default_dir, prompt))
+            .await
+            .map_err(|e| {
+                map_error_to_response(HarnessError::ValidationFailed {
+                    reason: format!("NATIVE_PICKER_JOIN_FAILED: {e}"),
+                })
+            })?
+            .map_err(map_error_to_response)?;
+
+    let Some(picked_raw) = picked_opt else {
+        return Ok(Json(FsNativePickResponse {
+            cancelled: true,
+            path: None,
+            is_git_repo: false,
+        }));
+    };
+
+    let (canonical, is_git_repo) = validate_native_picked_path(
+        &picked_raw,
+        &managed_anchor.canonical_path,
+        home_canon.as_deref(),
+        &registered_roots,
+    )
+    .map_err(map_error_to_response)?;
+
+    Ok(Json(FsNativePickResponse {
+        cancelled: false,
+        path: Some(canonical.display().to_string()),
+        is_git_repo,
+    }))
+}
+
 pub(super) async fn handle_fs_browse(
     State(state): State<DaemonAppState>,
     caller: Option<Extension<VerifiedLegacyIngress>>,
     headers: HeaderMap,
     Query(query): Query<FsBrowseQuery>,
 ) -> Result<Json<FsBrowseResponse>, Response> {
-    let verified_tenant = match caller {
-        Some(Extension(ref verified)) => {
-            crate::daemon_auth::require_editor_role(&verified.principal)?;
-            if verified.kind == crate::daemon_auth::LegacyAuthKind::Bearer
-                && !crate::daemon_auth::is_valid_superadmin_bearer(&headers)
-            {
-                return Err(map_error_to_response(HarnessError::BoundaryViolation {
-                    reason: "AUTH_SCOPE_MISMATCH: Browsing host filesystem requires superadmin Bearer, session token, or verified loopback HMAC".to_string(),
-                }));
-            }
-            verified.principal.tenant_id.clone()
-        }
-        None => {
-            return Err(crate::routes::legacy_workbench_v6::json_err(
-                axum::http::StatusCode::UNAUTHORIZED,
-                "UNAUTHENTICATED",
-                "Missing caller verification for fs_browse",
-            ));
-        }
-    };
-    let registered_roots: Vec<PathBuf> = {
-        let conn = state
-            .registry
-            .pool()
-            .connection()
-            .map_err(map_error_to_response)?;
-        let mut stmt = conn
-            .prepare("SELECT workspace_root FROM projects WHERE tenant_id = ?1 AND trash_deleted_at IS NULL")
-            .map_err(|e| map_error_to_response(HarnessError::ValidationFailed { reason: format!("FS_BROWSE_DB_ERROR: {e}") }))?;
-        let rows = stmt
-            .query_map(rusqlite::params![verified_tenant], |r| {
-                r.get::<_, String>(0)
-            })
-            .map_err(|e| {
-                map_error_to_response(HarnessError::ValidationFailed {
-                    reason: format!("FS_BROWSE_DB_ERROR: {e}"),
-                })
-            })?;
-        let mut out = Vec::new();
-        for row_res in rows {
-            let raw_root = row_res.map_err(|e| {
-                map_error_to_response(HarnessError::ValidationFailed {
-                    reason: format!("FS_BROWSE_DB_ERROR: {e}"),
-                })
-            })?;
-            let trimmed = raw_root.trim();
-            if !trimmed.is_empty() && trimmed != "." {
-                if let Ok(canon) = fs::canonicalize(trimmed) {
-                    out.push(canon);
-                }
-            }
-        }
-        out
-    };
+    let verified_tenant =
+        authorize_host_fs_caller(caller.as_ref(), &headers, "Browsing host filesystem")?;
+    let registered_roots = load_tenant_registered_roots(&state, &verified_tenant)?;
     let managed_root = default_managed_root().map_err(map_error_to_response)?;
     let managed_anchor = provision_dir_zero_toctou(&managed_root).map_err(map_error_to_response)?;
+    let home_canon = resolve_home_canon();
     let requested = query
         .path
         .as_deref()
@@ -1257,10 +1543,12 @@ pub(super) async fn handle_fs_browse(
         .filter(|s| !s.is_empty());
     let (current, expected_dev_ino) = match requested {
         Some(raw) => {
-            let anchor = inspect_path_jail(Path::new(raw)).map_err(map_error_to_response)?;
+            let expanded = expand_home_tilde(raw).map_err(map_error_to_response)?;
+            let anchor = inspect_path_jail(&expanded).map_err(map_error_to_response)?;
             if !is_browse_path_allowed(
                 &anchor.canonical_path,
                 &managed_anchor.canonical_path,
+                home_canon.as_deref(),
                 &registered_roots,
             ) {
                 return Err(map_error_to_response(HarnessError::BoundaryViolation {
@@ -1301,10 +1589,13 @@ pub(super) async fn handle_fs_browse(
         if name.starts_with('.') || !item.is_dir || item.is_symlink {
             continue;
         }
+        let p = current.join(&item.name);
+        if is_sensitive_or_system_path(&p) {
+            continue;
+        }
         if let Ok(Some(child_fd)) = open_child_dir_fd_nofollow(&current_fd, &item.name) {
             let is_git_repo =
                 check_child_non_symlink_in_dir_fd(&child_fd, std::ffi::OsStr::new(".git"));
-            let p = current.join(&item.name);
             entries.push(FsBrowseEntry {
                 name,
                 is_git_repo,
@@ -1316,12 +1607,22 @@ pub(super) async fn handle_fs_browse(
     entries.sort_by_key(|a| a.name.to_lowercase());
     let parent_path = current
         .parent()
-        .filter(|p| is_browse_path_allowed(p, &managed_anchor.canonical_path, &registered_roots))
+        .filter(|p| {
+            is_browse_path_allowed(
+                p,
+                &managed_anchor.canonical_path,
+                home_canon.as_deref(),
+                &registered_roots,
+            )
+        })
         .map(|p| p.display().to_string());
+    let quick_roots = collect_quick_roots(home_canon.as_deref(), &managed_anchor.canonical_path);
     Ok(Json(FsBrowseResponse {
         current_path: current.display().to_string(),
         parent_path,
         managed_root: managed_anchor.canonical_path.display().to_string(),
+        home_dir: home_canon.map(|p| p.display().to_string()),
+        quick_roots,
         entries,
     }))
 }

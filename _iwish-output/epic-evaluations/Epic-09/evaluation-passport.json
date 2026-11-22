@@ -1,0 +1,106 @@
+{
+  "schema_version": "epic-evaluation-passport/v1",
+  "epic_id": "Epic-09",
+  "feature_group": "VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe",
+  "created_at": "2026-11-20T13:44:30Z",
+  "updated_at": "2026-11-20T13:44:30Z",
+  "context_digest": "84e6ed0cf8c3b4284cddf08bfc0f64f93a50fe5992089a61223e4452616ca573",
+  "context_files": [
+    {
+      "path": "_iwish-output/2. Product Planning/2.1. product-brief-or-prd.md",
+      "sha256": "8e5e51b576c5feed8e5abf3aba7e210c79a707173d602004c3b230c13ffdf151"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.4. epics-and-stories.md",
+      "sha256": "8c59b9963c551b33a6173528784b0e9b3700e10ddfaaf05fc06fc238ef0f5add"
+    },
+    {
+      "path": "_iwish-output/2. Product Planning/2.6. feature-hierarchy.md",
+      "sha256": "8cbd53e1a8ceb2be4504e1251326dd10d03e1197ab2bbfaa7a892812ef2dafd6"
+    },
+    {
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe/Epic-09/epic.md",
+      "sha256": "0b35c3d45814440398c95cce5defe861858c4df572566ff767b4b515ea454d7c"
+    }
+  ],
+  "evaluation_integrity": "VERIFIED",
+  "epic_readiness": "READY",
+  "story_creation_envelope": {
+    "max_phase": "IMPLEMENT",
+    "allowed_story_ids": [
+      "09.1",
+      "09.2"
+    ],
+    "blocked_story_ids": [
+      "09.3"
+    ],
+    "remediation_lane": true
+  },
+  "party_mode": {
+    "mode": "deep",
+    "rounds": 2,
+    "roles": [
+      "PM",
+      "Architect",
+      "Review",
+      "Dev",
+      "UX"
+    ],
+    "transcript_ref": "_iwish-output/epic-evaluations/Epic-09/party-mode-transcript.md",
+    "consensus_summary": "Post-PR #14 reconciliation verified Epic-09 under 20-Slice Vertical Master Plan with TDR-006/007.",
+    "pushback_patterns": [
+      "Zero horizontal-only stories; 5-layer E2E slice enforcement and immutable completed baseline."
+    ]
+  },
+  "unknowns": {
+    "depth": "full",
+    "quadrants": [
+      "known_unknowns",
+      "unknown_unknowns",
+      "assumptions",
+      "blind_spots"
+    ],
+    "critical_open": [],
+    "macro_open": [],
+    "report_ref": "_iwish-output/unknowns/reports/unknowns-report-epic-09.md"
+  },
+  "evidence_receipts": [
+    {
+      "id": "epic-09-party-mode-transcript",
+      "path": "_iwish-output/epic-evaluations/Epic-09/party-mode-transcript.md",
+      "sha256": "115f159c81456860d9477bd230f07711926f816bc2d62192ecab1682e395fcb4"
+    },
+    {
+      "id": "epic-09-unknowns-report",
+      "path": "_iwish-output/unknowns/reports/unknowns-report-epic-09.md",
+      "sha256": "d05eb234bce99bdbbcdced002df7d79437c532c97197420355209b07e4476605"
+    },
+    {
+      "id": "epic-09-evaluation-report",
+      "path": "_iwish-output/epic-evaluations/Epic-09/evaluation-report.md",
+      "sha256": "e35735acd67698ce197b874b7a213392775801eca1f7885d6e4af5364d70dc94"
+    },
+    {
+      "id": "epic-09-plugin-boundary-review",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe/Epic-09/plugin-boundary-review.md",
+      "sha256": "b26301cdd38b149061b496c9c964dcd320c4ba42619b2ec5e731cf294f98a62a"
+    },
+    {
+      "id": "epic-09-agent-surface-map",
+      "path": "_iwish-output/3. Development/1. Epic & Story/VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe/Epic-09/agent-surface-map.md",
+      "sha256": "bb3f3f36aa51a66bcf74fa6f945fa89630df28c9cae0b7a6081c38b1217ea9c8"
+    },
+    {
+      "id": "epic-09-coherence-report",
+      "path": "_iwish-output/adhoc-workspace/scratch/coherence-report-Epic-09.json",
+      "sha256": "f2ab65dab9fd66b8cc5612265f12a830f95cb313b61ed6907942c0b0d7d6a952"
+    }
+  ],
+  "approval": {
+    "approved": true,
+    "approved_by": "User",
+    "approved_at": "2026-11-20T20:26:51+07:00",
+    "context_digest": "84e6ed0cf8c3b4284cddf08bfc0f64f93a50fe5992089a61223e4452616ca573"
+  },
+  "has_ui_stories": true
+}

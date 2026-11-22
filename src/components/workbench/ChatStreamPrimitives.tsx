@@ -3,6 +3,8 @@
 import React from "react";
 import { BrandIcon } from "@/components/ui/BrandIcon";
 import { useTranslation } from "@/hooks/useTranslation";
+import { VaultReceiptCard } from "@/features/chat-vault/VaultReceiptCard";
+import type { VaultReceiptDto } from "@/lib/validations/chat-vault";
 
 export interface SdiClarificationCardData {
   intentId: string;
@@ -18,6 +20,7 @@ export interface ChatMessage {
   sender: "human" | "agent";
   text: string;
   timestamp: string;
+  vaultReceipt?: VaultReceiptDto | null;
   sdiClarification?: SdiClarificationCardData;
 }
 
@@ -95,15 +98,20 @@ export const ChatStreamItem: React.FC<{
   msg: ChatMessage;
   onSelectSdiVariant?: (intentId: string, projectId: string, variantId: string) => void;
   onForkFromMessage?: (msg: ChatMessage) => void;
-}> = ({ msg, onSelectSdiVariant, onForkFromMessage }) => {
+  onReplaceVaultReceipt?: (receiptId: string, newSecret: string) => Promise<void>;
+  onRevokeVaultReceipt?: (receiptId: string) => Promise<void>;
+}> = ({ msg, onSelectSdiVariant, onForkFromMessage, onReplaceVaultReceipt, onRevokeVaultReceipt }) => {
   const { t } = useTranslation();
   if (msg.sender === "human") {
     return (
-      <div style={{ alignSelf: "flex-end", maxWidth: "86%", display: "flex", alignItems: "center", gap: "4px" }}>
-        <ForkFromTurnButton msg={msg} onForkFromMessage={onForkFromMessage} />
-        <div className="chat-human-bubble" data-testid="chat-human-bubble" style={{ backgroundColor: "var(--human-soft)", color: "var(--text-primary)", border: "1px solid var(--human-border)", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", fontSize: "12.5px", lineHeight: "1.5", wordBreak: "break-word" }}>
-          {msg.text}
+      <div style={{ alignSelf: "flex-end", maxWidth: "86%", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <ForkFromTurnButton msg={msg} onForkFromMessage={onForkFromMessage} />
+          <div className="chat-human-bubble" data-testid="chat-human-bubble" style={{ backgroundColor: "var(--human-soft)", color: "var(--text-primary)", border: "1px solid var(--human-border)", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", fontSize: "12.5px", lineHeight: "1.5", wordBreak: "break-word" }}>
+            {msg.text}
+          </div>
         </div>
+        {msg.vaultReceipt && <VaultReceiptCard receipt={msg.vaultReceipt} onReplace={onReplaceVaultReceipt} onRevoke={onRevokeVaultReceipt} />}
       </div>
     );
   }
@@ -116,6 +124,7 @@ export const ChatStreamItem: React.FC<{
         <span style={{ marginLeft: "auto" }}><ForkFromTurnButton msg={msg} onForkFromMessage={onForkFromMessage} /></span>
       </div>
       <div style={{ paddingLeft: "2px" }}>{msg.text}</div>
+      {msg.vaultReceipt && <VaultReceiptCard receipt={msg.vaultReceipt} onReplace={onReplaceVaultReceipt} onRevoke={onRevokeVaultReceipt} />}
       {msg.sdiClarification && <SdiClarificationBox sdi={msg.sdiClarification} onSelectSdiVariant={onSelectSdiVariant} />}
     </div>
   );

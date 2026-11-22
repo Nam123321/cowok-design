@@ -1,15 +1,11 @@
 {
   "schema_version": "1.0.0",
   "project_slug": "cowok-design",
-  "verified_state_sha": "3f48429134a9a135734678af2e50c7267bf8acec52ea097ef047bfd8a89e039d",
-  "generated_at": "2026-11-20T19:04:11.698096",
+  "verified_state_sha": "eed2646b29a4fd0b8dbeb948d0514faf011eb63b8354fd0d5882e8aa22e3f5b7",
+  "generated_at": "2026-11-20T21:15:08.017946",
   "maturity_baseline_epics": [
     "01",
-    "03",
-    "04",
-    "05",
-    "06",
-    "08"
+    "03"
   ],
   "waves": [
     {
@@ -18,8 +14,9 @@
       "status": "active",
       "epics": [
         "02",
-        "07",
-        "09"
+        "04",
+        "06",
+        "08"
       ],
       "sub_epic_slices": [],
       "vertical_value_slice": "Delivery of core capabilities for Wave 1",
@@ -37,6 +34,9 @@
       "wave_name": "Wave 2: Vertical Value Increment 2",
       "status": "pending",
       "epics": [
+        "05",
+        "09",
+        "11",
         "10"
       ],
       "sub_epic_slices": [],
@@ -55,7 +55,7 @@
       "wave_name": "Wave 3: Vertical Value Increment 3",
       "status": "pending",
       "epics": [
-        "11"
+        "07"
       ],
       "sub_epic_slices": [],
       "vertical_value_slice": "Delivery of core capabilities for Wave 3",
@@ -73,7 +73,8 @@
       "wave_name": "Wave 4: Vertical Value Increment 4",
       "status": "pending",
       "epics": [
-        "12"
+        "12",
+        "13"
       ],
       "sub_epic_slices": [],
       "vertical_value_slice": "Delivery of core capabilities for Wave 4",
@@ -92,34 +93,57 @@
       "02.1",
       "02.2",
       "02.3",
-      "07.1",
-      "07.2",
-      "07.3",
-      "09.1",
-      "09.2",
-      "09.3"
+      "02.4",
+      "04.1",
+      "04.2",
+      "04.3",
+      "04.4",
+      "04.5",
+      "04.6",
+      "06.1",
+      "06.2",
+      "06.3",
+      "06.4",
+      "06.5",
+      "08.1",
+      "08.2",
+      "08.3",
+      "08.4",
+      "08.5"
     ],
     "wave_2": [
+      "05.1",
+      "05.2",
+      "05.3",
+      "05.4",
+      "05.5",
+      "09.1",
+      "09.2",
+      "09.3",
+      "11.1",
+      "11.2",
+      "11.3",
       "10.1",
       "10.2",
       "10.3"
     ],
     "wave_3": [
-      "11.1",
-      "11.2",
-      "11.3"
+      "07.1",
+      "07.2",
+      "07.3"
     ],
     "wave_4": [
       "12.1",
       "12.2",
-      "12.3"
+      "12.3",
+      "13.1"
     ]
   },
   "immediate_p0_action_slices": [
     {
       "slice_id": "P0.1",
       "epic_id": "02",
-      "name": "JIT Prompt Assembler & 3-Profile Model Capability Adapter (Immediate P0 Anchor)",
+      "name": "JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills (Immediate P0 Anchor)",
       "story_ids": [
         "02.1",
         "02.2",
@@ -130,26 +154,38 @@
     },
     {
       "slice_id": "P0.2",
-      "epic_id": "07",
-      "name": "17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter (Immediate P0 Anchor)",
+      "epic_id": "04",
+      "name": "Flow-First 2D SVG Bezier DAG Studio, Security Kernel, CAS Intake & In-Chat Vault (Immediate P0 Anchor)",
       "story_ids": [
-        "07.1",
-        "07.2",
-        "07.3"
+        "04.1",
+        "04.2",
+        "04.3"
       ],
       "track": "Stream-2",
       "rationale": "Zero blocker risk anchor for Wave 1 unblocking downstream business workflows."
     },
     {
       "slice_id": "P0.3",
-      "epic_id": "09",
-      "name": "Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine (Immediate P0 Anchor)",
+      "epic_id": "06",
+      "name": "Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen (Immediate P0 Anchor)",
       "story_ids": [
-        "09.1",
-        "09.2",
-        "09.3"
+        "06.1",
+        "06.2",
+        "06.3"
       ],
-      "track": "Stream-3",
+      "track": "Stream-4",
+      "rationale": "Zero blocker risk anchor for Wave 1 unblocking downstream business workflows."
+    },
+    {
+      "slice_id": "P0.4",
+      "epic_id": "08",
+      "name": "agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN (Immediate P0 Anchor)",
+      "story_ids": [
+        "08.1",
+        "08.2",
+        "08.3"
+      ],
+      "track": "Stream-1",
       "rationale": "Zero blocker risk anchor for Wave 1 unblocking downstream business workflows."
     }
   ],

@@ -24,6 +24,7 @@ import {
   type RouteFn,
 } from "./vite-bff-flow-routes";
 import { PLUGIN_ECOSYSTEM_ROUTES } from "./vite-bff-plugins-routes";
+import { CHAT_VAULT_ROUTES } from "./vite-bff-chat-vault-routes";
 import * as doctorRoute from "../app/api/doctor/route";
 import * as snapshotRoute from "../app/api/projects/[id]/flow/snapshot/route";
 import * as nodesRoute from "../app/api/projects/[id]/flow/nodes/route";
@@ -37,11 +38,18 @@ import * as projectSessionsRoute from "../app/api/projects/[id]/sessions/route";
 import * as singleSessionRoute from "../app/api/projects/[id]/sessions/[sessionId]/route";
 import * as pathTokenRoute from "../app/api/projects/[id]/path-token/route";
 import * as fsBrowseRoute from "../app/api/fs/browse/route";
+import * as fsPickNativeRoute from "../app/api/fs/pick-native/route";
 import * as projectRestoreRoute from "../app/api/projects/[id]/restore/route";
 import * as verifyPathTokenRoute from "../app/api/projects/[id]/verify-path-token/route";
 import * as projectPromoteRoute from "../app/api/projects/[id]/promote/route";
 import * as projectSpecsRoute from "../app/api/projects/[id]/specs/route";
 import * as singleSpecRoute from "../app/api/projects/[id]/specs/[spec_key]/route";
+import * as contextAssembleRoute from "../app/api/v1/context/assemble/route";
+import * as contextTelemetryRoute from "../app/api/v1/context/telemetry/route";
+import * as ssotComponentsRoute from "../app/api/v1/ssot/components/route";
+import * as ssotAppShellLockRoute from "../app/api/v1/ssot/appshell/lock/route";
+import * as ssotExportRoute from "../app/api/v1/ssot/export/route";
+import * as skillsRouteHandler from "../app/api/v1/skills/route/route";
 import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize/route";
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
 import * as versionSnapshotsRoute from "../app/api/projects/[id]/snapshots/route";
@@ -114,6 +122,7 @@ const ROUTE_TABLE: RouteEntry[] = [
 
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/path-token$/, extractParams: idOnly, resolveHandler: () => pathTokenRoute.POST },
   { method: "GET", pattern: /^\/api\/fs\/browse$/, extractParams: noParams, resolveHandler: () => fsBrowseRoute.GET },
+  { method: "POST", pattern: /^\/api\/fs\/pick-native$/, extractParams: noParams, resolveHandler: () => fsPickNativeRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/restore$/, extractParams: idOnly, resolveHandler: () => projectRestoreRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/verify-path-token$/, extractParams: idOnly, resolveHandler: () => verifyPathTokenRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/promote$/, extractParams: idOnly, resolveHandler: () => projectPromoteRoute.POST },
@@ -165,6 +174,13 @@ const ROUTE_TABLE: RouteEntry[] = [
   proxyRoute("GET", /^\/api\/projects\/([^/]+)\/sdi\/intent\/([^/]+)$/, (m) => `/api/v1/projects/${safeEncodeSegment(m[1])}/sdi/intent/${safeEncodeSegment(m[2])}`),
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/sdi\/clarification$/, extractParams: idOnly, resolveHandler: () => sdiClarificationRoute.POST },
   ...PLUGIN_ECOSYSTEM_ROUTES,
+  ...CHAT_VAULT_ROUTES,
+  { method: "POST", pattern: /^\/api\/context\/assemble$/, extractParams: noParams, resolveHandler: () => contextAssembleRoute.POST },
+  { method: "GET", pattern: /^\/api\/context\/telemetry$/, extractParams: noParams, resolveHandler: () => contextTelemetryRoute.GET },
+  { method: "GET", pattern: /^\/api\/ssot\/components$/, extractParams: noParams, resolveHandler: () => ssotComponentsRoute.GET },
+  { method: "POST", pattern: /^\/api\/ssot\/appshell\/lock$/, extractParams: noParams, resolveHandler: () => ssotAppShellLockRoute.POST },
+  { method: "POST", pattern: /^\/api\/ssot\/export$/, extractParams: noParams, resolveHandler: () => ssotExportRoute.POST },
+  { method: "POST", pattern: /^\/api\/skills\/route$/, extractParams: noParams, resolveHandler: () => skillsRouteHandler.POST },
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.POST },
   { method: "PUT", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/reorder$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]) }), resolveHandler: () => deckReorderRoute.PUT },

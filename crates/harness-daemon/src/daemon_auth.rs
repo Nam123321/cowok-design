@@ -1038,6 +1038,17 @@ fn verify_hmac_v2(
     headers: &HeaderMap,
     raw_body: &[u8],
 ) -> Result<FlowPrincipal, (StatusCode, &'static str, &'static str)> {
+    let body_sha_hex = format!("{:x}", Sha256::digest(raw_body));
+    verify_hmac_v2_with_sha(auth, method, uri, headers, &body_sha_hex)
+}
+
+fn verify_hmac_v2_with_sha(
+    auth: &DaemonAuthState,
+    method: &Method,
+    uri: &axum::http::Uri,
+    headers: &HeaderMap,
+    body_sha_hex: &str,
+) -> Result<FlowPrincipal, (StatusCode, &'static str, &'static str)> {
     let sig_hex = hdr_str(headers, "x-cowok-hmac-sig")?;
     let ts_str = hdr_str(headers, "x-cowok-timestamp")?;
     let req_nonce = hdr_str(headers, "x-cowok-nonce")?;
@@ -1064,7 +1075,7 @@ fn verify_hmac_v2(
         )
     })?;
     let canonical = format!(
-        "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{:x}",
+        "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
         auth.daemon_nonce,
         ts_str,
         req_nonce,
@@ -1072,7 +1083,7 @@ fn verify_hmac_v2(
         uri.path(),
         uri.query().unwrap_or(""),
         principal_b64,
-        Sha256::digest(raw_body)
+        body_sha_hex
     );
     let expected_hex: String = hmac_sha256(&auth.hmac_key, canonical.as_bytes())
         .iter()
@@ -1225,6 +1236,17 @@ fn attach_loopback_cors_headers(headers: &mut HeaderMap, origin: Option<&str>) {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct CasIngressTempGuard {
+    pub path: std::path::PathBuf,
+}
+
+impl Drop for CasIngressTempGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
+}
+
 pub async fn legacy_project_auth_middleware(
     State(state): State<DaemonAppState>,
     req: Request,
@@ -1235,20 +1257,82 @@ pub async fn legacy_project_auth_middleware(
         return auth_err_resp(st, code, msg);
     }
     let (parts, body) = req.into_parts();
-    let raw_bytes = match to_bytes(body, MAX_BODY_BYTES * 2).await {
-        Ok(b) => b,
-        Err(_) => {
+    let is_cas_upload = parts.method == Method::POST && parts.uri.path() == "/api/v1/cas/upload";
+    if is_cas_upload {
+        const MAX_CAS_CONTENT_LEN: usize = 26_214_400 + 262_144;
+        let has_auth_hdr = parts.headers.contains_key("x-cowok-hmac-sig")
+            || parts.headers.contains_key("x-cowok-session-token")
+            || parts.headers.contains_key("authorization");
+        if !has_auth_hdr {
             return auth_err_resp(
-                StatusCode::PAYLOAD_TOO_LARGE,
-                "PAYLOAD_TOO_LARGE",
-                "Body exceeds 2 MiB",
-            )
+                StatusCode::UNAUTHORIZED,
+                "UNAUTHENTICATED",
+                "Missing authentication for legacy project endpoint",
+            );
         }
+        if parts
+            .headers
+            .get("x-cowok-role")
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|r| r.trim().eq_ignore_ascii_case("viewer"))
+        {
+            return auth_err_resp(
+                StatusCode::FORBIDDEN,
+                "AUTH_FORBIDDEN",
+                "Viewer role cannot upload attachments",
+            );
+        }
+        if let Some(clen) = parts
+            .headers
+            .get(header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.trim().parse::<usize>().ok())
+        {
+            if clen > MAX_CAS_CONTENT_LEN {
+                return crate::routes::chat_cas_storage::safe_api_error_response(
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "CAS_QUOTA_EXCEEDED",
+                    "Request upload size limit exceeded",
+                    false,
+                    Some("REQUEST_BYTES"),
+                );
+            }
+        }
+    }
+    let (raw_bytes, body_sha_hex, staged_cas) = if is_cas_upload {
+        let cas_dir = state
+            .registry
+            .pool()
+            .workspace_root()
+            .join(".cowok-design/cas");
+        match stream_cas_body_to_temp(&cas_dir, body).await {
+            Ok((sha, guard)) => (axum::body::Bytes::new(), sha, Some(Arc::new(guard))),
+            Err(resp) => return resp,
+        }
+    } else {
+        let b = match to_bytes(body, MAX_BODY_BYTES * 2).await {
+            Ok(b) => b,
+            Err(_) => {
+                return auth_err_resp(
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "PAYLOAD_TOO_LARGE",
+                    "Body exceeds 2 MiB",
+                )
+            }
+        };
+        let sha = format!("{:x}", Sha256::digest(&b));
+        (b, sha, None)
     };
     let auth = state_auth(&state);
     let verified: Option<VerifiedLegacyIngress> = if parts.headers.contains_key("x-cowok-hmac-sig")
     {
-        match verify_hmac_v2(&auth, &parts.method, &parts.uri, &parts.headers, &raw_bytes) {
+        match verify_hmac_v2_with_sha(
+            &auth,
+            &parts.method,
+            &parts.uri,
+            &parts.headers,
+            &body_sha_hex,
+        ) {
             Ok(mut principal) => {
                 // Honor explicit header downgrade to viewer/editor while preserving HMAC-verified admin
                 if let Some(hdr_role) = parts
@@ -1284,9 +1368,24 @@ pub async fn legacy_project_auth_middleware(
             .or_else(|| auth.get_valid_session(tok))
         {
             Some(mut principal) => {
-                let role = resolve_role(&parts.headers, Some(tok));
-                if role == "viewer" {
-                    principal.role = "viewer".to_string();
+                if let Some(hdr_role) = parts
+                    .headers
+                    .get("x-cowok-role")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.trim().to_ascii_lowercase())
+                {
+                    if hdr_role == "viewer" {
+                        principal.role = "viewer".to_string();
+                    } else if hdr_role == "editor" && principal.role == "admin" {
+                        principal.role = "editor".to_string();
+                    } else if hdr_role != "editor" && hdr_role != "admin" {
+                        principal.role = "viewer".to_string();
+                    }
+                } else {
+                    let role = resolve_role(&parts.headers, Some(tok));
+                    if role == "viewer" {
+                        principal.role = "viewer".to_string();
+                    }
                 }
                 Some(VerifiedLegacyIngress {
                     principal,
@@ -1367,7 +1466,7 @@ pub async fn legacy_project_auth_middleware(
         }
     }
 
-    if parts.uri.path() == "/api/v1/fs/browse" {
+    if parts.uri.path() == "/api/v1/fs/browse" || parts.uri.path() == "/api/v1/fs/pick-native" {
         if let Some(ref caller) = verified {
             if caller.kind == LegacyAuthKind::Bearer && !is_valid_superadmin_bearer(&parts.headers)
             {
@@ -1381,10 +1480,76 @@ pub async fn legacy_project_auth_middleware(
     }
 
     let mut rebuilt = Request::from_parts(parts, Body::from(raw_bytes));
+    if let Some(staged) = staged_cas {
+        rebuilt.extensions_mut().insert(staged);
+    }
     if let Some(caller) = verified {
         rebuilt.extensions_mut().insert(caller);
     }
     next.run(rebuilt).await
+}
+
+async fn stream_cas_body_to_temp(
+    cas_dir: &std::path::Path,
+    body: Body,
+) -> Result<(String, CasIngressTempGuard), Response> {
+    use futures_util::StreamExt;
+    use std::io::Write;
+    const MAX_INGRESS_BYTES: usize = 26_214_400 + 262_144;
+    let (tmp_path, mut tmp_file) = crate::routes::chat_cas_archive::open_secure_temp_file(
+        cas_dir,
+        &format!(".ingress-{}", Uuid::new_v4()),
+    )?;
+    let guard = CasIngressTempGuard { path: tmp_path };
+    let mut hasher = Sha256::new();
+    let mut total: usize = 0;
+    let mut stream = body.into_data_stream();
+    while let Some(chunk_res) = stream.next().await {
+        let Ok(chunk) = chunk_res else {
+            return Err(crate::routes::chat_cas_storage::safe_api_error_response(
+                StatusCode::BAD_REQUEST,
+                "CAS_INVALID_STREAM",
+                "Failed to read upload stream",
+                false,
+                None,
+            ));
+        };
+        total = total.saturating_add(chunk.len());
+        if total > MAX_INGRESS_BYTES {
+            return Err(crate::routes::chat_cas_storage::safe_api_error_response(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "CAS_QUOTA_EXCEEDED",
+                "Request upload size limit exceeded",
+                false,
+                Some("REQUEST_BYTES"),
+            ));
+        }
+        hasher.update(&chunk);
+        let write_res = tokio::task::spawn_blocking(move || {
+            let res = tmp_file.write_all(&chunk);
+            (tmp_file, res)
+        })
+        .await;
+        match write_res {
+            Ok((returned_file, Ok(()))) => {
+                tmp_file = returned_file;
+            }
+            _ => {
+                return Err(crate::routes::chat_cas_storage::safe_api_error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "CAS_STORAGE_ERROR",
+                    "Failed to stage upload stream",
+                    false,
+                    None,
+                ));
+            }
+        }
+    }
+    let _ = tokio::task::spawn_blocking(move || {
+        let _ = tmp_file.flush();
+    })
+    .await;
+    Ok((format!("{:x}", hasher.finalize()), guard))
 }
 
 fn is_anchored_readonly_post_path(path: &str) -> bool {
@@ -1411,6 +1576,7 @@ fn is_anchored_readonly_post_path(path: &str) -> bool {
                 "validate"
             ]
             | ["api", "v1", "decks", _, "presenter", "handshake"]
+            | ["api", "v1", "skills", "route"]
             | [
                 "api",
                 "v1",

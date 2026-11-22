@@ -8,6 +8,7 @@ import {
   assembleForwardHeaders,
   buildCanonicalHmacHeaders,
   relayDaemonResponse,
+  seedProjectsToDaemon,
   stripSpoofedHeaders,
   type DaemonLockRecord,
 } from "./daemon-hmac";
@@ -17,7 +18,7 @@ import { clearBffSessionHumanToken, setBffSessionHumanToken } from "./api-guard-
 
 export { buildCanonicalHmacHeaders, stripSpoofedHeaders };
 
-const DAEMON_MIN_SCHEMA_VERSION = 15;
+const DAEMON_MIN_SCHEMA_VERSION = 18;
 const DAEMON_STARTUP_TIMEOUT_MS = 8_000;
 const DAEMON_POLL_INTERVAL_MS = 40;
 const HTTP_UNAUTHORIZED = 401;
@@ -135,20 +136,7 @@ function buildSeedProjects() {
 }
 
 async function seedDefaultProjects(lock: DaemonLockRecord): Promise<void> {
-  for (const proj of buildSeedProjects()) {
-    const rawBody = JSON.stringify({
-      ...proj,
-      workspace_root: null,
-      inherit_brand_from_project_id: null,
-    });
-    const headers = buildCanonicalHmacHeaders({
-      daemonNonce: lock.daemon_nonce, hmacKeyHex: lock.hmac_key_hex,
-      method: "POST", canonicalPath: "/api/v1/projects", rawQuery: "",
-      principal: { tenantId: "local-default", userId: "bff-bootstrap", role: "editor" },
-      rawBody, correlationId: crypto.randomUUID(),
-    });
-    await fetch(`http://127.0.0.1:${lock.port}/api/v1/projects`, { method: "POST", headers, body: rawBody }).catch(() => undefined);
-  }
+  await seedProjectsToDaemon(lock, buildSeedProjects());
 }
 
 async function verifyHealthAndSeedDefaultProject(lock: DaemonLockRecord, workspaceRoot: string): Promise<void> {
@@ -237,7 +225,7 @@ async function resolveHumanSessionHeader(
     body: JSON.stringify({
       tenantId: opts.principal.tenantId,
       userId: opts.principal.userId,
-      role: opts.principal.role === "admin" ? "admin" : "editor",
+      role: "editor",
     }),
   });
   if (!res.ok) {
@@ -263,6 +251,8 @@ interface DaemonForwardOpts {
   daemonPath: string;
   rawQuery?: string;
   body?: unknown;
+  rawBodyBytes?: Uint8Array;
+  contentType?: string;
   inboundHeaders?: Headers;
   extraHeaders?: Record<string, string>;
   principal: { tenantId: string; userId: string; role: "viewer" | "editor" | "admin" };
@@ -278,7 +268,7 @@ async function fetchDaemonOnce(params: {
   opts: DaemonForwardOpts;
   safeInbound: Record<string, string>;
   rawQuery: string;
-  rawBody: string;
+  rawBody: string | Uint8Array;
   correlationId: string;
 }): Promise<Response> {
   const { lock, opts, safeInbound, rawQuery, rawBody, correlationId } = params;
@@ -286,7 +276,7 @@ async function fetchDaemonOnce(params: {
   const signedHeaders = buildCanonicalHmacHeaders({
     daemonNonce: lock.daemon_nonce, hmacKeyHex: lock.hmac_key_hex,
     method: opts.method, canonicalPath: opts.daemonPath, rawQuery,
-    principal: opts.principal, rawBody, correlationId,
+    principal: opts.principal, rawBody, contentType: opts.contentType, correlationId,
   });
   const extraHeaders = resolvedHumanTok
     ? { ...(opts.extraHeaders || {}), "X-Cowok-Human-Session": resolvedHumanTok }
@@ -297,19 +287,30 @@ async function fetchDaemonOnce(params: {
   logger.info("bff_forward_daemon", { method: opts.method, path: opts.daemonPath, correlationId });
   // Only propagate AbortSignal in Node server runtimes (jsdom swaps global AbortSignal across realms).
   const serverSignal = typeof window === "undefined" ? opts.signal : undefined;
+  const emptyBody = typeof rawBody === "string" ? rawBody === "" : rawBody.byteLength === 0;
   return fetch(targetUrl, {
     method: opts.method,
     headers,
-    body: opts.method === "GET" || opts.method === "HEAD" || rawBody === "" ? undefined : rawBody,
+    body: opts.method === "GET" || opts.method === "HEAD" || emptyBody ? undefined : (rawBody as BodyInit),
     ...(serverSignal ? { signal: serverSignal } : {}),
   });
+}
+
+function resolveForwardRawBody(opts: DaemonForwardOpts): string | Uint8Array {
+  if (opts.rawBodyBytes !== undefined) {
+    return opts.rawBodyBytes;
+  }
+  if (opts.body !== undefined) {
+    return JSON.stringify(opts.body);
+  }
+  return "";
 }
 
 export async function forwardToDaemonFlow(opts: DaemonForwardOpts): Promise<Response> {
   const safeInbound = opts.inboundHeaders ? stripSpoofedHeaders(opts.inboundHeaders) : {};
   const lock = await ensureRunningDaemon();
   const rawQuery = (opts.rawQuery || "").replace(/^\?/, "");
-  const rawBody = opts.body !== undefined ? JSON.stringify(opts.body) : "";
+  const rawBody = resolveForwardRawBody(opts);
   const correlationId = opts.correlationId || crypto.randomUUID();
   let upstream = await fetchDaemonOnce({ lock, opts, safeInbound, rawQuery, rawBody, correlationId });
   if (

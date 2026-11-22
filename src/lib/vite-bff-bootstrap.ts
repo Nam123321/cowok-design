@@ -23,6 +23,8 @@ export {
   HTTP_FORBIDDEN,
   HTTP_OK,
   HTTP_PAYLOAD_TOO_LARGE,
+  MAX_BODY_BYTES,
+  MAX_CAS_UPLOAD_BODY_BYTES,
   buildWorkbenchProofCookieHeader,
   injectBootCapMeta,
   issueBootCapToken,

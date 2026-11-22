@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "Conversa",
     "githubUrlPlaceholder": "Informe a URL do repositório (https://github.com/...)",
     "standaloneChatAck": "Prompt registrado na conversa independente",
-    "oauthCliFallback": "Acesso OAuth/CLI"
+    "oauthCliFallback": "Acesso OAuth/CLI",
+    "pickerPathPlaceholder": "~/Desktop/meu-projeto ou /Users/...",
+    "pickerGoBtn": "Ir",
+    "pickerOpenDirBtn": "Abrir",
+    "pickerNewSubfolderLabel": "Nova subpasta (opcional):",
+    "pickerNewSubfolderPlaceholder": "Ex.: meu-novo-app (deixe vazio para usar a pasta selecionada)",
+    "pickerInvalidSubfolderError": "Nome de subpasta inválido (não pode conter '/', '\\\\' nem começar com '.')",
+    "pickerHomeRootBlockedHint": "Não é possível vincular um projeto diretamente à pasta raiz Home (~). Selecione uma subpasta ou informe um novo nome.",
+    "pickerSelectedTargetPrefix": "Pasta de destino:",
+    "pickerNativeFinderBtn": "Abrir Finder...",
+    "pickerNativeFinderOpening": "Abrindo Finder...",
+    "pickerNativeFinderPrompt": "Selecione uma pasta local do projeto"
   },
   "chat": {
     "agentTitle": "Agente Cowok",
@@ -167,7 +178,9 @@
     "sseEventCompleted": "Evento {{event}} concluído.",
     "proposalCompileWarning": "Não foi possível sintetizar ChangeProposal agora; verifique as entradas.",
     "intentStatusLabel": "Estado",
-    "forkFromHere": "Ramificar conversa daqui"
+    "forkFromHere": "Ramificar conversa daqui",
+    "persistFailed": "Não foi possível salvar a mensagem no histórico SQLite.",
+    "vaultComposerPlaceholder": "Pergunte ao cowok Agent ou cole a chave API..."
   },
   "canvas": {
     "userflowLens": "Fluxo de usuário (Userflow)",
@@ -1143,5 +1156,95 @@
     },
     "commentsDrawerTitle": "Comentários fixados",
     "overlaysRegionLabel": "Camadas de interação espacial"
+  },
+  "cas": {
+    "uploadFailed": "Falha ao enviar arquivo para o armazenamento CAS.",
+    "uploading": "Enviando ativo binário para o CAS...",
+    "prompt": "Anexar .csv / .tsv / .xlsx / .fig / .pdf / .png / .svg / .txt"
+  },
+  "vault": {
+    "onboardingTitle": "Integração de Chave Decision Engine (Cofre Zero-Leak)",
+    "onboardingDesc": "Obtenha uma chave API no Google AI Studio ou TypeSafe JEV e cole no chat. As chaves são criptografadas antes do armazenamento.",
+    "localOnlyLabel": "Bloqueio Local Corporativo (sem sondas externas)",
+    "googleAiStudioKey": "Chave Google AI Studio",
+    "typesafeJevKey": "Chave TypeSafe JEV",
+    "replacePlaceholder": "Digite a nova chave API",
+    "confirm": "Confirmar salvamento",
+    "replace": "Substituir",
+    "revoke": "Revogar",
+    "localOnlyBadge": "Somente local",
+    "highEntropyBadge": "Chave de alta entropia",
+    "onboardingToggle": "Cofre API",
+    "ingestFailed": "Falha ao salvar a chave no cofre seguro."
+  },
+  "contextMeter": {
+    "triggerLabel": "Medidor de Orçamento de Contexto",
+    "popoverTitle": "Telemetria KV-Cache e Contexto do Portal",
+    "portalLabel": "Portal do aplicativo",
+    "horizonLabel": "Horizonte de tarefa",
+    "profileLabel": "Perfil do modelo",
+    "textBudgetLabel": "Texto em BPE",
+    "outlineLabel": "Estrutura de DOM",
+    "ssotLabel": "Índice SSOT",
+    "shaLabel": "Código SHA",
+    "loading": "Montando contexto do portal...",
+    "emptyState": "Selecione um projeto ou clique em Montar para ver o orçamento.",
+    "assembleButton": "Montar contexto",
+    "errors": {
+      "invalidRequest": "A solicitação de montagem de contexto é inválida.",
+      "invalidIdempotencyKey": "Cabeçalho Idempotency-Key UUIDv4 ausente ou inválido.",
+      "invalidCursor": "Cursor de paginação de telemetria inválido ou expirado.",
+      "projectTenantMismatch": "Acesso negado ao projeto neste inquilino.",
+      "crossPortalLeak": "Vazamento privilegiado entre portais bloqueado.",
+      "imageBudgetExceeded": "Os tokens de imagem excedem o limite por turno.",
+      "atomicBlockOverBudget": "Bloco atômico HTML/JSON excede o teto de tokens.",
+      "ssotRatioBelowMinimum": "Proporção SSOT/DOM abaixo do mínimo de 60%.",
+      "idempotencyKeyReused": "Chave de idempotência reutilizada com dados diferentes.",
+      "projectReferenceInvalid": "Referência do projeto de destino não existe.",
+      "telemetryConflict": "Conflito de persistência na telemetria.",
+      "telemetryWriteBusy": "Gravador SQLite de telemetria temporariamente ocupado.",
+      "telemetryStorageUnavailable": "Armazenamento de telemetria indisponível.",
+      "daemonContractViolation": "O daemon retornou um contrato de contexto inválido.",
+      "invalidSources": "A lista sourceIds deve conter entre 1 e 100 itens.",
+      "duplicateSourceId": "A lista sourceIds não pode conter entradas duplicadas.",
+      "storage": "Erro de armazenamento de contexto.",
+      "unauthorized": "Autenticação obrigatória.",
+      "forbidden": "Permissão negada.",
+      "requestRejected": "Solicitação rejeitada."
+    }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "Bloqueado em outra sessão",
+      "refresh": "Atualizar",
+      "locked": "Moldura bloqueada",
+      "unlock": "Desbloquear",
+      "unlocked": "Desbloqueado",
+      "lock": "Bloquear"
+    },
+    "export": {
+      "busy": "Exportando...",
+      "cta": "Exportar kit de design"
+    },
+    "patterns": {
+      "title": "Padrões de design",
+      "pendingSuffix": "pendentes",
+      "close": "Fechar padrões",
+      "portalSelect": "Portal ativo",
+      "refresh": "Atualizar",
+      "pending": "Em revisão",
+      "synced": "Sincronizado",
+      "empty": "Nenhum componente salvo neste portal.",
+      "button": "Padrões"
+    },
+    "toast": {
+      "loadFailed": "Não foi possível carregar os padrões do espaço.",
+      "lockAcquired": "Estrutura bloqueada para este espaço.",
+      "lockReleased": "Estrutura desbloqueada.",
+      "lockConflict": "Bloqueado por outra sessão. Atualize para sincronizar.",
+      "lockFailed": "Não foi possível atualizar o bloqueio.",
+      "exportSuccess": "Kit de design exportado (#{rev}).",
+      "exportFailed": "Não foi possível exportar o kit de design agora."
+    }
   }
 }

@@ -25,14 +25,15 @@ describe("Story 05.1: Frontend Sandbox Hardening, IframeKeepAlivePool & Option 5
   });
 
   describe("1. Sandbox HTML Hardening & CSP Nonce", () => {
-    it("strips all 8 dangerous tags: script, iframe, object, embed, foreignobject, svg, template, noscript", () => {
+    it("strips dangerous tags (script, iframe, object, embed, foreignobject, unsafe svg, template, noscript) and infers safe svg viewBox", () => {
       const maliciousPayload = `
         <div>Safe Content</div>
         <script>alert('xss')</script>
         <iframe src="https://evil.com"></iframe>
         <object data="malicious.swf"></object>
         <embed src="plugin.pdf">
-        <svg><text>Vector Injected</text></svg>
+        <svg onload="alert(1)"><text>Unsafe SVG</text></svg>
+        <svg><rect width="10" height="10"/></svg>
         <template><p>Template Injected</p></template>
         <noscript><p>Noscript Injected</p></noscript>
       `;
@@ -43,7 +44,8 @@ describe("Story 05.1: Frontend Sandbox Hardening, IframeKeepAlivePool & Option 5
       expect(wrapped).not.toContain("<iframe");
       expect(wrapped).not.toContain("<object");
       expect(wrapped).not.toContain("<embed");
-      expect(wrapped).not.toContain("<svg");
+      expect(wrapped).not.toContain("Unsafe SVG");
+      expect(wrapped).toContain('viewBox="0 0 1200 800"');
       expect(wrapped).not.toContain("<template");
       expect(wrapped).not.toContain("<noscript");
     });

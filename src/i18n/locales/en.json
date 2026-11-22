@@ -135,7 +135,18 @@
     "defaultStandaloneAliasPrefix": "Chat",
     "githubUrlPlaceholder": "Enter repository URL (https://github.com/...)",
     "standaloneChatAck": "Recorded standalone chat prompt",
-    "oauthCliFallback": "OAuth/CLI"
+    "oauthCliFallback": "OAuth/CLI",
+    "pickerPathPlaceholder": "~/Desktop/my-project or /Users/...",
+    "pickerGoBtn": "Go",
+    "pickerOpenDirBtn": "Open",
+    "pickerNewSubfolderLabel": "New subfolder (optional):",
+    "pickerNewSubfolderPlaceholder": "e.g. my-new-app (leave blank to use selected folder)",
+    "pickerInvalidSubfolderError": "Invalid subfolder name (cannot contain '/', '\\\\', or start with '.')",
+    "pickerHomeRootBlockedHint": "Cannot bind a project directly to Home (~). Select a subfolder or enter a new subfolder name.",
+    "pickerSelectedTargetPrefix": "Target folder:",
+    "pickerNativeFinderBtn": "Open Finder...",
+    "pickerNativeFinderOpening": "Opening Finder...",
+    "pickerNativeFinderPrompt": "Select a local project folder"
   },
   "chat": {
     "agentTitle": "cowok Agent",
@@ -167,7 +178,9 @@
     "sseEventCompleted": "Event {{event}} completed.",
     "proposalCompileWarning": "Unable to synthesize ChangeProposal right now; please inspect inputs.",
     "intentStatusLabel": "Status",
-    "forkFromHere": "Fork conversation from here"
+    "forkFromHere": "Fork conversation from here",
+    "persistFailed": "Unable to save message to SQLite history.",
+    "vaultComposerPlaceholder": "Ask cowok Agent or paste API key..."
   },
   "canvas": {
     "userflowLens": "Userflow",
@@ -1143,5 +1156,95 @@
     },
     "commentsDrawerTitle": "Pinned Comments",
     "overlaysRegionLabel": "Spatial overlays"
+  },
+  "cas": {
+    "uploadFailed": "Failed to upload file to CAS storage.",
+    "uploading": "Uploading binary asset to CAS...",
+    "prompt": "Attach .csv / .tsv / .xlsx / .fig / .pdf / .png / .svg / .txt"
+  },
+  "vault": {
+    "onboardingTitle": "Decision Engine API Key Onboarding (Zero-Leak Vault)",
+    "onboardingDesc": "Get an API key from Google AI Studio or TypeSafe JEV and paste it into chat. Keys are encrypted before storage.",
+    "localOnlyLabel": "Enterprise Local-Only Lock (no outbound probe)",
+    "googleAiStudioKey": "Google AI Studio Key",
+    "typesafeJevKey": "TypeSafe JEV Key",
+    "replacePlaceholder": "Enter replacement API key",
+    "confirm": "Confirm Save",
+    "replace": "Replace",
+    "revoke": "Revoke",
+    "localOnlyBadge": "Local-Only",
+    "highEntropyBadge": "High-Entropy Key",
+    "onboardingToggle": "API Key Vault",
+    "ingestFailed": "Failed to save credential to secure vault."
+  },
+  "contextMeter": {
+    "triggerLabel": "Context Budget Meter",
+    "popoverTitle": "KV-Cache & Portal Context Telemetry",
+    "portalLabel": "Portal",
+    "horizonLabel": "Horizon",
+    "profileLabel": "Model Profile",
+    "textBudgetLabel": "Text BPE",
+    "outlineLabel": "DOM Outline",
+    "ssotLabel": "SSOT",
+    "shaLabel": "SHA",
+    "loading": "Assembling portal context...",
+    "emptyState": "Select a project or click Assemble to inspect context budget.",
+    "assembleButton": "Assemble Context",
+    "errors": {
+      "invalidRequest": "Context assembly request is invalid.",
+      "invalidIdempotencyKey": "Missing or invalid Idempotency-Key UUIDv4 header.",
+      "invalidCursor": "Telemetry pagination cursor is invalid or expired.",
+      "projectTenantMismatch": "Project access denied for current tenant.",
+      "crossPortalLeak": "Cross-portal privileged context leakage blocked.",
+      "imageBudgetExceeded": "Requested image tokens exceed turn limit.",
+      "atomicBlockOverBudget": "Atomic HTML/JSON block exceeds token ceiling.",
+      "ssotRatioBelowMinimum": "SSOT/DOM ratio dropped below 60% floor.",
+      "idempotencyKeyReused": "Idempotency key reused with a different request payload.",
+      "projectReferenceInvalid": "Target project reference does not exist.",
+      "telemetryConflict": "Telemetry persistence conflict occurred.",
+      "telemetryWriteBusy": "SQLite telemetry writer is temporarily busy.",
+      "telemetryStorageUnavailable": "Context telemetry storage is unavailable.",
+      "daemonContractViolation": "Daemon returned a malformed context contract payload.",
+      "invalidSources": "Requested context sourceIds must contain 1 to 100 entries.",
+      "duplicateSourceId": "Requested context sourceIds must not contain duplicates.",
+      "storage": "Context storage error occurred.",
+      "unauthorized": "Authentication required.",
+      "forbidden": "Permission denied.",
+      "requestRejected": "Request rejected."
+    }
+  },
+  "ssot": {
+    "lock": {
+      "conflict": "Locked elsewhere",
+      "refresh": "Refresh",
+      "locked": "Shell locked",
+      "unlock": "Unlock",
+      "unlocked": "Unlocked",
+      "lock": "Lock"
+    },
+    "export": {
+      "busy": "Exporting...",
+      "cta": "Export Design Kit"
+    },
+    "patterns": {
+      "title": "Design patterns",
+      "pendingSuffix": "pending review",
+      "close": "Close patterns",
+      "portalSelect": "Active workspace portal",
+      "refresh": "Refresh",
+      "pending": "Pending review",
+      "synced": "Synced",
+      "empty": "No saved components in this portal yet.",
+      "button": "Patterns"
+    },
+    "toast": {
+      "loadFailed": "Could not load workspace patterns.",
+      "lockAcquired": "Shell locked for this workspace.",
+      "lockReleased": "Shell unlocked.",
+      "lockConflict": "Locked by another session. Refresh to sync.",
+      "lockFailed": "Could not update shell lock.",
+      "exportSuccess": "Design kit exported (#{rev}).",
+      "exportFailed": "Could not export design kit right now."
+    }
   }
 }

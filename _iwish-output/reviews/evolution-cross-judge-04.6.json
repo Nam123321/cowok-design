@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "story_id": "04.6",
+  "mode": "evolution-judge",
+  "round": 1,
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "verdict": "EVOLUTION_APPROVED",
+  "status": "COMPLETED",
+  "has_unresolved_group_a_blindspots": false,
+  "pending_lessons_checked": 1,
+  "pending_evolutions_checked": 0,
+  "approved_evolution_ids": [],
+  "approved_lesson_ids": [
+    "LSN-04.6-STAGE5A-QA"
+  ],
+  "timestamp": "2026-11-21T00:37:58.505319+00:00"
+}

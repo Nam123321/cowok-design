@@ -130,12 +130,18 @@ export class HarnessDaemonTransport {
       if (injected) return injected;
     }
     if (!forceRefresh && this.cachedToken) return this.cachedToken;
-    if (!forceRefresh && this.inflightBootstrap) return this.inflightBootstrap;
+    if (this.inflightBootstrap) return this.inflightBootstrap;
 
-    this.inflightBootstrap = this.bootstrapToken().finally(() => {
-      this.inflightBootstrap = null;
+    if (forceRefresh) {
+      this.cachedToken = null;
+    }
+    const pending = this.bootstrapToken().finally(() => {
+      if (this.inflightBootstrap === pending) {
+        this.inflightBootstrap = null;
+      }
     });
-    return this.inflightBootstrap;
+    this.inflightBootstrap = pending;
+    return pending;
   }
 
   async request<T>(
@@ -146,7 +152,8 @@ export class HarnessDaemonTransport {
   ): Promise<T> {
     const token = await this.ensureSessionToken(retried);
     const headers = new Headers(options.headers || {});
-    if (options.body !== undefined && !headers.has("Content-Type")) {
+    const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+    if (options.body !== undefined && !isFormData && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
     headers.set("X-Cowok-Session-Token", token);
@@ -172,6 +179,30 @@ export class HarnessDaemonTransport {
       return undefined as T;
     }
     return schema.parse(JSON.parse(rawText));
+  }
+
+  /** Performs an authenticated fetch returning the raw Response so custom error envelopes can be parsed intact. */
+  protected async fetchAuthedResponse(
+    path: string,
+    options: RequestInit = {},
+    retried = false
+  ): Promise<Response> {
+    const token = await this.ensureSessionToken(retried);
+    const headers = new Headers(options.headers || {});
+    if (options.body !== undefined && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+    headers.set("X-Cowok-Session-Token", token);
+    if (!headers.has("X-Correlation-Id")) {
+      headers.set("X-Correlation-Id", nextCorrelationId());
+    }
+    const doFetch = this.resolveFetch();
+    const res = await doFetch(`${this.baseUrl}${path}`, { ...options, headers });
+    if (res.status === HTTP_STATUS_UNAUTHORIZED && !retried) {
+      this.cachedToken = null;
+      return this.fetchAuthedResponse(path, options, true);
+    }
+    return res;
   }
 
   /** Opens an authenticated SSE Response using the loopback BFF session token header. */

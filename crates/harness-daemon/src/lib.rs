@@ -812,10 +812,16 @@ pub async fn serve_daemon_with_config(config: DaemonConfig) -> Result<(), Harnes
 
 /// Starts and serves the `cowok-design` loopback Axum harness daemon on the target workspace.
 pub fn run_daemon() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
     let workspace_root = match std::env::var("UXUI_OS_WORKSPACE_ROOT") {
         Ok(val) if !val.trim().is_empty() => PathBuf::from(val.trim()),
         _ => std::env::current_dir()?,
     };
+    if args.iter().any(|a| a == "--inspect-prompt") {
+        let json = context_compiler::inspect_prompt_from_args(&args, &workspace_root)?;
+        println!("{json}");
+        return Ok(());
+    }
     let config = DaemonConfig::loopback_default(workspace_root);
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()

@@ -1,0 +1,25 @@
+[package]
+name = "context-compiler"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "context-compiler"
+path = "src/bin/context-compiler.rs"
+
+[dependencies]
+domain = { path = "../domain" }
+spec-registry = { path = "../spec-registry" }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+base64 = "0.22"
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = { workspace = true }

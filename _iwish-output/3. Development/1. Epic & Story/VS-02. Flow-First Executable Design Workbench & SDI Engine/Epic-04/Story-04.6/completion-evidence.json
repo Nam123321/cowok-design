@@ -1,0 +1,70 @@
+{
+  "story_id": "04.6",
+  "epic_id": "04",
+  "stage": "stage-5b-completion",
+  "delivery_type": "core",
+  "status": "completed",
+  "approved_by": "flow-auto-epic",
+  "reviews": {
+    "antigravity_ocr_round3": {
+      "conversation_id": "395aef83-e435-46d3-af74-38ba5bee37cd",
+      "review_epoch_id": "epoch-2-bc285b71",
+      "tree_sha256": "bc285b717c295f1c0d6a1e7ab6b79e129fa39c2a9ffe852930d558f8e53329d6",
+      "ocr_status": "PASS",
+      "verdict": "APPROVED",
+      "score": 9.4,
+      "critical_count": 0,
+      "high_count": 0,
+      "signed_receipt": "qa/evidence/ocr-findings.json.sig"
+    },
+    "codex_round3": {
+      "model": "gpt-5.6-terra",
+      "round": 3,
+      "verdict": "APPROVED",
+      "score": 9.0,
+      "critical_count": 0,
+      "high_count": 0,
+      "evidence_file": "_iwish-output/reviews/review-codex-evidence-04.6.json",
+      "findings_file": "_iwish-output/reviews/review-codex-findings-04.6.json",
+      "report_file": "_iwish-output/reviews/review-codex-story-04.6-round3.md"
+    },
+    "consensus": {
+      "verdict": "APPROVED",
+      "wave": 3,
+      "report_file": "_iwish-output/reviews/review-consensus-04.6.json",
+      "audit_360": "APPROVED"
+    }
+  },
+  "qa_stage5a": {
+    "port_fe": 3115,
+    "port_released": true,
+    "executor_conversation_id": "b51f6250-22fb-4e10-831f-c244694c0ad3",
+    "playwright_specs": [
+      "tests/e2e/acceptance-story-04.6.spec.ts",
+      "tests/e2e/story-04.6.spec.ts"
+    ],
+    "live_target_grounding": "PASS (2 distinct states, HAR 944 entries, 0 5xx)",
+    "qa_provenance": "PASSED_CLEAN",
+    "pipeline_evidence": "pipeline-evidence-manual-test.json (all_passed: true)",
+    "acceptance_manifest": "qa-acceptance-evidence.json",
+    "manual_test_bundle": "qa/evidence/manual-test-bundle.json"
+  },
+  "self_evolve_gate": {
+    "assessment_file": "_iwish-output/_state/evolution-assessment-04.6.json",
+    "validate_evolution_gate": "PASS (ASSESSED_RESOLVED, 6/6 anomalies resolved)",
+    "codex_evolution_judge": "EVOLUTION_APPROVED",
+    "report_file": "_iwish-output/reviews/evolution-cross-judge-04.6.json",
+    "pending_lesson": "_iwish-output/_state/pending-lessons/LSN-04.6-stage5a-qa-harness.json"
+  },
+  "closeout_gate": {
+    "iwish_gate_closeout": "PASS (CL-02: PASS, CL-04: PASS, CL-05: PASS)",
+    "seal_gate_stage_4b_5b_completion": "SEALED (closeout-attestation.json)",
+    "direct_delivery_checks": {
+      "audit_clean_code": "APPROVED (27 checked files, 0 unratcheted errors)",
+      "validate_epic_sync": "PASS",
+      "plugin_dod_gate": "NOT_APPLICABLE"
+    },
+    "delivery_phase_waiver": "Matches Story 08.4 parity: pipeline-integrity-runner --phase delivery fails solely on upstream pipeline-evidence-post-code.json because ADR-091 forbids root dev.db (validate-prisma-drift.py exit 1); prisma/schema.contract.test.ts and npx prisma validate verify parity cleanly."
+  },
+  "timestamp": "2026-11-21T07:40:00+07:00"
+}

@@ -12,11 +12,12 @@ start_date: '2026-07-24'
 "Story 01.2 - Xây dựng crates/spec-registry với rusqlite SQLite WAL (16 Bảng) & 2-Way File Sync": completed
 "Story 01.3 - Xây dựng crates/harness-daemon (Axum + Tokio) & 9-Spec Synthesis Pipeline": completed
 
-# Epic 02: JIT Prompt Assembler & 3-Profile Model Capability Adapter
-"Epic 02 - JIT Prompt Assembler & 3-Profile Model Capability Adapter": planned
-"Story 02.1 - Bộ định tuyến Task Horizon (short / mid / long) & Cross-Department Context Slicer": ready-for-dev
-"Story 02.2 - Token Budget Governor (<= 1,500 Input Tokens) & Deterministic Prompt Compiler": planned
-"Story 02.3 - Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter)": planned
+# Epic 02: JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills
+"Epic 02 - JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills": completed
+"Story 02.1 - Portal-Safe Context Slicing, KV-Cache Static-Prefix Prompt Compiler & 3-Profile Live Execution": completed
+"Story 02.2 - Token Budget Governor (<= 1,500 Input Tokens) & Deterministic Prompt Compiler": cancelled
+"Story 02.3 - Bộ chuyển đổi 3 Hồ sơ Năng lực Mô hình (3-Profile Model Capability Adapter)": cancelled
+"Story 02.4 - Hidden Dual-Use SSOT (V16), AppShell & Component Registry, cowok-design-opt Spine, 7 Craft Skills & 3-Zone Router": completed
 
 # Epic 03: Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher
 "Epic 03 - Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher": completed
@@ -28,73 +29,85 @@ start_date: '2026-07-24'
 # Feature Group: VS-02. Flow-First Executable Design Workbench & SDI Engine
 # ==================================================
 
-# Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution
-"Epic 04 - Flow-First 2D SVG Bezier DAG Studio, Security Kernel, Onboarding Doctor & Persistent Node Execution": completed
+# Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, CAS Intake & In-Chat Vault
+"Epic 04 - Flow-First 2D SVG Bezier DAG Studio, Security Kernel, CAS Intake & In-Chat Vault": completed
 "Story 04.1 - Unified DualMainPanel Workbench, Multi-Format CompanionCanvasTab, True 2D SVG Bezier DAG Studio & HMAC/Preview Remediation": completed
 "Story 04.2 - SQLite V7 Additive Convergence, Streaming Dual-Ingress Vite BFF, Managed Workspace & Symlink-Safe FS Jail": completed
 "Story 04.3 - Day-0 Onboarding Wizard, Passive/Active 16+ CLI Doctor (Extension), Keychain->0600 Vault & Connect-Time SSRF Verifier": completed
 "Story 04.4 - Persistent KeyedParallelCoordinator, Monotonic Fencing, project_seq SSE Last-Event-ID, -PGID CLI Reaper & 3-Level Sidebar": completed
 "Story 04.5 - State-Hydrated Live Preview (CompanionLiveHtmlRightPane), DOMParser Zero-Network CSP-B, bootSecret Bridge, Interact/Inspect (C) & 409 STALE_MAPPING": completed
+"Story 04.6 - SQLite V4/V16 Chat Persistence, CAS Binary/CSV Intake, <svg viewBox> Normalizer & In-Chat Zero-Leak Key Vault": completed
 
-# Epic 05: Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR
-"Epic 05 - Option 5 2D Storyboard, Entry-First Live HTML, Per-Node Proposals & Real GitHub PR": completed
+# Epic 05: Option 5 2D Storyboard, Cognitive Sketch-to-Polish, Shared lol_html & 3-Tier Auto Flow DAG
+"Epic 05 - Option 5 2D Storyboard, Cognitive Sketch-to-Polish, Shared lol_html & 3-Tier Auto Flow DAG": in-progress
 "Story 05.1 - Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11)": completed
 "Story 05.2 - Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup": completed
 "Story 05.3 - Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17)": completed
+"Story 05.4 - Cognitive Sketch-to-Polish, Steering Chips, Shared lol_html + reconcile_ff_ids Surgical Editing & 2-Tier Auto-Apply": refactored
+"Story 05.5 - End-to-End /simulate-user (8D) & /edge-case-guardian (FMEA) -> 3-Tier Interactive Flow DAG": refactored
 
 # ==================================================
 # Feature Group: VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio
 # ==================================================
 
-# Epic 06: Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench
-"Epic 06 - Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench": completed
+# Epic 06: Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen
+"Epic 06 - Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen": in-progress
 "Story 06.1 - Khung trình chiếu HTML Slide Engine (`16:9`/`16:10`/`Auto`), 8 Layout Templates, `V12` Schema Foundation & `HostRuntimeContract`": completed
 "Story 06.2 - Dual-Pane Slide-Over CMS Workbench (`inert`-Guarded), Two-Tier `<16ms` Non-Reloading Sync, `lol_html` + `html5ever` mXSS & Crash Recovery": completed
 "Story 06.3 - Contextual Slide Copilot (`KeyedParallelCoordinator` Lease) & Offline CSP-B 2D Live Interactive Charts": completed
 "Story 06.4 - Dual-Screen Presenter Mode, Out-of-Band `BroadcastChannel` Security, Pace Timer & Fallback Modes": completed
+"Story 06.5 - End-to-End AI Multi-Slide Deck Generation, CSV/PDF-to-ChartSpecV12 Normalizer & <Stage>/<Window>/<Phone> (stageshow) Flow": refactored
 
-# Epic 07: 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter
-"Epic 07 - 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter": planned
-"Story 07.1 - Bộ kiểm định 17 Quy tắc Bố cục (17-Rule Solver Linter), WCAG 2.2 AA & Chống tràn khung 16:9": refactored
-"Story 07.2 - Lớp phủ Visual QC Overlay & Vòng lặp Auto-Fix 1-Click trên Workbench": refactored
-"Story 07.3 - Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)": refactored
+# Epic 07: Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter
+"Epic 07 - Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter": in-progress
+"Story 07.1 - Pooled 1-Chromium Rust CDP Visual QC (lib-audit + slides-check), QC Overlay & 1-Click Auto-Fix": refactored
+"Story 07.2 - Non-Tech Share & Present Export vs Developer Handoff": refactored
+"Story 07.3 - Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)": cancelled
 
 # ==================================================
 # Feature Group: VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe
 # ==================================================
 
-# Epic 08: agentskills.io Repackager Engine, Built-in Harness Skills & GitHub Cron Lifecycle
-"Epic 08 - agentskills.io Repackager Engine, Built-in Harness Skills & GitHub Cron Lifecycle": completed
+# Epic 08: agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN
+"Epic 08 - agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN": in-progress
 "Story 08.1 - Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host)": completed
 "Story 08.2 - Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills)": completed
 "Story 08.3 - Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core)": completed
 "Story 08.4 - SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI": completed
+"Story 08.5 - Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 LEARN Loop": refactored
 
-# Epic 09: Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine
-"Epic 09 - Design-Only REA & Awesome-RE Forge & JEV — TypeSafe 6-Primitive Acceleration Engine": planned
-"Story 09.1 - Xây dựng crates/design-rea-forge (Trích xuất Design DNA & Ranh giới Design-Only)": refactored
-"Story 09.2 - Tích hợp Jev Choice (<2ms Routing), Jev Noul (<1ms Pre-Filter) & Speculative Multi-Head (crates/jev-engine)": refactored
-"Story 09.3 - Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile OCC & 3-Strike Breaker": refactored
+# Epic 09: Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)
+"Epic 09 - Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)": in-progress
+"Story 09.1 - Design-Only /rea DNA Forge, Two-Store /rea + /awesome-re Library & License/ToS Firewall": refactored
+"Story 09.2 - 5-Stage DE -> Decision #1 -> DR/DE -> DE -> Decision #2 Flow, Rust DecisionCascadeClient & RubricShield": refactored
+"Story 09.3 - Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile OCC & 3-Strike Breaker": cancelled
 
 # ==================================================
 # Feature Group: VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution
 # ==================================================
 
-# Epic 10: cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design Tournament
-"Epic 10 - cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design Tournament": in-progress
-"Story 10.1 - Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z)": refactored
-"Story 10.2 - Hộp thư Điều phối .cowok-design/coordination/ (ONE_JOB + NEVER) & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)": refactored
-"Story 10.3 - Xây dựng advisor Meta-Agent (6-Step Self-Evolution Loop) & Đấu trường Thiết kế (Design Tournament Mode)": refactored
+# Epic 10: cowok Master Orchestrator, File Leases, Builder!=Scorer & CMP-07 Design Tournament
+"Epic 10 - cowok Master Orchestrator, File Leases, Builder!=Scorer & CMP-07 Design Tournament": in-progress
+"Story 10.1 - cowok Master Orchestrator, 3-Lane Router, MPSC SQLite Write Actor & $UIUX_LIVE_SPEC (<50ms + Cmd+Z)": refactored
+"Story 10.2 - Parallel Builder != Scorer Swarm Coordination, File Leases, 429 Clamp & Tier-3 Design Jury": refactored
+"Story 10.3 - Stage-B Anti-Clone Design Tournament (CMP-07), Blind Wipe, Cross-Variant Borrow, /crystallize & advisor Loop": refactored
 
-# Epic 11: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Compiler-Grade Open MCP Ecosystem
-"Epic 11 - POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Compiler-Grade Open MCP Ecosystem": in-progress
-"Story 11.1 - POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway": refactored
-"Story 11.2 - Sandbox Rèn Công cụ Tạm thời có Kiểm duyệt (Controlled Ephemeral Tool Forging)": refactored
-"Story 11.3 - Compiler-Grade Bidirectional Open MCP Server & 1-Click Host Installer UI": refactored
+# Epic 11: POSIX BYOS/BYOK Runner (0o600 FD + -PGID), Cross-CLI Normalizer & Universal Open MCP Gateway
+"Epic 11 - POSIX BYOS/BYOK Runner (0o600 FD + -PGID), Cross-CLI Normalizer & Universal Open MCP Gateway": in-progress
+"Story 11.1 - POSIX BYOS CLI Runner (0o600 FD + -PGID Reaper), BYOK Unified Gateway & Cross-CLI Normalizer": refactored
+"Story 11.2 - Compiler-Grade Bidirectional Open MCP Server (4 Auth Tiers) & 1-Click Host Installer UI": refactored
+"Story 11.3 - Compiler-Grade Bidirectional Open MCP Server & 1-Click Host Installer UI": cancelled
 
-# Epic 12: 4-Channel Packaging & Distribution Architecture
-"Epic 12 - 4-Channel Packaging & Distribution Architecture": in-progress
-"Story 12.1 - Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx)": refactored
+# Epic 12: 4-Channel Packaging, Standalone /api/* Parity & OCI Distribution
+"Epic 12 - 4-Channel Packaging, Standalone /api/* Parity & OCI Distribution": in-progress
+"Story 12.1 - Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench với /api/* Standalone Parity": refactored
 "Story 12.2 - Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai": refactored
-"Story 12.3 - Kênh 4 — Container Image (Docker / OCI) kèm Headless Chromium cho Đội nhóm & CI/CD": refactored
+"Story 12.3 - Kênh 4 — Container Image (Docker / OCI) kèm Pooled Headless Chromium cho Đội nhóm & CI/CD": refactored
 
+# ==================================================
+# Feature Group: VS-06. Release Certification & Anti-Goodhart Evaluation
+# ==================================================
+
+# Epic 13: End-to-End Sealed Anti-Goodhart Benchmark & 25-Case /simulate-user Certification Suite
+"Epic 13 - End-to-End Sealed Anti-Goodhart Benchmark & 25-Case /simulate-user Certification Suite": in-progress
+"Story 13.1 - End-to-End Sealed Anti-Goodhart Benchmark Runner & 25-Case /simulate-user M1..M5 Certification Suite": refactored

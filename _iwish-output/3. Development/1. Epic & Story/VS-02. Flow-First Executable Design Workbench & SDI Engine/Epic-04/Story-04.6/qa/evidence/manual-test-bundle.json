@@ -1,0 +1,99 @@
+{
+  "story_dir": "/Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-04/Story-04.6",
+  "commit_sha": "b9b117bec8978af403b1963782138a03b879c42a",
+  "evidence_file_count": 22,
+  "evidence_manifest": {
+    "qa/evidence/deep-audit-evidence-c48e4052.json": {
+      "sha256": "8f91caa3845589db57cd5cdf4c2a34e7e31e1cd511bccd3603f2cae8142cf492",
+      "size_bytes": 300
+    },
+    "qa/evidence/dismissed-findings-ledger.jsonl": {
+      "sha256": "1b7bb79b948958925b88f40c33f6fe45e122de159328498eb89ff02d3a9614b7",
+      "size_bytes": 2170
+    },
+    "qa/evidence/dom-snapshot.html": {
+      "sha256": "6581e3f87e4279907c399c004a08b4bb73f375f7a02fe4bd6775c28ada0d446d",
+      "size_bytes": 257523
+    },
+    "qa/evidence/jev-router-receipt.json": {
+      "sha256": "b37fd0f0528fdb53b75fcb5c6ff1fbdc80e8a7c16e5259c86967ba0450a643ff",
+      "size_bytes": 230
+    },
+    "qa/evidence/ocr-delegation-spec.json": {
+      "sha256": "72348246bfc2379f3413609b962cc4eed45f9b724576acce32f80cc7c36ae647",
+      "size_bytes": 78366
+    },
+    "qa/evidence/ocr-delegation-spec.json.sig": {
+      "sha256": "558da7c58e5fc4c0c10adac3778938270d2a29145d33712f721cb68c4d3095eb",
+      "size_bytes": 64
+    },
+    "qa/evidence/ocr-findings.json": {
+      "sha256": "c55221315e9e3072a7abb9344aad57cd25ca73891d1a416c0a495ece5042dca9",
+      "size_bytes": 36040
+    },
+    "qa/evidence/ocr-findings.json.sig": {
+      "sha256": "e20c5b3690bace99bcc009b3ddbcbf8a309495cc143e10897450d4b2a44c1433",
+      "size_bytes": 64
+    },
+    "qa/evidence/ocr-review-bundle.json": {
+      "sha256": "61439d3d6797e73127ed8b6ce8e68dcb76c27802d47593fec39597605beaa948",
+      "size_bytes": 36166
+    },
+    "qa/evidence/openapi-compat-c48e4052.json": {
+      "sha256": "d2488418da02861563da6ea325052bc12df0affdf07ed7f9c96ab988e45b806d",
+      "size_bytes": 178
+    },
+    "qa/evidence/pillar7-evidence-c48e4052.json": {
+      "sha256": "e9c3d5f836f05cc7a8be601d0834867f2cc351da5d9f0068d175ccbefa0d407b",
+      "size_bytes": 250
+    },
+    "qa/evidence/pillar7-evidence-c48e4052.json.sig": {
+      "sha256": "93be9b89f77c629ec694959dd95392d5c5105adc343667789149fe1ebe39cb32",
+      "size_bytes": 64
+    },
+    "qa/evidence/pillar7-fe-be-evidence-c48e4052.json": {
+      "sha256": "f66fe5e06771f16cee60bdb4f38fc3aff1ab9dfd10d453e583ef300547072415",
+      "size_bytes": 282
+    },
+    "qa/evidence/playwright-run.log": {
+      "sha256": "ec71297941beffda473acc7f974dac5d3d7ee01ad014a040c69e65217a21a973",
+      "size_bytes": 288
+    },
+    "qa/evidence/qa-nonce.json": {
+      "sha256": "6315234897d05e5f2558f98f71eede13ece12ade33acb675924bf75627383576",
+      "size_bytes": 147
+    },
+    "qa/evidence/review-run-manifest.json": {
+      "sha256": "d82a2b90909f08285b13491fe154864541a86cbf0543b7722169e3db3d59c7c6",
+      "size_bytes": 6234
+    },
+    "qa/evidence/review-run-manifest.json.sig": {
+      "sha256": "d624fcc55f32d37a527e11aeca90e8ec3a807b55fc2d38850d7cac04007c4ba2",
+      "size_bytes": 64
+    },
+    "qa/evidence/screenshot-final.png": {
+      "sha256": "ec8a8747b6d71872fa645ca09f0adcf53cbcb371572ebccf50e12bf65ca45681",
+      "size_bytes": 226041
+    },
+    "qa/evidence/screenshot-initial.png": {
+      "sha256": "91a200dc8b14fb7c962117251a3bb952b8bc4d4c12f27f545179def4c5347cc4",
+      "size_bytes": 206519
+    },
+    "qa/evidence/stage-telemetry-04.6.json": {
+      "sha256": "48bbae61069c6dbd14001abe2ef895ff574834361d8f92c7e917e1671cbcb334",
+      "size_bytes": 2755
+    },
+    "qa/evidence/story-04.6-network.har": {
+      "sha256": "b67f5cd0201332daea36058e9b65e760d05270b3371cb67641fac8be570cc82d",
+      "size_bytes": 13425879
+    },
+    "qa/evidence/zt-reviewer-provenance.json": {
+      "sha256": "6c1adb018919e35f888a935fd18772cf10ea0c7be175e30e6199f348a0118900",
+      "size_bytes": 909
+    }
+  },
+  "sanitized": true,
+  "provenance_verified": true,
+  "action_delta": "PASS",
+  "qa_verdict": "PASSED"
+}

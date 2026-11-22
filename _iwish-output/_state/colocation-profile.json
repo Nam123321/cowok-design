@@ -1,0 +1,145 @@
+{
+  "schema_version": "1.0",
+  "pattern": "feature-colocation-and-compile-time-auto-discovery",
+  "frontend_slice_pattern": "src/features/{feature_slug}",
+  "frontend_reserved_entrypoints": [
+    "entrypoints.ts",
+    "commands.ts",
+    "state.ts",
+    "index.ts"
+  ],
+  "generated_registry_path": "src/generated/feature-registry.ts",
+  "rust_crate_pattern": "crates/{crate_slug}",
+  "rust_dag_tiers": {
+    "domain": 1,
+    "spec-registry": 2,
+    "constraint-engine": 2,
+    "flow-graph": 2,
+    "storage": 2,
+    "spec-compiler": 2,
+    "audit-card": 2,
+    "token-budget": 2,
+    "git-guard": 2,
+    "process-sandbox": 2,
+    "html-forge": 3,
+    "presentation-cms": 3,
+    "plugin-host": 3,
+    "rea-bridge": 3,
+    "bot-fleet": 3,
+    "mcp-bridge": 3,
+    "mcp-gateway": 4,
+    "harness-daemon": 5,
+    "daemon": 5,
+    "cli": 5
+  },
+  "discovered_slices": {
+    "frontend_features": [
+      {
+        "slug": "chat-vault",
+        "path": "src/features/chat-vault",
+        "reserved_files_present": []
+      },
+      {
+        "slug": "comments",
+        "path": "src/features/comments",
+        "reserved_files_present": []
+      },
+      {
+        "slug": "flow",
+        "path": "src/features/flow",
+        "reserved_files_present": []
+      },
+      {
+        "slug": "plugin-center",
+        "path": "src/features/plugin-center",
+        "reserved_files_present": [
+          "entrypoints.ts"
+        ]
+      },
+      {
+        "slug": "plugins",
+        "path": "src/features/plugins",
+        "reserved_files_present": []
+      },
+      {
+        "slug": "preview",
+        "path": "src/features/preview",
+        "reserved_files_present": []
+      },
+      {
+        "slug": "proposals",
+        "path": "src/features/proposals",
+        "reserved_files_present": []
+      },
+      {
+        "slug": "sdi",
+        "path": "src/features/sdi",
+        "reserved_files_present": []
+      },
+      {
+        "slug": "snapshots",
+        "path": "src/features/snapshots",
+        "reserved_files_present": []
+      }
+    ],
+    "rust_crates": [
+      {
+        "slug": "bot-fleet",
+        "path": "crates/bot-fleet",
+        "dag_tier": 3
+      },
+      {
+        "slug": "constraint-engine",
+        "path": "crates/constraint-engine",
+        "dag_tier": 2
+      },
+      {
+        "slug": "domain",
+        "path": "crates/domain",
+        "dag_tier": 1
+      },
+      {
+        "slug": "flow-graph",
+        "path": "crates/flow-graph",
+        "dag_tier": 2
+      },
+      {
+        "slug": "harness-daemon",
+        "path": "crates/harness-daemon",
+        "dag_tier": 5
+      },
+      {
+        "slug": "html-forge",
+        "path": "crates/html-forge",
+        "dag_tier": 3
+      },
+      {
+        "slug": "mcp-gateway",
+        "path": "crates/mcp-gateway",
+        "dag_tier": 4
+      },
+      {
+        "slug": "plugin-host",
+        "path": "crates/plugin-host",
+        "dag_tier": 3
+      },
+      {
+        "slug": "presentation-cms",
+        "path": "crates/presentation-cms",
+        "dag_tier": 3
+      },
+      {
+        "slug": "rea-bridge",
+        "path": "crates/rea-bridge",
+        "dag_tier": 3
+      },
+      {
+        "slug": "spec-registry",
+        "path": "crates/spec-registry",
+        "dag_tier": 2
+      }
+    ]
+  },
+  "colocation_profile_sha256": "e6c2d18529803839a414c8393f9704fceeaab0c3ce8e50a215acdeb2791215b8",
+  "updated_at": "2026-11-21T00:33:58.969381+00:00"
+}

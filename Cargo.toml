@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/domain",
     "crates/spec-registry",
+    "crates/context-compiler",
     "crates/constraint-engine",
     "crates/flow-graph",
     "crates/html-forge",

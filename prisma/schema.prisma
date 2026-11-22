@@ -32,7 +32,11 @@ model Project {
   tombstones     SpecTombstone[]
   recoveryCommits RecoveryCommit[]
   workspaceSyncIntents WorkspaceSyncIntent[]
+  componentPatterns ComponentPattern[]
+  appShellLocks  AppShellLock[]
+  contextAssemblyTelemetry ContextAssemblyTelemetry[]
 
+  @@unique([id, tenantId], map: "uq_projects_id_tenant")
   @@index([inheritBrandFromProjectId])
   @@map("projects")
 }
@@ -565,6 +569,7 @@ model ChatMessage {
   proseMarkdown   String  @map("prose_markdown")
   parentMessageId String? @map("parent_message_id")
   turnReceiptJson String? @map("turn_receipt_json")
+  seqNo           BigInt? @map("seq_no")
   createdAt       BigInt  @map("created_at")
 
   session   ChatSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -572,6 +577,7 @@ model ChatMessage {
   snapshots ChatArtifactSnapshot[]
 
   @@index([sessionId, createdAt])
+  @@index([sessionId, seqNo], map: "idx_chat_messages_session_seq")
   @@map("chat_messages")
 }
 
@@ -1016,4 +1022,177 @@ model IdempotencyRecord {
   @@id([tenantId, actorId, idempotencyKey])
   @@index([expiresAt])
   @@map("idempotency_records")
+}
+
+model CasBlob {
+  sha256         String   @id
+  tenantId       String   @default("local-default") @map("tenant_id")
+  byteSize       BigInt   @map("byte_size")
+  mimeType       String   @map("mime_type")
+  fileExt        String   @map("file_ext")
+  storageRelpath String   @map("storage_relpath")
+  refCount       Int      @default(1) @map("ref_count")
+  gcLeaseUntil   BigInt   @default(0) @map("gc_lease_until")
+  createdAt      BigInt   @map("created_at")
+
+  attachments    CasAttachment[]
+  tenantUsages   TenantCasBlobUsage[]
+
+  @@index([gcLeaseUntil, refCount], map: "idx_cas_blobs_gc")
+  @@map("cas_blobs")
+}
+
+model CasAttachment {
+  id         String  @id @default(uuid())
+  blobSha256 String  @map("blob_sha256")
+  tenantId   String  @default("local-default") @map("tenant_id")
+  projectId  String? @map("project_id")
+  sessionId  String  @map("session_id")
+  filename   String
+  createdAt  BigInt  @map("created_at")
+
+  blob              CasBlob                 @relation(fields: [blobSha256], references: [sha256], onDelete: Cascade)
+  idempotencyClaims CasCommandIdempotency[]
+
+  @@index([tenantId, sessionId, createdAt], map: "idx_cas_attachments_tenant_session")
+  @@index([blobSha256], map: "idx_cas_attachments_blob")
+  @@map("cas_attachments")
+}
+
+model TenantCasBlobUsage {
+  tenantId        String @default("local-default") @map("tenant_id")
+  blobSha256      String @map("blob_sha256")
+  byteSize        BigInt @map("byte_size")
+  firstAttachedAt BigInt @map("first_attached_at")
+
+  blob CasBlob @relation(fields: [blobSha256], references: [sha256], onDelete: Cascade)
+
+  @@id([tenantId, blobSha256])
+  @@map("tenant_cas_blob_usage")
+}
+
+model CasUploadIngress {
+  id         String @id @default(uuid())
+  tenantId   String @default("local-default") @map("tenant_id")
+  sessionId  String @map("session_id")
+  byteSize   BigInt @map("byte_size")
+  acceptedAt BigInt @map("accepted_at")
+
+  @@index([tenantId, acceptedAt], map: "idx_cas_upload_ingress_window")
+  @@map("cas_upload_ingress")
+}
+
+model CasCommandIdempotency {
+  id             String @id @default(uuid())
+  tenantId       String @default("local-default") @map("tenant_id")
+  sessionId      String @map("session_id")
+  idempotencyKey String @map("idempotency_key")
+  payloadSha256  String @map("payload_sha256")
+  attachmentId   String @map("attachment_id")
+  acceptedAt     BigInt @map("accepted_at")
+  expiresAt      BigInt @map("expires_at")
+
+  attachment CasAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sessionId, idempotencyKey])
+  @@index([tenantId, expiresAt], map: "idx_cas_cmd_idempotency_exp")
+  @@map("cas_command_idempotency")
+}
+
+model VaultCommandIdempotency {
+  id             String @id @default(uuid())
+  tenantId       String @default("local-default") @map("tenant_id")
+  sessionId      String @map("session_id")
+  idempotencyKey String @map("idempotency_key")
+  payloadSha256  String @map("payload_sha256")
+  receiptId      String @map("receipt_id")
+  receiptJson    String @map("receipt_json")
+  acceptedAt     BigInt @map("accepted_at")
+  expiresAt      BigInt @map("expires_at")
+
+  @@unique([tenantId, sessionId, idempotencyKey])
+  @@index([tenantId, expiresAt], map: "idx_vault_cmd_idempotency_exp")
+  @@map("vault_command_idempotency")
+}
+
+model ContextAssemblyTelemetry {
+  id                       String  @id @default(uuid())
+  tenantId                 String  @default("local-default") @map("tenant_id")
+  projectId                String  @map("project_id")
+  idempotencyKey           String? @map("idempotency_key")
+  requestFingerprintSha256 String  @default("") @map("request_fingerprint_sha256")
+  portalId                 String  @map("portal_id")
+  horizon                  String
+  modelProfile             String  @map("model_profile")
+  adapterMode              String  @default("frontier_full") @map("adapter_mode")
+  prefixSha256             String  @map("prefix_sha256")
+  staticPrefixTokens       Int     @default(0) @map("static_prefix_tokens")
+  dynamicTailTokens        Int     @default(0) @map("dynamic_tail_tokens")
+  outlineTokens            Int     @map("outline_tokens")
+  totalTextTokens          Int     @map("total_text_tokens")
+  imageTokens              Int     @default(0) @map("image_tokens")
+  ssotDomTokens            Int     @default(0) @map("ssot_dom_tokens")
+  nonSsotTokens            Int     @default(0) @map("non_ssot_tokens")
+  ssotDomRatio             Float   @default(1.0) @map("ssot_dom_ratio")
+  sourcesRequested         Int     @default(0) @map("sources_requested")
+  sourcesIncluded          Int     @default(0) @map("sources_included")
+  sourcesPruned            Int     @default(0) @map("sources_pruned")
+  reasonCode               String  @map("reason_code")
+  responseJson             String  @default("{}") @map("response_json")
+  latencyMs                Int     @map("latency_ms")
+  createdAt                BigInt  @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, idempotencyKey], map: "uq_ctx_telemetry_idem")
+  @@index([projectId, portalId, createdAt, id], map: "idx_ctx_telemetry_proj_portal")
+  @@index([tenantId, projectId, createdAt, id], map: "idx_ctx_telemetry_tenant_proj")
+  @@map("context_assembly_telemetry")
+}
+
+model ComponentPattern {
+  id                  String  @id @default(uuid())
+  tenantId            String  @default("local-default") @map("tenant_id")
+  projectId           String  @map("project_id")
+  portalId            String  @map("portal_id")
+  patternSlug         String  @map("pattern_slug")
+  componentName       String  @map("component_name")
+  sourcePath          String? @map("source_path")
+  astSignatureSha256  String  @map("ast_signature_sha256")
+  dedupMarkerSha256   String  @default("") @map("dedup_marker_sha256")
+  sourceRevision      BigInt  @default(0) @map("source_revision")
+  lastSyncSource      String  @default("manual") @map("last_sync_source")
+  tokensSnapshotJson  String  @default("{}") @map("tokens_snapshot_json")
+  docMarkdown         String  @default("") @map("doc_markdown")
+  driftStatus         String  @default("synced") @map("drift_status")
+  quarantinedDiffJson String  @default("{}") @map("quarantined_diff_json")
+  revision            BigInt  @default(1)
+  createdAt           BigInt  @map("created_at")
+  updatedAt           BigInt  @map("updated_at")
+
+  project Project @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, portalId, patternSlug])
+  @@index([tenantId, projectId, portalId, updatedAt, id], map: "idx_component_patterns_proj_portal")
+  @@map("component_patterns")
+}
+
+model AppShellLock {
+  id              String @id @default(uuid())
+  tenantId        String @default("local-default") @map("tenant_id")
+  projectId       String @map("project_id")
+  portalId        String @map("portal_id")
+  lockOwnerId     String @map("lock_owner_id")
+  fencingToken    BigInt @default(1) @map("fencing_token")
+  lockedSlotsJson String @default("[]") @map("locked_slots_json")
+  expiresAt       BigInt @map("expires_at")
+  revision        BigInt @default(1)
+  createdAt       BigInt @map("created_at")
+  updatedAt       BigInt @map("updated_at")
+
+  project Project @relation(fields: [projectId, tenantId], references: [id, tenantId], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, portalId])
+  @@index([tenantId, projectId, portalId], map: "idx_app_shell_locks_proj_portal")
+  @@map("app_shell_locks")
 }

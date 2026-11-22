@@ -1,0 +1,109 @@
+{
+  "story_id": "04.6",
+  "commit_hash": "8c79acc4a10d912b814e0e099091e7ccea150c2b390d000020cd8b6b7d7b3788",
+  "traceability_matrix": [
+    {
+      "ac_id": "AC-1",
+      "status": "Completed",
+      "implementations": [
+        "crates/harness-daemon/src/routes/chat_cas_storage.rs",
+        "crates/harness-daemon/src/routes/chat_cas_vault.rs",
+        "src/api/chat-vault.ts",
+        "src/app/api/v1/chat-sessions/[sid]/messages/route.ts",
+        "src/features/chat-vault/ChatPrimitivesBridge.tsx",
+        "src/lib/validations/chat-vault.ts",
+        "src/lib/vite-bff-chat-vault-routes.ts"
+      ],
+      "tests": [
+        "crates/harness-daemon/tests/story_04_6_chat_cas_vault.rs",
+        "src/features/chat-vault/chat-vault.test.ts",
+        "tests/e2e/story-04.6.spec.ts"
+      ]
+    },
+    {
+      "ac_id": "AC-2",
+      "status": "Completed",
+      "implementations": [
+        "crates/harness-daemon/src/routes/chat_cas_archive.rs",
+        "crates/harness-daemon/src/routes/chat_cas_storage.rs",
+        "crates/harness-daemon/src/routes/chat_cas_upload_handler.rs",
+        "src/api/chat-vault.ts",
+        "src/app/api/v1/cas/upload/route.ts",
+        "src/features/chat-vault/CasDropzonePanel.tsx",
+        "src/features/chat-vault/ChatPrimitivesBridge.tsx",
+        "src/features/chat-vault/read-selected-chat-files.ts",
+        "src/lib/validations/chat-vault.ts",
+        "src/lib/vite-bff-chat-vault-routes.ts"
+      ],
+      "tests": [
+        "crates/harness-daemon/tests/story_04_6_chat_cas_vault.rs",
+        "src/features/chat-vault/chat-vault.test.ts",
+        "tests/e2e/story-04.6.spec.ts"
+      ]
+    },
+    {
+      "ac_id": "AC-3",
+      "status": "Completed",
+      "implementations": [
+        "src/features/flow/utils/html-sandbox-svg-policy.ts"
+      ],
+      "tests": [
+        "src/features/flow/utils/html-sandbox-sanitizer.test.ts",
+        "tests/e2e/story-04.6.spec.ts"
+      ]
+    },
+    {
+      "ac_id": "AC-4",
+      "status": "Completed",
+      "implementations": [
+        "crates/harness-daemon/src/routes/chat_cas_storage.rs",
+        "crates/harness-daemon/src/routes/chat_cas_vault.rs",
+        "src/api/chat-vault.ts",
+        "src/app/api/v1/chat-sessions/[sid]/messages/route.ts",
+        "src/app/api/v1/vault/chat-ingest/route.ts",
+        "src/app/api/v1/vault/receipts/[receipt_id]/route.ts",
+        "src/features/chat-vault/CasDropzonePanel.tsx",
+        "src/features/chat-vault/ChatPrimitivesBridge.tsx",
+        "src/features/chat-vault/DecisionEngineOnboardingCard.tsx",
+        "src/features/chat-vault/VaultReceiptCard.tsx",
+        "src/features/chat-vault/read-selected-chat-files.ts",
+        "src/features/chat-vault/secret-interceptor.ts",
+        "src/lib/validations/chat-vault.ts",
+        "src/lib/vite-bff-chat-vault-routes.ts"
+      ],
+      "tests": [
+        "crates/harness-daemon/tests/story_04_6_chat_cas_vault.rs",
+        "src/features/chat-vault/chat-vault.test.ts",
+        "tests/e2e/story-04.6.spec.ts"
+      ]
+    },
+    {
+      "ac_id": "AC-5",
+      "status": "Completed",
+      "implementations": [
+        "crates/harness-daemon/src/routes/chat_cas_archive.rs",
+        "crates/harness-daemon/src/routes/chat_cas_storage.rs",
+        "crates/harness-daemon/src/routes/chat_cas_upload_handler.rs",
+        "crates/harness-daemon/src/routes/chat_cas_vault.rs",
+        "src/api/chat-vault.ts",
+        "src/app/api/v1/cas/upload/route.ts",
+        "src/app/api/v1/chat-sessions/[sid]/messages/route.ts",
+        "src/app/api/v1/vault/chat-ingest/route.ts",
+        "src/app/api/v1/vault/receipts/[receipt_id]/route.ts",
+        "src/features/chat-vault/ChatPrimitivesBridge.tsx",
+        "src/features/chat-vault/VaultReceiptCard.tsx",
+        "src/features/chat-vault/secret-interceptor.ts",
+        "src/features/flow/utils/html-sandbox-svg-policy.ts",
+        "src/lib/validations/chat-vault.ts",
+        "src/lib/vite-bff-chat-vault-routes.ts"
+      ],
+      "tests": [
+        "crates/harness-daemon/tests/story_04_6_chat_cas_vault.rs",
+        "src/features/chat-vault/chat-vault.test.ts",
+        "src/features/flow/utils/html-sandbox-sanitizer.test.ts",
+        "tests/e2e/story-04.6.spec.ts"
+      ]
+    }
+  ],
+  "nonce": "831e944bc54f059fd784118051e8bd2610f8e33fe7e82c1635084dbe0a676076"
+}
