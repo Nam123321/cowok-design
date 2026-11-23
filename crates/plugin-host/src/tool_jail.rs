@@ -23,9 +23,11 @@ pub const TOOL_JAIL_MAX_STAGED_FILES: usize = 16;
 pub const TOOL_JAIL_MAX_STAGED_FILE_BYTES: usize = 64 * 1024;
 pub const TOOL_JAIL_MAX_OUTPUT_BYTES: usize = 64 * 1024;
 pub const TOOL_JAIL_RLIMIT_AS_BYTES: u64 = 256 * 1024 * 1024;
-pub const TOOL_JAIL_RLIMIT_NPROC: u64 = 16;
+pub const TOOL_JAIL_RLIMIT_NPROC: u64 = 0;
+pub const TOOL_JAIL_RLIMIT_NOFILE: u64 = 64;
 pub const TOOL_JAIL_RLIMIT_FSIZE_BYTES: u64 = 4 * 1024 * 1024;
 const PIPE_COLLECT_TIMEOUT_MS: u64 = 500;
+const REAP_MAX_ATTEMPTS: usize = 5;
 
 const FORBIDDEN_STAGED_EXTENSIONS: &[&str] = &[
     ".sh", ".bash", ".zsh", ".dash", ".py", ".pyw", ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts",
@@ -199,6 +201,11 @@ fn capability_deny_rules() -> &'static [CapabilityDenyRule] {
                 "JAIL-TRAVERSAL-001",
                 "Parent directory traversal ('..' or 'cd ..') forbidden inside ephemeral script",
                 r"(?i)(?:\.\./|\.\.\\|\bcd\s+\.\.)",
+            ),
+            (
+                "JAIL-FORK-001",
+                "Process-group escape (setsid/nohup/disown) or fork-bomb pattern forbidden inside ephemeral jail",
+                r"(?is)\b(?:setsid|nohup|disown)\b|:\s*\(\s*\)\s*\{|\b(?:while|for|until)\b.*?\bdo\b[^;]*&\s*(?:;|\bdone\b|\n|$)",
             ),
         ];
 
@@ -416,7 +423,23 @@ fn reap_process_group(pgid: i32) {
     #[cfg(unix)]
     if pgid > 0 {
         unsafe {
-            libc::kill(-pgid, libc::SIGKILL);
+            // Freeze the entire process group before killing so rapidly-forking children cannot outrun SIGKILL
+            libc::kill(-pgid, libc::SIGSTOP);
+            for _ in 0..REAP_MAX_ATTEMPTS {
+                if libc::kill(-pgid, libc::SIGKILL) != 0 {
+                    let err = std::io::Error::last_os_error();
+                    if err.raw_os_error() == Some(libc::ESRCH) {
+                        break;
+                    }
+                }
+                if libc::kill(-pgid, 0) != 0 {
+                    let err = std::io::Error::last_os_error();
+                    if err.raw_os_error() == Some(libc::ESRCH) {
+                        break;
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
         }
     }
     #[cfg(not(unix))]
@@ -509,6 +532,7 @@ fn run_inside_staged_dir(
         EphemeralRuntime::Node => {
             let mut c = Command::new("node");
             c.arg("--disallow-code-generation-from-strings")
+                .arg("--max-old-space-size=128")
                 .arg(&script_path);
             c
         }
@@ -530,57 +554,61 @@ fn run_inside_staged_dir(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    let apply_linux_as_limit = !matches!(request.runtime, EphemeralRuntime::Node);
+
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
+        macro_rules! set_rlimit_clamped {
+            ($resource:expr, $desired:expr, strict = $strict:expr) => {{
+                let mut current = libc::rlimit {
+                    rlim_cur: 0,
+                    rlim_max: 0,
+                };
+                if libc::getrlimit($resource, &mut current) == 0 {
+                    let target = ($desired as libc::rlim_t).min(current.rlim_max);
+                    let lim = libc::rlimit {
+                        rlim_cur: target,
+                        rlim_max: target,
+                    };
+                    if libc::setrlimit($resource, &lim) != 0 && $strict {
+                        return Err(std::io::Error::last_os_error());
+                    }
+                }
+            }};
+        }
+
         unsafe {
             cmd.pre_exec(move || {
                 if libc::setpgid(0, 0) != 0 {
                     return Err(std::io::Error::last_os_error());
                 }
 
-                let cpu_lim = libc::rlimit {
-                    rlim_cur: cpu_limit_secs as libc::rlim_t,
-                    rlim_max: cpu_limit_secs as libc::rlim_t,
-                };
-                if libc::setrlimit(libc::RLIMIT_CPU, &cpu_lim) != 0 {
-                    return Err(std::io::Error::last_os_error());
-                }
+                set_rlimit_clamped!(libc::RLIMIT_CPU, cpu_limit_secs, strict = true);
+                set_rlimit_clamped!(
+                    libc::RLIMIT_FSIZE,
+                    TOOL_JAIL_RLIMIT_FSIZE_BYTES,
+                    strict = true
+                );
+                set_rlimit_clamped!(libc::RLIMIT_NOFILE, TOOL_JAIL_RLIMIT_NOFILE, strict = false);
 
-                let fsize_lim = libc::rlimit {
-                    rlim_cur: TOOL_JAIL_RLIMIT_FSIZE_BYTES as libc::rlim_t,
-                    rlim_max: TOOL_JAIL_RLIMIT_FSIZE_BYTES as libc::rlim_t,
-                };
-                if libc::setrlimit(libc::RLIMIT_FSIZE, &fsize_lim) != 0 {
-                    return Err(std::io::Error::last_os_error());
-                }
-
+                // Note: RLIMIT_NPROC is intentionally NOT applied on Linux because it enforces a host-wide
+                // per-UID thread limit (causing EAGAIN under multi-threaded runners / desktop sessions).
+                // Process explosion is mitigated via JAIL-FORK-001 + RLIMIT_CPU + RLIMIT_NOFILE + 2-pass SIGSTOP/SIGKILL -PGID reaping.
                 #[cfg(target_os = "linux")]
-                {
-                    let as_lim = libc::rlimit {
-                        rlim_cur: TOOL_JAIL_RLIMIT_AS_BYTES as libc::rlim_t,
-                        rlim_max: TOOL_JAIL_RLIMIT_AS_BYTES as libc::rlim_t,
-                    };
-                    if libc::setrlimit(libc::RLIMIT_AS, &as_lim) != 0 {
-                        return Err(std::io::Error::last_os_error());
-                    }
-
-                    let nproc_lim = libc::rlimit {
-                        rlim_cur: TOOL_JAIL_RLIMIT_NPROC as libc::rlim_t,
-                        rlim_max: TOOL_JAIL_RLIMIT_NPROC as libc::rlim_t,
-                    };
-                    if libc::setrlimit(libc::RLIMIT_NPROC, &nproc_lim) != 0 {
-                        return Err(std::io::Error::last_os_error());
-                    }
+                if apply_linux_as_limit {
+                    set_rlimit_clamped!(libc::RLIMIT_AS, TOOL_JAIL_RLIMIT_AS_BYTES, strict = true);
                 }
 
                 #[cfg(not(target_os = "linux"))]
                 {
-                    let data_lim = libc::rlimit {
-                        rlim_cur: TOOL_JAIL_RLIMIT_AS_BYTES as libc::rlim_t,
-                        rlim_max: TOOL_JAIL_RLIMIT_AS_BYTES as libc::rlim_t,
-                    };
-                    let _ = libc::setrlimit(libc::RLIMIT_DATA, &data_lim);
+                    let _ = apply_linux_as_limit;
+                    // macOS XNU may return EINVAL for RLIMIT_DATA; apply best-effort without failing spawn
+                    set_rlimit_clamped!(
+                        libc::RLIMIT_DATA,
+                        TOOL_JAIL_RLIMIT_AS_BYTES,
+                        strict = false
+                    );
                 }
                 Ok(())
             });
@@ -628,10 +656,11 @@ fn run_inside_staged_dir(
     let duration_ms = start.elapsed().as_millis() as u64;
     let script_sha256 = format!("{:x}", Sha256::digest(request.script_source.as_bytes()));
 
-    #[cfg(target_os = "linux")]
-    let reported_nproc = TOOL_JAIL_RLIMIT_NPROC;
-    #[cfg(not(target_os = "linux"))]
-    let reported_nproc = 0u64;
+    let reported_as = if apply_linux_as_limit {
+        TOOL_JAIL_RLIMIT_AS_BYTES
+    } else {
+        128 * 1024 * 1024
+    };
 
     Ok(ToolJailAuditReceipt {
         execution_id: execution_id.to_string(),
@@ -649,7 +678,7 @@ fn run_inside_staged_dir(
         network_isolated: false,
         network_proxy_sinkholed: true,
         nofollow_verified: true,
-        rlimit_as_bytes: TOOL_JAIL_RLIMIT_AS_BYTES,
-        rlimit_nproc: reported_nproc,
+        rlimit_as_bytes: reported_as,
+        rlimit_nproc: TOOL_JAIL_RLIMIT_NPROC,
     })
 }

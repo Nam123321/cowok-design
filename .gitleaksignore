@@ -17,3 +17,6 @@
 4de23b829d84cd5ddf05b068b271f31a870b8430:src/features/chat-vault/chat-vault.test.ts:generic-api-key:70
 4de23b829d84cd5ddf05b068b271f31a870b8430:crates/harness-daemon/tests/story_04_6_chat_cas_vault.rs:generic-api-key:272
 4de23b829d84cd5ddf05b068b271f31a870b8430:crates/harness-daemon/tests/story_04_6_chat_cas_vault.rs:generic-api-key:468
+
+# False-positive synthetic redaction test fixture from PR #17 commit 4f39622 (replaced with runtime-joined fixture in follow-up commit; zero real credentials)
+4f3962254ddb66ce86f1c4b8b2f133cfd55ac8c9:crates/bot-fleet/tests/story_11_1_sandbox_and_gateway.rs:generic-api-key:128
