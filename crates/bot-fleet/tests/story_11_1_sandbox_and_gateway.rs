@@ -1,8 +1,9 @@
 // @story 11.1
 // @implements AC-01, AC-02, AC-03, AC-04 (Security, C-02/C-03/H-01..H-04/M-01..M-05 Regression Tests)
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use axum::{
     http::{HeaderMap, StatusCode},
@@ -22,6 +23,18 @@ use zeroize::Zeroizing;
 
 #[cfg(unix)]
 use std::os::unix::fs::{symlink, PermissionsExt};
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+struct PathRestoreGuard(Option<OsString>);
+
+impl Drop for PathRestoreGuard {
+    fn drop(&mut self) {
+        if let Some(ref p) = self.0 {
+            std::env::set_var("PATH", p);
+        }
+    }
+}
 
 #[test]
 fn test_11_1_01_0600_fd_staging_and_raii_cleanup_on_drop_and_panic() {
@@ -86,6 +99,7 @@ fn test_11_1_01_0600_fd_staging_and_raii_cleanup_on_drop_and_panic() {
 #[cfg(unix)]
 #[test]
 fn test_11_1_02_argv_zero_secret_and_env_clear_isolation_c02() {
+    let _env_guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = TempDir::new().expect("tempdir");
     let session = IsolatedSessionDir::create(tmp.path(), "sess-argv").expect("session");
     let secret_prompt = "CONFIDENTIAL_PROMPT_NEVER_IN_ARGV_884422";
@@ -189,6 +203,7 @@ echo "CODEX_HOME=${CODEX_HOME}"
 #[cfg(unix)]
 #[test]
 fn test_11_1_03_pgid_child_tree_kill_and_zero_zombie_reaping() {
+    let _env_guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = TempDir::new().expect("tempdir");
     let session = IsolatedSessionDir::create(tmp.path(), "sess-pgid").expect("session");
     let pid_file = tmp.path().join("grandchild.pid");
@@ -276,17 +291,20 @@ fn test_11_1_05_adapters_catalog_and_strict_model_id_h03_m05() {
     assert!(validate_model_id("gpt-4#frag", true).is_err());
 
     // M-05: relative PATH dir & non-executable file must NOT resolve
+    let _env_guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let tmp = TempDir::new().expect("tempdir");
     let non_exec = tmp.path().join("fake-non-exec-cli");
     std::fs::write(&non_exec, "#!/bin/sh\necho hi\n").expect("write");
     #[cfg(unix)]
     std::fs::set_permissions(&non_exec, std::fs::Permissions::from_mode(0o644)).expect("chmod");
     let old_path = std::env::var_os("PATH");
-    std::env::set_var("PATH", format!(".:{}", tmp.path().display()));
+    let _path_restore = PathRestoreGuard(old_path.clone());
+    let old_str = old_path
+        .as_deref()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "/usr/bin:/bin".to_string());
+    std::env::set_var("PATH", format!(".:{}:{old_str}", tmp.path().display()));
     assert!(CliAdapterRegistry::resolve_binary("fake-non-exec-cli").is_none());
-    if let Some(p) = old_path {
-        std::env::set_var("PATH", p);
-    }
 }
 
 #[tokio::test]
