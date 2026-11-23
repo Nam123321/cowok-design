@@ -39,6 +39,7 @@ model Project {
   sdiClarificationSessions SdiClarificationSession[]
   userSkillRegistries UserSkillRegistry[]
   gateFailureLedgers GateFailureLedger[]
+  decisionAuditLogs DecisionAuditLog[]
 
   @@unique([id, tenantId], map: "uq_projects_id_tenant")
   @@index([inheritBrandFromProjectId])
@@ -1285,4 +1286,25 @@ model GateFailureLedger {
   @@unique([tenantId, projectId, fingerprintSha256])
   @@index([tenantId, projectId, status, lastSeenAt], map: "idx_gate_failure_ledger_scope_status")
   @@map("gate_failure_ledger")
+}
+
+model DecisionAuditLog {
+  id                   String  @id @default(uuid())
+  tenantId             String  @default("local-default") @map("tenant_id")
+  projectId            String  @map("project_id")
+  cascadeStage         String  @map("cascade_stage")
+  tierUsed             String  @map("tier_used")
+  confidenceKind       String  @map("confidence_kind")
+  verdictLabel         String  @map("verdict_label")
+  rubricSwapConsistent Int?    @map("rubric_swap_consistent")
+  attemptNumber        Int     @map("attempt_number")
+  breakerTripped       Int     @default(0) @map("breaker_tripped")
+  staleFileSha256      String? @map("stale_file_sha256")
+  latencyMs            Int     @map("latency_ms")
+  createdAt            BigInt  @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId, createdAt], map: "idx_decision_audit_log_tenant_project")
+  @@map("decision_audit_log")
 }

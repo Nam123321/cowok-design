@@ -1,165 +1,114 @@
-# Lộ Trình Sản Phẩm Toàn Diện & Ma Trận Phụ Thuộc Thực Thi: cowok-design (Open-Source Agent-Native Design & Presentation Harness OS)
-*(Comprehensive Product Phased Roadmap & Dependency Matrix)*
+# Lộ Trình Sản Phẩm Toàn Diện & Ma Trận Phụ Thuộc Thực Thi: `cowok-design` (Open-Source Agent-Native Design & Presentation Harness OS)
+*(Comprehensive Product Phased Roadmap & Dependency Matrix — v4.0)*
 
-> **Phiên bản:** v3.0-Universal  
-> **Ngày cập nhật:** 2026-11-20  
-> **Trạng thái:** Active SSOT Baseline (Folder `3. Development`)  
-> **Bản thể dự án (Archetypes):** universal-hybrid-saas  
-> **Ngân sách Worktree đồng thời:** $\le 5$ song song (Tuân thủ trần Worktree Quota $\le 5$)  
-> **Hợp đồng Macro-to-Micro Lock:** `_iwish-output/_state/roadmap-lock.json`
-
----
-
-## 1. Tổng Quan Hiện Trạng & Điểm Tựa Nghiệp Vụ (Maturity Baseline vs. Active Delta)
-
-Hệ thống tính toán lộ trình dựa trên nguyên tắc **Mỏ neo Bậc vào bằng 0 (In-Degree = 0 Anchors)**: các Epics đã đạt trạng thái `completed` được xác lập làm **Maturity Baseline** đóng băng, không tái lập lịch, đóng vai trò là nền tảng cung cấp thực thể dữ liệu sạch cho các Epics đang triển khai (`Active Delta`).
-
-### 1.1. Bảng Điểm Tựa Nền Tảng Đã Hoàn Thành (Maturity Baseline)
-
-| STT | Mã Epic & Tên Module | Trạng Thái | Thực Thể Dữ Liệu & Hợp Đồng Đã Sẵn Sàng Cung Cấp |
-| :---: | :--- | :---: | :--- |
-| **Epic 01** | Cargo Workspace, Domain Contracts (ts-rs) & 16-Table SQLite Registry | `3` stories | `completed` | Zero-dependency baseline anchor |
-| **Epic 03** | Project-Scoped Configurable Constraint Engine & <1ms data-ff-id Patcher | `3` stories | `completed` | Zero-dependency baseline anchor |
-
-### 1.2. Thống Kê Active Delta Cần Triển Khai
-- **Tổng số Epics dự án:** 13
-- **Epics đã hoàn thành (Maturity Baseline):** 2
-- **Epics đang triển khai / Backlog:** 11
-- **Số làn sóng phát triển (Waves):** 4 Waves
-- **Số luồng song song (Parallel Tracks):** 5 Tracks
+> **Phiên bản:** `v4.0-Unified-Naming-And-Control-Plane`  
+> **Ngày cập nhật:** `2026-11-23`  
+> **Định danh sản phẩm & CLI thống nhất:** **`cowok-design`** (`ADR-008`, thay thế hoàn toàn tên cũ `uiux-os`)  
+> **Ngân sách Worktree đồng thời:** $\le 4$ song song (tuân thủ trần Worktree Quota $\le 5$, disjoint file/schema write-sets)  
+> **Trạng thái nguồn chân lý:** Đồng bộ 1:1 với `_iwish-output/sprint-status.yaml`, `PRD (FR-01..FR-38)` và `Architecture (ADR-001..ADR-008)`.
 
 ---
 
-## 2. Ma Trận Cung Cấp - Tiêu Thụ & Phân Tích Đồ Thị Khối (Provide-Consume Matrix & Dependency DAG)
+## 1. Tổng Quan Hiện Trạng (Maturity Baseline vs. Active Delta)
 
-### 2.1. Bảng Ma Trận Phụ Thuộc Chi Tiết Cấp Epic & Sub-Epic Phase Slices
+### 1.1. Maturity Baseline — Đã Hoàn Thành (`26` Stories `completed` / `4` Epics 100% xong)
 
-| Epic ID / Slice | Tên Khối Nghiệp Vụ | Cung Cấp (Provides - Entities & Contracts) | Tiêu Thụ (Consumes - From Epics) | Độ Toàn Vẹn Tiêu Thụ & Rủi Ro Nghẽn (Blocker Risk) |
-| :--- | :--- | :--- | :--- | :--- |
-| **Epic 02** | JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills | `Stream-1` | `Epic 05`, `Epic 09`, `Epic 11` | `Epic 01` |
-| **Epic 04** | Flow-First 2D SVG Bezier DAG Studio, Security Kernel, CAS Intake & In-Chat Vault | `Stream-2` | `Epic 10` | `Epic 01` |
-| **Epic 05** | Option 5 2D Storyboard, Cognitive Sketch-to-Polish, Shared lol_html & 3-Tier Auto Flow DAG | `Stream-3` | `Epic 07` | `Epic 02` |
-| **Epic 06** | Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen | `Stream-4` | *(Không có)* | `Epic 03` |
-| **Epic 07** | Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter | `Stream-5` | `Epic 12`, `Epic 13` | `Epic 05` |
-| **Epic 08** | agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN | `Stream-1` | *(Không có)* | `Epic 01` |
-| **Epic 09** | Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield) | `Stream-2` | *(Không có)* | `Epic 02` |
-| **Epic 10** | cowok Master Orchestrator, File Leases, Builder!=Scorer & CMP-07 Design Tournament | `Stream-3` | *(Không có)* | `Epic 04` |
-| **Epic 11** | POSIX BYOS/BYOK Runner (0o600 FD + -PGID), Cross-CLI Normalizer & Universal Open MCP Gateway | `Stream-4` | *(Không có)* | `Epic 02` |
-| **Epic 12** | 4-Channel Packaging, Standalone /api/* Parity & OCI Distribution | `Stream-5` | *(Không có)* | `Epic 07` |
-| **Epic 13** | End-to-End Sealed Anti-Goodhart Benchmark & 25-Case /simulate-user Certification Suite | `Stream-1` | *(Không có)* | `Epic 07` |
+| Epic | Tên Khối Nghiệp Vụ | Trạng Thái | Stories Đã Hoàn Thành | Còn Lại |
+| :---: | :--- | :---: | :--- | :--- |
+| **Epic 01** | Cargo Workspace, Domain Contracts (`ts-rs`) & SQLite WAL Core | `completed` | `01.1`, `01.2`, `01.3` | *(0)* |
+| **Epic 02** | KV-Cache Compiler, Hidden SSOT (`V16..V18`) & 7 Craft Skills | `completed` | `02.1`, `02.4` *(02.2/02.3 cancelled)* | *(0)* |
+| **Epic 03** | Project-Scoped Constraint Engine & `<1ms` `data-ff-id` Patcher | `completed` | `03.1`, `03.2`, `03.3` | *(0)* |
+| **Epic 04** | Flow-First 2D DAG Studio, Security Kernel, CAS Intake & In-Chat Vault | `completed` | `04.1`, `04.2`, `04.3`, `04.4`, `04.5`, `04.6` | *(0)* |
+| **Epic 05** | 2D Storyboard, Sketch-to-Polish, Shared `lol_html` & Snapshots/PR | `in-progress` | `05.1`, `05.2`, `05.3`, `05.4`, `05.6` | **`05.5`** |
+| **Epic 06** | Dual-Pane 16:9 HTML Presentation & Non-Tech CMS Workbench | `in-progress` | `06.1`, `06.2`, `06.3`, `06.4` | **`06.5`** |
+| **Epic 08** | `agentskills.io` Lifecycle, Split DE+DR Runtime (`V20`), 7 DE Tools & `LEARN` | `completed` | `08.1`, `08.2`, `08.3`, `08.4`, `08.5`, `08.6` | *(0)* |
+| **Epic 09** | Two-Store `/rea` + `/awesome-re` DNA Forge & 5-Stage Rust `DecisionCascadeClient` (`V21`) | `completed` | `09.1`, `09.2` *(09.3 cancelled)* | *(0)* |
+| **Epic 11** | POSIX CLI Sandbox (`0o600` FD + `-PGID`), Unified API Gateway & Open MCP | `in-progress` | `11.1` *(11.3 cancelled)* | **`11.2`** |
 
-### 2.2. Sơ Đồ Đồ Thị Khối Liên Kết Phụ Thuộc (Macro-DAG Flowchart)
+### 1.2. Thống Kê Active Delta Còn Lại (`14` Stories across `8` Active Epics)
+- **Tổng số Epics:** `14` (`6` đã hoàn thành 100%, `8` đang triển khai/backlog)
+- **Tổng số Stories còn lại cần triển khai:** **`14` stories** chia thành **4 Làn sóng tiếp theo (Wave B $\to$ Wave E)** sau khi **Wave A (`08.6` ∥ `09.1` ∥ `09.2`)** hoàn tất `completed`.
+
+---
+
+## 2. Phân Tích Phụ Thuộc & Sơ Đồ DAG Phần Còn Lại (Wave A $\to$ Wave E)
+
+### 2.1. Các Điểm Nút Kiến Trúc Quan Trọng (Critical Path & Ordering Invariants)
+1. **PR #17 CI Gate First (Pre-Wave A):** Khắc phục 2 lỗi CI trên PR #17 (`RLIMIT_NPROC` Linux trong `tool_jail.rs` + `Gitleaks` trên `story_11_1_sandbox_and_gateway.rs:128`) và merge vào `master` trước khi mở nhánh Wave A.
+2. **Mở khóa `Story 08.6` (`design-craft`) & `Story 06.5` (AI Multi-Slide Deck) ngay lập tức:** Cả `08.5` và `11.1` vừa hoàn thành đã mở khóa trực tiếp `08.6`, `06.5`, `09.1` và `10.1`.
+3. **Đưa `Story 14.1` (Client Edge Support/Telemetry) TRƯỚC `Epic 12`:** Để khi đóng gói single-binary `cowok-design` (`12.1`) và Desktop/5-Host Plugin (`12.2`), tính năng **Non-Tech Support Drawer (không cần GitHub)** và **Activation Funnel Telemetry** đã được nhúng sẵn từ Day-1, tránh phải đóng gói lại 2 lần.
+4. **Đưa `Story 08.6` (`design-craft`) & `Story 14.3` (Ed25519 Signed Updater/Quarantine) TRƯỚC `Story 12.2`:** Giúp Kênh 2 (Desktop Tauri v2) có sẵn chữ ký Ed25519 updater và Kênh 3 (Universal Multi-Harness Plugin Pack cho `Cowok.ai`, `Claude Code`, `Codex`, `Antigravity`, `Cursor`) đóng gói trực tiếp từ repo `design-craft`.
+5. **Chốt `Story 13.1` (Sealed Anti-Goodhart Benchmark & 25-Case E2E) ở cuối cùng (Wave E):** Kiểm định tổng thể toàn bộ 4 kênh phân phối + Design Tournament + 5-Stage Decision Cascade trước khi phát hành GA.
+
+### 2.2. Sơ Đồ Thực Thi DAG 5 Làn Sóng (Active Remaining Stories)
 
 ```mermaid
 flowchart TD
-flowchart TD
-    E01["Epic 01: Cargo Workspace, Domain Contracts ts-rs & 16-Table (Completed)"]
-    E03["Epic 03: Project-Scoped Configurable Constraint Engine & <1 (Completed)"]
-    E02["Epic 02: JIT Prompt Assembler, KV-Cache Compiler, Hidden SS"]
-    E04["Epic 04: Flow-First 2D SVG Bezier DAG Studio, Security Kern"]
-    E05["Epic 05: Option 5 2D Storyboard, Cognitive Sketch-to-Polish"]
-    E06["Epic 06: Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Wor"]
-    E07["Epic 07: Pooled 1-Chromium CDP Visual QC & Split Share vs D"]
-    E08["Epic 08: agentskills.io Repackager, Split DE+DR Runtime, 7 "]
-    E09["Epic 09: Two-Store /rea DNA Forge & 5-Stage Rust DecisionCa"]
-    E10["Epic 10: cowok Master Orchestrator, File Leases, Builder!=S"]
-    E11["Epic 11: POSIX BYOS/BYOK Runner 0o600 FD + -PGID, Cross-CLI"]
-    E12["Epic 12: 4-Channel Packaging, Standalone /api/* Parity & OC"]
-    E13["Epic 13: End-to-End Sealed Anti-Goodhart Benchmark & 25-Cas"]
-    E01 --> E02
-    E01 --> E04
-    E02 --> E05
-    E03 --> E06
-    E05 --> E07
-    E01 --> E08
-    E02 --> E09
-    E04 --> E10
-    E02 --> E11
-    E07 --> E12
-    E07 --> E13
+    BASE["Baseline: PR #17 Merged (26 Stories Completed: Epics 01-04, 05.1-05.4/05.6, 06.1-06.4, 08.1-08.5, 11.1)"]
+
+    subgraph WA["Wave A — Close Epics 08 & 09 & Unblock Decision Keystone (3 Parallel)"]
+        S086["08.6: design-craft Default Plugin Repo (Closes Epic 08)"]
+        S091["09.1: Design-Only /rea DNA Forge (crates/rea-bridge)"]
+        S092["09.2: 5-Stage Rust DecisionCascadeClient & V21 Audit (Closes Epic 09)"]
+    end
+
+    subgraph WB["Wave B — Close Epics 05 & 06, cowok Orch & Client Support Edge (4 Parallel)"]
+        S055["05.5: 8D Simulate-User & 3-Tier Flow DAG (Closes Epic 05)"]
+        S065["06.5: AI Multi-Slide Deck & CSV/PDF Charts (Closes Epic 06)"]
+        S101["10.1: cowok Master Orchestrator & $UIUX_LIVE_SPEC"]
+        S141["14.1: In-App Non-Tech Support Drawer & Zero-PII Telemetry Outbox"]
+    end
+
+    subgraph WC["Wave C — Visual QC, Swarm Leases, Universal MCP & SuperAdmin MVP (4 Parallel)"]
+        S071["07.1: Pooled 1-Chromium CDP Visual QC"]
+        S102["10.2: Builder!=Scorer Swarm, Leases & Design Jury"]
+        S112["11.2: Universal Open MCP Server 4-Tier & Installer (Closes Epic 11)"]
+        S142["14.2: Cloud API & SuperAdmin Portal MVP (Helpdesk/Funnel/Crash)"]
+    end
+
+    subgraph WD["Wave D — Split Export, Design Tournament & Distribution Ops (3 Parallel)"]
+        S072["07.2: Non-Tech Share vs Dev Handoff Export (Closes Epic 07)"]
+        S103["10.3: CMP-07 Design Tournament & advisor Loop (Closes Epic 10)"]
+        S143["14.3: Ed25519 Signed Updater, Global Skill Quarantine & Licenses (Closes Epic 14)"]
+    end
+
+    subgraph WE["Wave E — 4-Channel cowok-design Packaging & Final Release Gate"]
+        S121["12.1: Channel 1 Single-Binary cowok-design CLI & /api/* Parity"]
+        S122["12.2: Channel 2 Tauri Desktop & Channel 3 Multi-Harness Plugin Pack"]
+        S123["12.3: Channel 4 Docker/OCI + Pooled Chromium & Air-Gapped Mode (Closes Epic 12)"]
+        S131["13.1: Sealed Anti-Goodhart Benchmark & 25-Case E2E Gate (GA Release)"]
+    end
+
+    BASE --> S086 & S091 & S092
+    S092 --> S055 & S065 & S101
+    BASE --> S141
+    S055 & S065 --> S071
+    S101 --> S102 & S112
+    S141 --> S142
+    S071 --> S072
+    S102 & S092 --> S103
+    S142 & S086 --> S143
+    S072 & S112 & S141 --> S121
+    S121 & S086 & S143 --> S122
+    S121 & S071 --> S123
+    S122 & S123 & S103 --> S131
 ```
 
 ---
 
-## 3. Các Nguyên Tắc Logic Bất Biến Của Dự Án (Core Engineering & Domain Invariants)
+## 3. Kế Hoạch Chi Tiết Từng Làn Sóng (Wave A $\to$ Wave E)
 
-Thứ tự ưu tiên và phân bổ Wave không chỉ dựa vào phụ thuộc kỹ thuật thuần túy mà bắt buộc phải tuân thủ nghiêm ngặt **Các Nguyên Tắc Bất Biến Miền Nghiệp Vụ (Domain Invariants)** để loại bỏ rủi ro tài chính, vận hành và phân mảnh kiến trúc:
-
-- Không có invariant cụ thể.
-
----
-
-## 4. Phân Tích Khả Năng Triển Khai Song Song (Parallel Execution Tracks)
-
-Để tối ưu hóa thời gian bàn giao (Time-to-Market) mà không gây xung đột mã nguồn (Merge Conflicts trên `schema.prisma`) hoặc vượt trần tài nguyên ($\le 5$ worktrees), toàn bộ danh mục Epics được phân rã thành **5 Luồng triển khai song song độc lập**:
-
-### 4.1. Bảng Định Nghĩa 5 Parallel Tracks & Phạm Vi Cô Lập Bảng Dữ Liệu
-
-| Mã Luồng | Tên Luồng & Phạm Vi Chuyên Biệt | Danh Mục Bảng DB Sở Hữu Độc Quyền (Disjoint Write-Set) | Ngân Sách Worktree ($\le 4$) |
-| :--- | :--- | :--- | :---: |
-| **Stream-1** | VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine (VS-01. Rust Core Harness, 9-Spec Registry & Project Constraint Engine) | `domain_stream-1:CoreTables`, `domain_stream-1:LedgerTables` | `1` worktree |
-| **Stream-2** | VS-02. Flow-First Executable Design Workbench & SDI Engine (VS-02. Flow-First Executable Design Workbench & SDI Engine) | `domain_stream-2:CoreTables`, `domain_stream-2:LedgerTables` | `1` worktree |
-| **Stream-3** | VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio (VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio) | `domain_stream-3:CoreTables`, `domain_stream-3:LedgerTables` | `1` worktree |
-| **Stream-4** | VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe (VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe) | `domain_stream-4:CoreTables`, `domain_stream-4:LedgerTables` | `1` worktree |
-| **Stream-5** | VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution (VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution) | `domain_stream-5:CoreTables`, `domain_stream-5:LedgerTables` | `1` worktree |
-
-### 4.2. Ranh Giới Hợp Đồng Đóng Băng (Contract-First Isolation Boundary)
-- **Cổng Đồng Bộ Cấp Horizon/Wave (Contract-First & Sync Barrier):** Mọi Track/Stream trong Wave hiện tại phải hoàn tất 100% các bước nhân quả và vượt qua Sync Barrier (`git merge` + đóng băng Schema + E2E Gate) trước khi mở khóa Wave kế tiếp.
-- **Cô Lập Stream Song Song & Khóa Schema (Phase 0 Schema Seal Gate):** Các Streams chạy song song trên các Worktrees độc lập, không ghi đè chéo schema. Bất kỳ bảng dùng chung nào phải được khóa ở Phase 0 Frozen Baseline.
+| Wave | Stories Song Song (`<= 4` Tracks) | Đóng Khép Kín Epic | Mục Tiêu Giá Trị Bàn Giao (Vertical Value Slice) | Điều Kiện Mở Khóa |
+| :---: | :--- | :---: | :--- | :--- |
+| **Wave A** | `08.6` ∥ `09.1` ∥ `09.2` | **Epic 08, 09** | Xuất bản repo `design-craft` độc lập (`08.6`), Two-Store `/rea` FTS5 (`09.1`), và **5-Stage `DecisionCascadeClient` (`09.2`, `V21`)** — mở khóa trực tiếp `05.5`, `06.5` và `10.1`! | PR #17 merged (`d7b5c45`) |
+| **Wave B** | `05.5` ∥ `06.5` ∥ `10.1` ∥ `14.1` | **Epic 05, 06** | Hoàn tất Flow DAG 3 tầng (`05.5`), AI Multi-Slide Deck thật (`06.5`), `cowok` Master Orchestrator (`10.1`), và **In-App Non-Tech Support Drawer + Telemetry Outbox** (`14.1`). | Wave A merged |
+| **Wave C** | `07.1` ∥ `10.2` ∥ `11.2` ∥ `14.2` | **Epic 11** | Visual QC 1-Chromium CDP (`07.1`), Swarm `Builder!=Scorer` (`10.2`), **Universal Open MCP Server** (`11.2`), và **SuperAdmin Portal MVP** (`14.2`). | Wave B merged |
+| **Wave D** | `07.2` ∥ `10.3` ∥ `14.3` | **Epic 07, 10, 14** | Split Export (`07.2`), Design Tournament `CMP-07` (`10.3`), và **Ed25519 Signed Updater + Global Skill Quarantine + Offline Licenses** (`14.3`). | Wave C merged |
+| **Wave E** | `12.1` → `12.2` ∥ `12.3` → `13.1` | **Epic 12, 13 (GA)** | Single-Binary **`cowok-design`** (`12.1`), Desktop **Tauri v2** + **5-Host Multi-Harness Plugin Pack** (`12.2`), **Docker/OCI Air-Gapped** (`12.3`), chốt kiểm định **25-Case Sealed Anti-Goodhart** (`13.1`). | Wave D merged |
 
 ---
 
-## 5. Lộ Trình Phát Triển Toàn Diện Theo Làn Sóng (Multi-Wave Phased Master Plan)
-
-### 5.1. Bảng Phân Kỳ Chi Tiết 4 Làn Sóng (Wave 1 $\rightarrow$ Wave 4)
-
-| Làn Sóng | Tên Làn Sóng & Mục Tiêu Trọng Tâm | Danh Mục Epics & Sub-Epic Phase Slices | Lát Cắt Giá Trị Dọc Bàn Giao (Vertical Value Slice) | Điều Kiện Tiền Đề Mở Khóa (Unblock Condition) |
-| :---: | :--- | :--- | :--- | :--- |
-| **Wave 1** | Wave 1: Vertical Value Increment 1 | `Epic 02`, `Epic 04`, `Epic 06`, `Epic 08` | Delivery of core capabilities for Wave 1 | Baseline hoàn tất |
-| **Wave 2** | Wave 2: Vertical Value Increment 2 | `Epic 05`, `Epic 09`, `Epic 11`, `Epic 10` | Delivery of core capabilities for Wave 2 | Wave 1 Sync Barrier hoàn tất |
-| **Wave 3** | Wave 3: Vertical Value Increment 3 | `Epic 07` | Delivery of core capabilities for Wave 3 | Wave 2 Sync Barrier hoàn tất |
-| **Wave 4** | Wave 4: Vertical Value Increment 4 | `Epic 12`, `Epic 13` | Delivery of core capabilities for Wave 4 | Wave 3 Sync Barrier hoàn tất |
-
-### 5.2. Biểu Đồ Gantt Tiến Độ Thực Thi Đa Làn Sóng (Multi-Wave Phased Gantt)
-
-```mermaid
-gantt
-    title Lộ Trình Triển Khai Sản Phẩm Theo Làn Sóng & Luồng Song Song (SSOT)
-    dateFormat  YYYY-MM-DD
-    axisFormat  %d/%m
-    excludes    weekends
-
-    section Wave 1
-    Epic 02 JIT Prompt Assembler, KV-Cache Compiler, Hidden SS :active, e02, 2026-10-22, 10d
-    Epic 04 Flow-First 2D SVG Bezier DAG Studio, Security Kern :active, e04, 2026-10-22, 10d
-    Epic 06 Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Wor :active, e06, 2026-10-22, 10d
-    Epic 08 agentskills.io Repackager, Split DE+DR Runtime, 7  :active, e08, 2026-10-22, 10d
-    section Wave 2
-    Epic 05 Option 5 2D Storyboard, Cognitive Sketch-to-Polish : e05, 2026-10-22, 10d
-    Epic 09 Two-Store /rea DNA Forge & 5-Stage Rust DecisionCa : e09, 2026-10-22, 10d
-    Epic 11 POSIX BYOS/BYOK Runner 0o600 FD + -PGID, Cross-CLI : e11, 2026-10-22, 10d
-    Epic 10 cowok Master Orchestrator, File Leases, Builder!=S : e10, 2026-10-22, 10d
-    section Wave 3
-    Epic 07 Pooled 1-Chromium CDP Visual QC & Split Share vs D : e07, 2026-10-22, 10d
-    section Wave 4
-    Epic 12 4-Channel Packaging, Standalone /api/* Parity & OC : e12, 2026-10-22, 10d
-    Epic 13 End-to-End Sealed Anti-Goodhart Benchmark & 25-Cas : e13, 2026-10-22, 10d
-```
-
----
-
-## 6. Kế Hoạch Hành Động Tức Thời Cho Sprint Hiện Tại (Immediate P0 Action Slices)
-
-Từ Wave hiện tại, hệ thống lọc ra các **Lát Cắt Hành Động P0 Tức Thời (Immediate P0 Action Slices)** có bậc vào bằng 0 (`In-Degree == 0`), đã sẵn sàng 100% tài liệu tiền đề và có thể tiến hành lập Spec Stack hoặc code ngay lập tức:
-
-| Mã Lát Cắt | Module / Epic Trọng Tâm | Danh Sách Story IDs Triển Khai Ngay | Luồng (Track) | Lý Do Kích Hoạt Tức Thời (Activation Rationale) |
-| :---: | :--- | :--- | :---: | :--- |
-| **P0.1** | **Epic 02**: JIT Prompt Assembler, KV-Cache Compiler, Hidden SSOT & cowok-design-opt 7 Craft Skills (Immediate P0 Anchor) | `02.1`, `02.2`, `02.3` | `Stream-1` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
-| **P0.2** | **Epic 04**: Flow-First 2D SVG Bezier DAG Studio, Security Kernel, CAS Intake & In-Chat Vault (Immediate P0 Anchor) | `04.1`, `04.2`, `04.3` | `Stream-2` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
-| **P0.3** | **Epic 06**: Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen (Immediate P0 Anchor) | `06.1`, `06.2`, `06.3` | `Stream-4` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
-| **P0.4** | **Epic 08**: agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN (Immediate P0 Anchor) | `08.1`, `08.2`, `08.3` | `Stream-1` | Zero blocker risk anchor for Wave 1 unblocking downstream business workflows. |
-
----
-
-> [!NOTE]
-> Bản roadmap này được bảo vệ bởi cổng kiểm định **Category A Zero-Trust** (`validate-product-roadmap.py`). Khi có bất kỳ thay đổi kiến trúc hoặc khi một Epic hoàn thành tại `/iwish-feature-retrospective`, các Auto-Trigger Hooks sẽ tự động cập nhật và duy trì tính nhất quán tuyệt đối.
+## 4. Hành Động Tức Thời (Immediate Next Actions)
+1. **Ngay lập tức (Gate 0):** Chờ xác nhận của bạn cho **PR #17 Party-Mode Fix Plan (`LD-01..LD-04`)** $\to$ push commit sửa 2 lỗi CI (`RLIMIT_NPROC` Linux + `Gitleaks`), xác nhận 9/9 CI xanh và merge PR #17.
+2. **Commit Spec & Roadmap (`PR #18`):** Đẩy sạch bản cập nhật `PRD (FR-30, FR-37, FR-38)`, `ADR-008`, `Story 12.1/12.2` (thống nhất tên `cowok-design` + 5-Host Plugin Pack), `Epic 14 (14.1–14.3)` và `development-roadmap.md v4.0` sau khi PR #17 merge.
+3. **Khởi chạy Wave A (`/flow-auto-approve`):** Chạy song song `Story 08.6` (`design-craft`) ∥ `Story 05.5` ∥ `Story 06.5` ∥ `Story 09.1` (khép kín cùng lúc 3 Epic lớn: `05`, `06`, `08`!).

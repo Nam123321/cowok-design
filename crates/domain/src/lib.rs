@@ -6,6 +6,7 @@
 //! and error taxonomy. This crate resides at Layer 0 of the architecture DAG
 //! and has zero internal crate dependencies.
 
+pub mod decision;
 pub mod error;
 pub mod icon_typography;
 pub mod model_adapter;

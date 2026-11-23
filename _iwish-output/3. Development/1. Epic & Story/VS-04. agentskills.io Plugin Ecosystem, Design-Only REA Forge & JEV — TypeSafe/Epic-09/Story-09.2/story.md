@@ -4,7 +4,7 @@ id: "09.2"
 title: "Story 09.2: Decision Cascade Engine (~450 LOC Rust DecisionCascadeClient), 5-Stage DE->Decision#1->DR/DE->DE->Decision#2 & MAX_ATTEMPTS=3 Breaker"
 description: "Thay thế crates/jev-engine bằng Rust DecisionCascadeClient (~450 LOC trong crates/domain + crates/bot-fleet) tuân thủ ADR-006: máy trạng thái 5 bước DE -> Decision #1 -> DR/DE -> DE -> Decision #2 (Local FTS5 BM25 -> gemini-decision-1 / TypeSafe JEV -> Tiered Fallback), ConfidenceKind, egress_guard, VerdictShield (0% float leak), RubricShield (>=90%), MAX_ATTEMPTS=3 breaker & StaleFile OCC -> V17 decision_audit_log."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe/Epic-09/Story-09.2/story.md"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: core
 adr_ref: "ADR-006"
@@ -31,7 +31,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-23, FR-31: System-1 Decision Cascade (gemini-decision-1 / TypeSafe JEV / Offline FTS5), VerdictShield & MAX_ATTEMPTS=3 Breaker](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 09: Design-Only REA & Awesome-RE Forge & Decision Cascade Engine](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe/Epic-09/epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context

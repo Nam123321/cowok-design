@@ -6,3 +6,17 @@ license.workspace = true
 
 [dependencies]
 domain = { path = "../domain" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+rusqlite = { workspace = true }
+regex = "1"
+url = "2"
+base64 = "0.22"
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = { workspace = true }

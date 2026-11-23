@@ -10,6 +10,7 @@
 
 pub mod adapters;
 pub mod byok_gateway;
+pub mod decision_cascade;
 pub mod normalizer;
 pub mod posix_sandbox;
 pub mod session_dir;
@@ -23,6 +24,12 @@ pub use byok_gateway::{
     canonical_provider_id, default_model_for_provider, resolve_and_pin_provider_endpoint,
     ByokCredential, ByokExecutionResult, ByokGatewayRouter, CooldownTracker, ProviderCooldownDto,
     CANONICAL_BYOK_PROVIDERS, PROHIBITED_LOCAL_PORTS,
+};
+pub use decision_cascade::{
+    detect_verdict_oscillation, egress_guard, evaluate_rubric_pairwise_with_judge,
+    seal_verdict_shield, verify_stale_file_occ, DecisionCascadeClient, DecisionCascadeError,
+    DrDeHookFn, DrDeHookInput, DrDeHookResult, EgressGuardedPayload, VaultLookupFn,
+    EGRESS_MAX_CONTEXT_BYTES, EGRESS_MAX_PROMPT_BYTES,
 };
 pub use normalizer::{
     coerce_json_value, extract_fenced_or_raw_json, normalize_svg_viewboxes, strip_ansi_sequences,

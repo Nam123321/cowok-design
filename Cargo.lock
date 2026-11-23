@@ -872,6 +872,7 @@ dependencies = [
  "plugin-host",
  "presentation-cms",
  "rand 0.8.8",
+ "rea-bridge",
  "reqwest",
  "rusqlite",
  "serde",
@@ -2128,7 +2129,19 @@ dependencies = [
 name = "rea-bridge"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
+ "chrono",
  "domain",
+ "libc",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "url",
+ "uuid",
 ]
 
 [[package]]

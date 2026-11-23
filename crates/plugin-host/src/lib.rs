@@ -2,9 +2,10 @@
 //! deterministic Triangle Linter, per-run skill staging, capability registry,
 //! Zero-Trust skill repackager engine, and 6-state lifecycle with LEARN self-improving loop.
 
-// @story 08.1, 08.2, 08.3, 08.5
+// @story 08.1, 08.2, 08.3, 08.5, 08.6
 // @implements AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07
 pub mod de_tools;
+pub mod default_mount;
 pub mod learn_filter;
 pub mod lifecycle;
 pub mod models;
@@ -24,6 +25,13 @@ pub use de_tools::{
     DeToolResult, IntakeCapReport, IntakeFileSpec, NfaPackKind, NfaPackReport, NotesCheckReport,
     TokenPairInput, TokensCheckReport, DE_NFA_SLA_MS, GET_ARTIFACT_MAX_DEPTH,
     GET_ARTIFACT_MAX_FILES,
+};
+pub use default_mount::{
+    mount_default_design_craft_plugin, DefaultMountError, DesignCraftCapabilities,
+    DesignCraftDefaultMount, DesignCraftPluginManifest, MountedSkillSummary, OptionalPeerSpec,
+    DESIGN_CRAFT_HOST_ID, DESIGN_CRAFT_PLUGIN_NAME, DESIGN_CRAFT_RELATIVE_DIR,
+    DESIGN_CRAFT_SPEC_STANDARD, REQUIRED_AGENTS, REQUIRED_BUILDER_TOOLS,
+    REQUIRED_HOST_UPGRADE_KEYS, REQUIRED_QC_AUDIT_TOOLS,
 };
 pub use learn_filter::{
     check_learn_smuggling_safety, compute_jev_noul_fingerprint, evaluate_hysteresis_transition,

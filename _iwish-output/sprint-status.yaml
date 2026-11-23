@@ -70,18 +70,18 @@ start_date: '2026-07-24'
 # ==================================================
 
 # Epic 08: agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN
-"Epic 08 - agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN": in-progress
+"Epic 08 - agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN": completed
 "Story 08.1 - Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host)": completed
 "Story 08.2 - Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills)": completed
 "Story 08.3 - Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core)": completed
 "Story 08.4 - SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI": completed
 "Story 08.5 - Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 LEARN Loop": completed
-"Story 08.6 - Standalone Open-Source Default Plugin Repo (design-craft) — 4-Pillar Assembly, Optional Upstream REA Peer & Multi-Harness Export": backlog
+"Story 08.6 - Standalone Open-Source Default Plugin Repo (design-craft) — 4-Pillar Assembly, Optional Upstream REA Peer & Multi-Harness Export": completed
 
 # Epic 09: Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)
-"Epic 09 - Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)": in-progress
-"Story 09.1 - Design-Only /rea DNA Forge, Two-Store /rea + /awesome-re Library & License/ToS Firewall": refactored
-"Story 09.2 - 5-Stage DE -> Decision #1 -> DR/DE -> DE -> Decision #2 Flow, Rust DecisionCascadeClient & RubricShield": refactored
+"Epic 09 - Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)": completed
+"Story 09.1 - Design-Only /rea DNA Forge, Two-Store /rea + /awesome-re Library & License/ToS Firewall": completed
+"Story 09.2 - 5-Stage DE -> Decision #1 -> DR/DE -> DE -> Decision #2 Flow, Rust DecisionCascadeClient & RubricShield": completed
 "Story 09.3 - Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile OCC & 3-Strike Breaker": cancelled
 
 # ==================================================
@@ -100,11 +100,11 @@ start_date: '2026-07-24'
 "Story 11.2 - Compiler-Grade Bidirectional Open MCP Server (4 Auth Tiers) & 1-Click Host Installer UI": refactored
 "Story 11.3 - Compiler-Grade Bidirectional Open MCP Server & 1-Click Host Installer UI": cancelled
 
-# Epic 12: 4-Channel Packaging, Standalone /api/* Parity & OCI Distribution
-"Epic 12 - 4-Channel Packaging, Standalone /api/* Parity & OCI Distribution": in-progress
-"Story 12.1 - Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench với /api/* Standalone Parity": refactored
-"Story 12.2 - Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai": refactored
-"Story 12.3 - Kênh 4 — Container Image (Docker / OCI) kèm Pooled Headless Chromium cho Đội nhóm & CI/CD": refactored
+# Epic 12: 4-Channel cowok-design Packaging, Universal Multi-Harness Plugin Pack & OCI Distribution
+"Epic 12 - 4-Channel cowok-design Packaging, Universal Multi-Harness Plugin Pack & OCI Distribution": in-progress
+"Story 12.1 - Kênh 1 — Single-Binary CLI (cowok-design) & Local Web Workbench với /api/* Standalone Parity": refactored
+"Story 12.2 - Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Universal Multi-Harness Plugin Pack (Cowok.ai, Claude, Codex, Antigravity, Cursor)": refactored
+"Story 12.3 - Kênh 4 — Container Image (Docker / OCI) kèm Pooled Headless Chromium & Air-Gapped Mode cho Đội nhóm & CI/CD": refactored
 
 # ==================================================
 # Feature Group: VS-06. Release Certification & Anti-Goodhart Evaluation
@@ -113,3 +113,13 @@ start_date: '2026-07-24'
 # Epic 13: End-to-End Sealed Anti-Goodhart Benchmark & 25-Case /simulate-user Certification Suite
 "Epic 13 - End-to-End Sealed Anti-Goodhart Benchmark & 25-Case /simulate-user Certification Suite": in-progress
 "Story 13.1 - End-to-End Sealed Anti-Goodhart Benchmark Runner & 25-Case /simulate-user M1..M5 Certification Suite": refactored
+
+# ==================================================
+# Feature Group: VS-07. Cloud Control Plane, Non-Tech Support Desk & SuperAdmin Portal
+# ==================================================
+
+# Epic 14: Cloud Control Plane, Non-Tech Support Desk & SuperAdmin Portal (cowok-design)
+"Epic 14 - Cloud Control Plane, Non-Tech Support Desk & SuperAdmin Portal (cowok-design)": backlog
+"Story 14.1 - Client Edge — In-App Non-Tech Support/Request Drawer (No-GitHub), Zero-PII Diagnostic Scrubber & Multi-Channel Telemetry Outbox": backlog
+"Story 14.2 - Cloud Ingestion API & SuperAdmin Portal MVP — OIDC/MFA/RBAC, 2-Way Non-Tech Helpdesk, Feature Request Clustering, Activation Funnel & Crash Center": backlog
+"Story 14.3 - 4-Channel Distribution Ops — Canary Rollout, Ed25519 Signed Updater & Skill Quarantine Advisory, Offline Licenses & Cowok.ai Federation": backlog

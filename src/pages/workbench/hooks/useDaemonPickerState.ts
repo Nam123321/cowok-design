@@ -100,6 +100,19 @@ function useDirectoryLoader(tRef: React.MutableRefObject<(k: string, f: string) 
   };
 }
 
+const MAX_SLUG_ATTEMPTS = 100;
+const SLUG_TIMESTAMP_RADIX = 36;
+const SLUG_SUFFIX_LEN = 4;
+
+function pickNonCollidingSlug(baseSlug: string, existingNames: Set<string>): string {
+  if (!existingNames.has(baseSlug)) return baseSlug;
+  for (let i = 2; i < MAX_SLUG_ATTEMPTS; i += 1) {
+    const candidate = `${baseSlug}-${i}`;
+    if (!existingNames.has(candidate)) return candidate;
+  }
+  return `${baseSlug}-${Date.now().toString(SLUG_TIMESTAMP_RADIX).slice(-SLUG_SUFFIX_LEN)}`;
+}
+
 export function useDaemonPickerState(props: UseDaemonPickerStateProps) {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -109,11 +122,13 @@ export function useDaemonPickerState(props: UseDaemonPickerStateProps) {
   const [slugInput, setSlugInput] = useState(toManagedSlug(props.initialSlug || "cowok-project"));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const loadedForOpenRef = useRef(false);
+  const autoDedupedRef = useRef(false);
   const dir = useDirectoryLoader(tRef);
 
   useEffect(() => {
     if (!props.isOpen) {
       loadedForOpenRef.current = false;
+      autoDedupedRef.current = false;
       return;
     }
     dir.setErrorMsg(null);
@@ -127,6 +142,14 @@ export function useDaemonPickerState(props: UseDaemonPickerStateProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.isOpen, props.initialSlug, props.initialPath, props.mode, resolvedDefaultTab, dir.loadDirectory]);
+
+  useEffect(() => {
+    if (!props.isOpen || props.mode !== "create" || autoDedupedRef.current || !dir.browseData) return;
+    autoDedupedRef.current = true;
+    const existing = new Set((dir.browseData.entries ?? []).map((e) => e.name.toLowerCase()));
+    const base = toManagedSlug(props.initialSlug || "cowok-project");
+    setSlugInput(pickNonCollidingSlug(base, existing));
+  }, [props.isOpen, props.mode, props.initialSlug, dir.browseData]);
 
   return {
     activeTab, setActiveTab, slugInput, setSlugInput, isSubmitting, setIsSubmitting, ...dir,
