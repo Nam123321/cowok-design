@@ -37,6 +37,8 @@ model Project {
   contextAssemblyTelemetry ContextAssemblyTelemetry[]
   screenArtifactPatches ScreenArtifactPatch[]
   sdiClarificationSessions SdiClarificationSession[]
+  userSkillRegistries UserSkillRegistry[]
+  gateFailureLedgers GateFailureLedger[]
 
   @@unique([id, tenantId], map: "uq_projects_id_tenant")
   @@index([inheritBrandFromProjectId])
@@ -1243,4 +1245,44 @@ model SdiClarificationSession {
   @@unique([tenantId, projectId])
   @@index([tenantId, projectId, updatedAt], map: "idx_sdi_clarification_sessions_proj")
   @@map("sdi_clarification_sessions")
+}
+
+model UserSkillRegistry {
+  id                    String  @id @default(uuid())
+  tenantId              String  @default("local-default") @map("tenant_id")
+  projectId             String? @map("project_id")
+  skillSlug             String  @map("skill_slug")
+  repoSourceUrl         String? @map("repo_source_url")
+  headerTokens          Int     @map("header_tokens")
+  securityScanVerdict   String  @map("security_scan_verdict")
+  licenseClassification String  @map("license_classification")
+  skillMdPath           String  @map("skill_md_path")
+  createdAt             BigInt  @map("created_at")
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, skillSlug])
+  @@unique([tenantId, skillSlug], where: { projectId: null }, map: "uq_user_skill_registry_tenant_global_slug")
+  @@index([tenantId, projectId, createdAt], map: "idx_user_skill_registry_tenant_project")
+  @@map("user_skill_registry")
+}
+
+model GateFailureLedger {
+  id                String  @id @default(uuid())
+  tenantId          String  @default("local-default") @map("tenant_id")
+  projectId         String  @map("project_id")
+  ruleId            String  @map("rule_id")
+  fingerprintSha256 String  @map("fingerprint_sha256")
+  sampleMessage     String  @default("") @map("sample_message")
+  hitCount          Int     @default(1) @map("hit_count")
+  slprScore         Float   @default(0.0) @map("slpr_score")
+  promotedCardId    String? @map("promoted_card_id")
+  status            String  @default("ACCUMULATING")
+  lastSeenAt        BigInt  @map("last_seen_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, fingerprintSha256])
+  @@index([tenantId, projectId, status, lastSeenAt], map: "idx_gate_failure_ledger_scope_status")
+  @@map("gate_failure_ledger")
 }

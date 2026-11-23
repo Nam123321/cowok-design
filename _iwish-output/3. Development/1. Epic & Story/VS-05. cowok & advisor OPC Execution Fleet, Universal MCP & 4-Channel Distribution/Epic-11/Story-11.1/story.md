@@ -4,7 +4,7 @@ id: "11.1"
 title: "Story 11.1: POSIX BYOS CLI Sandbox (0600 FD Staging + setpgid/killpg) & BYOK Unified Gateway"
 description: "Tự động dò tìm và điều phối codex, claude, agy, ollama qua file descriptor 0600 (không lộ prompt trên ps aux), quản lý nhóm tiến trình bằng setpgid/killpg và tích hợp cổng BYOK."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-11/Story-11.1/story.md"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: hybrid
 adr_ref: "ADR-006"
@@ -36,7 +36,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-28: POSIX BYOS CLI Sandbox (0600 FD Staging + -PGID Reaper) & BYOK Unified Gateway](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 11: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Universal Open MCP Server](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-11/epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context

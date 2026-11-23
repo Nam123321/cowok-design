@@ -4,7 +4,7 @@ id: "08.5"
 title: "Story 08.5: Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 LEARN Loop"
 description: "Hợp nhất 08.5 + 13.1-split + 11.2 cũ thành lát cắt dọc Split DE+DR hoàn chỉnh trên nền crates/plugin-host: Plugin Center Repo Import UI + Ephemeral Tool Audit Drawer + LEARN Queue + CLI uiux-os de-check <-> 7 Built-in DE Tools (scan-ui, intake KIND_CAP, tokens OKLCH auto-contrast, linear-NFA tells/impeccable/hallmark/stageshow <=25ms, archify, get_artifact BFS, notes-check) + HUMAN_ONLY Ephemeral Tool Jail (env_clear, O_NOFOLLOW) + System-1 LEARN filter (hit_count>=3, dedupe noul, SLPR>=0.95, auto-retire) -> V18 gate_failure_ledger."
 resource: "iwish://uxui-os/development/epic-08/story-08.5"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: hybrid
 adr_ref: "ADR-007"
@@ -39,7 +39,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-35: Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 LEARN](file:///Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 08: agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN](../epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context

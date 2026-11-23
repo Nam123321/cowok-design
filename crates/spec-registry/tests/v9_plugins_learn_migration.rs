@@ -318,6 +318,7 @@ fn legacy_epic08_v9_to_v11_slots_rekey_to_v12_to_v14_and_backfill_epic05() {
             (17, spec_registry::pool::V17_MIGRATION_NAME.to_string()),
             (18, spec_registry::pool::V18_MIGRATION_NAME.to_string()),
             (19, spec_registry::pool::V19_MIGRATION_NAME.to_string()),
+            (20, spec_registry::pool::V20_MIGRATION_NAME.to_string()),
         ]
     );
 }
@@ -342,6 +343,8 @@ fn sqlite_master_matches_prisma_schema_for_story_08_4_tables() {
         ("KnowledgeCard", "knowledge_cards"),
         ("LearnConsumedNonce", "learn_consumed_nonces"),
         ("PluginCronSchedule", "plugin_cron_schedules"),
+        ("UserSkillRegistry", "user_skill_registry"),
+        ("GateFailureLedger", "gate_failure_ledger"),
     ] {
         assert!(
             prisma_text.contains(&format!("model {model_name} {{")),

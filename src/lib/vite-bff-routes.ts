@@ -52,6 +52,12 @@ import * as ssotExportRoute from "../app/api/v1/ssot/export/route";
 import * as skillsRouteHandler from "../app/api/v1/skills/route/route";
 import * as sdiClarifyRoute from "../app/api/v1/sdi/clarify/route";
 import * as surgicalPatchRoute from "../app/api/v1/patch/route";
+import * as deRunRoute from "../app/api/v1/de/run/route";
+import * as pluginImportRepoRoute from "../app/api/v1/plugins/import-repo/route";
+import * as ephemeralToolsExecuteRoute from "../app/api/v1/plugins/ephemeral-tools/execute/route";
+import * as learnLedgerRoute from "../app/api/v1/learn/ledger/route";
+import * as botFleetExecuteRoute from "../app/api/v1/bot-fleet/execute/route";
+import * as botFleetProvidersStatusRoute from "../app/api/v1/bot-fleet/providers/status/route";
 import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize/route";
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
 import * as versionSnapshotsRoute from "../app/api/projects/[id]/snapshots/route";
@@ -187,6 +193,14 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/sdi\/clarify$/, extractParams: noParams, resolveHandler: () => sdiClarifyRoute.POST },
   { method: "GET", pattern: /^\/api\/patch$/, extractParams: noParams, resolveHandler: () => surgicalPatchRoute.GET },
   { method: "POST", pattern: /^\/api\/patch$/, extractParams: noParams, resolveHandler: () => surgicalPatchRoute.POST },
+  { method: "POST", pattern: /^\/api\/de\/run$/, extractParams: noParams, resolveHandler: () => deRunRoute.POST },
+  { method: "GET", pattern: /^\/api\/plugins\/import-repo$/, extractParams: noParams, resolveHandler: () => pluginImportRepoRoute.GET },
+  { method: "POST", pattern: /^\/api\/plugins\/import-repo$/, extractParams: noParams, resolveHandler: () => pluginImportRepoRoute.POST },
+  { method: "POST", pattern: /^\/api\/plugins\/ephemeral-tools\/execute$/, extractParams: noParams, resolveHandler: () => ephemeralToolsExecuteRoute.POST },
+  { method: "GET", pattern: /^\/api\/learn\/ledger$/, extractParams: noParams, resolveHandler: () => learnLedgerRoute.GET },
+  { method: "POST", pattern: /^\/api\/learn\/ledger$/, extractParams: noParams, resolveHandler: () => learnLedgerRoute.POST },
+  { method: "POST", pattern: /^\/api\/bot-fleet\/execute$/, extractParams: noParams, resolveHandler: () => botFleetExecuteRoute.POST },
+  { method: "GET", pattern: /^\/api\/bot-fleet\/providers\/status$/, extractParams: noParams, resolveHandler: () => botFleetProvidersStatusRoute.GET },
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.POST },
   { method: "PUT", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/reorder$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]) }), resolveHandler: () => deckReorderRoute.PUT },

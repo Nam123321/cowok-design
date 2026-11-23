@@ -237,3 +237,202 @@
   gap: var(--space-2);
   align-items: center;
 }
+
+/* @story 08.5: Split DE+DR Plugin Runtime, Ephemeral Tool Jail & LEARN Ledger */
+.plugin-eco-form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.plugin-eco-textarea {
+  width: 100%;
+  min-height: 68px;
+  box-sizing: border-box;
+  padding: var(--space-2);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-default);
+  background-color: var(--bg-workspace);
+  color: var(--text-primary);
+  resize: vertical;
+}
+
+.plugin-eco-drawer-panel {
+  border-left: 3px solid var(--state-danger);
+}
+
+.plugin-eco-badge-human-only {
+  background-color: var(--state-danger-soft);
+  color: var(--state-danger);
+  border: var(--badge-human-only, 1px solid var(--state-danger));
+}
+
+.plugin-eco-badge-de-sla {
+  background-color: var(--state-success-soft);
+  color: var(--state-success);
+  border-color: var(--state-success);
+}
+
+.plugin-eco-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 8px;
+}
+
+.plugin-eco-chip-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-workspace);
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.plugin-eco-chip-card--selected {
+  border-color: var(--human-border, var(--human-accent));
+  background-color: var(--human-soft);
+}
+
+.plugin-eco-check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.plugin-eco-toggle-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  background-color: var(--bg-subtle);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.plugin-eco-toggle-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.plugin-eco-toggle-chip--active {
+  border-color: var(--state-success);
+  background-color: var(--state-success-soft);
+  color: var(--state-success);
+}
+
+.plugin-eco-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--text-muted);
+}
+
+.plugin-eco-status-dot--active {
+  background-color: var(--state-success);
+}
+
+.plugin-eco-status-dot--danger {
+  background-color: var(--state-danger);
+}
+
+.plugin-eco-inline-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.plugin-eco-inline-bar .plugin-eco-rationale-input {
+  flex: 1 1 240px;
+  width: auto;
+}
+
+.plugin-eco-meta-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(200px, 2fr) minmax(110px, 0.7fr);
+  gap: var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .plugin-eco-meta-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.plugin-eco-quarantine-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background-color: transparent;
+  color: var(--state-danger);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.plugin-eco-quarantine-chip:hover {
+  border-color: var(--state-danger);
+  background-color: var(--state-danger-soft);
+}
+
+.plugin-eco-bulk-float {
+  position: sticky;
+  bottom: 12px;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--human-border, var(--border-strong));
+  background-color: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+}
+
+.plugin-eco-bulk-count {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--human-accent);
+}
+
+.plugin-eco-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background-color: var(--bg-overlay);
+}
+
+.plugin-eco-modal-card {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background-color: var(--bg-surface);
+  box-shadow: var(--shadow-lg);
+}

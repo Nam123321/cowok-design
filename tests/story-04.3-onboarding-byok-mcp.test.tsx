@@ -117,12 +117,12 @@ describe("Story 04.3: Onboarding Wizard - Prioritize BYOS CLI BEFORE BYOK & Auto
 
     // Verify Section 1 Header text exists
     expect(
-      screen.getByText(/1\.\s*Kết nối CLI sẵn có trên máy — Bring Your Own Subscription \(BYOS\)/i)
+      screen.getByText(/1\.\s*(Kết nối công cụ AI sẵn có trên máy|Connect Local AI Tools)/i)
     ).toBeTruthy();
 
-    // Verify Section 2 BYOK Header text exists
+    // Verify Section 2 API Key Header text exists
     expect(
-      screen.getByText(/2\.\s*Hoặc dán API Key trực tiếp \(BYOK\)/i)
+      screen.getByText(/2\.\s*(Hoặc kết nối bằng Khóa API|Or connect with your own API key)/i)
     ).toBeTruthy();
 
     // Verify BYOK inputs are present

@@ -7,8 +7,10 @@ use axum::{
 };
 
 use crate::daemon_auth::legacy_project_auth_middleware;
+use crate::routes::bot_fleet::build_bot_fleet_router;
 use crate::routes::chat_cas_vault::chat_cas_vault_routes;
 use crate::routes::context_assemble::{handle_context_assemble, handle_get_context_telemetry};
+use crate::routes::de_runtime::build_de_runtime_router;
 use crate::routes::fs_jail;
 use crate::routes::github_ide_integrations::integration_routes;
 use crate::routes::legacy_proposals::{
@@ -261,6 +263,8 @@ pub(crate) fn build_protected_legacy_router(state: DaemonAppState) -> Router<Dae
         .merge(chat_cas_vault_routes())
         .merge(integration_routes())
         .merge(presentation_routes())
+        .merge(build_de_runtime_router())
+        .merge(build_bot_fleet_router())
         .route_layer(middleware::from_fn_with_state(
             state,
             legacy_project_auth_middleware,

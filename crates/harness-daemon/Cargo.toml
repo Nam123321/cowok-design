@@ -17,6 +17,7 @@ html-forge = { path = "../html-forge" }
 presentation-cms = { path = "../presentation-cms" }
 flow-graph = { path = "../flow-graph" }
 plugin-host = { path = "../plugin-host" }
+bot-fleet = { path = "../bot-fleet" }
 axum = "0.7"
 futures-util = { version = "0.3", default-features = false }
 tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "net", "process", "sync", "time"] }

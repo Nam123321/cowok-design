@@ -348,7 +348,7 @@ describe("Story 08.4 BFF guardedRoute, Routing Table, SDK & XSS/UI States", () =
         onReject={onReject}
       />
     );
-    expect(screen.getByTestId("learn-token-budget").textContent).toContain("/1500");
+    expect(screen.getByTestId("learn-token-budget").textContent).toMatch(/\/1[.,]?500/);
     const preview = screen.getByTestId(`learn-card-preview-${SAMPLE_LEARN_CARD.id}`);
     expect(preview.querySelectorAll("img, script")).toHaveLength(0);
     const approveBtn = screen.getByTestId(`btn-approve-learn-${SAMPLE_LEARN_CARD.id}`) as HTMLButtonElement;
@@ -796,13 +796,24 @@ describe("Story 08.4 BFF guardedRoute, Routing Table, SDK & XSS/UI States", () =
     expect(screen.queryByTestId("btn-activate-compromised-skill")).toBeNull();
     expect(screen.getByTestId("plugin-quarantine-reason-compromised-skill").textContent).toContain("Blocked script exfiltration attempt");
 
-    const qInput = screen.getByTestId(`input-quarantine-reason-${SAMPLE_PLUGIN.pluginSlug}`);
-    const qBtn = screen.getByTestId(`btn-quarantine-${SAMPLE_PLUGIN.pluginSlug}`) as HTMLButtonElement;
-    expect(qBtn.disabled).toBe(true);
+    // Compact chip grid: clicking Cách ly opens Quarantine Reason popup modal
+    const qTrigger = screen.getByTestId(`btn-quarantine-${SAMPLE_PLUGIN.pluginSlug}`) as HTMLButtonElement;
+    expect(qTrigger.disabled).toBe(false);
+    fireEvent.click(qTrigger);
+    expect(screen.getByTestId("quarantine-reason-modal")).toBeTruthy();
+    const qInput = screen.getByTestId("input-quarantine-reason-modal");
+    const qConfirm = screen.getByTestId("btn-confirm-quarantine-modal") as HTMLButtonElement;
+    expect(qConfirm.disabled).toBe(true);
     fireEvent.change(qInput, { target: { value: "Suspicious telemetry call" } });
-    expect(qBtn.disabled).toBe(false);
-    fireEvent.click(qBtn);
+    expect(qConfirm.disabled).toBe(false);
+    fireEvent.click(qConfirm);
     expect(onQuarantine).toHaveBeenCalledWith(SAMPLE_PLUGIN, "Suspicious telemetry call");
+
+    // Multi-select checkbox reveals Bulk Action Floating Card
+    fireEvent.click(screen.getByTestId(`checkbox-plugin-${SAMPLE_PLUGIN.pluginSlug}`));
+    expect(screen.getByTestId("plugin-bulk-floating-bar")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("btn-bulk-clear"));
+    expect(screen.queryByTestId("plugin-bulk-floating-bar")).toBeNull();
 
     rerender(
       <CronSyncStatus

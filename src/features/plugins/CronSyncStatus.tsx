@@ -2,6 +2,7 @@
 // @implements AC-04 (Cron Sync Schedule Monitor, Lease/Retry Backoff, & AUTH_REQUIRED Recovery)
 import React, { useState } from "react";
 import { BrandIcon } from "../../components/ui/BrandIcon";
+import { useFormatter } from "../../hooks/useFormatter";
 import { useTranslation } from "../../hooks/useTranslation";
 import type { PluginSummaryDto } from "../../lib/validations/plugins";
 import {
@@ -121,6 +122,7 @@ const CronCardHeader: React.FC<{
   statusLabel: string;
 }> = ({ plugin, schedule, statusLabel }) => {
   const { t } = useTranslation();
+  const { formatNumber } = useFormatter();
   return (
     <div className="plugin-eco-card-row">
       <div>
@@ -129,7 +131,7 @@ const CronCardHeader: React.FC<{
         </div>
         <div className="plugin-eco-meta">
           {schedule ? schedule.upstreamRepoUrl : plugin.upstreamRepoUrl || plugin.sourceRepoUrl} • {t("cron.failuresLabel", "Failures")}:{" "}
-          {schedule ? schedule.consecutiveFailures : 0}
+          {formatNumber(schedule ? schedule.consecutiveFailures : 0)}
         </div>
       </div>
       <span className={cronBadgeClass(statusLabel)} data-testid={`cron-status-${plugin.pluginSlug}`}>
@@ -149,7 +151,7 @@ const CronScheduleCard: React.FC<{
   const { t } = useTranslation();
   const statusLabel = schedule ? schedule.syncStatus : "UNSCHEDULED";
   return (
-    <div className="plugin-eco-card" data-testid={`cron-card-${plugin.pluginSlug}`}>
+    <div className="plugin-eco-chip-card" data-testid={`cron-card-${plugin.pluginSlug}`}>
       <CronCardHeader plugin={plugin} schedule={schedule} statusLabel={statusLabel} />
       {schedule?.syncStatus === "AUTH_REQUIRED" && (
         <CronAuthBanner
@@ -210,7 +212,7 @@ const CronSyncBody: React.FC<{
     );
   }
   return (
-    <div className="plugin-eco-list">
+    <div className="plugin-eco-chip-grid">
       {entries.map(({ plugin, schedule }) => {
         const pluginBusy =
           pendingActionId === `sync:${plugin.id}` || pendingActionId === `schedule:${plugin.id}`;

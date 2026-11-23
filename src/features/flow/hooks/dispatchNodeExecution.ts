@@ -1,6 +1,7 @@
-// @story 04.4
-// @implements AC-01, AC-02, AC-03 (Daemon Enqueue, Lifecycle SSE Stream & CAS Dispatch Helper)
+// @story 04.4, 11.1
+// @implements AC-01, AC-02, AC-03 (Daemon Enqueue, Real Bot-Fleet BYOS/BYOK Execution, Lifecycle SSE Stream & CAS Dispatch)
 import React from "react";
+import { apiBotFleet } from "@/api/bot-fleet";
 import { apiChangeProposal } from "@/api/change-proposal";
 import { apiFlowExecution } from "@/api/flow-execution";
 import { apiSdiEngine } from "@/api/sdi-engine";
@@ -8,6 +9,7 @@ import {
   buildUiChangeProposalInput,
   notifyProposalsChanged,
 } from "@/features/proposals/utils/proposal-events";
+import type { BotFleetExecuteData } from "@/lib/validations/bot-fleet";
 import { WorkbenchNode } from "../store/flow-workbench-store";
 import { globalKeyedParallelCoordinator } from "../store/keyed-parallel-coordinator";
 import { sharedChatStore, toSessionChatKey } from "../store/shared-chat-sync";
@@ -24,6 +26,11 @@ interface ActiveSseListener {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PERCENT_SCALE = 100;
+const ISO_TIME_START = 11;
+const ISO_TIME_END = 16;
+const BOT_FLEET_DEFAULT_TIMEOUT_MS = 30_000;
+const BOT_FLEET_PREVIEW_MAX_CHARS = 600;
 const activeStreams = new Map<string, ActiveSseListener>();
 
 function formatJsonSsePayload(
@@ -139,11 +146,13 @@ export function ensureProjectSseStream(opts: {
         };
         if (listener.onAppendMsg) listener.onAppendMsg(msg);
         else sharedChatStore.appendMessage(toSessionChatKey(projectId, listener.sessionId), {
-          id: msg.id, sender: "agent", text: msg.content, timestamp: new Date(msg.timestamp).toISOString().slice(11, 16),
+          id: msg.id, sender: "agent", text: msg.content, timestamp: new Date(msg.timestamp).toISOString().slice(ISO_TIME_START, ISO_TIME_END),
           createdAtMs: msg.timestamp, nodeId: ev.nodeId, jobId: ev.jobId, projectSeq: msg.projectSeq,
         });
       }
-      if (events.some((ev) => ev.jobStatus)) void syncCoordinatorFromDaemon(projectId);
+      if (events.some((ev) => ev.jobStatus)) {
+        syncCoordinatorFromDaemon(projectId).catch(() => undefined);
+      }
     },
   }).catch(() => { /* stream aborted or offline */ }).finally(() => {
     if (activeStreams.get(streamKey) === listener) activeStreams.delete(streamKey);
@@ -197,6 +206,43 @@ async function synthesizeProposalAndCompleteJobs(
   await syncCoordinatorFromDaemon(params.projectId, params.coordinator);
 }
 
+function buildBotFleetContent(exec: BotFleetExecuteData, t: TranslateFn): string {
+  const engine = exec.adapterId || exec.providerId || exec.mode;
+  const header = t("chat.botFleetExecutedPrefix", "Thực thi qua {{engine}} ({{ms}}ms)")
+    .replace("{{engine}}", engine)
+    .replace("{{ms}}", String(exec.durationMs));
+  const preview = exec.normalizedContent.slice(0, BOT_FLEET_PREVIEW_MAX_CHARS).trim();
+  return [header, preview].filter(Boolean).join("\n");
+}
+
+async function tryExecuteBotFleetPrompt(
+  params: DispatchExecutionParams
+): Promise<string> {
+  try {
+    const res = await apiBotFleet.executePrompt({
+      projectId: params.projectId,
+      sessionId: params.sessionId,
+      nodeId: params.primaryNode?.id,
+      mode: "auto",
+      prompt: params.prompt,
+      timeoutMs: BOT_FLEET_DEFAULT_TIMEOUT_MS,
+    });
+    params.onAppendMsg({
+      id: `fleet-${res.data.executionId}`,
+      nodeId: params.primaryNode?.id || "unknown",
+      role: "assistant",
+      content: buildBotFleetContent(res.data, params.t),
+      timestamp: Date.now(),
+    });
+    if (res.data.timedOut) {
+      return params.prompt;
+    }
+    return [params.prompt, res.data.normalizedContent].filter(Boolean).join("\n\n");
+  } catch {
+    return params.prompt;
+  }
+}
+
 async function runEnqueueAndCompile(params: DispatchExecutionParams): Promise<void> {
   const enq = await apiFlowExecution.enqueueJobs(params.projectId, {
     sessionId: params.sessionId,
@@ -208,7 +254,7 @@ async function runEnqueueAndCompile(params: DispatchExecutionParams): Promise<vo
   sharedChatStore.bumpSubSessionsVersion();
 
   const intent = await apiSdiEngine.compileIntent(params.projectId, { rawPrompt: params.prompt, targetNodeId: params.primaryNode?.id });
-  const clarifyPct = params.formatNumber(Math.round(intent.ambiguityScore * 100));
+  const clarifyPct = params.formatNumber(Math.round(intent.ambiguityScore * PERCENT_SCALE));
   const summary = intent.status === "clarifying"
     ? `${params.t("chat.clarifyPrefix", "Cần làm rõ")} (${clarifyPct}%): ${intent.clarificationVariants?.map((v) => v.title).join(" | ") || intent.intentType}`
     : `${params.t("floatingChat.compiledIntent", "Đã biên dịch intent")} (${intent.intentType}) · ${params.t("chat.intentStatusLabel", "Status")}: ${intent.status}`;
@@ -223,7 +269,9 @@ async function runEnqueueAndCompile(params: DispatchExecutionParams): Promise<vo
       }
     : undefined;
   params.onAppendMsg({ id: `resp-${intent.id}`, nodeId: params.primaryNode?.id || "unknown", role: "assistant", content: summary, timestamp: Date.now(), sdiClarification });
-  await synthesizeProposalAndCompleteJobs(params, enq.jobs, intent.intentType);
+
+  const proposalPrompt = await tryExecuteBotFleetPrompt(params);
+  await synthesizeProposalAndCompleteJobs({ ...params, prompt: proposalPrompt }, enq.jobs, intent.intentType);
 }
 
 export async function dispatchNodeExecutionToDaemon(params: DispatchExecutionParams) {
@@ -273,7 +321,7 @@ export function dispatchSteerToDaemon(params: {
       const msg = err instanceof Error ? err.message : "steer_failed";
       const prefix = msg.includes("409") || msg.includes("STALE_FENCING_TOKEN") ? "409 STALE_FENCING_TOKEN" : params.errorPrefix;
       params.appendMsg({ id: `steer-err-${Date.now()}`, nodeId: params.nodeId, role: "assistant", content: `${prefix}: ${msg}`, timestamp: Date.now() });
-      void syncCoordinatorFromDaemon(params.projectId, params.coordinator);
+      syncCoordinatorFromDaemon(params.projectId, params.coordinator).catch(() => undefined);
     });
 }
 
@@ -287,9 +335,12 @@ export function dispatchTransitionToDaemon(params: {
 }): void {
   const { projectId, kind, jobId, fence, coordinator, onErrorMsg } = params;
   if (!UUID_RE.test(projectId)) {
-    if (kind === "pause") coordinator.pauseJob(jobId);
-    else if (kind === "resume") coordinator.resumeJob(jobId);
-    else coordinator.cancelJob(jobId);
+    const localOps = {
+      pause: () => coordinator.pauseJob(jobId),
+      resume: () => coordinator.resumeJob(jobId),
+      cancel: () => coordinator.cancelJob(jobId),
+    };
+    localOps[kind]();
     return;
   }
   const transitions = {
@@ -299,15 +350,18 @@ export function dispatchTransitionToDaemon(params: {
   };
   const call = transitions[kind]();
 
-  void call
+  call
     .then((dto) => {
       globalKeyedParallelCoordinator.reconcileSingleJob(dto, apiFlowExecution.getLastProjectSeq(projectId));
-      if (kind === "cancel") void syncCoordinatorFromDaemon(projectId, coordinator);
-      else sharedChatStore.bumpSubSessionsVersion();
+      if (kind === "cancel") {
+        syncCoordinatorFromDaemon(projectId, coordinator).catch(() => undefined);
+      } else {
+        sharedChatStore.bumpSubSessionsVersion();
+      }
     })
     .catch((err: unknown) => {
       const msg = err instanceof Error ? err.message : `${kind}_failed`;
       onErrorMsg?.(msg);
-      void syncCoordinatorFromDaemon(projectId, coordinator);
+      syncCoordinatorFromDaemon(projectId, coordinator).catch(() => undefined);
     });
 }
