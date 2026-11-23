@@ -1,10 +1,12 @@
 // @story 04.1, 04.6
 // @implements AC-01, AC-03, AC-04, AC-06
+pub mod bot_fleet;
 pub mod chat_cas_archive;
 pub mod chat_cas_storage;
 pub mod chat_cas_upload_handler;
 pub mod chat_cas_vault;
 pub mod context_assemble;
+pub mod de_runtime;
 pub mod doctor_usage;
 pub mod doctor_vault;
 pub mod execution_coordinator;

@@ -53,8 +53,18 @@ export interface SettingsGeneralModelsPaneProps {
   onDefaultModelChange: (model: string) => void;
   byosEndpoint: string;
   onByosEndpointChange: (url: string) => void;
-  ephemeralApiKeys: { gemini: string; claude: string; openai: string; byosToken: string };
-  onEphemeralKeyChange: (key: "gemini" | "claude" | "openai" | "byosToken", val: string) => void;
+  ephemeralApiKeys: {
+    gemini: string;
+    claude: string;
+    openai: string;
+    openrouter?: string;
+    deepseek?: string;
+    byosToken: string;
+  };
+  onEphemeralKeyChange: (
+    key: "gemini" | "claude" | "openai" | "openrouter" | "deepseek" | "byosToken",
+    val: string
+  ) => void;
   showKeys: boolean;
   onToggleShowKeys: () => void;
   onAgentPrefsChange?: (vaultMode: string, permissionMode: string) => void;
@@ -298,10 +308,10 @@ const ModelsByosSection: React.FC<
     <>
       <div>
         <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "2px" }}>
-          {t("settings.modelsTitle", "Kết nối AI, BYOS & Quyền Runtime")}
+          {t("settings.modelsTitle", "Kết nối Mô hình AI & Quyền Runtime")}
         </div>
         <div style={{ fontSize: "11px", color: "var(--text-muted)", marginBottom: "4px", lineHeight: "1.4" }}>
-          {t("settings.modelsDesc", "Kết nối tự động CLI trên máy, API Providers và chính sách Runtime. Việc chọn model theo tác vụ thực hiện trực tiếp tại khung Chat.")}
+          {t("settings.modelsDesc", "Tự động phát hiện công cụ AI trên máy, khóa API nhà cung cấp và chính sách Runtime. Chọn mô hình theo từng tác vụ ngay tại khung Chat.")}
         </div>
         {daemonNotice && (
           <div

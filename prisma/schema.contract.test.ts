@@ -229,6 +229,12 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V20__story_08_5_de_dr_learn_ledger.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
@@ -299,10 +305,12 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
     expect(mappedTables).toContain("app_shell_locks");
     expect(mappedTables).toContain("screen_artifact_patches");
     expect(mappedTables).toContain("sdi_clarification_sessions");
-    expect(mappedTables).toHaveLength(60);
+    expect(mappedTables).toContain("user_skill_registry");
+    expect(mappedTables).toContain("gate_failure_ledger");
+    expect(mappedTables).toHaveLength(62);
   });
 
-  it("UT-DB-02: executes V1-V19 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V20 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 
@@ -662,5 +670,53 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
       db.prepare("PRAGMA index_list(projects)").all() as Array<{ name: string }>
     ).map((r) => r.name);
     expect(projIdx).toContain("uq_projects_id_tenant");
+  });
+
+  it("UT-DB-11: verifies Story 08.5 V20 user_skill_registry & gate_failure_ledger Prisma parity, CHECK constraints, and cascade", () => {
+    const db = openMigratedMemoryDb();
+    const schemaText = fs.readFileSync(schemaPath, "utf-8");
+
+    for (const [modelName, tableName] of [
+      ["UserSkillRegistry", "user_skill_registry"],
+      ["GateFailureLedger", "gate_failure_ledger"],
+    ] as const) {
+      const pragmaRows = db
+        .prepare(`PRAGMA table_info(${tableName})`)
+        .all() as Array<{ name: string }>;
+      const sqliteCols = pragmaRows.map((r) => r.name).sort();
+      const prismaCols = parsePrismaModelColumns(schemaText, modelName);
+      expect(sqliteCols, `Column parity for ${tableName} <-> ${modelName}`).toEqual(prismaCols);
+    }
+
+    const now = Date.now();
+    db.prepare(
+      "INSERT INTO projects (id, tenant_id, name, slug, created_at, updated_at) VALUES ('p-085', 'tenant-a', 'Proj 085', 'p-085', ?, ?)"
+    ).run(now, now);
+
+    // Header tokens > 100 must fail CHECK constraint
+    expect(() => {
+      db.prepare(
+        "INSERT INTO user_skill_registry (id, tenant_id, project_id, skill_slug, header_tokens, security_scan_verdict, license_classification, skill_md_path, created_at) VALUES ('usr-bad', 'tenant-a', 'p-085', 'bad-skill', 101, 'PASS', 'ADOPT_PRIOR_ART', 'skills/bad/SKILL.md', ?)"
+      ).run(now);
+    }).toThrow();
+
+    db.prepare(
+      "INSERT INTO user_skill_registry (id, tenant_id, project_id, skill_slug, header_tokens, security_scan_verdict, license_classification, skill_md_path, created_at) VALUES ('usr-1', 'tenant-a', 'p-085', 'good-skill', 42, 'PASS', 'ADOPT_PRIOR_ART', 'skills/good/SKILL.md', ?)"
+    ).run(now);
+
+    db.prepare(
+      "INSERT INTO gate_failure_ledger (id, tenant_id, project_id, rule_id, fingerprint_sha256, sample_message, hit_count, slpr_score, status, last_seen_at) VALUES ('gfl-1', 'tenant-a', 'p-085', 'TELLS-001', 'abc123', 'AI slop detected', 3, 0.96, 'PROPOSED', ?)"
+    ).run(now);
+
+    // Project delete cascades cleanly
+    db.prepare("DELETE FROM projects WHERE id = 'p-085'").run();
+    const skillCount = (
+      db.prepare("SELECT COUNT(*) as c FROM user_skill_registry").get() as { c: number }
+    ).c;
+    const ledgerCount = (
+      db.prepare("SELECT COUNT(*) as c FROM gate_failure_ledger").get() as { c: number }
+    ).c;
+    expect(skillCount).toBe(0);
+    expect(ledgerCount).toBe(0);
   });
 });

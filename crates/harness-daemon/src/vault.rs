@@ -160,6 +160,19 @@ impl RamVaultStore {
             guard.retain(|(tid, _), _| tid != tenant_id);
         }
     }
+
+    pub fn list_tenant_secrets(&self, tenant_id: &str) -> Vec<(String, Zeroizing<String>)> {
+        self.inner
+            .read()
+            .map(|guard| {
+                guard
+                    .iter()
+                    .filter(|((tid, _), _)| tid == tenant_id)
+                    .map(|((_, provider), secret)| (provider.clone(), secret.clone()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
 }
 
 #[derive(Debug, Clone)]

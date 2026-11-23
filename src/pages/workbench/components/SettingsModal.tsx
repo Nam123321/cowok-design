@@ -52,7 +52,7 @@ const SettingsTabStrip: React.FC<{
   const { t } = useTranslation();
   const tabs: { id: SettingsTab; label: string; icon: string }[] = [
     { id: "general", label: t("settings.tabGeneral", "Chung"), icon: "settings" },
-    { id: "models", label: t("settings.tabModels", "Mô hình & BYOS"), icon: "llm-config" },
+    { id: "models", label: t("settings.tabModels", "Mô hình AI"), icon: "llm-config" },
     { id: "mcp", label: t("settings.tabMcp", "MCP & Tiện ích"), icon: "plugin" },
     { id: "automations", label: t("settings.tabAutomations", "Tự động hóa"), icon: "automation" },
   ];
@@ -143,6 +143,8 @@ async function executeSaveSettings(
       { providerId: "gemini", secret: s.ephemeralKeys.gemini.trim() },
       { providerId: "anthropic", secret: s.ephemeralKeys.claude.trim() },
       { providerId: "openai", secret: s.ephemeralKeys.openai.trim() },
+      { providerId: "openrouter", secret: (s.ephemeralKeys.openrouter ?? "").trim() },
+      { providerId: "deepseek", secret: (s.ephemeralKeys.deepseek ?? "").trim() },
       { providerId: "byos", secret: s.ephemeralKeys.byosToken.trim() },
     ];
     for (const entry of providerKeyEntries) {

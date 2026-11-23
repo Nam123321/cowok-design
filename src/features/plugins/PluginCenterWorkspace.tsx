@@ -12,6 +12,10 @@ import { CronSyncStatus } from "./CronSyncStatus";
 import { LearnCardReviewQueue } from "./LearnCardReviewQueue";
 import { PluginRegistryPanel } from "./PluginRegistryPanel";
 import { usePluginRegistry } from "./hooks/usePluginRegistry";
+import { DeToolsStatusList } from "../plugin-center/DeToolsStatusList";
+import { EphemeralToolAuditDrawerPanel } from "../plugin-center/EphemeralToolAuditDrawerPanel";
+import { LearnLedgerQueueList } from "../plugin-center/LearnLedgerQueueList";
+import { RepoImportForm } from "../plugin-center/RepoImportForm";
 
 export interface PluginCenterWorkspaceProps {
   projectId: string;
@@ -33,9 +37,10 @@ function updateTabQueryParam(nextScope: "mcp" | "automations", preserveLearnTab:
 }
 
 const PluginCenterMcpContent: React.FC<{
+  projectId: string;
   registry: ReturnType<typeof usePluginRegistry>;
   initialLearnFilter: "ALL" | "PROPOSED" | "ACCEPTED" | "REJECTED";
-}> = ({ registry, initialLearnFilter }) => {
+}> = ({ projectId, registry, initialLearnFilter }) => {
   const pluginCheck = validatePluginCards(registry.plugins);
   const cardCheck = validateLearnCards(registry.learnCards);
   return (
@@ -51,6 +56,13 @@ const PluginCenterMcpContent: React.FC<{
         onQuarantine={(plugin, reason) => void registry.quarantinePlugin(plugin, reason)}
         onPromoteStaging={(plugin, reason) => void registry.promoteStaging(plugin, reason)}
         onDiscardStaging={(plugin, reason) => void registry.discardStaging(plugin, reason)}
+      />
+      <DeToolsStatusList projectId={projectId} />
+      <RepoImportForm projectId={projectId} />
+      <EphemeralToolAuditDrawerPanel projectId={projectId} />
+      <LearnLedgerQueueList
+        projectId={projectId}
+        onCardProposed={() => void registry.refreshAll()}
       />
       <LearnCardReviewQueue
         cards={cardCheck.valid}
@@ -120,7 +132,11 @@ export const PluginCenterWorkspace: React.FC<PluginCenterWorkspaceProps> = ({
     >
       <PluginCenterHeader scope={scope} onSwitchScope={switchScope} />
       {scope === "mcp" ? (
-        <PluginCenterMcpContent registry={registry} initialLearnFilter={initialLearnFilter} />
+        <PluginCenterMcpContent
+          projectId={projectId}
+          registry={registry}
+          initialLearnFilter={initialLearnFilter}
+        />
       ) : (
         <CronSyncStatus
           plugins={cronPlugins}

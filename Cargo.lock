@@ -236,7 +236,20 @@ dependencies = [
 name = "bot-fleet"
 version = "0.1.0"
 dependencies = [
+ "axum",
+ "chrono",
  "domain",
+ "libc",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -845,6 +858,7 @@ dependencies = [
  "argon2",
  "axum",
  "base64 0.22.1",
+ "bot-fleet",
  "chrono",
  "constraint-engine",
  "context-compiler",
@@ -1904,7 +1918,10 @@ dependencies = [
  "chrono",
  "constraint-engine",
  "domain",
+ "html-forge",
  "libc",
+ "regex",
+ "rusqlite",
  "serde",
  "serde_json",
  "serde_yaml",

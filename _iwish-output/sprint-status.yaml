@@ -75,7 +75,7 @@ start_date: '2026-07-24'
 "Story 08.2 - Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills)": completed
 "Story 08.3 - Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core)": completed
 "Story 08.4 - SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI": completed
-"Story 08.5 - Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 LEARN Loop": refactored
+"Story 08.5 - Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 LEARN Loop": completed
 "Story 08.6 - Standalone Open-Source Default Plugin Repo (design-craft) — 4-Pillar Assembly, Optional Upstream REA Peer & Multi-Harness Export": backlog
 
 # Epic 09: Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)
@@ -96,7 +96,7 @@ start_date: '2026-07-24'
 
 # Epic 11: POSIX BYOS/BYOK Runner (0o600 FD + -PGID), Cross-CLI Normalizer & Universal Open MCP Gateway
 "Epic 11 - POSIX BYOS/BYOK Runner (0o600 FD + -PGID), Cross-CLI Normalizer & Universal Open MCP Gateway": in-progress
-"Story 11.1 - POSIX BYOS CLI Runner (0o600 FD + -PGID Reaper), BYOK Unified Gateway & Cross-CLI Normalizer": refactored
+"Story 11.1 - POSIX BYOS CLI Runner (0o600 FD + -PGID Reaper), BYOK Unified Gateway & Cross-CLI Normalizer": completed
 "Story 11.2 - Compiler-Grade Bidirectional Open MCP Server (4 Auth Tiers) & 1-Click Host Installer UI": refactored
 "Story 11.3 - Compiler-Grade Bidirectional Open MCP Server & 1-Click Host Installer UI": cancelled
 

@@ -72,7 +72,14 @@ export function useSettingsDialogState(isOpen: boolean, onClose: () => void, act
   const [vaultMode, setVaultMode] = useState<string>("vault_0600");
   const [permissionMode, setPermissionMode] = useState<string>("auto_sandbox");
   const [onboardingDone, setOnboardingDone] = useState<boolean>(false);
-  const [ephemeralKeys, setEphemeralKeys] = useState({ gemini: "", claude: "", openai: "", byosToken: "" });
+  const [ephemeralKeys, setEphemeralKeys] = useState({
+    gemini: "",
+    claude: "",
+    openai: "",
+    openrouter: "",
+    deepseek: "",
+    byosToken: "",
+  });
   const [showKeys, setShowKeys] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState(false);
   const [isSaving, setIsSaving] = useState(false);

@@ -2,6 +2,7 @@
 // @implements AC-05 (LEARN Human Approval Queue with XSS & Beacon Stripping)
 import React, { useState } from "react";
 import { BrandIcon } from "../../components/ui/BrandIcon";
+import { useFormatter } from "../../hooks/useFormatter";
 import { useTranslation } from "../../hooks/useTranslation";
 import { MAX_LEARN_TOKENS, type KnowledgeCardDto } from "../../lib/validations/plugins-learn-cron";
 import { sanitizeLearnMarkdownPreview } from "./sanitizeMarkdownPreview";
@@ -99,15 +100,16 @@ const LearnCardItem: React.FC<{
   onReject: (card: KnowledgeCardDto, reason: string) => void;
 }> = ({ card, busy, onApprove, onReject }) => {
   const { t } = useTranslation();
+  const { formatNumber } = useFormatter();
   return (
-    <div className="plugin-eco-card" data-testid={`learn-card-${card.id}`}>
+    <div className="plugin-eco-chip-card" data-testid={`learn-card-${card.id}`}>
       <div className="plugin-eco-card-row">
         <div>
           <div className="plugin-eco-slug">
             [{card.category}] {card.title}
           </div>
           <div className="plugin-eco-meta">
-            {t("learn.revLabel", "Revision")} {card.revision} • {card.contentSha256.slice(0, SHA_PREFIX_LEN)} • {card.sourceEvidence}
+            {t("learn.revLabel", "Revision")} {formatNumber(card.revision)} • {card.contentSha256.slice(0, SHA_PREFIX_LEN)} • {card.sourceEvidence}
           </div>
         </div>
         <span className={statusBadgeClass(card.status)} data-testid={`learn-card-status-${card.id}`}>
@@ -168,7 +170,7 @@ const LearnQueueBody: React.FC<
     );
   }
   return (
-    <div className="plugin-eco-list">
+    <div className="plugin-eco-chip-grid">
       {cards.map((card) => (
         <LearnCardItem
           key={card.id}
@@ -184,6 +186,7 @@ const LearnQueueBody: React.FC<
 
 const LearnQueueHeader: React.FC<{ usedTokens: number }> = ({ usedTokens }) => {
   const { t } = useTranslation();
+  const { formatNumber } = useFormatter();
   return (
     <div className="plugin-eco-header">
       <div className="plugin-eco-title-group">
@@ -192,7 +195,7 @@ const LearnQueueHeader: React.FC<{ usedTokens: number }> = ({ usedTokens }) => {
       </div>
       <div className="plugin-eco-actions">
         <span className="plugin-eco-badge" data-testid="learn-token-budget">
-          {t("learn.budgetLabel", "Prompt Budget")}: {usedTokens}/{MAX_LEARN_TOKENS}
+          {t("learn.budgetLabel", "Prompt Budget")}: {formatNumber(usedTokens)}/{formatNumber(MAX_LEARN_TOKENS)}
         </span>
         <span className="plugin-eco-badge plugin-eco-badge-human">HUMAN_ONLY</span>
       </div>

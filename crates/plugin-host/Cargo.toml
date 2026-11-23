@@ -8,6 +8,7 @@ license.workspace = true
 domain = { path = "../domain" }
 constraint-engine = { path = "../constraint-engine" }
 spec-registry = { path = "../spec-registry" }
+html-forge = { path = "../html-forge" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = "0.9"
@@ -15,8 +16,14 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 sha2 = { workspace = true }
+rusqlite = { workspace = true }
 libc = "0.2"
+regex = "1"
 ts-rs = { workspace = true, optional = true }
+
+[[bin]]
+name = "uiux-de-check"
+path = "src/bin/uiux_de_check.rs"
 
 [features]
 default = []

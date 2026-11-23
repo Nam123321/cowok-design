@@ -1466,7 +1466,8 @@ pub async fn legacy_project_auth_middleware(
         }
     }
 
-    if parts.uri.path() == "/api/v1/fs/browse" || parts.uri.path() == "/api/v1/fs/pick-native" {
+    let path = parts.uri.path();
+    if path == "/api/v1/fs/browse" || path == "/api/v1/fs/pick-native" {
         if let Some(ref caller) = verified {
             if caller.kind == LegacyAuthKind::Bearer && !is_valid_superadmin_bearer(&parts.headers)
             {
@@ -1474,6 +1475,24 @@ pub async fn legacy_project_auth_middleware(
                     StatusCode::FORBIDDEN,
                     "AUTH_SCOPE_MISMATCH",
                     "Browsing host filesystem requires superadmin Bearer, session token, or verified loopback HMAC",
+                );
+            }
+        }
+    }
+    let requires_strict_non_legacy_bearer = path.starts_with("/api/v1/bot-fleet/")
+        || path == "/api/v1/de/run"
+        || path == "/api/v1/plugins/import-repo"
+        || path == "/api/v1/plugins/ephemeral-tools/execute"
+        || path == "/api/v1/learn/ledger"
+        || path == "/api/v1/learn/ledger/record";
+    if requires_strict_non_legacy_bearer {
+        if let Some(ref caller) = verified {
+            if caller.kind == LegacyAuthKind::Bearer && !is_valid_superadmin_bearer(&parts.headers)
+            {
+                return auth_err_resp(
+                    StatusCode::UNAUTHORIZED,
+                    "UNAUTHORIZED",
+                    "This endpoint requires superadmin Bearer, session token, or verified loopback HMAC",
                 );
             }
         }
@@ -1577,6 +1596,7 @@ fn is_anchored_readonly_post_path(path: &str) -> bool {
             ]
             | ["api", "v1", "decks", _, "presenter", "handshake"]
             | ["api", "v1", "skills", "route"]
+            | ["api", "v1", "de", "run"]
             | [
                 "api",
                 "v1",

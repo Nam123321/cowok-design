@@ -108,7 +108,7 @@ async fn create_project(router: &axum::Router, tok: &str, slug: &str) -> String 
 
 #[tokio::test]
 async fn it_05_4_01_clarify_direction_preempts_pgid_increments_epoch_and_rejects_stale_epoch() {
-    assert_eq!(CURRENT_SCHEMA_VERSION, 19);
+    assert_eq!(CURRENT_SCHEMA_VERSION, 20);
     let tmp = TempDir::new().expect("tempdir");
     let (state, router, editor_tok, viewer_tok, other_tenant_tok) = setup_daemon(&tmp);
     let project_id = create_project(&router, &editor_tok, "clarify-proj").await;

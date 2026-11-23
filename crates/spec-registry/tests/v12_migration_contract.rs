@@ -55,8 +55,8 @@ fn ut_01_v12_backfills_valid_crockford_ulids_and_preserves_table_count() {
         )
         .expect("table count");
     assert_eq!(
-        table_count, 60,
-        "V3..V19 migrations must yield 60 canonical tables"
+        table_count, 62,
+        "V3..V20 migrations must yield 62 canonical tables"
     );
 
     let null_count: i64 = conn
