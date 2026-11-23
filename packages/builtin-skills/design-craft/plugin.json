@@ -1,0 +1,92 @@
+{
+  "name": "design-craft",
+  "version": "1.0.0",
+  "specStandard": "agentskills.io/v1",
+  "description": "Cognitive Progressive Design & Presentation Operating Kit for AI Agents (5-Phase Workflow, Business & Craft Skills, Portable Builder & QC/Audit Tools, Multi-Agent Pack & MCP)",
+  "defaultForHosts": [
+    "cowok-design"
+  ],
+  "phaseSkillMap": {
+    "phase-0": [
+      "phase-0-intent-framing",
+      "business-requirements-distiller"
+    ],
+    "phase-1": [
+      "phase-1-structural-sketch",
+      "sketch-monochrome",
+      "flow-state-completer",
+      "ux-microcopy-and-i18n"
+    ],
+    "phase-2": [
+      "phase-2-brand-visual-studio",
+      "oklch-palette",
+      "typography",
+      "reference-design-contract"
+    ],
+    "phase-3": [
+      "phase-3-synthesis-polish",
+      "impeccable-polish",
+      "dashboard-ux",
+      "stageshow-slide",
+      "responsive-and-a11y-craft",
+      "data-viz-storyteller"
+    ],
+    "phase-4": [
+      "phase-4-verify-handoff",
+      "user-simulation-8d",
+      "self-healing-eval-gate"
+    ]
+  },
+  "optionalPeers": [
+    {
+      "id": "rea-upstream",
+      "kind": "upstream-github-mcp",
+      "repoUrl": "https://github.com/nicobailey/reverse-engineer-anything",
+      "installHint": "git clone https://github.com/nicobailey/reverse-engineer-anything",
+      "purpose": "Extract live UI tokens, visual hierarchy & interaction behavior from target apps/websites via Design-Only boundary (reference-design-contract)",
+      "fallback": "catalogs/reference-archetypes.json"
+    }
+  ],
+  "capabilities": {
+    "builderTools": [
+      "de-phase-router",
+      "de-intake",
+      "de-scan-sketch",
+      "de-tokens-oklch",
+      "de-brand-preview",
+      "de-extract-contract",
+      "de-patch-dom"
+    ],
+    "qcAuditTools": [
+      "qc-a11y-contrast",
+      "qc-anti-slop-linter",
+      "qc-layout-overflow",
+      "qc-chart-and-data",
+      "qc-spec-parity",
+      "qc-popular-coverage"
+    ],
+    "hostUpgradeMap": {
+      "de-phase-router": "cowok-design::plugin-host::phase_router",
+      "de-intake": "cowok-design::plugin-host::intake_cap",
+      "de-scan-sketch": "cowok-design::plugin-host::scan_ui",
+      "de-tokens-oklch": "cowok-design::html-forge::oklch",
+      "de-brand-preview": "cowok-design::html-forge::brand_preview",
+      "de-extract-contract": "cowok-design::spec-registry::extract_contract",
+      "de-patch-dom": "cowok-design::html-forge::reconcile_ff_ids",
+      "qc-a11y-contrast": "cowok-design::plugin-host::wcag_contrast",
+      "qc-anti-slop-linter": "cowok-design::plugin-host::triangle_linter",
+      "qc-layout-overflow": "cowok-design::cdp-visual-qc",
+      "qc-chart-and-data": "cowok-design::cdp-visual-qc::chart_data",
+      "qc-spec-parity": "cowok-design::spec-registry::spec_parity",
+      "qc-popular-coverage": "cowok-design::spec-registry::popular_coverage"
+    }
+  },
+  "agents": [
+    "design-orchestrator",
+    "flow-architect",
+    "brand-stylist",
+    "ui-crafter",
+    "design-auditor"
+  ],
+  "mcpServer": "mcp/server.mjs"
+}

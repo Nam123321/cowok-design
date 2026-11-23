@@ -18,7 +18,7 @@ import { clearBffSessionHumanToken, setBffSessionHumanToken } from "./api-guard-
 
 export { buildCanonicalHmacHeaders, stripSpoofedHeaders };
 
-const DAEMON_MIN_SCHEMA_VERSION = 20;
+const DAEMON_MIN_SCHEMA_VERSION = 21;
 const DAEMON_STARTUP_TIMEOUT_MS = 8_000;
 const DAEMON_POLL_INTERVAL_MS = 40;
 const HTTP_UNAUTHORIZED = 401;

@@ -684,7 +684,7 @@ for (const file of files) {
     const scriptKind = file.endsWith('.tsx') ? ts.ScriptKind.TSX : file.endsWith('.jsx') ? ts.ScriptKind.JSX : ts.ScriptKind.TS;
     let sf = null;
     try {
-      sf = ts.createSourceFile(file, contentNoStyles, ts.ScriptTarget.Latest, true, scriptKind);
+      sf = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true, scriptKind);
     } catch {
       sf = null;
     }
@@ -725,6 +725,74 @@ for (const file of files) {
         }
         return false;
       };
+
+      const visitFeTruthfulness = (node) => {
+        if (!file.endsWith('.tsx') || isTestFile || hasMockBoundary || isLegacy) return;
+
+        // FE-HARDCODED-JSON-MOCK-01: set*(JSON.stringify({ ...3+ literal keys... })) inside FE UI components
+        if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+          if (node.expression.expression.getText(sf) === 'JSON' && node.expression.name.getText(sf) === 'stringify') {
+            const firstArg = node.arguments[0];
+            if (firstArg && ts.isObjectLiteralExpression(firstArg) && firstArg.properties.length >= 3) {
+              const allStaticLiterals = firstArg.properties.every((prop) => {
+                if (!ts.isPropertyAssignment(prop)) return false;
+                const init = prop.initializer;
+                return (
+                  ts.isStringLiteral(init) ||
+                  ts.isNumericLiteral(init) ||
+                  init.kind === ts.SyntaxKind.TrueKeyword ||
+                  init.kind === ts.SyntaxKind.FalseKeyword ||
+                  (ts.isArrayLiteralExpression(init) && init.elements.every((el) => ts.isStringLiteral(el) || ts.isNumericLiteral(el)))
+                );
+              });
+              if (allStaticLiterals) {
+                const { line: lineNum } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
+                findings.push({
+                  file,
+                  line: lineNum + 1,
+                  pattern: 'fe_hardcoded_json_mock',
+                  severity: 'critical',
+                  text: `[FE-HARDCODED-JSON-MOCK-01] Hardcoded literal JSON.stringify({...}) payload in production UI component '${file}'. Wire to real backend/SDK output instead of static mock JSON.`,
+                  mock_approved: false
+                });
+                allMocksApproved = false;
+                mockCount++;
+              }
+            }
+          }
+        }
+
+        // FE-DUMMY-BUTTON-NO-BE-02: No-op or console-only onClick={() => {}} dummy handler on <button>
+        if (ts.isJsxAttribute(node) && node.name.getText(sf) === 'onClick' && node.initializer && ts.isJsxExpression(node.initializer)) {
+          const expr = node.initializer.expression;
+          if (expr && (ts.isArrowFunction(expr) || ts.isFunctionExpression(expr)) && ts.isBlock(expr.body)) {
+            const stmts = expr.body.statements;
+            const isNoOp = stmts.length === 0;
+            const isConsoleOnly =
+              stmts.length === 1 &&
+              ts.isExpressionStatement(stmts[0]) &&
+              ts.isCallExpression(stmts[0].expression) &&
+              ts.isPropertyAccessExpression(stmts[0].expression.expression) &&
+              stmts[0].expression.expression.expression.getText(sf) === 'console';
+            if (isNoOp || isConsoleOnly) {
+              const { line: lineNum } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
+              findings.push({
+                file,
+                line: lineNum + 1,
+                pattern: 'fe_dummy_button_no_be',
+                severity: 'critical',
+                text: `[FE-DUMMY-BUTTON-NO-BE-02] Dummy/no-op onClick handler detected in '${file}'. Every visible button must execute real backend/SDK or verified UI logic.`,
+                mock_approved: false
+              });
+              allMocksApproved = false;
+              mockCount++;
+            }
+          }
+        }
+
+        ts.forEachChild(node, visitFeTruthfulness);
+      };
+      visitFeTruthfulness(sf);
 
       const visitMapSet = (node) => {
         if (ts.isNewExpression(node) && node.expression) {

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "1.0",
+  "track": "presentation-16-9",
+  "viewport": {
+    "width": 1280,
+    "height": 720,
+    "aspectRatio": "16:9"
+  },
+  "components": [
+    {
+      "id": "title-hero-slide",
+      "name": "Title Hero Slide",
+      "category": "opening",
+      "recommended": true,
+      "aliases": ["cover-slide", "deck-cover"],
+      "maxTextWords": 35
+    },
+    {
+      "id": "executive-summary-3col",
+      "name": "3-Column Executive Summary",
+      "category": "narrative",
+      "recommended": true,
+      "aliases": ["three-pillars", "key-takeaways"],
+      "maxTextWords": 85
+    },
+    {
+      "id": "kpi-scorecard-slide",
+      "name": "KPI Scorecard Slide",
+      "category": "metrics",
+      "recommended": true,
+      "aliases": ["metrics-slide", "traction-slide"],
+      "maxTextWords": 70
+    },
+    {
+      "id": "comparison-matrix-slide",
+      "name": "Comparison Matrix Slide",
+      "category": "analysis",
+      "recommended": true,
+      "aliases": ["feature-matrix", "before-after"],
+      "maxTextWords": 110
+    },
+    {
+      "id": "timeline-roadmap-slide",
+      "name": "Timeline Roadmap Slide",
+      "category": "planning",
+      "recommended": false,
+      "aliases": ["milestones-slide", "phased-plan"],
+      "maxTextWords": 95
+    },
+    {
+      "id": "architecture-diagram-slide",
+      "name": "Architecture Diagram Slide",
+      "category": "technical",
+      "recommended": false,
+      "aliases": ["system-diagram", "workflow-diagram"],
+      "maxTextWords": 75
+    },
+    {
+      "id": "closing-cta-slide",
+      "name": "Closing Next-Steps Slide",
+      "category": "closing",
+      "recommended": true,
+      "aliases": ["next-steps", "decision-ask"],
+      "maxTextWords": 50
+    }
+  ]
+}

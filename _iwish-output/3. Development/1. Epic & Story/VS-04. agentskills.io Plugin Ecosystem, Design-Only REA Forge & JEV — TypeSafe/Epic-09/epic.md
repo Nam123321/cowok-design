@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-09"
 title: "Epic 09: Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)"
-status: in-progress
+status: completed
 track: "Stream-4"
 wave: 2
 provides: ["crates/rea-bridge (Two-Store Tier-1A <=250 tok + Tier-1B FTS5 + License/ToS Firewall)", "DecisionCascadeClient (~450 LOC in crates/domain + crates/bot-fleet)", "5-Stage DE -> Decision #1 -> DR/DE -> DE -> Decision #2 State Machine + RubricShield + 3-Strike Breaker"]
@@ -38,8 +38,8 @@ links_to:
 
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
-| [Story-09.1](./Story-09.1/story.md) | Design-Only `/rea` DNA Forge, Two-Store `/rea` + `/awesome-re` Library & `License/ToS Firewall` | `refactored` | `3` | `['03.1', '08.2', '08.5']` |
-| [Story-09.2](./Story-09.2/story.md) | 5-Stage Flow, Rust `DecisionCascadeClient`, `RubricShield` & 3-Strike Breaker *(No `crates/jev-engine`)* | `refactored` | `3` | `['02.1', '02.4', '04.6', '08.5']` |
+| [Story-09.1](./Story-09.1/story.md) | Design-Only `/rea` DNA Forge, Two-Store `/rea` + `/awesome-re` Library & `License/ToS Firewall` | `completed` | `3` | `['03.1', '08.2', '08.5']` |
+| [Story-09.2](./Story-09.2/story.md) | 5-Stage Flow, Rust `DecisionCascadeClient`, `RubricShield` & 3-Strike Breaker *(No `crates/jev-engine`)* | `completed` | `3` | `['02.1', '02.4', '04.6', '08.5']` |
 | [Story-09.3](./Story-09.3/story.md) | *(Superseded by `05.4`, `07.1`, `09.2`)* `window.__jevFast` + Occlusion + 3-Strike Breaker | `cancelled` | `3` | `['09.2']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)

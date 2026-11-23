@@ -4,7 +4,7 @@ id: "08.6"
 title: "Story 08.6: Standalone `design-craft` GitHub Repo Assembler, 4-Pillar Operational Skills/Tools Pack, Multi-Agent Pack, Optional Upstream REA Installer & Default Plugin Mount"
 description: "Single Accountable Owner đóng gói toàn bộ 4 trụ cột vận hành thiết kế FE & Presentation (5-Phase Cognitive Progressive Workflow + Business/Domain & Forged Craft Skills + Portable Builder & QC/Audit Deterministic Tools + Multi-Agent Orchestration Pack & Lightweight MCP Server) từ packages/builtin-skills thành GitHub Repo độc lập mang tên `design-craft`, kèm installer CLI đa harness gợi ý cài GitHub repo REA gốc (optionalPeers), và mount làm Default Plugin Repo của cowok-design."
 resource: "iwish://uxui-os/development/epic-08/story-08.6"
-status: backlog
+status: completed
 risk_tier: 3
 delivery: core
 timestamp: "2026-11-22T22:50:00+07:00"

@@ -58,6 +58,12 @@ import * as ephemeralToolsExecuteRoute from "../app/api/v1/plugins/ephemeral-too
 import * as learnLedgerRoute from "../app/api/v1/learn/ledger/route";
 import * as botFleetExecuteRoute from "../app/api/v1/bot-fleet/execute/route";
 import * as botFleetProvidersStatusRoute from "../app/api/v1/bot-fleet/providers/status/route";
+import * as reaIngestRoute from "../app/api/v1/rea/ingest/route";
+import * as reaSearchRoute from "../app/api/v1/rea/search/route";
+import * as reaCatalogRoute from "../app/api/v1/rea/catalog/route";
+import * as reaExportProofRoute from "../app/api/v1/rea/export-proof/route";
+import * as decisionRouteHandler from "../app/api/v1/decision/route/route";
+import * as decisionAuditRoute from "../app/api/v1/decision/audit/route";
 import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize/route";
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
 import * as versionSnapshotsRoute from "../app/api/projects/[id]/snapshots/route";
@@ -201,6 +207,12 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/learn\/ledger$/, extractParams: noParams, resolveHandler: () => learnLedgerRoute.POST },
   { method: "POST", pattern: /^\/api\/bot-fleet\/execute$/, extractParams: noParams, resolveHandler: () => botFleetExecuteRoute.POST },
   { method: "GET", pattern: /^\/api\/bot-fleet\/providers\/status$/, extractParams: noParams, resolveHandler: () => botFleetProvidersStatusRoute.GET },
+  { method: "POST", pattern: /^\/api\/rea\/ingest$/, extractParams: noParams, resolveHandler: () => reaIngestRoute.POST },
+  { method: "GET", pattern: /^\/api\/rea\/search$/, extractParams: noParams, resolveHandler: () => reaSearchRoute.GET },
+  { method: "GET", pattern: /^\/api\/rea\/catalog$/, extractParams: noParams, resolveHandler: () => reaCatalogRoute.GET },
+  { method: "POST", pattern: /^\/api\/rea\/export-proof$/, extractParams: noParams, resolveHandler: () => reaExportProofRoute.POST },
+  { method: "POST", pattern: /^\/api\/decision\/route$/, extractParams: noParams, resolveHandler: () => decisionRouteHandler.POST },
+  { method: "GET", pattern: /^\/api\/decision\/audit$/, extractParams: noParams, resolveHandler: () => decisionAuditRoute.GET },
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.POST },
   { method: "PUT", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/reorder$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]) }), resolveHandler: () => deckReorderRoute.PUT },

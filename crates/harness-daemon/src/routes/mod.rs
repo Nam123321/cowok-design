@@ -7,6 +7,7 @@ pub mod chat_cas_upload_handler;
 pub mod chat_cas_vault;
 pub mod context_assemble;
 pub mod de_runtime;
+pub mod decision;
 pub mod doctor_usage;
 pub mod doctor_vault;
 pub mod execution_coordinator;
@@ -32,6 +33,7 @@ pub mod presentation_copilot;
 pub mod presentation_presenter;
 pub mod presentation_storage;
 pub mod project_trash;
+pub mod rea_bridge;
 pub mod sketch_polish;
 pub mod ssot_registry;
 

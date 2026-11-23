@@ -1,30 +1,30 @@
 ---
 type: I-Wish Story
 id: "12.2"
-title: "Story 12.2: Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai"
-description: "Đóng gói ứng dụng Desktop gốc nhẹ (~25MB) cho người dùng non-tech và xuất bản gói cài đặt 1-click Native Plugin & Skill Pack cho Cowok.ai."
+title: "Story 12.2: Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Universal Multi-Harness Plugin Pack (Cowok.ai, Claude, Codex, Antigravity, Cursor)"
+description: "Đóng gói ứng dụng Desktop gốc nhẹ (~25MB) với binary cowok-design cho người dùng non-tech và xuất bản Universal Multi-Harness Plugin & Skill Pack từ 1 manifest chuẩn cho Cowok.ai, Claude Code, OpenAI Codex CLI, Google Antigravity IDE và Cursor."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-12/Story-12.2/story.md"
 status: refactored
 risk_tier: 3
 delivery: hybrid
-adr_ref: "ADR-007"
+adr_ref: "ADR-008"
 components:
   - id: "tauri-desktop-host"
     packaging: "KERNEL_CORE"
-  - id: "cowok-native-plugin-pack"
+  - id: "universal-multi-harness-plugin-pack"
     packaging: "EXTENSION_PLUGIN"
-timestamp: "2026-11-20T18:00:00+07:00"
+timestamp: "2026-11-23T11:30:00+07:00"
 tags:
   - "story-12.2"
   - "epic-12"
-  - "uxui-os"
+  - "cowok-design"
   - "tauri-v2"
-  - "cowok-plugin"
+  - "multi-harness-plugin"
 links_to:
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md"
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.5.%20architecture.md"
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.2.%20database-spec.md"
-dependencies: ["12.1", "08.5"]
+dependencies: ["12.1", "08.6", "14.3"]
 provides_apis:
   - "internal:epic-12/story-12.2"
 consumes_apis:
@@ -32,25 +32,31 @@ consumes_apis:
   - "POST /api/v1/de/run"
 ---
 
-# Story 12.2: Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (`.dmg/.msi/.AppImage`) & Gói Native Plugin cho Cowok.ai
+# Story 12.2: Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (`.dmg/.msi/.AppImage`) & Universal Multi-Harness Plugin Pack (`Cowok.ai`, `Claude Code`, `Codex`, `Antigravity`, `Cursor`)
 
-- **FR Covered:** [FR-30: Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
+- **FR Covered:** [FR-30: 4-Channel Unified cowok-design Packaging & Universal Multi-Harness Plugin Distribution](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 12: 4-Channel Packaging & Distribution Architecture](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-12/epic.md)
 - **Status:** `refactored`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context
-Đóng gói ứng dụng Desktop gốc nhẹ (~25MB) trên **Tauri v2** (`.dmg/.msi/.AppImage`) cho người dùng non-tech dùng chung sidecar binary từ `Story 12.1`, và xuất bản **Native Plugin & Skill Pack** cài đặt 1-click cho `Cowok.ai` (mang trọn bộ `cowok-design-opt`, Split DE+DR runtime `Story 08.5`, Decision Cascade & MCP hooks vào không gian Cowok).
+Đóng gói ứng dụng Desktop gốc nhẹ (~25MB) trên **Tauri v2** (`.dmg/.msi/.AppImage`) cho người dùng non-tech dùng chung sidecar binary **`cowok-design`** từ `Story 12.1` (tích hợp Ed25519 Signed Auto-Updater & In-App Support Drawer từ `14.1`/`14.3`), và xuất bản **Universal Multi-Harness Plugin & Skill Pack** từ 1 canonical manifest (`design-craft` từ `08.6` + `cowok-design mcp` từ `11.2`) ra đồng bộ **5 nền tảng**: **Cowok.ai**, **Claude Code / Desktop**, **OpenAI Codex CLI**, **Google Antigravity IDE**, và **Cursor**.
 
 ## 2. Plan-Tune Heuristic & Complexity Score
-- **Complexity Score (CS):** `CS = 5` (Scope=1, Data=1, Integration=1, UI=0.5, Security=1, Unknowns=0.5 $\rightarrow$ `CS = 5 < 7`, đạt ngưỡng an toàn).
-- **Formal-Verify Candidate (`risk_tier: 3`):** Ranh giới HMAC capability token từ WebView, xác thực chữ ký updater (`O_NOFOLLOW` + `nlink == 1`) và bảo toàn khóa `HUMAN_ONLY` khi đồng bộ plugin Cowok.ai.
+- **Complexity Score (CS):** `CS = 5.5` (Scope=1, Data=1, Integration=1.5, UI=0.5, Security=1, Unknowns=0.5 $\rightarrow$ `CS = 5.5 < 7`, đạt ngưỡng an toàn).
+- **Formal-Verify Candidate (`risk_tier: 3`):** Ranh giới HMAC capability token từ WebView, xác thực chữ ký Ed25519 updater/skill-advisory (`O_NOFOLLOW` + `nlink == 1`) và bảo toàn khóa `HUMAN_ONLY` trên cả 5 plugin host.
 
 ## 3. Acceptance Criteria (AC)
-- **AC-01 (Tauri v2 Desktop App `.dmg/.msi/.AppImage` ~25MB):** Đóng gói React 19 Workbench cùng sidecar `uiux-os` từ `Story 12.1` thành app desktop bản địa không đòi người dùng mở Terminal, hỗ trợ drag-and-drop workspace/CSV/Brand Kit thẳng vào khung chat (kết hợp Windows Job Object cleanup ở `11.1`).
-- **AC-02 (1-Click Native Plugin & Skill Pack cho `Cowok.ai`):** Xuất bản manifest plugin chuẩn tương thích Cowok.ai đóng gói Split DE+DR Skill Pack (`Story 08.5`), tự động đồng bộ cấu hình MCP (`Story 11.2`) và cặp đôi `cowok` / `advisor` ngay sau khi cài, đồng thời giữ nguyên rào chắn `HUMAN_ONLY` không bị nới quyền.
-- **AC-03 ([EDGE-CASE] Auto-Sync Drift Repair & Symlink/Hardlink Extraction Rejection):** Khi người dùng nâng cấp hoặc thay đổi thư mục workspace trong `Cowok.ai`, plugin tự phát hiện cấu hình MCP cũ và khôi phục an toàn mà không ghi đè khóa bí mật; giải nén plugin và updater bắt buộc kiểm tra `O_NOFOLLOW` + `nlink == 1` và từ chối mọi symlink thoát sandbox workspace.
-- **AC-04 (Tauri v2 HMAC Preload Trust Boundary & Native Module / Updater Integrity Harness):** Khoanh vùng bảo mật chọn thư mục bằng **HMAC capability token** ở tiến trình Rust main (tuyệt đối không lộ đường dẫn filesystem thô xuống WebView untrusted) và chạy harness kiểm tra chữ ký SHA-256 của mọi native sidecar + auto-updater trước khi đóng gói phát hành.
+- **AC-01 (Tauri v2 Desktop App `.dmg/.msi/.AppImage` ~25MB):** Đóng gói React 19 Workbench cùng sidecar `cowok-design` từ `Story 12.1` thành app desktop bản địa không đòi người dùng mở Terminal, hỗ trợ drag-and-drop workspace/CSV/Brand Kit thẳng vào khung chat, tích hợp In-App Support Drawer (`14.1`) và Ed25519 Auto-Updater (`14.3`).
+- **AC-02 (Universal Multi-Harness Plugin Pack — 1 Canonical Manifest $\to$ 5 Hosts):** Biên dịch tự động từ 1 nguồn sự thật (`design-craft` `08.6` + `cowok-design mcp` `11.2`) thành 5 gói cài đặt chuẩn 1-lệnh (`cowok-design install --target cowok|claude|codex|antigravity|cursor`):
+  1. **Cowok.ai:** `plugin.json` + `skills/` (Default Plugin Mount).
+  2. **Claude Code / Desktop:** `.claude-plugin/plugin.json` + `.mcp.json` (`stdio`) + `skills/` + `agents/`.
+  3. **OpenAI Codex CLI:** `.codex/config.toml` (`[mcp_servers.cowok_design]`) + `.codex/skills/` + `AGENTS.md`.
+  4. **Google Antigravity IDE:** Marketplace Plugin (`plugin.json` + MCP `stdio` + `skills/` + `agents/`).
+  5. **Cursor:** `.cursor/mcp.json` + `.cursor/rules/*.mdc`.
+  Mọi gói đều bảo toàn rào chắn `HUMAN_ONLY`, gắn nhãn telemetry `channel` đúng từng host và expose MCP tool `cowok_submit_feedback` cho non-tech/IDE users.
+- **AC-03 ([EDGE-CASE] Auto-Sync Drift Repair & Symlink/Hardlink Extraction Rejection):** Khi người dùng nâng cấp hoặc thay đổi thư mục workspace trên bất kỳ host nào trong 5 nền tảng, bộ cài `cowok-design install` tự phát hiện cấu hình MCP cũ và khôi phục an toàn mà không ghi đè khóa bí mật hay config riêng khác của host; giải nén plugin và updater bắt buộc kiểm tra `O_NOFOLLOW` + `nlink == 1` và từ chối mọi symlink thoát sandbox workspace.
+- **AC-04 (Tauri v2 HMAC Preload Trust Boundary & Ed25519 Sidecar / Updater Integrity Harness):** Khoanh vùng bảo mật chọn thư mục bằng **HMAC capability token** ở tiến trình Rust main (tuyệt đối không lộ đường dẫn filesystem thô xuống WebView untrusted) và chạy harness kiểm tra chữ ký Ed25519 + SHA-256 của mọi native sidecar + auto-updater trước khi đóng gói phát hành.
 
 ## 4. Tasks
 - [ ] **Task 12.2.1**: Cấu hình Tauri v2 bundle (`.dmg/.msi/.AppImage`) nhúng sidecar `uiux-os` và native workspace drag-and-drop cho non-tech (thỏa mãn `AC-01`).

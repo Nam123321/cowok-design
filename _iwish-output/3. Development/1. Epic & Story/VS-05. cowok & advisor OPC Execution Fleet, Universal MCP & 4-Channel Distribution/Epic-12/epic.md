@@ -5,8 +5,8 @@ title: "Epic 12: 4-Channel Packaging, Standalone /api/* Parity & OCI Distributio
 status: in-progress
 track: "Stream-5"
 wave: 4
-provides: ["Single-Binary CLI (uiux-os) with /api/* Standalone Daemon Parity", "Tauri v2 Desktop App (.dmg/.msi/.AppImage) & Cowok Plugin Pack", "Docker/OCI Image with Pooled Headless Chromium"]
-consumes: ["Epic 07", "Epic 08", "Epic 11"]
+provides: ["Single-Binary CLI (cowok-design) with /api/* Standalone Daemon Parity", "Tauri v2 Desktop App (.dmg/.msi/.AppImage) & Universal Multi-Harness Plugin Pack (Cowok.ai, Claude Code, Codex, Antigravity, Cursor)", "Docker/OCI Image with Pooled Headless Chromium & Air-Gapped Mode"]
+consumes: ["Epic 07", "Epic 08", "Epic 11", "Epic 14"]
 links_to:
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md"
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.5.%20architecture.md"
@@ -23,13 +23,13 @@ links_to:
 - **Consumes:** `Epic 07`, `Epic 08`, `Epic 11`.
 
 ## 2. Goals / Business Value
-1. **Binary Độc lập & Tương thích Đường dẫn Standalone (`Story 12.1`):** Nhúng React 19 Workbench & built-in skills vào 1 Rust binary `uiux-os`, mở thêm alias `/api/*` ngay trên `crates/harness-daemon` để chạy độc lập không cần Vite dev server (`0` Vite-proxy 404s).
-2. **Desktop Gốc Tauri v2 & Native Cowok Plugin (`Story 12.2`):** Đóng gói `.dmg`/`.msi`/`.AppImage` cho non-tech và gói plugin chuẩn Cowok.ai đồng bộ kiến trúc `08.5`.
+1. **Binary Độc lập & Tương thích Đường dẫn Standalone (`Story 12.1`):** Nhúng React 19 Workbench & built-in skills vào 1 Rust binary `cowok-design`, mở thêm alias `/api/*` ngay trên `crates/harness-daemon` để chạy độc lập không cần Vite dev server (`0` Vite-proxy 404s).
+2. **Desktop Gốc Tauri v2 & Universal Multi-Harness Plugin Pack (`Story 12.2`):** Đóng gói `.dmg`/`.msi`/`.AppImage` cho non-tech và Universal Multi-Harness Plugin Pack (Cowok.ai, Claude Code, Codex, Antigravity, Cursor) từ `design-craft` (`08.6`) + MCP (`11.2`) + Ed25519 Updater (`14.3`).
 3. **CI/CD Team Container kèm Pooled Chromium (`Story 12.3`):** Image `Docker`/`OCI` tích hợp sẵn Pooled Headless Chromium cho `lib-audit`, `slides-check` (`07.1`) và Sealed Eval (`13.1`).
 
 ## 3. Scope / Scope Boundaries
 - **In-Scope:**
-  - `Story 12.1` (refactored): Single-Binary CLI (`uiux-os`) & Local Web với Standalone `/api/*` Daemon Alias.
+  - `Story 12.1` (refactored): Single-Binary CLI (`cowok-design`) & Local Web với Standalone `/api/*` Daemon Alias.
   - `Story 12.2` (refactored): Ứng dụng Desktop `Tauri v2` & Native Plugin Pack cho Cowok.ai.
   - `Story 12.3` (refactored): Docker / OCI Image kèm Pooled Headless Chromium.
 - **Out-of-Scope:**
@@ -39,8 +39,8 @@ links_to:
 
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
-| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (`uiux-os`) & Local Web Workbench với `/api/*` Standalone Parity | `refactored` | `2` | `['07.2', '11.1', '11.2']` |
-| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop `Tauri v2` (`.dmg`/`.msi`/`.AppImage`) & Gói Native Plugin cho Cowok.ai | `refactored` | `2` | `['12.1', '08.5']` |
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (`cowok-design`) & Local Web Workbench với `/api/*` Standalone Parity | `refactored` | `2` | `['07.2', '11.1', '11.2', '14.1']` |
+| [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop `Tauri v2` (`.dmg`/`.msi`/`.AppImage`) & Universal Multi-Harness Plugin Pack (`Cowok.ai`, `Claude`, `Codex`, `Antigravity`, `Cursor`) | `refactored` | `3` | `['12.1', '08.6', '14.3']` |
 | [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (`Docker` / `OCI`) kèm Pooled Headless Chromium cho Đội nhóm & CI/CD | `refactored` | `2` | `['07.1', '12.1']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)

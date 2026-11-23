@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0",
+  "blueprints": [
+    {
+      "id": "saas-b2b-operations",
+      "domain": "B2B SaaS Operations",
+      "defaultTrack": "app-fe-be",
+      "recommendedArchetype": "linear-precision",
+      "coreFlows": ["workspace-overview", "record-triage", "detail-inspection", "settings-permissions"],
+      "recommendedComponents": ["kpi-metric-line", "advanced-filter-bar", "data-table-view", "right-drawer", "toast-feedback", "empty-state"]
+    },
+    {
+      "id": "fintech-ledger",
+      "domain": "Fintech & Treasury",
+      "defaultTrack": "app-fe-be",
+      "recommendedArchetype": "stripe-editorial",
+      "coreFlows": ["balance-overview", "transactions-ledger", "approval-workflow", "reconciliation-export"],
+      "recommendedComponents": ["kpi-metric-line", "advanced-filter-bar", "data-table-view", "modal-dialog", "chart-card", "toast-feedback"]
+    },
+    {
+      "id": "content-editorial-workspace",
+      "domain": "Editorial & Knowledge Workspace",
+      "defaultTrack": "app-fe-be",
+      "recommendedArchetype": "editorial-warm-studio",
+      "coreFlows": ["library-index", "document-studio", "review-comments", "publish-checklist"],
+      "recommendedComponents": ["advanced-filter-bar", "right-drawer", "command-palette", "empty-state", "toast-feedback"]
+    },
+    {
+      "id": "executive-board-deck",
+      "domain": "Executive & Product Presentation",
+      "defaultTrack": "presentation-16-9",
+      "recommendedArchetype": "executive-keynote-16-9",
+      "coreFlows": ["opening-thesis", "kpi-scorecard", "strategic-options", "roadmap-decision-ask"],
+      "recommendedComponents": ["title-hero-slide", "executive-summary-3col", "kpi-scorecard-slide", "comparison-matrix-slide", "closing-cta-slide"]
+    }
+  ]
+}

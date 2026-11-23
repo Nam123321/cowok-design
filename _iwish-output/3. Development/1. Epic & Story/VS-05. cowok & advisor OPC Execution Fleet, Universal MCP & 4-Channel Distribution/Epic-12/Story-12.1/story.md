@@ -1,25 +1,25 @@
 ---
 type: I-Wish Story
 id: "12.1"
-title: "Story 12.1: Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx)"
-description: "Nhúng toàn bộ tài sản giao diện React 19 Workbench và 7 Built-in Craft Skills + 7 DE Tools vào một binary Rust duy nhất (uiux-os) hỗ trợ Axum /api/* parity alias (TDR-002 Phase 2), uiux-os up và uiux-os mcp."
+title: "Story 12.1: Kênh 1 — Single-Binary CLI (cowok-design) & Local Web Workbench (cargo / brew / npx)"
+description: "Nhúng toàn bộ tài sản giao diện React 19 Workbench, 7 Built-in Craft Skills + 7 DE Tools và Client Edge Support/Telemetry (14.1) vào một binary Rust duy nhất (cowok-design) hỗ trợ Axum /api/* parity alias (TDR-002 Phase 2), cowok-design up, cowok-design mcp và cowok-design feedback."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-12/Story-12.1/story.md"
 status: refactored
 risk_tier: 2
 delivery: core
-adr_ref: "ADR-006"
-timestamp: "2026-11-20T18:00:00+07:00"
+adr_ref: "ADR-008"
+timestamp: "2026-11-23T11:30:00+07:00"
 tags:
   - "story-12.1"
   - "epic-12"
-  - "uxui-os"
+  - "cowok-design"
   - "rust-day-1"
   - "cli-parity"
 links_to:
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md"
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.5.%20architecture.md"
   - "file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.2.%20database-spec.md"
-dependencies: ["07.2", "11.1", "11.2"]
+dependencies: ["07.2", "11.1", "11.2", "14.1"]
 provides_apis:
   - "internal:epic-12/story-12.1"
 consumes_apis:

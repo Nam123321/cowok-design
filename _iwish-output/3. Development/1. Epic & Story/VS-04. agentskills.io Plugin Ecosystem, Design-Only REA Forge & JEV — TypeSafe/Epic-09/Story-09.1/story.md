@@ -4,7 +4,7 @@ id: "09.1"
 title: "Story 09.1: Two-Store /rea + /awesome-re Bridge (crates/rea-bridge), Design-Only DNA Forge & License/ToS Firewall"
 description: "Khai thác dữ liệu từ URL hoặc repo tham khảo (kết hợp Awesome-RE & REA) theo Two-Store Tier-1A (<=250 tok) + Tier-1B FTS5 (.cowok-design/cache/rea-reference.sqlite3) qua crates/rea-bridge thay thế mock JSON trong ProjectLaunchpadModal, tích hợp License/ToS Firewall, SSRF/Zip-Bomb guards & lossless .fig/.pen/.wire/Clipboard/.zip import."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe/Epic-09/Story-09.1/story.md"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: core
 adr_ref: "ADR-007"
@@ -31,7 +31,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-22: Two-Store /rea + /awesome-re Design DNA Forge, License/ToS Firewall & crates/rea-bridge](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 09: Design-Only REA & Awesome-RE Forge & Decision Cascade Engine](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe/Epic-09/epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context

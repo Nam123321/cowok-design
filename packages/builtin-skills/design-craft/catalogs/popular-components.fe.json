@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "1.0",
+  "track": "app-fe-be",
+  "components": [
+    {
+      "id": "kpi-metric-line",
+      "name": "KPI Metric Line",
+      "category": "data-display",
+      "recommended": true,
+      "aliases": ["stat-strip", "metric-cards", "kpi-bar"],
+      "requiredStates": ["default", "loading", "empty"],
+      "a11yRole": "region"
+    },
+    {
+      "id": "advanced-filter-bar",
+      "name": "Advanced Filter Bar",
+      "category": "navigation",
+      "recommended": true,
+      "aliases": ["filter-toolbar", "search-filter", "faceted-bar"],
+      "requiredStates": ["default", "active-filters", "empty-result"],
+      "a11yRole": "search"
+    },
+    {
+      "id": "data-table-view",
+      "name": "Data Table View",
+      "category": "data-display",
+      "recommended": true,
+      "aliases": ["table", "grid-table", "record-list"],
+      "requiredStates": ["default", "loading", "empty", "error", "selected"],
+      "a11yRole": "table"
+    },
+    {
+      "id": "right-drawer",
+      "name": "Right Detail Drawer",
+      "category": "overlay",
+      "recommended": true,
+      "aliases": ["inspector-drawer", "slide-over", "side-sheet"],
+      "requiredStates": ["closed", "open", "loading"],
+      "a11yRole": "dialog"
+    },
+    {
+      "id": "modal-dialog",
+      "name": "Modal Dialog",
+      "category": "overlay",
+      "recommended": true,
+      "aliases": ["confirm-modal", "dialog", "action-modal"],
+      "requiredStates": ["closed", "open", "submitting"],
+      "a11yRole": "dialog"
+    },
+    {
+      "id": "toast-feedback",
+      "name": "Toast Notification",
+      "category": "feedback",
+      "recommended": true,
+      "aliases": ["snackbar", "alert-toast", "status-toast"],
+      "requiredStates": ["info", "success", "warning", "error"],
+      "a11yRole": "status"
+    },
+    {
+      "id": "empty-state",
+      "name": "Actionable Empty State",
+      "category": "feedback",
+      "recommended": true,
+      "aliases": ["zero-state", "no-data"],
+      "requiredStates": ["first-use", "filtered-empty"],
+      "a11yRole": "status"
+    },
+    {
+      "id": "command-palette",
+      "name": "Command Palette",
+      "category": "navigation",
+      "recommended": false,
+      "aliases": ["quick-switcher", "cmd-k"],
+      "requiredStates": ["closed", "searching", "no-match"],
+      "a11yRole": "combobox"
+    },
+    {
+      "id": "stepper-wizard",
+      "name": "Multi-Step Wizard",
+      "category": "form",
+      "recommended": false,
+      "aliases": ["onboarding-stepper", "wizard"],
+      "requiredStates": ["step-active", "step-complete", "step-error"],
+      "a11yRole": "list"
+    },
+    {
+      "id": "chart-card",
+      "name": "Insight Chart Card",
+      "category": "data-viz",
+      "recommended": false,
+      "aliases": ["analytics-card", "trend-chart"],
+      "requiredStates": ["default", "loading", "empty", "error"],
+      "a11yRole": "figure"
+    }
+  ]
+}

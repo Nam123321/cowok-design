@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-08"
 title: "Epic 08: agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN"
-status: in-progress
+status: completed
 track: "Stream-4"
 wave: 1
 provides: ["crates/plugin-host", "crates/skill-repackager", "packages/builtin-skills", "6 Core + 3 Seed Harness Skills", "agentskills.io SKILL.md + plugin.json Normalizer", "GitHub Cron Sync Scheduler", "LEARN HUMAN_ONLY Valve", "Split DE+DR Plugin Runtime + 7 Built-in DE Tools + Controlled Ephemeral Tool Jail + System-1 LEARN"]
@@ -45,7 +45,7 @@ links_to:
 | [Story 08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (`crates/plugin-host` Domain Core) | `completed` | `3` | `['08.2']` |
 | [Story 08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon `HUMAN_ONLY` Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | `completed` | `3` | `['04.3', '04.4', '08.1', '08.2', '08.3']` |
 | [Story 08.5](./Story-08.5/story.md) | Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 `LEARN` Loop | `completed` | `3` | `['08.1', '08.2', '08.3', '08.4']` |
-| [Story 08.6](./Story-08.6/story.md) | Standalone `design-craft` GitHub Repo Assembler, 4-Pillar Operational Skills/Tools Pack, Multi-Agent Pack, Optional Upstream REA Installer & Default Plugin Mount | `backlog` | `3` | `['08.5', '05.4', '05.6', '02.4']` |
+| [Story 08.6](./Story-08.6/story.md) | Standalone `design-craft` GitHub Repo Assembler, 4-Pillar Operational Skills/Tools Pack, Multi-Agent Pack, Optional Upstream REA Installer & Default Plugin Mount | `completed` | `3` | `['08.5', '05.4', '05.6', '02.4']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 

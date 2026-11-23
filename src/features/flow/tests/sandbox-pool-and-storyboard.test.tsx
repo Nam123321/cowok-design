@@ -286,21 +286,21 @@ describe("Story 05.1: Frontend Sandbox Hardening, IframeKeepAlivePool & Option 5
 
       expect(screen.getByTestId("project-launchpad-modal")).toBeTruthy();
 
-      // Tab 1: PRD
+      // Tab 1: Local Disk (Folder + File quick-start, zero textarea clutter)
       expect(screen.getByTestId("launchpad-panel-prd")).toBeTruthy();
-      fireEvent.change(screen.getByTestId("launchpad-prd-textarea"), { target: { value: "My PRD text" } });
+      fireEvent.change(screen.getByTestId("launchpad-local-folder-input"), { target: { value: "/tmp/my-app" } });
 
-      // Tab 2: Templates
+      // Tab 4: Live Top-5 Awesome-RE Visual Gallery & Local Reference Library
       fireEvent.click(screen.getByTestId("launchpad-tab-templates"));
       expect(screen.getByTestId("launchpad-panel-templates")).toBeTruthy();
-      expect(screen.getByTestId("launchpad-tpl-tpl-fintech")).toBeTruthy();
+      expect(screen.getByTestId("launchpad-rea-search-section")).toBeTruthy();
+      expect(screen.getByTestId("launchpad-rea-topic-design")).toBeTruthy();
 
-      // Tab 3: Design Import & Offline Token Extractor
+      // Tab 2: Online Design Tools (single primary footer CTA + secondary Firewall Pre-check)
       fireEvent.click(screen.getByTestId("launchpad-tab-design"));
       expect(screen.getByTestId("launchpad-panel-design")).toBeTruthy();
-      fireEvent.click(screen.getByTestId("launchpad-extract-tokens-btn"));
-      expect(screen.getByTestId("launchpad-extracted-tokens-preview")).toBeTruthy();
-      expect(screen.getByTestId("launchpad-extracted-tokens-preview").textContent).toContain("primaryColor");
+      expect(screen.getByTestId("launchpad-rea-ingest-btn")).toBeTruthy();
+      expect(screen.getByTestId("launchpad-extract-tokens-btn")).toBeTruthy();
 
       // Tab 4: Git Codebase Mode
       fireEvent.click(screen.getByTestId("launchpad-tab-git"));
@@ -370,9 +370,10 @@ describe("Story 05.1: Frontend Sandbox Hardening, IframeKeepAlivePool & Option 5
 
       render(<ProjectLaunchpadModal isOpen={true} onClose={vi.fn()} />);
       expect(screen.getByTestId("launchpad-prd-file-input")).toBeTruthy();
-      fireEvent.click(screen.getByTestId("launchpad-load-sample-prd-btn"));
-      const textarea = screen.getByTestId("launchpad-prd-textarea") as HTMLTextAreaElement;
-      expect(textarea.value).toContain("FinTech Multi-Sig Wallet");
+      expect(screen.getByTestId("launchpad-pick-folder-btn")).toBeTruthy();
+      const folderInput = screen.getByTestId("launchpad-local-folder-input") as HTMLInputElement;
+      fireEvent.change(folderInput, { target: { value: "~/Projects/fintech-wallet" } });
+      expect(folderInput.value).toBe("~/Projects/fintech-wallet");
     });
   });
 });

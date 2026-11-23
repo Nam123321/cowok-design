@@ -235,6 +235,12 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V21__story_09_2_decision_audit_log.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
@@ -307,10 +313,11 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
     expect(mappedTables).toContain("sdi_clarification_sessions");
     expect(mappedTables).toContain("user_skill_registry");
     expect(mappedTables).toContain("gate_failure_ledger");
-    expect(mappedTables).toHaveLength(62);
+    expect(mappedTables).toContain("decision_audit_log");
+    expect(mappedTables).toHaveLength(63);
   });
 
-  it("UT-DB-02: executes V1-V20 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V21 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 
@@ -718,5 +725,52 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
     ).c;
     expect(skillCount).toBe(0);
     expect(ledgerCount).toBe(0);
+  });
+
+  it("UT-DB-12: verifies Story 09.2 V21 decision_audit_log Prisma parity, CHECK constraints, index, and cascade", () => {
+    const db = openMigratedMemoryDb();
+    const schemaText = fs.readFileSync(schemaPath, "utf-8");
+
+    const pragmaRows = db
+      .prepare("PRAGMA table_info(decision_audit_log)")
+      .all() as Array<{ name: string }>;
+    const sqliteCols = pragmaRows.map((r) => r.name).sort();
+    const prismaCols = parsePrismaModelColumns(schemaText, "DecisionAuditLog");
+    expect(sqliteCols).toEqual(prismaCols);
+
+    const idxNames = (
+      db.prepare("PRAGMA index_list(decision_audit_log)").all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    expect(idxNames).toContain("idx_decision_audit_log_tenant_project");
+
+    const now = Date.now();
+    db.prepare(
+      "INSERT INTO projects (id, tenant_id, name, slug, created_at, updated_at) VALUES ('p-092', 'tenant-a', 'Proj 092', 'p-092', ?, ?)"
+    ).run(now, now);
+
+    // Invalid attempt_number > 3 must fail CHECK constraint
+    expect(() => {
+      db.prepare(
+        "INSERT INTO decision_audit_log (id, tenant_id, project_id, cascade_stage, tier_used, confidence_kind, verdict_label, attempt_number, breaker_tripped, latency_ms, created_at) VALUES ('dal-bad', 'tenant-a', 'p-092', 'DECISION_1', 'LOCAL_FTS5_BM25', 'ExactMatch', 'ACCEPT_ARTIFACT', 4, 0, 2, ?)"
+      ).run(now);
+    }).toThrow();
+
+    // Invalid confidence_kind must fail CHECK constraint
+    expect(() => {
+      db.prepare(
+        "INSERT INTO decision_audit_log (id, tenant_id, project_id, cascade_stage, tier_used, confidence_kind, verdict_label, attempt_number, breaker_tripped, latency_ms, created_at) VALUES ('dal-bad-conf', 'tenant-a', 'p-092', 'DECISION_1', 'LOCAL_FTS5_BM25', 'RawFloat', 'ACCEPT_ARTIFACT', 1, 0, 2, ?)"
+      ).run(now);
+    }).toThrow();
+
+    db.prepare(
+      "INSERT INTO decision_audit_log (id, tenant_id, project_id, cascade_stage, tier_used, confidence_kind, verdict_label, rubric_swap_consistent, attempt_number, breaker_tripped, stale_file_sha256, latency_ms, created_at) VALUES ('dal-1', 'tenant-a', 'p-092', 'RUBRIC_SHIELD', 'LOCAL_FTS5_BM25', 'ExactMatch', 'CANDIDATE_X', 1, 1, 0, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 3, ?)"
+    ).run(now);
+
+    // Project deletion cascades cleanly
+    db.prepare("DELETE FROM projects WHERE id = 'p-092'").run();
+    const auditCount = (
+      db.prepare("SELECT COUNT(*) as c FROM decision_audit_log").get() as { c: number }
+    ).c;
+    expect(auditCount).toBe(0);
   });
 });
