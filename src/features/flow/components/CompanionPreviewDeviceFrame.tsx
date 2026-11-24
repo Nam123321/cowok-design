@@ -30,8 +30,10 @@ const LEGACY_DEVICE_FRAME_MAX_WIDTH_PX = 820;
 const FONT_WEIGHT_SEMIBOLD = 600;
 
 const VIEWPORT_WIDTHS: Record<ViewportPreset, string> = {
-  "mobile-390": "375px",
-  "tablet-768": "620px",
+  "fold-outer-344": "344px",
+  "mobile-390": "390px",
+  "fold-inner-712": "712px",
+  "tablet-768": "768px",
   "desktop-1440": "100%",
 };
 const ASPECT_RATIO_VALUES: Record<"auto" | "16-9" | "16-10", string | undefined> = {

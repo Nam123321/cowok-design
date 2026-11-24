@@ -184,12 +184,25 @@ export function assembleDesignCraftRepo(options: AssembleOptions): AssembleRepor
   const resolvedRepoRoot = path.resolve(options.repoRoot);
   const resolvedOut = path.resolve(options.outputDir);
   assertSafeOutputDir(resolvedRepoRoot, resolvedOut);
-  const sourceBundle = path.join(resolvedRepoRoot, "packages", "builtin-skills", "design-craft");
+  const canonicalBundle = path.join(resolvedRepoRoot, "packages", "design-craft");
+  const fallbackBundle = path.join(resolvedRepoRoot, "packages", "builtin-skills", "design-craft");
+  const sourceBundle = fs.existsSync(path.join(canonicalBundle, "plugin.json"))
+    ? canonicalBundle
+    : fallbackBundle;
   const forgedSkillsDir = path.join(resolvedRepoRoot, "packages", "builtin-skills", "skills");
   fs.rmSync(resolvedOut, { recursive: true, force: true });
   copyDirRecursive(sourceBundle, resolvedOut);
   if (fs.existsSync(forgedSkillsDir)) {
+    const existingSkills = new Set<string>([
+      ...listImmediateDirs(path.join(resolvedOut, "skills", "craft")),
+      ...listImmediateDirs(path.join(resolvedOut, "skills", "domain-business")),
+      ...listImmediateDirs(path.join(resolvedOut, "skills")),
+    ]);
     for (const skillName of listImmediateDirs(forgedSkillsDir)) {
+      if (existingSkills.has(skillName)) {
+        // Never overwrite upgraded v2.x skills already present in design-craft with legacy v1.0.0 copies
+        continue;
+      }
       copyDirRecursive(path.join(forgedSkillsDir, skillName), path.join(resolvedOut, "skills", "craft", skillName));
     }
   }

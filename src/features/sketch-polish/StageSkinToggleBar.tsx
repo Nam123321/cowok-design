@@ -27,6 +27,8 @@ export interface StageSkinToggleBarProps {
   oklchWarning?: string | null;
   lastSwapMs?: number | null;
   onOpenClarify?: () => void;
+  onOpenBrandStudio?: () => void;
+  onOpenHiddenSpecs?: () => void;
 }
 
 function getPhaseLabel(
@@ -218,6 +220,32 @@ const PolishPhaseActions: React.FC<{
   );
 };
 
+const ELLIPSIS_LABEL_STYLE: React.CSSProperties = {
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const COMPACT_CTA_STYLE: React.CSSProperties = {
+  maxWidth: "136px",
+  minWidth: 0,
+  padding: "0 8px",
+  flexShrink: 1,
+};
+
+const COMPACT_STUDIO_CHIP_STYLE: React.CSSProperties = {
+  whiteSpace: "nowrap",
+  padding: "0 7px",
+  flexShrink: 1,
+  minWidth: 0,
+};
+
+const COMPACT_SPECS_CHIP_STYLE: React.CSSProperties = {
+  whiteSpace: "nowrap",
+  padding: "0 7px",
+  flexShrink: 0,
+};
+
 const PhaseActionControls: React.FC<{
   phase: CognitivePhase;
   isSketchLens: boolean;
@@ -228,18 +256,20 @@ const PhaseActionControls: React.FC<{
 }> = ({ phase, isSketchLens, onAdvanceToStyle, onOpenClarify, onApproveV1, onToggleSketchLens }) => {
   const { t } = useTranslation();
   if (phase === "sketch") {
+    const label = t("sketchPolish.promoteToStyleBtn", "Chốt phác thảo → Chọn diện mạo");
     return (
-      <button type="button" className="sp-phase-cta" data-testid="promote-sketch-to-style-btn" onClick={onAdvanceToStyle ?? onOpenClarify}>
+      <button type="button" className="sp-phase-cta" data-testid="promote-sketch-to-style-btn" title={label} style={COMPACT_CTA_STYLE} onClick={onAdvanceToStyle ?? onOpenClarify}>
         <BrandIcon name="sparkles" size={ICON_SIZE_SM} strokeWidth={STROKE_WIDTH_MONO} />
-        <span>{t("sketchPolish.promoteToStyleBtn", "Chốt phác thảo → Chọn diện mạo")}</span>
+        <span style={ELLIPSIS_LABEL_STYLE}>{label}</span>
       </button>
     );
   }
   if (phase === "style") {
+    const label = t("sketchPolish.chooseStyleBtn", "Chọn diện mạo & màu sắc");
     return (
-      <button type="button" className="sp-phase-cta" data-testid="open-live-direction-btn" onClick={onOpenClarify ?? onAdvanceToStyle}>
+      <button type="button" className="sp-phase-cta" data-testid="open-live-direction-btn" title={label} style={COMPACT_CTA_STYLE} onClick={onOpenClarify ?? onAdvanceToStyle}>
         <BrandIcon name="brand-agent" size={ICON_SIZE_SM} strokeWidth={STROKE_WIDTH_MONO} />
-        <span>{t("sketchPolish.chooseStyleBtn", "Chọn diện mạo & màu sắc")}</span>
+        <span style={ELLIPSIS_LABEL_STYLE}>{label}</span>
       </button>
     );
   }
@@ -300,7 +330,10 @@ export const StageSkinToggleBar: React.FC<StageSkinToggleBarProps> = ({
   oklchWarning = null,
   lastSwapMs = null,
   onOpenClarify,
+  onOpenBrandStudio,
+  onOpenHiddenSpecs,
 }) => {
+  const { t } = useTranslation();
   const isSketch = skin === "sketch-paper";
   const effectivePhase: CognitivePhase = cognitivePhase ?? (isSketch ? "sketch" : "polish");
   const handleToggleLens = onToggleSketchLens ?? (() => onChangeSkin(isSketch ? "brand-color" : "sketch-paper"));
@@ -310,7 +343,7 @@ export const StageSkinToggleBar: React.FC<StageSkinToggleBarProps> = ({
       className="sp-toolbar-group"
       data-ff-id="stage-skin-toggle"
       data-testid="stage-skin-toggle"
-      style={{ display: "inline-flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: "6px", whiteSpace: "nowrap", minWidth: 0 }}
+      style={{ display: "inline-flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: "4px", whiteSpace: "nowrap", flex: "1 1 auto", minWidth: 0 }}
     >
       <CognitivePhaseStepper phase={effectivePhase} onSelectPhase={onSelectPhase} />
       <PhaseActionControls
@@ -321,6 +354,32 @@ export const StageSkinToggleBar: React.FC<StageSkinToggleBarProps> = ({
         onApproveV1={onApproveV1}
         onToggleSketchLens={effectivePhase === "polish" || effectivePhase === "approved" ? handleToggleLens : undefined}
       />
+      {onOpenBrandStudio && (
+        <button
+          type="button"
+          className="sp-chip-btn"
+          data-testid="open-brand-studio-btn"
+          title={t("brandStudio.openStudioBtn", "Brand Studio")}
+          onClick={onOpenBrandStudio}
+          style={COMPACT_STUDIO_CHIP_STYLE}
+        >
+          <BrandIcon name="layers" size={ICON_SIZE_SM} strokeWidth={STROKE_WIDTH_MONO} />
+          <span style={ELLIPSIS_LABEL_STYLE}>{t("brandStudio.openStudioBtn", "Brand Studio")}</span>
+        </button>
+      )}
+      {onOpenHiddenSpecs && (
+        <button
+          type="button"
+          className="sp-chip-btn"
+          data-testid="open-hidden-specs-btn"
+          title={t("brandStudio.openHiddenSpecsBtn", "Đặc tả ẩn")}
+          onClick={onOpenHiddenSpecs}
+          style={COMPACT_SPECS_CHIP_STYLE}
+        >
+          <BrandIcon name="file-text" size={ICON_SIZE_SM} strokeWidth={STROKE_WIDTH_MONO} />
+          <span>{t("brandStudio.openHiddenSpecsBtn", "Đặc tả ẩn")}</span>
+        </button>
+      )}
       <StageSkinStatusBadges
         showBrandBypass={hasExistingBrandTokens && !isSketch}
         oklchWarning={oklchWarning}

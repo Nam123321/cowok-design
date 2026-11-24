@@ -412,7 +412,7 @@ pub fn ensure_session_for_tenant(
         let (def_id, def_slug) = default_project_id_for_tenant(tenant_id);
         tx.execute(
             "INSERT OR IGNORE INTO projects (id, slug, name, workspace_root, product_brief, tenant_id, provenance, status, created_at, updated_at)
-             VALUES (?1, ?2, 'Workbench Default', '.', '', ?3, 'workbench', 'ACTIVE', ?4, ?4)",
+             VALUES (?1, ?2, 'Workbench Default', '.', '', ?3, 'scratch', 'ACTIVE', ?4, ?4)",
             params![def_id, def_slug, tenant_id, now_ms],
         )?;
         def_id

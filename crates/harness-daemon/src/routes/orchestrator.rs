@@ -17,7 +17,7 @@ use bot_fleet::{
     deduplicate_provenance_backlinks, parse_live_spec_jsonl, read_live_spec_file_nofollow,
     validate_session_id, CowokOrchestrator, DecisionCascadeClient, LiveSpecBridgeState,
     LiveSpecPatchLine, OrchestratorCommandKind, OrchestratorError, OrchestratorLane,
-    OrchestratorRouteInput, ProvenanceBacklink, LIVE_SPEC_MAX_BYTES,
+    OrchestratorRouteInput, PromptCacheHints, ProvenanceBacklink, LIVE_SPEC_MAX_BYTES,
 };
 use chrono::Utc;
 use domain::decision::{CascadeStage, ConfidenceKind, DecisionTier};
@@ -28,6 +28,10 @@ use html_forge::{
 };
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use spec_registry::skill_router::{
+    compile_two_breakpoint_prompt, CompiledTwoBreakpointPrompt, ConversationTurn,
+    TwoBreakpointPromptInput,
+};
 use spec_registry::{
     SqliteActorError, SqlitePool, SqliteWriteActor, SqliteWriteActorHandle,
     DEFAULT_WRITE_ACTOR_CAPACITY,
@@ -36,6 +40,8 @@ use uuid::Uuid;
 
 use super::bot_fleet::{load_tenant_byok_credentials, shared_cooldown_tracker};
 use super::legacy_specs::verify_anti_idor_with_caller;
+use super::models_registry::load_tenant_model_registry;
+use super::skills_catalog::load_or_discover_catalog;
 use super::DaemonAppState;
 use crate::daemon_auth::{
     is_valid_superadmin_bearer, FlowPrincipal, LegacyAuthKind, VerifiedLegacyIngress,
@@ -768,6 +774,183 @@ fn map_live_op_kind_to_v19(op_kind: &str) -> &'static str {
     }
 }
 
+const CANONICAL_ORCHESTRATOR_TOOL_SCHEMAS_JSON: &str = r#"[
+  {"name":"de-phase-router","kind":"builder"},
+  {"name":"de-intake","kind":"builder"},
+  {"name":"de-scan-sketch","kind":"builder"},
+  {"name":"de-tokens-oklch","kind":"builder"},
+  {"name":"de-brand-preview","kind":"builder"},
+  {"name":"de-extract-contract","kind":"builder"},
+  {"name":"de-patch-dom","kind":"builder"},
+  {"name":"qc-a11y-contrast","kind":"audit"},
+  {"name":"qc-anti-slop-linter","kind":"audit"},
+  {"name":"qc-layout-overflow","kind":"audit"},
+  {"name":"qc-chart-and-data","kind":"audit"},
+  {"name":"qc-spec-parity","kind":"audit"},
+  {"name":"qc-popular-coverage","kind":"audit"}
+]"#;
+
+const MAX_DESIGN_ASSET_HASH_BYTES: u64 = 512 * 1024;
+
+/// Computes a deterministic SHA-256 over real project `DESIGN.md` and `tokens.css` files
+/// beneath `workspace_root` (rejecting symlinks and oversized files), or an explicit
+/// `"no-design-tokens"` digest when neither file exists in the workspace.
+pub(crate) fn compute_workspace_design_tokens_sha256(workspace_root: &Path) -> String {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+
+    const CANDIDATES: &[&str] = &[
+        "DESIGN.md",
+        "specs/DESIGN.md",
+        "tokens.css",
+        ".cowok-design/tokens.css",
+        "src/styles/tokens.css",
+    ];
+    let mut hasher = Sha256::new();
+    let mut found_any = false;
+    for rel in CANDIDATES {
+        let candidate = workspace_root.join(rel);
+        let Ok(meta) = std::fs::symlink_metadata(&candidate) else {
+            continue;
+        };
+        if meta.file_type().is_symlink()
+            || !meta.is_file()
+            || meta.len() > MAX_DESIGN_ASSET_HASH_BYTES
+        {
+            continue;
+        }
+        let mut opts = std::fs::OpenOptions::new();
+        opts.read(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.custom_flags(libc::O_NOFOLLOW);
+        }
+        let Ok(file) = opts.open(&candidate) else {
+            continue;
+        };
+        let mut buf = Vec::new();
+        if file
+            .take(MAX_DESIGN_ASSET_HASH_BYTES + 1)
+            .read_to_end(&mut buf)
+            .is_ok()
+            && buf.len() as u64 <= MAX_DESIGN_ASSET_HASH_BYTES
+        {
+            found_any = true;
+            hasher.update(rel.as_bytes());
+            hasher.update(b"\0");
+            hasher.update(&buf);
+            hasher.update(b"\n");
+        }
+    }
+    if found_any {
+        format!("{:x}", hasher.finalize())
+    } else {
+        compute_sha256_hex(b"no-design-tokens")
+    }
+}
+
+fn load_session_conversation_history(
+    state: &DaemonAppState,
+    tenant_id: &str,
+    project_id: &str,
+    session_id: &str,
+) -> Vec<ConversationTurn> {
+    let Ok(conn) = state.registry.pool().connection() else {
+        return Vec::new();
+    };
+    let sql = "SELECT cm.role, cm.prose_markdown \
+               FROM chat_messages cm \
+               INNER JOIN chat_sessions cs ON cs.id = cm.session_id \
+               INNER JOIN projects p ON p.id = cs.project_id \
+               WHERE cm.session_id = ?1 AND cs.project_id = ?2 AND p.tenant_id = ?3 \
+               ORDER BY cm.created_at ASC \
+               LIMIT 64";
+    let Ok(mut stmt) = conn.prepare(sql) else {
+        return Vec::new();
+    };
+    let Ok(rows) = stmt.query_map(params![session_id, project_id, tenant_id], |r| {
+        Ok(ConversationTurn {
+            role: r.get(0)?,
+            content: r.get(1)?,
+        })
+    }) else {
+        return Vec::new();
+    };
+    rows.flatten().collect()
+}
+
+/// Compiles a 2-Breakpoint Cache-Safe prompt (`Story 08.7 AC-02`) backed by the cached
+/// `UnifiedSkillCatalog`, real `DESIGN.md`/`tokens.css` hash, canonical tool schemas,
+/// and the active model's `context_window` from the tenant's dynamic `ModelRegistry`.
+pub fn compile_orchestrator_turn_prompt(
+    state: &DaemonAppState,
+    tenant_id: &str,
+    project_id: &str,
+    user_turn: &str,
+    history: Vec<ConversationTurn>,
+) -> (String, CompiledTwoBreakpointPrompt) {
+    let ws = state.registry.pool().workspace_root();
+    let models = load_tenant_model_registry(state, tenant_id);
+    let active_context_window = models
+        .iter()
+        .find(|m| m.enabled && m.is_default_for_provider)
+        .or_else(|| models.iter().find(|m| m.enabled))
+        .map(|m| m.context_window)
+        .unwrap_or(200_000);
+    compile_orchestrator_turn_prompt_with_context(
+        state,
+        tenant_id,
+        project_id,
+        ws,
+        user_turn,
+        history,
+        active_context_window,
+    )
+}
+
+fn compile_orchestrator_turn_prompt_with_context(
+    state: &DaemonAppState,
+    tenant_id: &str,
+    project_id: &str,
+    project_workspace_root: &Path,
+    user_turn: &str,
+    history: Vec<ConversationTurn>,
+    context_window_tokens: usize,
+) -> (String, CompiledTwoBreakpointPrompt) {
+    let catalog = load_or_discover_catalog(state, tenant_id, Some(project_id), false);
+    let catalog_sha = catalog.catalog_sha256().to_string();
+    let matched = catalog.route_skills_multilingual(user_turn, 3);
+    let mut jit_tier2 = Vec::with_capacity(matched.len());
+    let mut jit_tier3 = Vec::new();
+    for m in &matched {
+        if let Ok(body) = catalog.load_tier2_skill_body(&m.skill_id) {
+            jit_tier2.push((m.skill_id.clone(), body));
+        }
+        if let Some(entry) = catalog.get(&m.skill_id) {
+            for ref_path in entry.reference_paths.iter().take(2) {
+                if let Ok(ref_text) = catalog.load_tier3_reference(&m.skill_id, ref_path) {
+                    jit_tier3.push((m.skill_id.clone(), ref_path.clone(), ref_text));
+                }
+            }
+        }
+    }
+    let design_tokens_hash = compute_workspace_design_tokens_sha256(project_workspace_root);
+    let compiled = compile_two_breakpoint_prompt(&TwoBreakpointPromptInput {
+        system_identity: "cowok-host-spine (Zero-Hardcode 2-Breakpoint AI Harness)".to_string(),
+        tool_schemas_json: CANONICAL_ORCHESTRATOR_TOOL_SCHEMAS_JSON.to_string(),
+        tier1_skill_index: catalog.render_zone1_tier1_index().to_string(),
+        design_tokens_sha256: design_tokens_hash,
+        catalog_sha256: catalog_sha.clone(),
+        jit_tier2_skills: jit_tier2,
+        jit_tier3_references: jit_tier3,
+        conversation_history: history,
+        user_turn: user_turn.to_string(),
+        context_window_tokens,
+    });
+    (catalog_sha, compiled)
+}
+
 /// `POST /api/v1/orchestrator/chat`
 pub async fn handle_orchestrator_chat(
     State(state): State<DaemonAppState>,
@@ -882,6 +1065,36 @@ pub async fn handle_orchestrator_chat(
         req.live_spec_payload.as_deref(),
     );
 
+    // Compile the 2-breakpoint prompt BEFORE `route_three_lane(...)` using cached UnifiedSkillCatalog,
+    // real SQLite session message history, real DESIGN.md/tokens.css hash, and tenant ModelRegistry.
+    let (catalog_sha256, compiled_prompt, tenant_model_registry) = {
+        let st = state.clone();
+        let tid = tenant_id.clone();
+        let pid = normalized_project_id.clone();
+        let sid = safe_session_id.clone();
+        let ws = workspace_root.clone();
+        let msg = message.to_string();
+        match tokio::task::spawn_blocking(move || {
+            let models = load_tenant_model_registry(&st, &tid);
+            let ctx_win = models
+                .iter()
+                .find(|m| m.enabled && m.is_default_for_provider)
+                .or_else(|| models.iter().find(|m| m.enabled))
+                .map(|m| m.context_window)
+                .unwrap_or(200_000);
+            let history = load_session_conversation_history(&st, &tid, &pid, &sid);
+            let (csha, compiled) = compile_orchestrator_turn_prompt_with_context(
+                &st, &tid, &pid, &ws, &msg, history, ctx_win,
+            );
+            (csha, compiled, models)
+        })
+        .await
+        {
+            Ok((csha, compiled, models)) => (Some(csha), Some(compiled), models),
+            Err(_) => (None, None, Vec::new()),
+        }
+    };
+
     let orchestrator = match lane_preview {
         OrchestratorLane::Lane1DecisionCascade => {
             let vault_state = state.clone();
@@ -897,6 +1110,7 @@ pub async fn handle_orchestrator_chat(
                 DecisionCascadeClient::new()
                     .with_vault_lookup(Arc::new(move |_tid: &str| (*creds_arc).clone())),
             )
+            .with_model_registry(tenant_model_registry)
         }
         OrchestratorLane::Lane2OpcFleet => {
             let vault_state = state.clone();
@@ -907,7 +1121,23 @@ pub async fn handle_orchestrator_chat(
             })
             .await
             .unwrap_or_default();
-            CowokOrchestrator::new().with_byok_fleet(creds, shared_cooldown_tracker())
+            let mut orch = CowokOrchestrator::new()
+                .with_byok_fleet(creds, shared_cooldown_tracker())
+                .with_model_registry(tenant_model_registry);
+            if let (Some(ref csha), Some(ref compiled)) = (&catalog_sha256, &compiled_prompt) {
+                let cache_hints = PromptCacheHints {
+                    project_id: normalized_project_id.clone(),
+                    catalog_sha256: csha.clone(),
+                    zone1_static_prefix: Some(compiled.zone1_static_prefix.clone()),
+                    cached_content_name: None,
+                    history_breakpoint_block: compiled.history_breakpoint_block.clone(),
+                };
+                orch = orch.with_prompt_cache_context(
+                    cache_hints,
+                    Some(compiled.zone2_dynamic_tail.clone()),
+                );
+            }
+            orch
         }
         OrchestratorLane::Lane0Deterministic => CowokOrchestrator::new(),
     };
@@ -1197,7 +1427,7 @@ pub async fn handle_orchestrator_chat(
         route_out
     };
 
-    ok_response(
+    let mut resp = ok_response(
         OrchestratorChatData {
             lane: route_out.lane,
             latency_ms: route_out.latency_ms,
@@ -1210,7 +1440,25 @@ pub async fn handle_orchestrator_chat(
             actor_queue_depth: actor.queue_depth(),
         },
         request_id,
-    )
+    );
+    if let Some(ref csha) = catalog_sha256 {
+        if let Ok(val) = HeaderValue::from_str(csha) {
+            resp.headers_mut().insert("x-cowok-catalog-sha256", val);
+        }
+    }
+    if let Some(ref compiled) = compiled_prompt {
+        if let Ok(val) = HeaderValue::from_str(&compiled.zone1_prefix_sha256) {
+            resp.headers_mut()
+                .insert("x-cowok-zone1-prefix-sha256", val);
+        }
+        let skills_hdr = compiled.activated_skills.join(",");
+        if !skills_hdr.is_empty() {
+            if let Ok(val) = HeaderValue::from_str(&skills_hdr) {
+                resp.headers_mut().insert("x-cowok-activated-skills", val);
+            }
+        }
+    }
+    resp
 }
 
 /// `POST /api/v1/orchestrator/live-patch`

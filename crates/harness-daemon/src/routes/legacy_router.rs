@@ -9,6 +9,7 @@ use axum::{
 use crate::daemon_auth::legacy_project_auth_middleware;
 use crate::routes::bot_fleet::build_bot_fleet_router;
 use crate::routes::chat_cas_vault::chat_cas_vault_routes;
+use crate::routes::cognitive_studio::build_cognitive_studio_router;
 use crate::routes::context_assemble::{handle_context_assemble, handle_get_context_telemetry};
 use crate::routes::de_runtime::build_de_runtime_router;
 use crate::routes::decision::build_decision_router;
@@ -16,6 +17,7 @@ use crate::routes::deck_generation::build_deck_generation_router;
 use crate::routes::flow_synthesize::build_flow_synthesize_router;
 use crate::routes::fs_jail;
 use crate::routes::github_ide_integrations::integration_routes;
+use crate::routes::learn_studio_corrections::build_learn_studio_corrections_router;
 use crate::routes::legacy_proposals::{
     handle_apply_proposal, handle_create_pr, handle_create_proposal, handle_create_snapshot,
     handle_decide_tradeoff, handle_diff_proposal, handle_download_export, handle_export_snapshots,
@@ -41,6 +43,7 @@ use crate::routes::legacy_specs::{
     handle_list_projects, handle_list_specs, handle_put_spec, handle_synthesize_specs,
     handle_update_project,
 };
+use crate::routes::models_registry::build_models_registry_router;
 use crate::routes::orchestrator::build_orchestrator_router;
 use crate::routes::presentation::presentation_routes;
 use crate::routes::project_trash::handle_restore_project;
@@ -49,6 +52,7 @@ use crate::routes::sketch_polish::{
     handle_apply_sketch_patch, handle_get_sdi_clarify, handle_get_sketch_patch_history,
     handle_sdi_clarify,
 };
+use crate::routes::skills_catalog::build_skills_catalog_router;
 use crate::routes::ssot_registry::{
     handle_export_ssot, handle_get_ssot_components, handle_mutate_appshell_lock,
     handle_route_skills,
@@ -277,6 +281,10 @@ pub(crate) fn build_protected_legacy_router(state: DaemonAppState) -> Router<Dae
         .merge(build_deck_generation_router())
         .merge(build_orchestrator_router())
         .merge(build_support_telemetry_router())
+        .merge(build_skills_catalog_router())
+        .merge(build_models_registry_router())
+        .merge(build_learn_studio_corrections_router())
+        .merge(build_cognitive_studio_router())
         .route_layer(middleware::from_fn_with_state(
             state,
             legacy_project_auth_middleware,

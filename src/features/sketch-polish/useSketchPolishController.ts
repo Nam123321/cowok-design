@@ -242,14 +242,16 @@ function useSkinSwapAction(
   setOklchWarning: (w: string | null) => void,
   setLastSwapMs: (ms: number | null) => void
 ) {
-  return useCallback((nextSkin: StageSkinMode) => {
+  return useCallback((nextSkin: StageSkinMode, brandCssVars?: Record<string, string>) => {
     const start = typeof performance !== "undefined" ? performance.now() : Date.now();
     setStageSkin(nextSkin);
-    const sketchVars = nextSkin === "sketch-paper" ? readActiveSketchThemeVars() : {};
+    const activeVars = nextSkin === "sketch-paper" ? readActiveSketchThemeVars() : (brandCssVars ?? {});
     const pair = nextSkin === "sketch-paper"
-      ? { fgHex: sketchVars["--stage-sketch-ink"] ?? DEFAULT_SKIN_FG_HEX, bgHex: sketchVars["--stage-sketch-bg"] ?? DEFAULT_SKIN_BG_HEX }
-      : readComputedBrandHexPair();
-    stageSkinSwapRef.current?.(nextSkin, sketchVars);
+      ? { fgHex: activeVars["--stage-sketch-ink"] ?? DEFAULT_SKIN_FG_HEX, bgHex: activeVars["--stage-sketch-bg"] ?? DEFAULT_SKIN_BG_HEX }
+      : (activeVars["--text-primary"] && activeVars["--bg-surface"]
+          ? { fgHex: activeVars["--text-primary"], bgHex: activeVars["--bg-surface"] }
+          : readComputedBrandHexPair());
+    stageSkinSwapRef.current?.(nextSkin, activeVars);
     const check = evaluateClientContrast(pair.fgHex, pair.bgHex);
     setOklchWarning(check.passesAa ? null : `WCAG AA (${check.ratio}:1)`);
     const elapsed = (typeof performance !== "undefined" ? performance.now() : Date.now()) - start;

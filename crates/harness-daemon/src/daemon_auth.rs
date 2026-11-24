@@ -1461,7 +1461,11 @@ pub async fn legacy_project_auth_middleware(
         || path == "/api/v1/plugins/import-repo"
         || path == "/api/v1/plugins/ephemeral-tools/execute"
         || path == "/api/v1/learn/ledger"
-        || path == "/api/v1/learn/ledger/record";
+        || path == "/api/v1/learn/ledger/record"
+        || path == "/api/v1/learn/studio-corrections"
+        || path.starts_with("/api/v1/skills/catalog")
+        || path.starts_with("/api/v1/models/registry")
+        || path.starts_with("/api/v1/cognitive/");
 
     if let Some(ref caller) = verified {
         if requires_strict_non_legacy_bearer

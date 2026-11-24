@@ -202,22 +202,33 @@ fn list_projects_blocking(
         (true, true) => {
             "SELECT id, slug, name, product_brief, workspace_root, inherit_brand_from_project_id,
                     created_at, updated_at, project_code, provenance, trash_deleted_at
-             FROM projects ORDER BY updated_at DESC"
+             FROM projects
+             WHERE id NOT LIKE '__workbench_default__%' AND slug NOT LIKE '__workbench_default__%'
+             ORDER BY updated_at DESC"
         }
         (true, false) => {
             "SELECT id, slug, name, product_brief, workspace_root, inherit_brand_from_project_id,
                     created_at, updated_at, project_code, provenance, trash_deleted_at
-             FROM projects WHERE trash_deleted_at IS NULL ORDER BY updated_at DESC"
+             FROM projects
+             WHERE trash_deleted_at IS NULL
+               AND id NOT LIKE '__workbench_default__%' AND slug NOT LIKE '__workbench_default__%'
+             ORDER BY updated_at DESC"
         }
         (false, true) => {
             "SELECT id, slug, name, product_brief, workspace_root, inherit_brand_from_project_id,
                     created_at, updated_at, project_code, provenance, trash_deleted_at
-             FROM projects WHERE tenant_id = ?1 ORDER BY updated_at DESC"
+             FROM projects
+             WHERE tenant_id = ?1
+               AND id NOT LIKE '__workbench_default__%' AND slug NOT LIKE '__workbench_default__%'
+             ORDER BY updated_at DESC"
         }
         (false, false) => {
             "SELECT id, slug, name, product_brief, workspace_root, inherit_brand_from_project_id,
                     created_at, updated_at, project_code, provenance, trash_deleted_at
-             FROM projects WHERE trash_deleted_at IS NULL AND tenant_id = ?1 ORDER BY updated_at DESC"
+             FROM projects
+             WHERE trash_deleted_at IS NULL AND tenant_id = ?1
+               AND id NOT LIKE '__workbench_default__%' AND slug NOT LIKE '__workbench_default__%'
+             ORDER BY updated_at DESC"
         }
     };
     let mut stmt = conn

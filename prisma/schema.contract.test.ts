@@ -253,6 +253,18 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V24__story_08_7_model_registry_and_studio_corrections.sql"),
+      "utf-8"
+    )
+  );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V25__story_05_6_brand_proposals_and_heritage_packs.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
@@ -330,10 +342,15 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
     expect(mappedTables).toContain("telemetry_outbox");
     expect(mappedTables).toContain("local_support_tickets");
     expect(mappedTables).toContain("telemetry_preferences");
-    expect(mappedTables).toHaveLength(67);
+    expect(mappedTables).toContain("model_registry_profiles");
+    expect(mappedTables).toContain("studio_correction_signals");
+    expect(mappedTables).toContain("brand_proposal_snapshots");
+    expect(mappedTables).toContain("heritage_design_packs");
+    expect(mappedTables).toContain("hidden_spec_documents");
+    expect(mappedTables).toHaveLength(72);
   });
 
-  it("UT-DB-02: executes V1-V23 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V25 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 

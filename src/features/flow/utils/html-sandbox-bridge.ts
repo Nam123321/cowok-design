@@ -564,6 +564,16 @@ function buildDeckNavAndRectsSnippet(): string {
           document.body.style.removeProperty("background-color");
           document.body.style.removeProperty("color");
         }
+        if (cssVars && typeof cssVars === "object") {
+          var bKeys = Object.keys(cssVars);
+          for (var bi = 0; bi < bKeys.length; bi++) {
+            var bk = bKeys[bi];
+            if (bk && bk.indexOf("--") === 0 && /^--[a-zA-Z0-9_-]{1,64}$/.test(bk)) {
+              var bv = String(cssVars[bk] || "").trim();
+              if (bv && bv.length <= 128 && sanitizeCss(bv)) root.style.setProperty(bk, bv);
+            }
+          }
+        }
       }
       scheduleElementRectsPublish();
     } catch (_) {}

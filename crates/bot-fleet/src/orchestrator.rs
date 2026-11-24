@@ -15,8 +15,9 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::byok_gateway::{ByokCredential, ByokGatewayRouter, CooldownTracker};
+use crate::byok_gateway::{ByokCredential, ByokGatewayRouter, CooldownTracker, PromptCacheHints};
 use crate::decision_cascade::DecisionCascadeClient;
+use crate::model_registry::{builtin_seed_models, ModelRegistryEntry};
 use crate::normalizer::PostExecutionNormalizer;
 use crate::session_dir::{validate_session_id, IsolatedSessionDir};
 
@@ -475,6 +476,9 @@ pub struct CowokOrchestrator {
     decision_client: DecisionCascadeClient,
     byok_credentials: Vec<ByokCredential>,
     byok_cooldowns: CooldownTracker,
+    model_registry: Vec<ModelRegistryEntry>,
+    prompt_cache_hints: Option<PromptCacheHints>,
+    compiled_turn_tail: Option<String>,
 }
 
 impl Default for CowokOrchestrator {
@@ -489,6 +493,9 @@ impl CowokOrchestrator {
             decision_client: DecisionCascadeClient::new(),
             byok_credentials: Vec::new(),
             byok_cooldowns: CooldownTracker::new(),
+            model_registry: builtin_seed_models(),
+            prompt_cache_hints: None,
+            compiled_turn_tail: None,
         }
     }
 
@@ -497,6 +504,9 @@ impl CowokOrchestrator {
             decision_client,
             byok_credentials: Vec::new(),
             byok_cooldowns: CooldownTracker::new(),
+            model_registry: builtin_seed_models(),
+            prompt_cache_hints: None,
+            compiled_turn_tail: None,
         }
     }
 
@@ -507,6 +517,23 @@ impl CowokOrchestrator {
     ) -> Self {
         self.byok_credentials = byok_credentials;
         self.byok_cooldowns = byok_cooldowns;
+        self
+    }
+
+    pub fn with_model_registry(mut self, entries: Vec<ModelRegistryEntry>) -> Self {
+        if !entries.is_empty() {
+            self.model_registry = entries;
+        }
+        self
+    }
+
+    pub fn with_prompt_cache_context(
+        mut self,
+        hints: PromptCacheHints,
+        compiled_turn_tail: Option<String>,
+    ) -> Self {
+        self.prompt_cache_hints = Some(hints);
+        self.compiled_turn_tail = compiled_turn_tail;
         self
     }
 
@@ -946,22 +973,29 @@ impl CowokOrchestrator {
         let live_spec_str = live_spec_path.to_string_lossy().into_owned();
 
         let (reply, token_cost) = if !self.byok_credentials.is_empty() {
-            let router = ByokGatewayRouter::new(self.byok_cooldowns.clone());
+            let router = ByokGatewayRouter::new(self.byok_cooldowns.clone())
+                .with_model_registry(self.model_registry.clone());
+            let turn_body = self
+                .compiled_turn_tail
+                .as_deref()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or(&input.message);
             let fleet_prompt = format!(
                 "[cowok-lane2-opc-fleet] session={} screen={} live_spec={}\n{}",
                 safe_session,
                 bridge.current_state().screen_id,
                 live_spec_str,
-                input.message
+                turn_body
             );
             match router
-                .execute_with_failover(
+                .execute_with_failover_and_cache(
                     &input.tenant_id,
                     &fleet_prompt,
                     None,
                     None,
                     &self.byok_credentials,
                     15_000,
+                    self.prompt_cache_hints.as_ref(),
                 )
                 .await
             {

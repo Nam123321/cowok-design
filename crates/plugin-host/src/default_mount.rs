@@ -656,14 +656,23 @@ fn mount_skill_entries(
 pub fn mount_default_design_craft_plugin(
     repo_root: &Path,
 ) -> Result<DesignCraftDefaultMount, DefaultMountError> {
-    let canonical_repo_root = std::fs::canonicalize(repo_root).map_err(|_| {
-        DefaultMountError::BundleNotFound(repo_root.join(DESIGN_CRAFT_RELATIVE_DIR))
-    })?;
+    mount_design_craft_bundle_at(repo_root, DESIGN_CRAFT_RELATIVE_DIR)
+}
+
+/// Mounts and validates a `design-craft` bundle at `bundle_rel_dir` beneath `repo_root`,
+/// enforcing `plugin.json`, `optionalPeers`, read-only `design-auditor`, core assets,
+/// `<= 100`-token `SKILL.md` frontmatter, and `phaseSkillMap` parity.
+pub fn mount_design_craft_bundle_at(
+    repo_root: &Path,
+    bundle_rel_dir: &str,
+) -> Result<DesignCraftDefaultMount, DefaultMountError> {
+    let canonical_repo_root = std::fs::canonicalize(repo_root)
+        .map_err(|_| DefaultMountError::BundleNotFound(repo_root.join(bundle_rel_dir)))?;
     let Some(bundle_dir) =
-        verify_confined_dir_no_symlink(repo_root, &canonical_repo_root, DESIGN_CRAFT_RELATIVE_DIR)?
+        verify_confined_dir_no_symlink(repo_root, &canonical_repo_root, bundle_rel_dir)?
     else {
         return Err(DefaultMountError::BundleNotFound(
-            repo_root.join(DESIGN_CRAFT_RELATIVE_DIR),
+            repo_root.join(bundle_rel_dir),
         ));
     };
     let canonical_bundle_dir =

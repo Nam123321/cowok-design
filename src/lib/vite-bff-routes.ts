@@ -75,6 +75,16 @@ import * as supportTicketsRoute from "../app/api/v1/support/tickets/route";
 import * as supportTicketAttachmentRoute from "../app/api/v1/support/tickets/[id]/attachment/route";
 import * as telemetryEventsRoute from "../app/api/v1/telemetry/events/route";
 import * as telemetryPreferencesRoute from "../app/api/v1/telemetry/preferences/route";
+import * as skillsCatalogRoute from "../app/api/v1/skills/catalog/route";
+import * as skillsCatalogReloadRoute from "../app/api/v1/skills/catalog/reload/route";
+import * as modelsRegistryRoute from "../app/api/v1/models/registry/route";
+import * as learnStudioCorrectionsRoute from "../app/api/v1/learn/studio-corrections/route";
+import * as cognitiveBrandProposalsRoute from "../app/api/v1/cognitive/brand-proposals/route";
+import * as cognitiveScanComponentsRoute from "../app/api/v1/cognitive/scan-components/route";
+import * as cognitiveFeDataContractRoute from "../app/api/v1/cognitive/fe-data-contract/route";
+import * as cognitiveSpecsRevealRoute from "../app/api/v1/cognitive/specs/reveal/route";
+import * as cognitiveHiddenSpecsRoute from "../app/api/v1/cognitive/hidden-specs/route";
+import * as cognitiveHeritagePacksRoute from "../app/api/v1/cognitive/heritage-packs/route";
 import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize/route";
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
 import * as versionSnapshotsRoute from "../app/api/projects/[id]/snapshots/route";
@@ -238,6 +248,18 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/telemetry\/events$/, extractParams: noParams, resolveHandler: () => telemetryEventsRoute.POST },
   { method: "GET", pattern: /^\/api\/telemetry\/preferences$/, extractParams: noParams, resolveHandler: () => telemetryPreferencesRoute.GET },
   { method: "PUT", pattern: /^\/api\/telemetry\/preferences$/, extractParams: noParams, resolveHandler: () => telemetryPreferencesRoute.PUT },
+  { method: "GET", pattern: /^\/api\/skills\/catalog$/, extractParams: noParams, resolveHandler: () => skillsCatalogRoute.GET },
+  { method: "POST", pattern: /^\/api\/skills\/catalog\/reload$/, extractParams: noParams, resolveHandler: () => skillsCatalogReloadRoute.POST },
+  { method: "GET", pattern: /^\/api\/models\/registry$/, extractParams: noParams, resolveHandler: () => modelsRegistryRoute.GET },
+  { method: "POST", pattern: /^\/api\/learn\/studio-corrections$/, extractParams: noParams, resolveHandler: () => learnStudioCorrectionsRoute.POST },
+  { method: "POST", pattern: /^\/api\/cognitive\/brand-proposals$/, extractParams: noParams, resolveHandler: () => cognitiveBrandProposalsRoute.POST },
+  { method: "POST", pattern: /^\/api\/cognitive\/scan-components$/, extractParams: noParams, resolveHandler: () => cognitiveScanComponentsRoute.POST },
+  { method: "GET", pattern: /^\/api\/cognitive\/fe-data-contract$/, extractParams: noParams, resolveHandler: () => cognitiveFeDataContractRoute.GET },
+  { method: "POST", pattern: /^\/api\/cognitive\/specs\/reveal$/, extractParams: noParams, resolveHandler: () => cognitiveSpecsRevealRoute.POST },
+  { method: "GET", pattern: /^\/api\/cognitive\/hidden-specs$/, extractParams: noParams, resolveHandler: () => cognitiveHiddenSpecsRoute.GET },
+  { method: "PUT", pattern: /^\/api\/cognitive\/hidden-specs$/, extractParams: noParams, resolveHandler: () => cognitiveHiddenSpecsRoute.PUT },
+  { method: "GET", pattern: /^\/api\/cognitive\/heritage-packs$/, extractParams: noParams, resolveHandler: () => cognitiveHeritagePacksRoute.GET },
+  { method: "POST", pattern: /^\/api\/cognitive\/heritage-packs$/, extractParams: noParams, resolveHandler: () => cognitiveHeritagePacksRoute.POST },
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.POST },
   { method: "PUT", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/reorder$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]) }), resolveHandler: () => deckReorderRoute.PUT },

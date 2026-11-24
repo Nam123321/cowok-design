@@ -18,12 +18,13 @@ use chrono::Utc;
 use futures_util::stream::Stream;
 use plugin_host::{
     ensure_safe_dir_no_symlink, load_verified_staged_bundle_from_dir, manifest_to_skill_plugin,
-    map_storage_constraint_error, scan_skill_markdown_safety, validate_safe_segment,
-    ActorKind as DomainActorKind, CardDecisionAction, CardStatus, ConsumedNonceRecord,
-    DomainStorageAction, HumanSessionAuthority, KnowledgeCard, LearnCardCategory, LearnError,
-    LearnPipeline, ManagedPlugin, MintTokenInput, PerRunStager, PluginLifecycleError, PluginState,
-    ProposeCardInput, SkillManifest, SkillRegistry, SkillRepackager, StorageConstraintError,
-    StorageConstraintTarget, TriangleLinter, VideoIntakeProcessor, MAX_LEARN_PROMPT_TOKENS,
+    map_storage_constraint_error, mount_default_design_craft_plugin, scan_skill_markdown_safety,
+    validate_safe_segment, ActorKind as DomainActorKind, CardDecisionAction, CardStatus,
+    ConsumedNonceRecord, DomainStorageAction, HumanSessionAuthority, KnowledgeCard,
+    LearnCardCategory, LearnError, LearnPipeline, ManagedPlugin, MintTokenInput, PerRunStager,
+    PluginLifecycleError, PluginState, ProposeCardInput, SkillManifest, SkillRegistry,
+    SkillRepackager, StorageConstraintError, StorageConstraintTarget, TriangleLinter,
+    VideoIntakeProcessor, MAX_LEARN_PROMPT_TOKENS,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -47,6 +48,7 @@ use crate::routes::plugins_cron::{
     read_clean_regular_utf8_nofollow, run_plugin_sync_cycle, snapshot_from_plugin_row,
     validate_cron_expression, write_staged_source_bytes, ScopedTempDir,
 };
+use crate::routes::skills_catalog::invalidate_catalog_cache_for_tenant;
 use crate::routes::{DaemonAppState, HttpErrorBody};
 use crate::vault::VaultStore;
 
@@ -711,6 +713,36 @@ pub async fn handle_get_plugin_registry(
                 ));
             }
         }
+        // Surface default mounted `design-craft` plugin cleanly when present on disk
+        if let Ok(mounted) = mount_default_design_craft_plugin(&ws_root) {
+            if !overridden_slugs.contains(&mounted.manifest.name) {
+                overridden_slugs.insert(mounted.manifest.name.clone());
+                let eff_pid = effective_builtin_project_id(scope_pid);
+                dtos.push(PluginSummaryDto {
+                    id: builtin_scoped_plugin_id(&tenant_id, eff_pid, &mounted.manifest.name),
+                    tenant_id: tenant_id.clone(),
+                    project_id: eff_pid.to_string(),
+                    plugin_slug: mounted.manifest.name.clone(),
+                    version: mounted.manifest.version.clone(),
+                    lifecycle_state: "ACTIVE".to_string(),
+                    enabled: mounted.default_enabled,
+                    source_type: "builtin".to_string(),
+                    source_repo_url: "builtin://packages/design-craft".to_string(),
+                    upstream_repo_url: None,
+                    upstream_commit_sha: Some(mounted.bundle_fingerprint_sha256.clone()),
+                    cron_schedule: None,
+                    revision: 1,
+                    breaking_change_isolated: false,
+                    staging_version: None,
+                    staging_diff_reasons: Vec::new(),
+                    quarantined: false,
+                    quarantine_reason: None,
+                    manifest_json: serde_json::to_value(&mounted.manifest)
+                        .unwrap_or_else(|_| serde_json::json!({})),
+                    updated_at: "1970-01-01T00:00:00+00:00".to_string(),
+                });
+            }
+        }
         for (slug, up) in list_bundled_upstream_skills(&ws_root) {
             if !overridden_slugs.contains(&slug) {
                 let eff_pid = effective_builtin_project_id(scope_pid);
@@ -1164,6 +1196,7 @@ async fn persist_discovered_or_installed(
         if let Some(swap) = runtime_swap {
             swap.commit();
         }
+        invalidate_catalog_cache_for_tenant(&saved.tenant_id);
         Ok(saved)
     })
     .await?;
@@ -1434,6 +1467,7 @@ pub async fn handle_transition_plugin(
                 current.staging_bundle_dir.as_deref(),
             );
         }
+        invalidate_catalog_cache_for_tenant(&persisted.tenant_id);
         Ok(persisted)
     })
     .await?;
@@ -1524,6 +1558,7 @@ pub async fn handle_quarantine_plugin(
             .map_err(map_harness_to_resp)?
             .map_err(|f| map_cas_failure(f, "SkillPlugin"))?;
         cleanup_staging_dir_if_owned(pool.workspace_root(), current.staging_bundle_dir.as_deref());
+        invalidate_catalog_cache_for_tenant(&persisted.tenant_id);
         Ok(persisted)
     })
     .await?;
@@ -1643,6 +1678,7 @@ pub async fn handle_promote_staging(
                 current.staging_bundle_dir.as_deref(),
             );
         }
+        invalidate_catalog_cache_for_tenant(&persisted.tenant_id);
         Ok(persisted)
     })
     .await?;
@@ -1713,6 +1749,7 @@ pub async fn handle_discard_staging(
                 current.staging_bundle_dir.as_deref(),
             );
         }
+        invalidate_catalog_cache_for_tenant(&persisted.tenant_id);
         Ok(persisted)
     })
     .await?;
@@ -2665,6 +2702,7 @@ async fn decide_learn_card(
             )
         })?;
 
+        invalidate_catalog_cache_for_tenant(&persisted.tenant_id);
         Ok(HumanOnlyDecisionReceiptDto {
             card: card_row_to_dto(persisted),
             kid: token.kid().to_string(),

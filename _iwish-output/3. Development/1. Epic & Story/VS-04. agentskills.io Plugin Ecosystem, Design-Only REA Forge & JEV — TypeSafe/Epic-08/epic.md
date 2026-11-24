@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-08"
 title: "Epic 08: agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN"
-status: in-progress
+status: completed
 track: "Stream-4"
 wave: 1
 provides: ["crates/plugin-host", "crates/skill-repackager", "packages/builtin-skills", "6 Core + 3 Seed Harness Skills", "agentskills.io SKILL.md + plugin.json Normalizer", "GitHub Cron Sync Scheduler", "LEARN HUMAN_ONLY Valve", "Split DE+DR Plugin Runtime + 7 Built-in DE Tools + Controlled Ephemeral Tool Jail + System-1 LEARN"]
@@ -46,7 +46,7 @@ links_to:
 | [Story 08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon `HUMAN_ONLY` Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | `completed` | `3` | `['04.3', '04.4', '08.1', '08.2', '08.3']` |
 | [Story 08.5](./Story-08.5/story.md) | Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 `LEARN` Loop | `completed` | `3` | `['08.1', '08.2', '08.3', '08.4']` |
 | [Story 08.6](./Story-08.6/story.md) | Standalone `design-craft` GitHub Repo Assembler, 4-Pillar Operational Skills/Tools Pack, Multi-Agent Pack, Optional Upstream REA Installer & Default Plugin Mount | `completed` | `3` | `['08.5', '05.4', '05.6', '02.4']` |
-| [Story 08.7](./Story-08.7/story.md) | Zero-Hardcode AI Harness Spine — `UnifiedSkillCatalog`, 2-Breakpoint Provider Prompt Caching, Dynamic Model Registry, 3-Bucket Skill Separation & Studio-to-Ledger Bridge (`ADR-009`) | `backlog` | `3` | `['08.5', '08.6', '09.2', '10.1', '11.1']` |
+| [Story 08.7](./Story-08.7/story.md) | Zero-Hardcode AI Harness Spine — `UnifiedSkillCatalog`, 2-Breakpoint Provider Prompt Caching, Dynamic Model Registry, 3-Bucket Skill Separation & Studio-to-Ledger Bridge (`ADR-009`) | `completed` | `3` | `['08.5', '08.6', '09.2', '10.1', '11.1']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 
@@ -143,10 +143,7 @@ flowchart TD
 | [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core) | 08.2 | completed |
 | [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | completed |
 | [Story-08.5](./Story-08.5/story.md) | Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 LEARN Loop | 08.1, 08.2, 08.3, 08.4 | completed |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-08.1](./Story-08.1/story.md) | Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host) | 01.1, 01.2 | completed |
-| [Story-08.2](./Story-08.2/story.md) | Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills) | 08.1 | completed |
-| [Story-08.3](./Story-08.3/story.md) | Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core) | 08.2 | completed |
-| [Story-08.4](./Story-08.4/story.md) | SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI | 04.3, 04.4, 08.1, 08.2, 08.3 | completed |
-| [Story-08.5](./Story-08.5/story.md) | Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 LEARN Loop | 08.1, 08.2, 08.3, 08.4 | completed |
+| [Story-08.6](./Story-08.6/story.md) | Standalone `design-craft` GitHub Repo Assembler, 4-Pillar Operational Skills/Tools Pack & Default Plugin Mount | 08.5, 05.4, 05.6, 02.4 | completed |
+| [Story-08.7](./Story-08.7/story.md) | Zero-Hardcode AI Harness Spine — `UnifiedSkillCatalog`, 2-Breakpoint Provider Prompt Caching, Dynamic Model Registry, 3-Bucket Skill Separation & Studio-to-Ledger Bridge (`ADR-009`) | 08.5, 08.6, 09.2, 10.1, 11.1 | completed |
+
+- **Retrospective:** [Epic 08 Retrospective (Wave 1 + Wave 2 Full Closure)](./retrospective.md)

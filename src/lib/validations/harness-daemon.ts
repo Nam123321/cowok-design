@@ -40,10 +40,12 @@ export const ProjectProvenanceSchema = z
     "git_codebase",
     "design_import",
     "starter_template",
+    "workbench",
   ])
   .transform((v) => {
     if (v === "folder_backed") return "folder-backed";
     if (v === "git_codebase") return "git-codebase";
+    if (v === "workbench") return "scratch";
     return v;
   });
 

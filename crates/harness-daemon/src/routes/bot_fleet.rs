@@ -14,7 +14,8 @@ use axum::{
 use bot_fleet::{
     canonical_provider_id, validate_model_id, validate_session_id, BotFleetError, ByokCredential,
     ByokGatewayRouter, CliAdapterRegistry, CliAdapterStatusDto, CooldownTracker,
-    PgidProcessSupervisor, PostExecutionNormalizer, ProviderCooldownDto, CANONICAL_BYOK_PROVIDERS,
+    PgidProcessSupervisor, PostExecutionNormalizer, PromptCacheHints, ProviderCooldownDto,
+    CANONICAL_BYOK_PROVIDERS,
 };
 use chrono::Utc;
 use domain::HarnessError;
@@ -25,6 +26,8 @@ use uuid::Uuid;
 use zeroize::Zeroizing;
 
 use super::legacy_specs::verify_anti_idor_with_caller;
+use super::models_registry::load_tenant_model_registry;
+use super::orchestrator::compile_orchestrator_turn_prompt;
 use super::DaemonAppState;
 use crate::daemon_auth::{
     is_valid_superadmin_bearer, FlowPrincipal, LegacyAuthKind, VerifiedLegacyIngress,
@@ -804,15 +807,42 @@ pub async fn handle_bot_fleet_execute(
         );
     }
 
-    let router = ByokGatewayRouter::new(gateway_cooldowns());
+    // Load tenant dynamic model registry + 2-breakpoint PromptCacheHints before BYOK dispatch
+    let state_meta = state.clone();
+    let tid_meta = tenant_id.clone();
+    let pid_meta = req.project_id.trim().to_string();
+    let prompt_meta = prompt.to_string();
+    let (model_registry, cache_hints) = tokio::task::spawn_blocking(move || {
+        let models = load_tenant_model_registry(&state_meta, &tid_meta);
+        let (catalog_sha, compiled) = compile_orchestrator_turn_prompt(
+            &state_meta,
+            &tid_meta,
+            &pid_meta,
+            &prompt_meta,
+            Vec::new(),
+        );
+        let hints = PromptCacheHints {
+            project_id: pid_meta,
+            catalog_sha256: catalog_sha,
+            zone1_static_prefix: Some(compiled.zone1_static_prefix),
+            cached_content_name: None,
+            history_breakpoint_block: compiled.history_breakpoint_block,
+        };
+        (models, hints)
+    })
+    .await
+    .unwrap_or_else(|_| (Vec::new(), PromptCacheHints::default()));
+
+    let router = ByokGatewayRouter::new(gateway_cooldowns()).with_model_registry(model_registry);
     match router
-        .execute_with_failover(
+        .execute_with_failover_and_cache(
             &tenant_id,
             prompt,
             req.provider_id.as_deref(),
             req.model_id.as_deref(),
             &creds,
             timeout_ms,
+            Some(&cache_hints),
         )
         .await
     {
