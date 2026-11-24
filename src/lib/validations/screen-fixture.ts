@@ -1,12 +1,20 @@
 import { z } from "zod";
 
-export const CanonicalViewportPresetSchema = z.enum(["desktop-1440", "tablet-768", "mobile-390"]);
+export const CanonicalViewportPresetSchema = z.enum([
+  "desktop-1440",
+  "tablet-768",
+  "fold-inner-712",
+  "mobile-390",
+  "fold-outer-344",
+]);
 export const ViewportPresetSchema = z.preprocess((val) => {
   if (typeof val !== "string") return val;
   const v = val.trim().toLowerCase();
   if (!v || v === "desktop" || v === "desktop-1440") return "desktop-1440";
   if (v === "tablet" || v === "tablet-768") return "tablet-768";
+  if (v === "fold-inner" || v === "fold-inner-712") return "fold-inner-712";
   if (v === "mobile" || v === "mobile-390") return "mobile-390";
+  if (v === "fold-outer" || v === "fold-outer-344") return "fold-outer-344";
   return val.trim();
 }, CanonicalViewportPresetSchema);
 export type ViewportPreset = z.infer<typeof CanonicalViewportPresetSchema>;
@@ -20,9 +28,17 @@ const TABLET_WIDTH = 768;
 const TABLET_HEIGHT = 1024;
 const TABLET_SCALE = 0.75;
 
+const FOLD_INNER_WIDTH = 712;
+const FOLD_INNER_HEIGHT = 884;
+const FOLD_INNER_SCALE = 0.78;
+
 const MOBILE_WIDTH = 390;
 const MOBILE_HEIGHT = 844;
 const MOBILE_SCALE = 1.0;
+
+const FOLD_OUTER_WIDTH = 344;
+const FOLD_OUTER_HEIGHT = 882;
+const FOLD_OUTER_SCALE = 1.0;
 
 export interface ViewportConfig {
   preset: ViewportPreset;
@@ -47,6 +63,13 @@ export const VIEWPORT_PRESETS: Record<ViewportPreset, ViewportConfig> = {
     height: TABLET_HEIGHT,
     scale: TABLET_SCALE,
   },
+  "fold-inner-712": {
+    preset: "fold-inner-712",
+    label: "Foldable Inner",
+    width: FOLD_INNER_WIDTH,
+    height: FOLD_INNER_HEIGHT,
+    scale: FOLD_INNER_SCALE,
+  },
   "mobile-390": {
     preset: "mobile-390",
     label: "Mobile",
@@ -54,12 +77,21 @@ export const VIEWPORT_PRESETS: Record<ViewportPreset, ViewportConfig> = {
     height: MOBILE_HEIGHT,
     scale: MOBILE_SCALE,
   },
+  "fold-outer-344": {
+    preset: "fold-outer-344",
+    label: "Foldable Outer",
+    width: FOLD_OUTER_WIDTH,
+    height: FOLD_OUTER_HEIGHT,
+    scale: FOLD_OUTER_SCALE,
+  },
 };
 
 export function normalizeViewportPreset(raw?: string | null): ViewportPreset {
   const val = (raw ?? "").trim().toLowerCase();
   if (val === "tablet" || val === "tablet-768") return "tablet-768";
+  if (val === "fold-inner" || val === "fold-inner-712") return "fold-inner-712";
   if (val === "mobile" || val === "mobile-390") return "mobile-390";
+  if (val === "fold-outer" || val === "fold-outer-344") return "fold-outer-344";
   return "desktop-1440";
 }
 

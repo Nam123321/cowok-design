@@ -331,12 +331,14 @@ pub fn normalize_viewport_preset(raw: &str) -> Result<String, FlowServiceError> 
     match trimmed.to_ascii_lowercase().as_str() {
         "desktop" | "desktop-1440" => Ok("desktop-1440".to_string()),
         "tablet" | "tablet-768" => Ok("tablet-768".to_string()),
+        "fold-inner" | "fold-inner-712" => Ok("fold-inner-712".to_string()),
         "mobile" | "mobile-390" => Ok("mobile-390".to_string()),
+        "fold-outer" | "fold-outer-344" => Ok("fold-outer-344".to_string()),
         other => Err(FlowServiceError::new(
             400,
             "VALIDATION_ERROR",
             format!(
-                "Invalid viewportPreset '{other}' (expected desktop-1440|tablet-768|mobile-390)"
+                "Invalid viewportPreset '{other}' (expected desktop-1440|tablet-768|fold-inner-712|mobile-390|fold-outer-344)"
             ),
         )),
     }

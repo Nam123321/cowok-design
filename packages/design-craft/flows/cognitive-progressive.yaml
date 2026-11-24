@@ -1,0 +1,159 @@
+id: cognitive-progressive
+version: "1.0.0"
+name: Cognitive Progressive Design & Presentation Workflow
+description: 5-phase adaptive workflow with Async HITL phase gates, disjoint multi-agent ownership, and sub-millisecond MICRO_POLISH fast-path.
+
+governance:
+  disjoint_file_ownership: true
+  auditor_read_only: true
+  builder_auditor_separation: strict
+  hitl_bypass_policy:
+    default: forbid_unconfirmed_gate_advance
+    auto_pilot_flag: "--auto-pilot"
+    auto_pilot_requires_heritage_pack: true
+    reject_auto_pilot_without_heritage_pack: true
+  theme_modes_policy:
+    hardcoded_defaults: false
+    user_driven_only: true
+    pattern: "^[a-z0-9][a-z0-9-]{0,31}$"
+
+entry_modes:
+  GREENFIELD:
+    start_phase: 0
+    phases: [0, 1, 2, 3, 4]
+    spawn_subagents: true
+    max_agents: 5
+    gates: [GATE_1_SKETCH, GATE_2_BRAND, GATE_3_APPROVE_V1]
+  ADD_FEATURE:
+    start_phase: 1
+    phases: [1, 3, 4]
+    spawn_subagents: true
+    max_agents: 3
+    requires_existing_brand: true
+    gates: [GATE_1_SKETCH, GATE_3_APPROVE_V1]
+  REVAMP:
+    start_phase: 2
+    phases: [2, 3, 4]
+    spawn_subagents: true
+    max_agents: 4
+    gates: [GATE_2_BRAND, GATE_3_APPROVE_V1]
+  MICRO_POLISH:
+    start_phase: 3
+    phases: [3]
+    spawn_subagents: false
+    max_agents: 1
+    execution_strategy: single-agent-fast-path
+    target_latency_ms: 1
+    direct_tool: de-patch-dom
+    gates: []
+  DECK_FROM_APP:
+    start_phase: 0
+    phases: [0, 2, 3, 4]
+    output_track: presentation-16-9
+    spawn_subagents: true
+    max_agents: 4
+    gates: [GATE_2_BRAND, GATE_3_APPROVE_V1]
+
+hitl_gates:
+  GATE_1_SKETCH:
+    after_phase: 1
+    mode: async_suspend_resume
+    prompt: "Review monochrome structural sketch, user flows, and microcopy before brand styling."
+    skippable_only_with: "--auto-pilot + heritagePackId"
+  GATE_2_BRAND:
+    after_phase: 2
+    mode: async_suspend_resume
+    prompt: "Review custom themeModes OKLCH palette, typography, and reference design contract."
+    skippable_only_with: "--auto-pilot + heritagePackId"
+  GATE_3_APPROVE_V1:
+    after_phase: 4
+    mode: async_suspend_resume
+    prompt: "Review 6-tool QC audit report, 8D user simulation, and final handoff package."
+    skippable_only_with: "--auto-pilot + heritagePackId"
+
+phases:
+  - id: phase-0
+    index: 0
+    title: Intent Framing & Business Requirements
+    owner_agent: flow-architect
+    skills:
+      - phase-0-intent-framing
+      - business-requirements-distiller
+    tools:
+      - de-phase-router
+      - de-intake
+    write_scope:
+      - specs/01-intent/**
+    hitl_gate_after: NONE
+
+  - id: phase-1
+    index: 1
+    title: Structural Sketch, States & Microcopy
+    owner_agent: flow-architect
+    skills:
+      - phase-1-structural-sketch
+      - sketch-monochrome
+      - flow-state-completer
+      - ux-microcopy-and-i18n
+    tools:
+      - de-scan-sketch
+    write_scope:
+      - specs/02-flows/**
+      - sketches/**
+    hitl_gate_after: GATE_1_SKETCH
+
+  - id: phase-2
+    index: 2
+    title: Brand & Visual Studio
+    owner_agent: brand-stylist
+    skills:
+      - phase-2-brand-visual-studio
+      - oklch-palette
+      - typography
+      - reference-design-contract
+    tools:
+      - de-tokens-oklch
+      - de-brand-preview
+      - de-extract-contract
+    write_scope:
+      - tokens/**
+      - brand/**
+    hitl_gate_after: GATE_2_BRAND
+
+  - id: phase-3
+    index: 3
+    title: Synthesis, Polish & Responsive Craft
+    owner_agent: ui-crafter
+    skills:
+      - phase-3-synthesis-polish
+      - impeccable-polish
+      - dashboard-ux
+      - stageshow-slide
+      - responsive-and-a11y-craft
+      - data-viz-storyteller
+    tools:
+      - de-patch-dom
+    write_scope:
+      - screens/**
+      - slides/**
+      - components/**
+    hitl_gate_after: NONE
+
+  - id: phase-4
+    index: 4
+    title: Independent Verify, Audit & Handoff
+    owner_agent: design-auditor
+    read_only: true
+    skills:
+      - phase-4-verify-handoff
+      - user-simulation-8d
+      - self-healing-eval-gate
+    tools:
+      - qc-a11y-contrast
+      - qc-anti-slop-linter
+      - qc-layout-overflow
+      - qc-chart-and-data
+      - qc-spec-parity
+      - qc-popular-coverage
+    write_scope: []
+    hitl_gate_after: GATE_3_APPROVE_V1

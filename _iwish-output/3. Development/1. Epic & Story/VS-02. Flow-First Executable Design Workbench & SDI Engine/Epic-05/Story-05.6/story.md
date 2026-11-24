@@ -4,7 +4,7 @@ id: "05.6"
 title: "Story 05.6: Phase 2 Brand & Component Visual Studio, User-Driven Multi-Mode Themes, Bidirectional Hidden Spec Drawer & FE Data Contract"
 description: "Triển khai bề mặt trực quan hóa đầy đủ của Phase 2–4 trong quy trình Cognitive Progressive Working: 1× Sketch DOM × N× BrandProposalV1 (hiển thị 2–3 trang thật từ Sketch Phase 1 + Extracted Shared Component Gallery theo đúng themeModes người dùng yêu cầu: light/dark/warm/dim/custom), Popular FE/Deck Component AST Auditor, Bidirectional Hidden Spec Drawer (01..09), trích xuất FE-Required Data Contract (fe-data-contract.draft.ts) và Cross-Project Heritage Pack Picker."
 resource: "iwish://uxui-os/development/epic-05/story-05.6"
-status: backlog
+status: completed
 risk_tier: 3
 delivery: core
 timestamp: "2026-11-22T22:50:00+07:00"
@@ -38,7 +38,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-33: Cognitive Sketch-to-Polish & Progressive Spec Synthesis](file:///Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 05: Option 5 2D Storyboard, Cognitive Sketch-to-Polish, Shared lol_html & 3-Tier Auto Flow DAG](../epic.md)
-- **Status:** `backlog`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context

@@ -12,7 +12,9 @@ import { CompactOptionDropdown, TOOLBAR_BTN_BASE, TOOLBAR_ICON_BTN_BASE } from "
 const ICON_SIZE_SM = 12;
 const DESKTOP_PX = 1440;
 const TABLET_PX = 768;
+const FOLD_INNER_PX = 712;
 const MOBILE_PX = 390;
+const FOLD_OUTER_PX = 344;
 const PAN_SCALE_PCT = 100;
 const DISABLED_OPACITY = 0.45;
 const FONT_WEIGHT_MEDIUM = 500;
@@ -20,14 +22,16 @@ const FONT_WEIGHT_SEMIBOLD = 600;
 
 const VIEWPORT_ITEMS: ReadonlyArray<{
   preset: ViewportPreset;
-  icon: "monitor" | "tablet" | "smartphone";
+  icon: "monitor" | "tablet" | "fold-inner" | "smartphone" | "fold-outer";
   pxWidth: number;
   i18nKey: string;
   defaultLabel: string;
 }> = [
   { preset: "desktop-1440", icon: "monitor", pxWidth: DESKTOP_PX, i18nKey: "canvas.viewportDesktop", defaultLabel: "Desktop" },
   { preset: "tablet-768", icon: "tablet", pxWidth: TABLET_PX, i18nKey: "canvas.viewportTablet", defaultLabel: "Tablet" },
+  { preset: "fold-inner-712", icon: "fold-inner", pxWidth: FOLD_INNER_PX, i18nKey: "canvas.viewportFoldInner", defaultLabel: "Màn hình mở gập" },
   { preset: "mobile-390", icon: "smartphone", pxWidth: MOBILE_PX, i18nKey: "canvas.viewportMobile", defaultLabel: "Mobile" },
+  { preset: "fold-outer-344", icon: "fold-outer", pxWidth: FOLD_OUTER_PX, i18nKey: "canvas.viewportFoldOuter", defaultLabel: "Màn hình ngoài gập" },
 ];
 
 export const TOOLBAR_PILL_GROUP_STYLE: React.CSSProperties = {

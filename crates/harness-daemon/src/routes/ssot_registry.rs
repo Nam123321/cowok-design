@@ -23,11 +23,12 @@ use spec_registry::reverse_sync::{
     list_component_patterns, ComponentPatternDto, SsotComponentsPage,
 };
 use spec_registry::skill_router::{
-    CachePreservingSkillRouter, SkillRouteCommand, SkillRouteOutcome,
+    CachePreservingSkillRouter, DynamicSkillEntry, SkillRouteCommand, SkillRouteOutcome,
 };
 use uuid::Uuid;
 
 use super::legacy_specs::{constant_time_eq, verify_anti_idor_with_caller};
+use super::skills_catalog::load_or_discover_catalog;
 use super::DaemonAppState;
 use crate::daemon_auth::{LegacyAuthKind, VerifiedLegacyIngress};
 
@@ -1050,15 +1051,65 @@ pub(crate) async fn handle_route_skills(
     }
 
     let cmd = SkillRouteCommand {
-        project_id: req.project_id,
-        intent_summary: req.intent_summary,
+        project_id: req.project_id.clone(),
+        intent_summary: req.intent_summary.clone(),
         portal_id: req.portal_id,
         requested_slugs: req.requested_slugs,
         max_spine_tokens: req.max_spine_tokens,
     };
 
-    match CachePreservingSkillRouter::route(&cmd) {
-        Ok(out @ SkillRouteOutcome { .. }) => ok_response(out, request_id),
-        Err(err) => map_lock_error(err, request_id),
+    let state_for_blocking = state.clone();
+    let tenant_id = scope.tenant_id;
+    let project_id = req.project_id;
+    let blocking_res = tokio::task::spawn_blocking(move || {
+        let catalog =
+            load_or_discover_catalog(&state_for_blocking, &tenant_id, Some(&project_id), false);
+        let auto_selected: Vec<String> = if cmd.requested_slugs.is_none() {
+            catalog
+                .route_skills_multilingual(&cmd.intent_summary, 5)
+                .into_iter()
+                .map(|m| m.skill_id)
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let target_slugs: Vec<String> = match &cmd.requested_slugs {
+            Some(list) => list.clone(),
+            None => auto_selected.clone(),
+        };
+        let mut dynamic_entries = Vec::with_capacity(catalog.entries().len());
+        for entry in catalog.entries() {
+            let tier2_body = if target_slugs.iter().any(|s| s.trim() == entry.skill_id) {
+                catalog
+                    .load_tier2_skill_body(&entry.skill_id)
+                    .unwrap_or_else(|_| entry.description.clone())
+            } else {
+                String::new()
+            };
+            dynamic_entries.push(DynamicSkillEntry {
+                slug: entry.skill_id.clone(),
+                tier1_summary: entry.description.clone(),
+                tier2_body,
+            });
+        }
+        CachePreservingSkillRouter::route_with_dynamic_catalog(
+            &cmd,
+            &dynamic_entries,
+            &auto_selected,
+        )
+    })
+    .await;
+
+    match blocking_res {
+        Ok(Ok(out @ SkillRouteOutcome { .. })) => ok_response(out, request_id),
+        Ok(Err(err)) => map_lock_error(err, request_id),
+        Err(_) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "INTERNAL_ERROR",
+            "Skill route worker failed unexpectedly",
+            None,
+            None,
+            request_id,
+        ),
     }
 }

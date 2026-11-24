@@ -216,7 +216,9 @@ function buildModePalette(modeName, brandHue, accentChroma) {
   const surfaceChroma = isWarmLike ? 0.022 : 0.012;
   const bgL = lower === "dim" ? 0.24 : isDarkLike ? 0.16 : isWarmLike ? 0.96 : 0.985;
   const cardL = lower === "dim" ? 0.29 : isDarkLike ? 0.21 : isWarmLike ? 0.93 : 0.96;
+  const elevatedL = lower === "dim" ? 0.33 : isDarkLike ? 0.25 : isWarmLike ? 0.98 : 1.0;
   const textL = isDarkLike ? 0.94 : 0.20;
+  const secondaryL = isDarkLike ? 0.80 : 0.36;
   const mutedL = isDarkLike ? 0.74 : 0.44;
   const borderL = isDarkLike ? 0.36 : 0.84;
   const accentHue = (brandHue + (isWarmLike ? -12 : isDarkLike ? 6 : hashHueOffset(modeName) % 15)) % 360;
@@ -227,13 +229,20 @@ function buildModePalette(modeName, brandHue, accentChroma) {
     mode: modeName,
     polarity: isDarkLike ? "low-luminance" : "high-luminance",
     tokens: {
-      "--surface-primary": `oklch(${bgL.toFixed(3)} ${surfaceChroma.toFixed(3)} ${surfaceHue})`,
-      "--surface-card": `oklch(${cardL.toFixed(3)} ${(surfaceChroma + 0.004).toFixed(3)} ${surfaceHue})`,
+      "--bg-workspace": `oklch(${bgL.toFixed(3)} ${surfaceChroma.toFixed(3)} ${surfaceHue})`,
+      "--bg-surface": `oklch(${cardL.toFixed(3)} ${(surfaceChroma + 0.004).toFixed(3)} ${surfaceHue})`,
+      "--bg-elevated": `oklch(${elevatedL.toFixed(3)} ${(surfaceChroma + 0.002).toFixed(3)} ${surfaceHue})`,
       "--text-primary": `oklch(${textL.toFixed(3)} 0.014 ${surfaceHue})`,
+      "--text-secondary": `oklch(${secondaryL.toFixed(3)} 0.016 ${surfaceHue})`,
       "--text-muted": `oklch(${mutedL.toFixed(3)} 0.018 ${surfaceHue})`,
       "--border-subtle": `oklch(${borderL.toFixed(3)} 0.015 ${surfaceHue})`,
-      "--accent-primary": `oklch(${accentL.toFixed(3)} ${accentChroma.toFixed(3)} ${normalizedHue})`,
-      "--accent-foreground": `oklch(${accentTextL.toFixed(3)} 0.010 ${normalizedHue})`,
+      "--action-primary": `oklch(${accentL.toFixed(3)} ${accentChroma.toFixed(3)} ${normalizedHue})`,
+      "--action-primary-fg": `oklch(${accentTextL.toFixed(3)} 0.010 ${normalizedHue})`,
+      // @deprecated aliases retained strictly for backward compatibility
+      "--surface-primary": "var(--bg-workspace)",
+      "--surface-card": "var(--bg-surface)",
+      "--accent-primary": "var(--action-primary)",
+      "--accent-foreground": "var(--action-primary-fg)",
     },
   };
 }
@@ -297,10 +306,10 @@ export function deBrandPreview(input = {}, ctx = {}) {
   const sections = tokenResult.themeModes
     .map((mode) => {
       return [
-        `<section data-ff-id="preview-${mode}" data-theme="${mode}" style="background:var(--surface-primary);color:var(--text-primary);padding:24px;border:1px solid var(--border-subtle);border-radius:10px;margin-bottom:16px;">`,
+        `<section data-ff-id="preview-${mode}" data-theme="${mode}" style="background:var(--bg-workspace);color:var(--text-primary);padding:24px;border:1px solid var(--border-subtle);border-radius:10px;margin-bottom:16px;">`,
         `  <h2 style="margin:0 0 8px 0;">${safeBrandName} — ${mode}</h2>`,
-        `  <p style="color:var(--text-muted);margin:0 0 12px 0;">User-selected mode preview using semantic OKLCH variables.</p>`,
-        `  <button type="button" style="background:var(--accent-primary);color:var(--accent-foreground);border:none;padding:8px 14px;border-radius:6px;">Primary Action</button>`,
+        `  <p style="color:var(--text-secondary);margin:0 0 12px 0;">User-selected mode preview using semantic OKLCH variables.</p>`,
+        `  <button type="button" style="background:var(--action-primary);color:var(--action-primary-fg);border:none;padding:8px 14px;border-radius:6px;">Primary Action</button>`,
         `</section>`,
       ].join("\n");
     })

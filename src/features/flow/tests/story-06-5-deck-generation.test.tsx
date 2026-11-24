@@ -332,7 +332,7 @@ describe("Story 06.5 — Option D v2 Chart & Dashboard Studio (Data Storytelling
     fireEvent.click(screen.getByTestId("studio-toggle-subchat-btn"));
     expect(subChatPanel.style.height).toBe("34px");
     fireEvent.click(screen.getByTestId("studio-toggle-subchat-btn"));
-    expect(subChatPanel.style.height).toBe("168px");
+    expect(subChatPanel.style.height).toBe("224px");
 
     fireEvent.click(screen.getByTestId("studio-toggle-master-btn"));
     expect(screen.queryByTestId("studio-master-pane")).toBeNull();

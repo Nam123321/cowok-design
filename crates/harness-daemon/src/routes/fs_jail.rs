@@ -662,6 +662,26 @@ pub fn ensure_child_dir_fd(
     mode: libc::mode_t,
 ) -> Result<OwnedFd, HarnessError> {
     if let Some(existing) = open_dir_fd_nofollow(parent_fd.as_raw_fd(), name)? {
+        let mut st: libc::stat = unsafe { std::mem::zeroed() };
+        if unsafe { libc::fstat(existing.as_raw_fd(), &mut st) } != 0 {
+            return Err(HarnessError::ValidationFailed {
+                reason: format!(
+                    "FSTAT_DIR_FAILED [{}]: {}",
+                    name.to_string_lossy(),
+                    std::io::Error::last_os_error()
+                ),
+            });
+        }
+        let current_perm = (st.st_mode as libc::mode_t) & 0o777;
+        if (current_perm & !mode) != 0 && unsafe { libc::fchmod(existing.as_raw_fd(), mode) } != 0 {
+            return Err(HarnessError::ValidationFailed {
+                reason: format!(
+                    "FCHMOD_FAILED [{}]: {}",
+                    name.to_string_lossy(),
+                    std::io::Error::last_os_error()
+                ),
+            });
+        }
         return Ok(existing);
     }
     let c_name = CString::new(name.as_bytes()).map_err(|_| HarnessError::PathTraversalDenied {
@@ -926,6 +946,56 @@ pub fn write_file_in_dir_fd(
             reason: format!("FSYNC_FILE_FAILED [{label}]: {e}"),
         })
     })
+}
+
+pub fn read_file_in_dir_fd(
+    dir_fd: &OwnedFd,
+    name: &std::ffi::OsStr,
+    max_bytes: usize,
+) -> Result<Vec<u8>, HarnessError> {
+    use std::io::Read;
+    let label = name.to_string_lossy().into_owned();
+    let c_name = CString::new(name.as_bytes()).map_err(|_| HarnessError::PathTraversalDenied {
+        path: label.clone(),
+    })?;
+    let rd_flags = libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC;
+    let raw = unsafe { libc::openat(dir_fd.as_raw_fd(), c_name.as_ptr(), rd_flags) };
+    if raw < 0 {
+        let err = std::io::Error::last_os_error();
+        return Err(if err.raw_os_error() == Some(libc::ELOOP) {
+            HarnessError::BoundaryViolation {
+                reason: format!("FS_JAIL_VIOLATION: Symlink read rejected at '{label}'"),
+            }
+        } else {
+            HarnessError::ValidationFailed {
+                reason: format!("OPENAT_READ_FAILED [{label}]: {err}"),
+            }
+        });
+    }
+    let fd = unsafe { OwnedFd::from_raw_fd(raw) };
+    let mut st: libc::stat = unsafe { std::mem::zeroed() };
+    if unsafe { libc::fstat(fd.as_raw_fd(), &mut st) } != 0 {
+        return Err(HarnessError::ValidationFailed {
+            reason: format!(
+                "FSTAT_READ_FAILED [{label}]: {}",
+                std::io::Error::last_os_error()
+            ),
+        });
+    }
+    verify_regular_stat(&st, &label, true)?;
+    let f = fs::File::from(fd);
+    let mut out = Vec::new();
+    f.take((max_bytes as u64).saturating_add(1))
+        .read_to_end(&mut out)
+        .map_err(|e| HarnessError::ValidationFailed {
+            reason: format!("READ_FILE_FAILED [{label}]: {e}"),
+        })?;
+    if out.len() > max_bytes {
+        return Err(HarnessError::ValidationFailed {
+            reason: format!("READ_FILE_TOO_LARGE [{label}]: exceeds {max_bytes} bytes"),
+        });
+    }
+    Ok(out)
 }
 
 pub fn check_child_non_symlink_in_dir_fd(dir_fd: &OwnedFd, name: &std::ffi::OsStr) -> bool {

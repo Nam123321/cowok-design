@@ -26,6 +26,8 @@ export interface AgentChatComposerProps {
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
   placeholder?: string;
   testIdPrefix?: string;
+  textareaTestId?: string;
+  sendButtonTestId?: string;
   compact?: boolean;
 }
 
@@ -57,13 +59,15 @@ function syncTextareaHeight(el: HTMLTextAreaElement | null): void {
 }
 
 const AttachmentChipList: React.FC<{
+  prefix: string;
   chips: string[];
   onRemove?: (chip: string) => void;
-}> = ({ chips, onRemove }) => {
+}> = ({ prefix, chips, onRemove }) => {
   const { t } = useTranslation();
   if (chips.length === 0) return null;
+  const trayId = prefix === "chat-composer" ? "chatAttachmentTray" : `${prefix}-attachment-tray`;
   return (
-    <div id="chatAttachmentTray" style={{ display: "flex", gap: "5px", flexWrap: "wrap", paddingBottom: "4px" }}>
+    <div id={trayId} style={{ display: "flex", gap: "5px", flexWrap: "wrap", paddingBottom: "4px" }}>
       {chips.map((chip, idx) => (
         <span key={idx} data-testid={`attachment-chip-${idx}`} className="cowok-badge cowok-badge-mono" style={{ fontSize: "10px", padding: "2px 7px", borderRadius: "var(--radius-pill)", display: "inline-flex", alignItems: "center", gap: "5px", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", color: "var(--text-primary)" }}>
           <span>{chip}</span>
@@ -77,21 +81,24 @@ const AttachmentChipList: React.FC<{
 };
 
 const ComposerFooterBar: React.FC<{
+  prefix: string;
   selectedModel: { id: string; label: string };
   onSelectModel: (model: { id: string; label: string }) => void;
   isSendDisabled: boolean;
   onSend: () => void;
   onAttachClick?: () => void;
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
-}> = ({ selectedModel, onSelectModel, isSendDisabled, onSend, onAttachClick, onOpenSettings }) => {
+  sendButtonTestId?: string;
+}> = ({ prefix, selectedModel, onSelectModel, isSendDisabled, onSend, onAttachClick, onOpenSettings, sendButtonTestId = "chat-composer-send-btn" }) => {
   const { t } = useTranslation();
   const attachLabel = t("chat.attachContext", "Đính kèm tệp hoặc vùng chọn");
   const sendLabel = t("chat.sendPrompt", "Gửi chỉ thị (Enter)");
+  const attachTestId = prefix === "chat-composer" ? "chat-composer-attach-btn" : `${prefix}-attach-btn`;
 
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "2px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "6px", position: "relative" }}>
-        <button type="button" data-testid="chat-composer-attach-btn" onClick={onAttachClick} title={attachLabel} aria-label={attachLabel} className="cowok-btn-ghost" style={{ width: "24px", height: "24px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-subtle)", color: "var(--text-secondary)", cursor: "pointer" }}>
+        <button type="button" data-testid={attachTestId} onClick={onAttachClick} title={attachLabel} aria-label={attachLabel} className="cowok-btn-ghost" style={{ width: "24px", height: "24px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-xs)", border: "1px solid var(--border-subtle)", backgroundColor: "var(--bg-subtle)", color: "var(--text-secondary)", cursor: "pointer" }}>
           <BrandIcon name="plus" size={ICON_PLUS_SIZE} color="currentColor" />
         </button>
         <ModelPickerQuotaPopover
@@ -103,7 +110,7 @@ const ComposerFooterBar: React.FC<{
           onOpenSettings={onOpenSettings}
         />
       </div>
-      <button type="button" onClick={onSend} disabled={isSendDisabled} title={sendLabel} aria-label={sendLabel} data-testid="chat-composer-send-btn" className="cowok-btn-primary" style={{ width: "28px", height: "28px", minWidth: "28px", padding: 0, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", backgroundColor: isSendDisabled ? "var(--bg-subtle)" : "var(--action-primary)", color: isSendDisabled ? "var(--text-muted)" : "var(--action-primary-fg)", border: "none", cursor: isSendDisabled ? "not-allowed" : "pointer", transition: "all var(--duration-fast)" }}>
+      <button type="button" onClick={onSend} disabled={isSendDisabled} title={sendLabel} aria-label={sendLabel} data-testid={sendButtonTestId} className="cowok-btn-primary" style={{ width: "28px", height: "28px", minWidth: "28px", padding: 0, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "50%", backgroundColor: isSendDisabled ? "var(--bg-subtle)" : "var(--action-primary)", color: isSendDisabled ? "var(--text-muted)" : "var(--action-primary-fg)", border: "none", cursor: isSendDisabled ? "not-allowed" : "pointer", transition: "all var(--duration-fast)" }}>
         <BrandIcon name="send" size={ICON_SEND_SIZE} color="currentColor" />
       </button>
     </div>
@@ -116,6 +123,7 @@ const IME_COMPOSITION_KEYCODE = 229;
 function ComposerTextareaField(opts: {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   prefix: string;
+  textareaTestId?: string;
   inputValue: string;
   placeholder: string;
   isComposingRef: React.MutableRefObject<boolean>;
@@ -123,12 +131,13 @@ function ComposerTextareaField(opts: {
   onPasteFiles?: (files: File[]) => void;
   onSend: () => void;
 }) {
-  const { textareaRef, prefix, inputValue, placeholder, isComposingRef, onInputChange, onPasteFiles, onSend } = opts;
+  const { textareaRef, prefix, textareaTestId, inputValue, placeholder, isComposingRef, onInputChange, onPasteFiles, onSend } = opts;
+  const inputFfId = prefix === "chat-composer" ? "chat-composer-input" : `${prefix}-input`;
   return (
     <textarea
       ref={textareaRef}
-      data-ff-id="chat-composer-input"
-      data-testid={`${prefix}-textarea`}
+      data-ff-id={inputFfId}
+      data-testid={textareaTestId ?? `${prefix}-textarea`}
       value={inputValue}
       onCompositionStart={() => { isComposingRef.current = true; }}
       onCompositionEnd={() => { isComposingRef.current = false; }}
@@ -189,10 +198,11 @@ export const AgentChatComposer: React.FC<AgentChatComposerProps> = (props) => {
     <div data-testid={`${prefix}-wrapper`} style={{ padding: props.compact ? "6px 10px 10px 10px" : "8px 12px 12px 12px", backgroundColor: "var(--bg-canvas)", borderTop: "none" }}>
       <input ref={fileInputRef} type="file" multiple data-testid={`${prefix}-file-input`} accept={ALLOWED_CHAT_ATTACHMENT_ACCEPT} onChange={handleFileInputChange} style={{ display: "none" }} />
       <div className="chat-composer-capsule" style={{ backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", padding: "8px 10px", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column", gap: "6px" }}>
-        <AttachmentChipList chips={props.attachmentChips} onRemove={props.onRemoveAttachmentChip} />
+        <AttachmentChipList prefix={prefix} chips={props.attachmentChips} onRemove={props.onRemoveAttachmentChip} />
         <ComposerTextareaField
           textareaRef={textareaRef}
           prefix={prefix}
+          textareaTestId={props.textareaTestId}
           inputValue={props.inputValue}
           placeholder={placeholder}
           isComposingRef={isComposingRef}
@@ -203,7 +213,7 @@ export const AgentChatComposer: React.FC<AgentChatComposerProps> = (props) => {
           }}
           onSend={handleSend}
         />
-        <ComposerFooterBar selectedModel={selectedModel} onSelectModel={setSelectedModel} isSendDisabled={isSendDisabled} onSend={handleSend} onAttachClick={handleAttachButtonClick} onOpenSettings={props.onOpenSettings} />
+        <ComposerFooterBar prefix={prefix} selectedModel={selectedModel} onSelectModel={setSelectedModel} isSendDisabled={isSendDisabled} onSend={handleSend} onAttachClick={handleAttachButtonClick} onOpenSettings={props.onOpenSettings} sendButtonTestId={props.sendButtonTestId} />
       </div>
     </div>
   );

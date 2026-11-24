@@ -73,6 +73,8 @@ export interface SubChatMessage {
   role: "user" | "assistant";
   text: string;
   targetFfId?: string;
+  kind?: "chat" | "comment";
+  pinNumber?: number;
 }
 
 export interface UploadedFileState {

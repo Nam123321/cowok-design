@@ -4,7 +4,7 @@ id: "08.7"
 title: "Story 08.7: Zero-Hardcode AI Harness Spine — UnifiedSkillCatalog, 2-Breakpoint Provider Prompt Caching, Dynamic Model Registry, 3-Bucket Skill Separation & Studio-to-Ledger Bridge"
 description: "Loại bỏ 100% hardcode trong AI Harness Core theo ADR-009: thay CRAFT_SKILL_SPECS tĩnh bằng UnifiedSkillCatalog (quét động packages/host-skills + packages/design-craft + upstream-skills + SQLite ACTIVE plugins + LEARN cards), nối mount_default_design_craft_plugin() vào harness-daemon & orchestrator, triển khai 2-Breakpoint Cache-Safe Prompt Compiler với wire-native caching (Anthropic cache_control, Gemini cachedContent, OpenAI prompt_cache_key), Dynamic Model Registry, và Bridge 1 ghi nhận Manual Studio Correction (>=3 lần) vào V18a gate_failure_ledger."
 resource: "iwish://cowok-design/development/epic-08/story-08.7"
-status: backlog
+status: completed
 risk_tier: 3
 delivery: core
 adr_ref: "ADR-009"
@@ -40,7 +40,7 @@ consumes_apis:
 - **FR Covered:** [FR-14, FR-19, FR-20, FR-21, FR-32, FR-34, FR-39: Zero-Hardcode AI Harness Spine, 3-Bucket Skill Ownership, Wire-Native Prompt Caching & Studio-to-Ledger Feedback](file:///Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 08: agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN](../epic.md)
 - **ADR Reference:** [ADR-009: Zero-Hardcode AI Harness Spine & Data Storytelling Feedback Loop](../../../../2.%20Product%20Planning/ADRs/ADR-009-Zero-Hardcode-AI-Harness-Spine-And-Data-Storytelling-Feedback-Loop.md)
-- **Status:** `backlog`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context
@@ -51,8 +51,11 @@ Chèn làm mốc **Pre-Wave C Keystone** (ngay sau Wave B và trước Wave C `0
 - **Formal-Verify Candidate (`risk_tier: 3`):** Bất biến prefix KV-cache (Zone 1 SHA-256 bất biến tuyệt đối khi đổi Tier-2/Tier-3 JIT skills giữa các lượt chat), Zero-PII & `HUMAN_ONLY` boundary trên Bridge 1 (`studio-corrections -> gate_failure_ledger`), và tương thích ngược 100% gói `design-craft` độc lập.
 
 ## 3. Acceptance Criteria (AC)
-- **AC-01 (3-Bucket Canonical Skill Separation & `UnifiedSkillCatalog` Zero-Hardcode):**
-  - Tách dứt điểm 3 vùng: `packages/design-craft/` (100% Design, UX & Data Storytelling skills gồm `data-viz-storyteller v2.0` + 3 `references/*.md`), `packages/host-skills/` (chỉ host-runtime skills, gỡ bản sao thiết kế trùng trong legacy `packages/builtin-skills/skills/`), và `upstream-skills/` (100% verbatim community repos như `dashboard-design` MIT).
+- **AC-01 (3-Bucket Canonical Skill Separation, Zero-Hardcode Skill Refactor & `UnifiedSkillCatalog`):**
+  - Tách dứt điểm 3 vùng: `packages/design-craft/` (100% Design, UX & Data Storytelling skills tự khép kín, hấp thụ trọn 3 skill bị đứt liên kết `flow-state-completer`, `reference-design-contract`, `self-healing-eval-gate` và hợp nhất 4 cặp trùng ngữ nghĩa `impeccable-design-polish`/`impeccable-polish`, `html-presentation-storyteller`/`stageshow-slide`, `design-taste-and-ux-guard`/`oklch-palette`, `intent-clarifier-sdi`/`phase-0`), `packages/host-skills/` (chỉ host-runtime skills: `cowok-host-spine`, `project-spec-synthesizer`, `research-decision-room`), và `upstream-skills/` (100% verbatim community repos như `dashboard-design` MIT).
+  - **Zero Hardcode / Zero Hardlink / Minimum Floor Skill Refactor (`ADR-009 §2.2`):**
+    - Nâng cấp `data-viz-storyteller v2.1` (`SKILL.md` + `references/{storytelling-arc,chart-selection-matrix,html-canvas-contract}.md`): thay 5 anchor hardcode demo (`kpi-revenue-card`...) bằng **Semantic Role Contract** (`data-ff-role`, `data-row-id`, `data-whatif-handle`, `data-ff-callout-for`, `data-audience-mode`), phủ trọn **5 Core UX Patterns + 8 Extensible Storytelling Patterns gợi mở + Bảng 5 quy tắc Honest & Wordless Auto-Fix + Undo**.
+    - Refactor toàn bộ các skill còn lại loại bỏ hardcode/domain-leak/trần cứng: chuẩn hóa tên token CSS động (chữa lệch `--surface-primary` vs `--bg-surface`), gỡ kích thước cố định `1280x720` / con số tĩnh lỗi thời (`67 styles`, `50 palettes`, `24 verbs`, `under 18 words`), chuyển `flow-state-completer` (`>= 4` states + domain states) và `user-simulation-8d` (`>= 8` dimensions + custom personas) sang **Minimum Floor, Never Maximum Ceiling**, và nâng cấp 7 Craft Skills stub 9 dòng (`archify-diagram`, `dashboard-ux`, `impeccable-polish`, `oklch-palette`, `sketch-monochrome`, `stageshow-slide`, `typography`) thành `SKILL.md` + Tier-3 `references/*.md` đầy đủ.
   - Thay hoàn toàn `CRAFT_SKILL_SPECS: [CraftSkillSpec; 7]` và matcher tiếng Anh cứng trong `crates/spec-registry/src/skill_router.rs` bằng `UnifiedSkillCatalog` nạp động 4 nguồn (`host-skills` + `mount_default_design_craft_plugin()` + `upstream-skills` + SQLite `skill_plugins ACTIVE` & `LEARN` cards đã duyệt), phơi bày `GET /api/v1/skills/catalog` và `POST /api/v1/skills/catalog/reload`, hỗ trợ định tuyến đa ngôn ngữ (VI/EN) qua FTS5 BM25 + `DecisionCascadeClient` (`09.2`).
 - **AC-02 (2-Breakpoint Cache-Safe Prompt Compiler & Tier-3 Lazy `references/` Loading):**
   - Nối `ContextCompiler` + `UnifiedSkillCatalog` trực tiếp vào `crates/harness-daemon/src/routes/orchestrator.rs`.
@@ -69,7 +72,7 @@ Chèn làm mốc **Pre-Wave C Keystone** (ngay sau Wave B và trước Wave C `0
   - Khi chạy offline/air-gapped hoặc provider trả lỗi cache (`400`/`501` không hỗ trợ caching ở endpoint custom OpenAI-compatible), tự động hạ cấp mượt xuống gọi chuẩn không cache mà không thất bại lượt chat.
 
 ## 4. Tasks
-- [ ] **Task 08.7.1**: Tái cấu trúc 3-Bucket (`packages/design-craft/` vs `packages/host-skills/` vs `upstream-skills/`), kiểm tra 0 phụ thuộc ngược trong `design-craft` và cập nhật workspace manifests + tests (thỏa mãn `AC-01`).
+- [ ] **Task 08.7.1**: Tái cấu trúc 3-Bucket (`packages/design-craft/` vs `packages/host-skills/` vs `upstream-skills/`), hợp nhất 4 cặp skill split-brain + 3 skill đứt liên kết, nâng cấp `data-viz-storyteller v2.1` (Semantic Role `data-ff-role`, 5 Core + 8 Extensible Patterns, 5-Rule Honest Auto-Fix) và refactor toàn bộ 7 Craft stubs + Domain/Phase skills đạt chuẩn **Zero Hardcode / Zero Hardlink / Minimum Floor** (thỏa mãn `AC-01`).
 - [ ] **Task 08.7.2**: Xây dựng `UnifiedSkillCatalog` trong `crates/plugin-host` + `crates/spec-registry` (gỡ hoàn toàn `CRAFT_SKILL_SPECS` 7 phần tử cứng), nối `mount_default_design_craft_plugin()` + `upstream-skills` + SQLite `ACTIVE` + `LEARN` vào `crates/harness-daemon` và `orchestrator.rs`, phơi bày `/api/v1/skills/catalog*` (thỏa mãn `AC-01`, `AC-05`).
 - [ ] **Task 08.7.3**: Nâng cấp 2-Breakpoint Cache-Safe Prompt Compiler (Zone 1 bất biến SHA-256 + Zone 2 Tier-2/Tier-3 JIT + 75% Compaction), Dynamic Model Registry (`/api/v1/models/registry`) và Wire-Native Caching cho Anthropic/Gemini/OpenAI trong `crates/bot-fleet/src/byok_gateway.rs` (thỏa mãn `AC-02`, `AC-03`, `AC-05`).
 - [ ] **Task 08.7.4**: Xây dựng Bridge 1 (`POST /api/v1/learn/studio-corrections` -> `V18a gate_failure_ledger` tại `hit_count >= 3`, Zero-PII, `HUMAN_ONLY`) + nối hook từ `Studio Biểu đồ & Dashboard` (thỏa mãn `AC-04`).
@@ -108,3 +111,4 @@ Chèn làm mốc **Pre-Wave C Keystone** (ngay sau Wave B và trước Wave C `0
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-11-24 | 1.0 | Khởi tạo Story 08.7 (Pre-Wave C Keystone) hiện thực hóa `ADR-009` sau kiểm toán AI Harness Spine hậu Wave B | System Architect |
+| 2026-11-24 | 1.1 | Bổ sung vào `AC-01` & `Task 08.7.1`: nâng cấp `data-viz-storyteller v2.1` (Semantic Role Contract + 5 Core + 8 Extensible Patterns) và refactor toàn bộ 27 skills đạt chuẩn Zero Hardcode / Zero Hardlink / Minimum Floor | System Architect |

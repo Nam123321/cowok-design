@@ -10,7 +10,7 @@ description: Xây dựng Kiến trúc Đăng ký & Khám phá Năng lực Mở �
   runtime thẩm quyền D2 crates/plugin-host.
 resource: _iwish-output/3. Development/1. Epic & Story/VS-04. agentskills.io Plugin
   Ecosystem, Design-Only REA Forge & JEV — TypeSafe/Epic-08/Story-08.1/story.md
-status: completed
+status: fixing
 risk_tier: 2
 delivery: core
 adr_ref: ../../../../2. Product Planning/ADRs/ADR-002-Tech-Stack-Tradeoffs-Rust-Go-vs-Node.md

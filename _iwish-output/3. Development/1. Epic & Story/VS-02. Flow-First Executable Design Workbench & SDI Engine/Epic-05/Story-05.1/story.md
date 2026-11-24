@@ -4,7 +4,7 @@ id: "05.1"
 title: "Story 05.1: Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11)"
 description: "Nâng cấp giao diện tạo dự án hỗ trợ 4 lối vào (Prompt/PRD, Starter Templates, Design/Reference Import, Codebase Mode); xây dựng Option 5 Action-Linked Vertical Storyboard 2D đồng bộ CTA <16ms; triển khai Entry-First Live Shell đắp dần trên IframeKeepAlivePool (LRU-5); Shared AppShell đa màn hình; và thanh công cụ 5-Mode Visual Canvas Toolbar kèm SDI Gap-Driven Discovery."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-02. Flow-First Executable Design Workbench & SDI Engine/Epic-05/Story-05.1/story.md"
-status: completed
+status: fixing
 risk_tier: 2
 delivery: core
 timestamp: "2026-11-12T16:00:00+07:00"

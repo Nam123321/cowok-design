@@ -80,7 +80,7 @@ export const FeDataContractDraftSchema = z.object({
 });
 ```
 
-## 2. Persistence Schema (`V20` Planned — Composite Tenant Isolation)
+## 2. Persistence Schema (`V25__story_05_6_brand_proposals_and_heritage_packs.sql` — Composite Tenant Isolation, Sequential After `V24`)
 
 ```prisma
 model BrandProposalSnapshot {
@@ -96,4 +96,38 @@ model BrandProposalSnapshot {
   @@index([tenantId, projectId])
   @@map("brand_proposal_snapshots")
 }
+
+model HeritageDesignPack {
+  id                  String @id @default(uuid())
+  tenantId            String @map("tenant_id")
+  name                String
+  sourceProjectId     String @map("source_project_id")
+  brandIdentityJson   String @map("brand_identity_json")
+  componentRegistryJson String @map("component_registry_json")
+  presentationThemeJson String @map("presentation_theme_json")
+  themeModesJson      String @map("theme_modes_json")
+  createdAt           BigInt @map("created_at")
+
+  @@index([tenantId, sourceProjectId])
+  @@map("heritage_design_packs")
+}
+
+model HiddenSpecDocument {
+  id              String @id @default(uuid())
+  tenantId        String @map("tenant_id")
+  projectId       String @map("project_id")
+  specKey         String @map("spec_key")
+  title           String
+  contentMarkdown String @map("content_markdown")
+  contentSha256   String @map("content_sha256")
+  revision        Int    @default(1)
+  updatedAt       BigInt @map("updated_at")
+
+  @@unique([tenantId, projectId, specKey])
+  @@index([tenantId, projectId])
+  @@map("hidden_spec_documents")
+}
 ```
+
+### Additional Verified Route (Stage 4 Polish)
+- `POST /api/v1/cognitive/specs/reveal` (`RevealSpecsFolderRequestSchema` -> `RevealSpecsFolderResponseSchema`): Strictly enforces `roles: ["editor", "admin"]`, `MAX_BODY_BYTES = 4_096`, `parseJsonBodyStrict` (`rawBinary: true`), and `fs_jail::check_child_non_symlink_in_dir_fd` + `symlink_metadata` before invoking OS file manager on `.cowok-design/specs/`.

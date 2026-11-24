@@ -172,14 +172,32 @@ fn infer_slugs_from_intent(portal_id: &str, intent: &str) -> Vec<String> {
     inferred.into_iter().collect()
 }
 
+/// Dynamic skill descriptor supplied by `UnifiedSkillCatalog` so `POST /api/v1/skills/route`
+/// routes arbitrary discovered skills (including VI/EN intents, `data-viz-storyteller`,
+/// `dashboard-design`, active plugins, and approved LEARN cards) without hardcoded slug ceilings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DynamicSkillEntry {
+    pub slug: String,
+    pub tier1_summary: String,
+    pub tier2_body: String,
+}
+
 /// Deterministic 3-Zone Cache-Preserving Skill Router matching `SkillRouteResponseSchema`:
 /// - Zone 1 (`cowok-design-opt` spine): strictly `<= max_spine_tokens <= 250` BPE tokens
-/// - Zone 2 (canonical craft skills prefix): deduplicated & lexicographically sorted by slug
+/// - Zone 2 (selected skills prefix): deduplicated & lexicographically sorted by slug
 /// - Zone 3 (volatile intent tail): intent summary, never alters `prefix_sha256`
 pub struct CachePreservingSkillRouter;
 
 impl CachePreservingSkillRouter {
     pub fn route(cmd: &SkillRouteCommand) -> Result<SkillRouteOutcome, SsotLockError> {
+        Self::route_with_dynamic_catalog(cmd, &[], &[])
+    }
+
+    pub fn route_with_dynamic_catalog(
+        cmd: &SkillRouteCommand,
+        dynamic_entries: &[DynamicSkillEntry],
+        auto_selected_slugs: &[String],
+    ) -> Result<SkillRouteOutcome, SsotLockError> {
         let start = Instant::now();
 
         if cmd.project_id.trim().is_empty() || cmd.project_id.len() > 128 {
@@ -220,32 +238,46 @@ impl CachePreservingSkillRouter {
             });
         }
 
+        let has_dynamic = !dynamic_entries.is_empty();
         let candidate_slugs = match &cmd.requested_slugs {
             Some(list) => list.clone(),
+            None if !auto_selected_slugs.is_empty() => auto_selected_slugs.to_vec(),
             None => infer_slugs_from_intent(&cmd.portal_id, &cmd.intent_summary),
         };
-        if candidate_slugs.len() > 7 {
+        let max_slugs = if has_dynamic { 16 } else { 7 };
+        if candidate_slugs.len() > max_slugs {
             return Err(SsotLockError::Validation {
                 code: "INVALID_REQUEST",
-                message: "requestedSlugs supports at most 7 items".to_string(),
+                message: format!("requestedSlugs supports at most {max_slugs} items"),
             });
         }
 
         let mut sorted_set = BTreeSet::new();
         for slug in &candidate_slugs {
-            if lookup_craft_skill(slug.as_str()).is_none() {
+            let trimmed = slug.trim();
+            let in_dynamic = dynamic_entries.iter().any(|e| e.slug == trimmed);
+            let in_legacy = lookup_craft_skill(trimmed).is_some();
+            if !in_dynamic && !in_legacy {
                 return Err(SsotLockError::Validation {
                     code: "INVALID_REQUEST",
-                    message: format!("Unknown craft skill slug: {slug}"),
+                    message: format!("Unknown skill slug: {slug}"),
                 });
             }
-            sorted_set.insert(slug.clone());
+            sorted_set.insert(trimmed.to_string());
         }
 
         let selected_slugs: Vec<String> = sorted_set.into_iter().collect();
         let mut zone2_sections = Vec::with_capacity(selected_slugs.len());
         for slug in &selected_slugs {
-            if let Some(spec) = lookup_craft_skill(slug.as_str()) {
+            if let Some(dyn_entry) = dynamic_entries.iter().find(|e| e.slug == *slug) {
+                let body_excerpt: String = dyn_entry.tier2_body.trim().chars().take(1200).collect();
+                zone2_sections.push(format!(
+                    "Rule[{}]: {}\n{}",
+                    dyn_entry.slug,
+                    dyn_entry.tier1_summary.trim(),
+                    body_excerpt
+                ));
+            } else if let Some(spec) = lookup_craft_skill(slug.as_str()) {
                 zone2_sections.push(format!("{}\n{}", spec.tier1_rule, spec.tier2_guide));
             }
         }
@@ -279,5 +311,332 @@ impl CachePreservingSkillRouter {
             zone3_intent_tail,
             latency_ms,
         })
+    }
+}
+
+// ============================================================================
+// Story 08.7: 2-Breakpoint Cache-Safe Prompt Compiler & 75% Cache-Safe Compaction
+// ============================================================================
+
+/// Default cache-safe compaction trigger threshold (75% of model context window).
+pub const CACHE_SAFE_COMPACTION_THRESHOLD_PCT: usize = 75;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationTurn {
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TwoBreakpointPromptInput {
+    pub system_identity: String,
+    pub tool_schemas_json: String,
+    pub tier1_skill_index: String,
+    pub design_tokens_sha256: String,
+    pub catalog_sha256: String,
+    #[serde(default)]
+    pub jit_tier2_skills: Vec<(String, String)>,
+    #[serde(default)]
+    pub jit_tier3_references: Vec<(String, String, String)>,
+    #[serde(default)]
+    pub conversation_history: Vec<ConversationTurn>,
+    pub user_turn: String,
+    #[serde(default = "default_context_window_tokens")]
+    pub context_window_tokens: usize,
+}
+
+fn default_context_window_tokens() -> usize {
+    128_000
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompiledTwoBreakpointPrompt {
+    /// Breakpoint 1: Strictly static, byte-invariant across turns when catalog & design hash are unchanged.
+    pub zone1_static_prefix: String,
+    /// Deterministic SHA-256 of `zone1_static_prefix`.
+    pub zone1_prefix_sha256: String,
+    /// Breakpoint 2 block: Cache-safe compacted `[CONVERSATION_HISTORY]` block (None when history is empty).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub history_breakpoint_block: Option<String>,
+    /// Dynamic turn tail AFTER Breakpoint 2: JIT Tier-2 `SKILL.md` + Tier-3 `references/*.md` + `[USER_TURN]` (without repeating history).
+    pub zone2_dynamic_tail: String,
+    /// Combined Zone 2 payload (Breakpoint 2 history + dynamic turn tail) for single-string callers.
+    pub zone2_turn_tail: String,
+    pub activated_skills: Vec<String>,
+    pub loaded_references: Vec<String>,
+    pub compaction_applied: bool,
+    pub zone1_tokens: usize,
+    pub estimated_total_tokens: usize,
+}
+
+/// Cache-Safe History Compaction (`Story 08.7 AC-02`):
+/// Preserves the leading turn prefix intact (so KV cache Breakpoint 2 prefix hits remain hot)
+/// and compacts overflowing middle turns into a deterministic summary marker while retaining
+/// the most recent turns verbatim whenever history exceeds `max_history_tokens`.
+pub fn compact_history_cache_safe(
+    history: &[ConversationTurn],
+    max_history_tokens: usize,
+) -> (Vec<ConversationTurn>, bool) {
+    let total_tokens: usize = history
+        .iter()
+        .map(|t| count_exact_bpe_tokens(&t.content).saturating_add(4))
+        .sum();
+    if total_tokens <= max_history_tokens || history.len() <= 3 {
+        return (history.to_vec(), false);
+    }
+
+    // Keep the very first turn (anchored prefix) + recent tail turns that fit budget,
+    // compacting the middle span into a single deterministic digest turn.
+    let head = history[0].clone();
+    let head_tokens = count_exact_bpe_tokens(&head.content).saturating_add(4);
+    let mut kept_tail: Vec<ConversationTurn> = Vec::new();
+    let mut used = head_tokens.saturating_add(48); // reserve for compaction summary turn
+    let mut split_idx = history.len();
+
+    for idx in (1..history.len()).rev() {
+        let turn_tokens = count_exact_bpe_tokens(&history[idx].content).saturating_add(4);
+        if used.saturating_add(turn_tokens) > max_history_tokens && !kept_tail.is_empty() {
+            break;
+        }
+        used = used.saturating_add(turn_tokens);
+        kept_tail.push(history[idx].clone());
+        split_idx = idx;
+    }
+    kept_tail.reverse();
+
+    if split_idx <= 1 {
+        return (history.to_vec(), false);
+    }
+
+    let compacted_slice = &history[1..split_idx];
+    let mut summary_parts = Vec::with_capacity(compacted_slice.len());
+    for turn in compacted_slice {
+        let preview: String = turn
+            .content
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .chars()
+            .take(80)
+            .collect();
+        summary_parts.push(format!("[{}: {}]", turn.role, preview));
+    }
+    let summary_turn = ConversationTurn {
+        role: "system".to_string(),
+        content: format!(
+            "[CACHE_SAFE_COMPACTION: {} earlier turns summarized to stay <= {}% context budget] {}",
+            compacted_slice.len(),
+            CACHE_SAFE_COMPACTION_THRESHOLD_PCT,
+            summary_parts.join(" | ")
+        ),
+    };
+
+    let mut out = Vec::with_capacity(2 + kept_tail.len());
+    out.push(head);
+    out.push(summary_turn);
+    out.extend(kept_tail);
+    (out, true)
+}
+
+/// Compiles a 2-Breakpoint Cache-Safe prompt:
+/// - **Zone 1 (`zone1_static_prefix`)**: System Identity + Tool Schemas + Tier-1 Skill Index (`<= 100 tok`/skill)
+///   + `DESIGN.md`/`tokens.css` hash + `catalog_sha256`. 100% invariant across turns!
+/// - **Zone 2 (`zone2_turn_tail`)**: Cache-safe compacted conversation history + JIT Tier-2 `SKILL.md`
+///   bodies + lazy Tier-3 `references/*.md` + current `user_turn`.
+pub fn compile_two_breakpoint_prompt(
+    input: &TwoBreakpointPromptInput,
+) -> CompiledTwoBreakpointPrompt {
+    let zone1_static_prefix = format!(
+        "=== ZONE 1: STATIC CACHED PREFIX ===\n\
+         [SYSTEM_IDENTITY]\n{}\n\
+         [TOOL_SCHEMAS]\n{}\n\
+         [TIER1_SKILL_INDEX catalog_sha256={}]\n{}\n\
+         [DESIGN_TOKENS_SHA256]\n{}",
+        input.system_identity.trim(),
+        input.tool_schemas_json.trim(),
+        input.catalog_sha256.trim(),
+        input.tier1_skill_index.trim(),
+        input.design_tokens_sha256.trim(),
+    );
+
+    let mut hasher = Sha256::new();
+    hasher.update(zone1_static_prefix.as_bytes());
+    let zone1_prefix_sha256 = format!("{:x}", hasher.finalize());
+    let zone1_tokens = count_exact_bpe_tokens(&zone1_static_prefix);
+
+    // Build JIT Tier-2 + Tier-3 sections (strictly in Zone 2 Turn Tail!)
+    let mut activated_skills = Vec::with_capacity(input.jit_tier2_skills.len());
+    let mut tier2_blocks = Vec::with_capacity(input.jit_tier2_skills.len());
+    for (skill_id, body) in &input.jit_tier2_skills {
+        activated_skills.push(skill_id.clone());
+        tier2_blocks.push(format!(
+            "### [JIT_TIER2_SKILL id={skill_id}]\n{}",
+            body.trim()
+        ));
+    }
+
+    let mut loaded_references = Vec::with_capacity(input.jit_tier3_references.len());
+    let mut tier3_blocks = Vec::with_capacity(input.jit_tier3_references.len());
+    for (skill_id, ref_path, content) in &input.jit_tier3_references {
+        loaded_references.push(format!("{skill_id}:{ref_path}"));
+        tier3_blocks.push(format!(
+            "### [JIT_TIER3_REF skill={skill_id} path={ref_path}]\n{}",
+            content.trim()
+        ));
+    }
+
+    let jit_section = [tier2_blocks.join("\n\n"), tier3_blocks.join("\n\n")]
+        .into_iter()
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    let jit_and_turn_tokens = count_exact_bpe_tokens(&jit_section)
+        .saturating_add(count_exact_bpe_tokens(&input.user_turn));
+
+    let threshold_budget = input
+        .context_window_tokens
+        .max(2048)
+        .saturating_mul(CACHE_SAFE_COMPACTION_THRESHOLD_PCT)
+        / 100;
+    let history_budget = threshold_budget
+        .saturating_sub(zone1_tokens)
+        .saturating_sub(jit_and_turn_tokens)
+        .max(256);
+
+    let (compacted_history, compaction_applied) =
+        compact_history_cache_safe(&input.conversation_history, history_budget);
+
+    let history_block = compacted_history
+        .iter()
+        .map(|t| format!("[{}]: {}", t.role, t.content))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let history_breakpoint_block = if history_block.is_empty() {
+        None
+    } else {
+        Some(format!("[CONVERSATION_HISTORY]\n{history_block}"))
+    };
+
+    let mut dynamic_parts = Vec::new();
+    if !jit_section.is_empty() {
+        dynamic_parts.push(format!("[JIT_LOADED_SKILLS_AND_REFERENCES]\n{jit_section}"));
+    }
+    dynamic_parts.push(format!("[USER_TURN]\n{}", input.user_turn.trim()));
+    let zone2_dynamic_tail = dynamic_parts.join("\n\n");
+
+    let zone2_turn_tail = match &history_breakpoint_block {
+        Some(hist) => format!("{hist}\n\n{zone2_dynamic_tail}"),
+        None => zone2_dynamic_tail.clone(),
+    };
+
+    let estimated_total_tokens =
+        zone1_tokens.saturating_add(count_exact_bpe_tokens(&zone2_turn_tail));
+
+    CompiledTwoBreakpointPrompt {
+        zone1_static_prefix,
+        zone1_prefix_sha256,
+        history_breakpoint_block,
+        zone2_dynamic_tail,
+        zone2_turn_tail,
+        activated_skills,
+        loaded_references,
+        compaction_applied,
+        zone1_tokens,
+        estimated_total_tokens,
+    }
+}
+
+#[cfg(test)]
+mod two_breakpoint_tests {
+    use super::*;
+
+    #[test]
+    fn zone1_prefix_sha256_stays_100_percent_invariant_across_different_jit_skills_and_turns() {
+        let base_system = "You are cowok-host-spine.";
+        let base_tools = r#"[{"name":"de-tokens-oklch"}]"#;
+        let base_index = "- dashboard-design [upstream_verbatim@v1.0.0]: Calm honest dashboards\n- data-viz-storyteller [design_craft@v2.1.0]: Insight-led charts";
+        let design_hash = "a".repeat(64);
+        let catalog_hash = "b".repeat(64);
+
+        let turn1 = compile_two_breakpoint_prompt(&TwoBreakpointPromptInput {
+            system_identity: base_system.to_string(),
+            tool_schemas_json: base_tools.to_string(),
+            tier1_skill_index: base_index.to_string(),
+            design_tokens_sha256: design_hash.clone(),
+            catalog_sha256: catalog_hash.clone(),
+            jit_tier2_skills: vec![("data-viz-storyteller".into(), "# Full Tier-2 Body".into())],
+            jit_tier3_references: vec![(
+                "data-viz-storyteller".into(),
+                "references/storytelling-arc.md".into(),
+                "# 5 Core Patterns".into(),
+            )],
+            conversation_history: vec![],
+            user_turn: "Tạo biểu đồ doanh thu kể chuyện dữ liệu cho CEO".to_string(),
+            context_window_tokens: 128_000,
+        });
+
+        let turn2 = compile_two_breakpoint_prompt(&TwoBreakpointPromptInput {
+            system_identity: base_system.to_string(),
+            tool_schemas_json: base_tools.to_string(),
+            tier1_skill_index: base_index.to_string(),
+            design_tokens_sha256: design_hash.clone(),
+            catalog_sha256: catalog_hash.clone(),
+            jit_tier2_skills: vec![("dashboard-design".into(), "# Upstream MIT Body".into())],
+            jit_tier3_references: vec![],
+            conversation_history: vec![ConversationTurn {
+                role: "user".into(),
+                content: "Previous turn".into(),
+            }],
+            user_turn: "Build operational KPI dashboard".to_string(),
+            context_window_tokens: 128_000,
+        });
+
+        assert_eq!(turn1.zone1_prefix_sha256, turn2.zone1_prefix_sha256);
+        assert_eq!(turn1.zone1_static_prefix, turn2.zone1_static_prefix);
+        assert_ne!(turn1.zone2_turn_tail, turn2.zone2_turn_tail);
+        assert!(turn1.zone2_turn_tail.contains("JIT_TIER3_REF"));
+        assert!(!turn1.zone1_static_prefix.contains("Full Tier-2 Body"));
+        assert!(turn1.history_breakpoint_block.is_none());
+        let turn2_hist = turn2
+            .history_breakpoint_block
+            .as_deref()
+            .expect("non-empty history produces Breakpoint 2 block");
+        assert!(turn2_hist.contains("[CONVERSATION_HISTORY]"));
+        assert!(turn2_hist.contains("Previous turn"));
+        assert!(!turn2.zone2_dynamic_tail.contains("[CONVERSATION_HISTORY]"));
+        assert!(turn2.zone2_dynamic_tail.contains("[USER_TURN]"));
+    }
+
+    #[test]
+    fn compacts_history_at_75_percent_threshold_preserving_head_turn() {
+        let mut history = vec![ConversationTurn {
+            role: "user".into(),
+            content: "Initial project charter".into(),
+        }];
+        for i in 0..20 {
+            history.push(ConversationTurn {
+                role: if i % 2 == 0 { "assistant" } else { "user" }.into(),
+                content: format!("Turn {i}: {}", "detailed analysis context ".repeat(40)),
+            });
+        }
+        let compiled = compile_two_breakpoint_prompt(&TwoBreakpointPromptInput {
+            system_identity: "spine".into(),
+            tool_schemas_json: "[]".into(),
+            tier1_skill_index: "- skill".into(),
+            design_tokens_sha256: "0".repeat(64),
+            catalog_sha256: "1".repeat(64),
+            jit_tier2_skills: vec![],
+            jit_tier3_references: vec![],
+            conversation_history: history,
+            user_turn: "Final request".into(),
+            context_window_tokens: 2048,
+        });
+        assert!(compiled.compaction_applied);
+        assert!(compiled.zone2_turn_tail.contains("Initial project charter"));
+        assert!(compiled.zone2_turn_tail.contains("CACHE_SAFE_COMPACTION"));
     }
 }

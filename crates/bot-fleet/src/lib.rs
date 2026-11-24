@@ -11,6 +11,7 @@
 pub mod adapters;
 pub mod byok_gateway;
 pub mod decision_cascade;
+pub mod model_registry;
 pub mod normalizer;
 pub mod orchestrator;
 pub mod posix_sandbox;
@@ -22,15 +23,24 @@ pub use adapters::{
     validate_model_id, CliAdapterCategory, CliAdapterRegistry, CliAdapterSpec, CliAdapterStatusDto,
 };
 pub use byok_gateway::{
-    canonical_provider_id, default_model_for_provider, resolve_and_pin_provider_endpoint,
-    ByokCredential, ByokExecutionResult, ByokGatewayRouter, CooldownTracker, ProviderCooldownDto,
-    CANONICAL_BYOK_PROVIDERS, PROHIBITED_LOCAL_PORTS,
+    build_gemini_cached_content_create_payload, build_provider_wire_payload, canonical_provider_id,
+    default_model_for_provider, extract_cache_telemetry_from_provider_json,
+    format_openai_prompt_cache_key, resolve_and_pin_provider_endpoint, resolve_default_model_id,
+    resolve_gemini_cached_contents_endpoint, shared_gemini_cache_registry, ByokCredential,
+    ByokExecutionResult, ByokGatewayRouter, CooldownTracker, GeminiCacheHandleRegistry,
+    GeminiCachedContentCreateRequest, GeminiCachedContentHandle, PromptCacheHints,
+    PromptCacheTelemetry, ProviderCooldownDto, CANONICAL_BYOK_PROVIDERS,
+    DEFAULT_GEMINI_CACHE_TTL_SECS, PROHIBITED_LOCAL_PORTS,
 };
 pub use decision_cascade::{
     detect_verdict_oscillation, egress_guard, evaluate_rubric_pairwise_with_judge,
     seal_verdict_shield, verify_stale_file_occ, DecisionCascadeClient, DecisionCascadeError,
     DrDeHookFn, DrDeHookInput, DrDeHookResult, EgressGuardedPayload, VaultLookupFn,
     EGRESS_MAX_CONTEXT_BYTES, EGRESS_MAX_PROMPT_BYTES,
+};
+pub use model_registry::{
+    builtin_seed_models, list_registry_models, parse_registry_json, resolve_cache_strategy,
+    resolve_model_for_provider, CacheStrategy, ModelRegistryEntry, ModelTier,
 };
 pub use normalizer::{
     coerce_json_value, extract_fenced_or_raw_json, normalize_svg_viewboxes, strip_ansi_sequences,

@@ -40,6 +40,7 @@ model Project {
   userSkillRegistries UserSkillRegistry[]
   gateFailureLedgers GateFailureLedger[]
   decisionAuditLogs DecisionAuditLog[]
+  studioCorrectionSignals StudioCorrectionSignal[]
 
   @@unique([id, tenantId], map: "uq_projects_id_tenant")
   @@index([inheritBrandFromProjectId])
@@ -1370,4 +1371,93 @@ model TelemetryPreference {
   updatedAt        BigInt @map("updated_at")
 
   @@map("telemetry_preferences")
+}
+
+// ============================================================================
+// Bounded Context: ai-harness-spine & brand-visual-studio (Stories 08.7 & 05.6)
+// ============================================================================
+
+model ModelRegistryProfile {
+  id                  String @id
+  tenantId            String @default("local-default") @map("tenant_id")
+  providerId          String @map("provider_id")
+  modelId             String @map("model_id")
+  displayName         String @map("display_name")
+  tier                String
+  contextWindow       Int    @map("context_window")
+  supportsPromptCache Int    @default(0) @map("supports_prompt_cache")
+  cacheStrategy       String @default("none") @map("cache_strategy")
+  isDefault           Int    @default(0) @map("is_default")
+  enabled             Int    @default(1)
+  updatedAt           BigInt @map("updated_at")
+
+  @@unique([tenantId, providerId, modelId])
+  @@index([tenantId, providerId, enabled, isDefault], map: "idx_model_registry_profiles_tenant_provider")
+  @@map("model_registry_profiles")
+}
+
+model StudioCorrectionSignal {
+  id                String  @id
+  tenantId          String  @default("local-default") @map("tenant_id")
+  projectId         String  @map("project_id")
+  correctionKind    String  @map("correction_kind")
+  signatureKey      String  @map("signature_key")
+  fromValue         String? @map("from_value")
+  toValue           String? @map("to_value")
+  skillId           String? @map("skill_id")
+  hitCount          Int     @default(1) @map("hit_count")
+  escalatedLedgerId String? @map("escalated_ledger_id")
+  firstSeenAt       BigInt  @map("first_seen_at")
+  lastSeenAt        BigInt  @map("last_seen_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, projectId, signatureKey])
+  @@index([tenantId, projectId, lastSeenAt], map: "idx_studio_correction_signals_tenant_project")
+  @@map("studio_correction_signals")
+}
+
+model BrandProposalSnapshot {
+  id             String @id @default(uuid())
+  tenantId       String @default("local-default") @map("tenant_id")
+  projectId      String @map("project_id")
+  proposalId     String @map("proposal_id")
+  proposalJson   String @map("proposal_json")
+  themeModesJson String @default("[]") @map("theme_modes_json")
+  isSelected     Int    @default(0) @map("is_selected")
+  createdAt      BigInt @map("created_at")
+
+  @@index([tenantId, projectId, createdAt], map: "idx_brand_proposal_snapshots_tenant_proj")
+  @@map("brand_proposal_snapshots")
+}
+
+model HeritageDesignPack {
+  id                    String @id @default(uuid())
+  tenantId              String @default("local-default") @map("tenant_id")
+  name                  String
+  sourceProjectId       String @map("source_project_id")
+  entryMode             String @default("GREENFIELD") @map("entry_mode")
+  brandIdentityJson     String @default("{}") @map("brand_identity_json")
+  componentRegistryJson String @default("{}") @map("component_registry_json")
+  presentationThemeJson String @default("{}") @map("presentation_theme_json")
+  themeModesJson        String @default("[]") @map("theme_modes_json")
+  createdAt             BigInt @map("created_at")
+
+  @@index([tenantId, sourceProjectId, createdAt], map: "idx_heritage_design_packs_tenant_src")
+  @@map("heritage_design_packs")
+}
+
+model HiddenSpecDocument {
+  id              String @id @default(uuid())
+  tenantId        String @default("local-default") @map("tenant_id")
+  projectId       String @map("project_id")
+  specKey         String @map("spec_key")
+  revision        BigInt @default(1)
+  contentSha256   String @map("content_sha256")
+  contentMarkdown String @default("") @map("content_markdown")
+  updatedAt       BigInt @map("updated_at")
+
+  @@unique([tenantId, projectId, specKey])
+  @@index([tenantId, projectId, specKey], map: "idx_hidden_spec_documents_tenant_proj")
+  @@map("hidden_spec_documents")
 }

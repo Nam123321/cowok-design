@@ -14,14 +14,13 @@ import {
   PalettePickerPopover,
   QaAuditPopover,
 } from "./StudioToolbarPopovers";
-import {
-  STUDIO_MODE_OPTIONS,
-  type StudioAudienceMode,
-  type StudioChartType,
-  type StudioInteractionMode,
-  type StudioPaletteId,
-  type StudioQaIssue,
-  type StudioViewState,
+import type {
+  StudioAudienceMode,
+  StudioChartType,
+  StudioInteractionMode,
+  StudioPaletteId,
+  StudioQaIssue,
+  StudioViewState,
 } from "./types";
 
 export interface StudioCanvasToolbarProps {
@@ -40,6 +39,7 @@ export interface StudioCanvasToolbarProps {
   onFrameChange: (preset: StageshowFramePreset) => void;
   onToggleAudienceMode: () => void;
   onAutoFixQa: () => void;
+  tier3Strip?: React.ReactNode;
 }
 
 type OpenPopover = "chart" | "palette" | "qa" | null;
@@ -107,28 +107,49 @@ function subStateBtnStyle(active: boolean): React.CSSProperties {
   };
 }
 
+const DashboardPinIconButton: React.FC<{ active: boolean; pinCount: number; onClick: () => void }> = ({ active, pinCount, onClick }) => {
+  const { t } = useTranslation();
+  const label = `${t("comments.drawerTitle", "Bình luận ghim trên phần tử")} (${pinCount})`;
+  return (
+    <button
+      type="button" data-testid="studio-mode-pin" aria-pressed={active} title={label} aria-label={label} onClick={onClick}
+      style={{ ...modeButtonStyle(active), width: "26px", padding: 0, justifyContent: "center" }}
+    >
+      <BrandIcon name="message-square" size={ICON_SM} color="currentColor" />
+      {pinCount > 0 && (
+        <span data-testid="studio-mode-pin-count" style={{ position: "absolute", top: "-4px", right: "-4px", minWidth: "13px", height: "13px", padding: "0 3px", borderRadius: "999px", fontSize: "8.5px", fontWeight: FONT_WEIGHT_BOLD, backgroundColor: "var(--action-primary)", color: "var(--action-primary-fg)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+          {pinCount}
+        </span>
+      )}
+    </button>
+  );
+};
+
 const RowOneCanvasModes: React.FC<{
   mode: StudioInteractionMode;
   pinCount: number;
   onModeChange: (m: StudioInteractionMode) => void;
-}> = ({ mode, pinCount, onModeChange }) => (
-  <div role="radiogroup" aria-label="Chế độ tương tác Canvas" style={{ display: "inline-flex", alignItems: "center", gap: "4px", flexWrap: "nowrap" }}>
-    {STUDIO_MODE_OPTIONS.map((opt) => {
-      const active = opt.id === mode;
-      return (
-        <button key={opt.id} type="button" role="radio" aria-checked={active} data-testid={`studio-mode-${opt.id}`} onClick={() => onModeChange(opt.id)} style={modeButtonStyle(active)}>
-          <BrandIcon name={opt.icon} size={ICON_SM} color="currentColor" />
-          <span>{opt.label}</span>
-          {opt.id === "pin" && pinCount > 0 && (
-            <span data-testid="studio-mode-pin-count" style={{ padding: "0 4px", borderRadius: "999px", fontSize: "9px", fontWeight: FONT_WEIGHT_BOLD, backgroundColor: active ? "var(--bg-surface)" : "var(--action-primary)", color: active ? "var(--action-primary)" : "var(--action-primary-fg)" }}>
-              {pinCount}
-            </span>
-          )}
-        </button>
-      );
-    })}
-  </div>
-);
+}> = ({ mode, pinCount, onModeChange }) => {
+  const { t } = useTranslation();
+  const isSelecting = mode === "select";
+  const isText = mode === "text";
+  const isPin = mode === "pin";
+  const toggleLabel = isSelecting ? t("canvas.modeSelectRegion", "Chọn vùng") : t("canvas.modeInteractShort", "Tương tác");
+  const toggleTooltip = t("canvas.modeToggleTooltip", "Tương tác ↔ Chọn vùng: nhấn để click phần tử hoặc kéo vùng (>=16x16px) vào bình luận/chat (Phím tắt C)");
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", flexWrap: "nowrap" }}>
+      <button type="button" data-testid={isSelecting ? "studio-mode-interact" : "studio-mode-select"} aria-pressed={isSelecting} title={toggleTooltip} onClick={() => onModeChange(isSelecting ? "interact" : "select")} style={modeButtonStyle(isSelecting)}>
+        <BrandIcon name={isSelecting ? "crosshair" : "cursor-click"} size={ICON_SM} color="currentColor" />
+        <span>{toggleLabel}</span>
+      </button>
+      <button type="button" data-testid="studio-mode-text" aria-pressed={isText} title="Sửa trực tiếp tiêu đề / chú thích trên canvas" onClick={() => onModeChange(isText ? "interact" : "text")} style={modeButtonStyle(isText)}>
+        <BrandIcon name="edit-3" size={ICON_SM} color="currentColor" />
+        <span>Sửa chữ</span>
+      </button>
+      <DashboardPinIconButton active={isPin} pinCount={pinCount} onClick={() => onModeChange(isPin ? "interact" : "pin")} />
+    </div>
+  );
+};
 
 const RowTwoSubStateAndViewport: React.FC<{
   viewState: StudioViewState;
@@ -214,6 +235,11 @@ export const StudioCanvasToolbar: React.FC<StudioCanvasToolbarProps> = (props) =
         </div>
       </div>
       <RowTwoSubStateAndViewport viewState={props.viewState} framePreset={props.framePreset} onViewStateChange={props.onViewStateChange} onFrameChange={props.onFrameChange} />
+      {props.tier3Strip && (
+        <div data-testid="studio-toolbar-tier3" style={{ ...ROW_STYLE, borderTop: "1px solid var(--border-subtle)", paddingTop: "3px" }}>
+          {props.tier3Strip}
+        </div>
+      )}
     </div>
   );
 };

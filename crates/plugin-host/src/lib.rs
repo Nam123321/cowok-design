@@ -14,6 +14,7 @@ pub mod repackager;
 pub mod staging;
 pub mod tool_jail;
 pub mod triangle_linter;
+pub mod unified_catalog;
 pub mod user_skill_packager;
 pub mod validator;
 
@@ -27,10 +28,10 @@ pub use de_tools::{
     GET_ARTIFACT_MAX_FILES,
 };
 pub use default_mount::{
-    mount_default_design_craft_plugin, DefaultMountError, DesignCraftCapabilities,
-    DesignCraftDefaultMount, DesignCraftPluginManifest, MountedSkillSummary, OptionalPeerSpec,
-    DESIGN_CRAFT_HOST_ID, DESIGN_CRAFT_PLUGIN_NAME, DESIGN_CRAFT_RELATIVE_DIR,
-    DESIGN_CRAFT_SPEC_STANDARD, REQUIRED_AGENTS, REQUIRED_BUILDER_TOOLS,
+    mount_default_design_craft_plugin, mount_design_craft_bundle_at, DefaultMountError,
+    DesignCraftCapabilities, DesignCraftDefaultMount, DesignCraftPluginManifest,
+    MountedSkillSummary, OptionalPeerSpec, DESIGN_CRAFT_HOST_ID, DESIGN_CRAFT_PLUGIN_NAME,
+    DESIGN_CRAFT_RELATIVE_DIR, DESIGN_CRAFT_SPEC_STANDARD, REQUIRED_AGENTS, REQUIRED_BUILDER_TOOLS,
     REQUIRED_HOST_UPGRADE_KEYS, REQUIRED_QC_AUDIT_TOOLS,
 };
 pub use learn_filter::{
@@ -76,6 +77,12 @@ pub use repackager::{
 pub use staging::{ensure_safe_dir_no_symlink, validate_staged_prompt_content, PerRunStager};
 pub use triangle_linter::{
     auto_fix_issues, check_geometric_and_wcag_rules, scan_slop_and_tells, TriangleLinter,
+};
+pub use unified_catalog::{
+    SkillMatchResult, SkillSourceBucket, UnifiedCatalogError, UnifiedSkillCatalog,
+    UnifiedSkillCatalogSnapshot, UnifiedSkillEntry, CANONICAL_DESIGN_CRAFT_RELATIVE_DIR,
+    HOST_SKILLS_RELATIVE_DIR, MAX_SKILL_BYTES, MAX_TIER1_SKILL_TOKENS,
+    UPSTREAM_SKILLS_RELATIVE_DIR,
 };
 pub use validator::{
     estimate_token_count, parse_and_validate_skill_frontmatter, validate_skill_frontmatter,

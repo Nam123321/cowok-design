@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-05"
 title: "Epic 05: Option 5 2D Storyboard, Cognitive Sketch-to-Polish, Shared lol_html & 3-Tier Auto Flow DAG"
-status: in-progress
+status: completed
 track: "Stream-2"
 wave: 3
 provides: ["Option 5 2D Storyboard", "Entry-First Live HTML Stage", "Per-Node ChangeProposal & cowok-design-diff", "Turn Snapshots & Real GitHub PR Pipeline", "Cognitive Sketch-to-Polish (sketch-paper -> Brand Swap)", "Shared lol_html + reconcile_ff_ids Surgical Editing", "3-Tier Simulate-User & FMEA Auto Flow DAG"]
@@ -179,23 +179,13 @@ flowchart TD
 | [Story-05.1](./Story-05.1/story.md) | Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11) | 04.5 | completed |
 | [Story-05.2](./Story-05.2/story.md) | Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup | 05.1 | completed |
 | [Story-05.3](./Story-05.3/story.md) | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | 05.2 | completed |
-| [Story-05.4](./Story-05.4/story.md) | Cognitive Sketch-to-Polish, Steering Chips, Shared `lol_html` + `reconcile_ff_ids` Surgical Editing & 2-Tier Auto-Apply | 05.1, 05.2, 06.2, 02.4 | refactored |
-| [Story-05.5](./Story-05.5/story.md) | End-to-End `/simulate-user` (8D) & `/edge-case-guardian` (FMEA) -> 3-Tier Interactive Flow DAG | 05.1, 05.4, 09.2 | refactored |
+| [Story-05.4](./Story-05.4/story.md) | Cognitive Sketch-to-Polish, Steering Chips, Shared `lol_html` + `reconcile_ff_ids` Surgical Editing & 2-Tier Auto-Apply | 05.1, 05.2, 06.2, 02.4 | completed |
+| [Story-05.5](./Story-05.5/story.md) | End-to-End `/simulate-user` (8D) & `/edge-case-guardian` (FMEA) -> 3-Tier Interactive Flow DAG | 05.1, 05.4, 09.2 | completed |
+| [Story-05.6](./Story-05.6/story.md) | Phase 2 Brand & Component Visual Studio, User-Driven Multi-Mode Themes, `[5.26] StudioDrawerShell`, Bidirectional Hidden Spec Drawer & FE Data Contract | 05.4, 05.5, 02.4 | completed |
 
-## Layer Documents
+## Layer Documents & Retrospective
 - [Layer-Epic-FE](./layer-epic-fe.md)
 - [Layer-Epic-DB](./layer-epic-db.md)
 - [Layer-Epic-API](./layer-epic-api.md)
 - [Contract Claims](./contract_claims.yaml)
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11) | 04.5 | completed |
-| [Story-05.2](./Story-05.2/story.md) | Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup | 05.1 | completed |
-| [Story-05.3](./Story-05.3/story.md) | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | 05.2 | completed |
-| Story ID | Title | Dependencies | Status |
-|---|---|---|---|
-| [Story-05.1](./Story-05.1/story.md) | Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11) | 04.5 | completed |
-| [Story-05.2](./Story-05.2/story.md) | Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup | 05.1 | completed |
-| [Story-05.3](./Story-05.3/story.md) | Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17) | 05.2 | completed |
-| [Story-05.4](./Story-05.4/story.md) | Cognitive Sketch-to-Polish, Steering Chips, Shared `lol_html` + `reconcile_ff_ids` Surgical Editing & 2-Tier Auto-Apply | 05.1, 05.2, 06.2, 02.4 | refactored |
-| [Story-05.5](./Story-05.5/story.md) | End-to-End `/simulate-user` (8D) & `/edge-case-guardian` (FMEA) -> 3-Tier Interactive Flow DAG | 05.1, 05.4, 09.2 | refactored |
+- [Epic 05 Retrospective](./retrospective.md)

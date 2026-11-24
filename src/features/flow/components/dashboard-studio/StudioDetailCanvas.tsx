@@ -1,6 +1,13 @@
 // @story 06.5
 // @implements AC-02, AC-03, AC-04, AC-05 (Interactive HTML/SVG Right Detail Dashboard Canvas v2 with 5 Storytelling Patterns)
 import React, { useMemo, useState } from "react";
+import {
+  StudioMarqueeOverlay,
+  StudioSpatialActionBar,
+  useStudioMarqueeSelection,
+  type StudioSpatialCoreAction,
+  type StudioSpatialTarget,
+} from "../../../../components/ui/studio-drawer";
 import { useTranslation } from "../../../../hooks/useTranslation";
 import type { StageshowFramePreset } from "../../../../lib/validations/deck-generation";
 import { StudioCanvasToolbar } from "./StudioCanvasToolbar";
@@ -51,6 +58,8 @@ export interface StudioDetailCanvasProps {
   onAskAiExplainRow: (row: StudioDataRow) => void;
   onApplyWhatIf: (rowId: string, deltaPct: number) => void;
   onRevertToSource: () => void;
+  onFocusSubChat?: (prefill: string) => void;
+  onCommentSubmitted?: (targetLabel: string, commentText: string, pinNum: number) => void;
 }
 
 const PIN_MIN_X = 8;
@@ -159,16 +168,14 @@ const CanvasFrameBody: React.FC<{
   );
 };
 
-export const StudioDetailCanvas: React.FC<StudioDetailCanvasProps> = (props) => {
-  const [activePinId, setActivePinId] = useState<string | null>(null);
-  const snap = props.snapshot;
-  const qaIssues = useMemo(() => runHonestDataQaAudit(snap), [snap]);
-  const activeRow = useMemo(() => snap.rows.find((r) => r.id === props.highlightedRowId) ?? null, [snap.rows, props.highlightedRowId]);
-  const hasCallout = Boolean(activeRow && snap.callouts.some((c) => c.rowId === activeRow.id));
-
+function useDashboardStageSpatialHandlers(
+  props: StudioDetailCanvasProps,
+  setActivePinId: (id: string | null) => void,
+  setSpatialTarget: (t: StudioSpatialTarget | null) => void
+) {
   const handleChartStageClick = (ev: React.MouseEvent<HTMLDivElement>) => {
     if (props.interactionMode === "pin") {
-      const pin = buildCommentPinFromClick(ev, snap.pins);
+      const pin = buildCommentPinFromClick(ev, props.snapshot.pins);
       props.onAddPin(pin);
       setActivePinId(pin.id);
       return;
@@ -176,21 +183,53 @@ export const StudioDetailCanvas: React.FC<StudioDetailCanvasProps> = (props) => 
     props.onSelectElement("main-chart-panel");
   };
 
+  const handleSpatialAction = (action: StudioSpatialCoreAction, target: StudioSpatialTarget) => {
+    if (action === "comment") {
+      const pin: StudioCommentPin = { id: `pin-${Date.now()}`, num: props.snapshot.pins.length + 1, xPct: PIN_FALLBACK_X, yPct: PIN_FALLBACK_Y, text: "", targetFfId: target.ffId };
+      props.onAddPin(pin);
+      setActivePinId(pin.id);
+    } else if (action === "ask-subchat") props.onFocusSubChat?.(`Tinh chỉnh ${target.label ?? target.ffId}: `);
+    else if (action === "edit") props.onModeChange("text");
+    else props.onSelectElement(target.ffId);
+    setSpatialTarget(null);
+  };
+
+  const handleSubmitSpatialComment = (target: StudioSpatialTarget, commentText: string) => {
+    const nextNum = props.snapshot.pins.length + 1;
+    props.onAddPin({ id: `pin-${Date.now()}-${nextNum}`, num: nextNum, xPct: PIN_FALLBACK_X, yPct: PIN_FALLBACK_Y, text: commentText, targetFfId: target.ffId });
+    props.onCommentSubmitted?.(target.label ?? target.ffId, commentText, nextNum);
+    setSpatialTarget(null);
+  };
+
+  return { handleChartStageClick, handleSpatialAction, handleSubmitSpatialComment };
+}
+
+export const StudioDetailCanvas: React.FC<StudioDetailCanvasProps> = (props) => {
+  const [activePinId, setActivePinId] = useState<string | null>(null);
+  const [spatialTarget, setSpatialTarget] = useState<StudioSpatialTarget | null>(null);
+  const snap = props.snapshot;
+  const qaIssues = useMemo(() => runHonestDataQaAudit(snap), [snap]);
+  const activeRow = useMemo(() => snap.rows.find((r) => r.id === props.highlightedRowId) ?? null, [snap.rows, props.highlightedRowId]);
+  const hasCallout = Boolean(activeRow && snap.callouts.some((c) => c.rowId === activeRow.id));
+  const { handleChartStageClick, handleSpatialAction, handleSubmitSpatialComment } = useDashboardStageSpatialHandlers(props, setActivePinId, setSpatialTarget);
+  const marquee = useStudioMarqueeSelection({
+    pointerMode: props.interactionMode === "select" ? "select-region" : "interact",
+    onSelectTarget: (target) => { props.onSelectElement(target.ffId); setSpatialTarget(target); },
+  });
+
   return (
     <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", backgroundColor: "var(--bg-canvas)", overflow: "hidden" }}>
       <StudioCanvasToolbar
-        chartType={snap.chartType} paletteId={snap.paletteId} interactionMode={props.interactionMode}
-        viewState={snap.viewState} framePreset={snap.framePreset} audienceMode={snap.audienceMode}
-        pinCount={snap.pins.length} qaIssues={qaIssues}
-        onChartTypeChange={(chartType) => props.onCommitPatch({ chartType })}
-        onPaletteChange={(paletteId) => props.onCommitPatch({ paletteId })}
-        onModeChange={props.onModeChange} onViewStateChange={(viewState) => props.onCommitPatch({ viewState })}
-        onFrameChange={(framePreset) => props.onCommitPatch({ framePreset })}
+        chartType={snap.chartType} paletteId={snap.paletteId} interactionMode={props.interactionMode} viewState={snap.viewState}
+        framePreset={snap.framePreset} audienceMode={snap.audienceMode} pinCount={snap.pins.length} qaIssues={qaIssues}
+        onChartTypeChange={(chartType) => props.onCommitPatch({ chartType })} onPaletteChange={(paletteId) => props.onCommitPatch({ paletteId })}
+        onModeChange={props.onModeChange} onViewStateChange={(viewState) => props.onCommitPatch({ viewState })} onFrameChange={(framePreset) => props.onCommitPatch({ framePreset })}
         onToggleAudienceMode={() => props.onCommitPatch({ audienceMode: snap.audienceMode === "ceo" ? "analyst" : "ceo" })}
-        onAutoFixQa={props.onAutoFixQa}
+        onAutoFixQa={props.onAutoFixQa} tier3Strip={<AiLensStrip activeLens={snap.activeLens} onApplyLens={props.onApplyAiLens} />}
       />
-      <div data-testid="studio-detail-canvas" style={{ flex: 1, overflowY: "auto", padding: "12px 14px" }}>
-        <AiLensStrip activeLens={snap.activeLens} onApplyLens={props.onApplyAiLens} />
+      <div ref={marquee.containerRef} data-testid="studio-detail-canvas" onMouseDown={marquee.handleCanvasMouseDown} onContextMenu={marquee.handleCanvasContextMenu} style={{ flex: 1, overflowY: "auto", padding: "12px 14px", position: "relative", userSelect: props.interactionMode === "select" ? "none" : "auto" }}>
+        <StudioMarqueeOverlay rect={marquee.marqueeRect} />
+        <StudioSpatialActionBar target={spatialTarget} onCoreAction={handleSpatialAction} onSubmitComment={handleSubmitSpatialComment} onClose={() => setSpatialTarget(null)} />
         <div style={getFrameContainerStyle(snap.framePreset)}>
           <WindowFrameChrome preset={snap.framePreset} title={snap.title} />
           <CanvasFrameBody props={props} activeRow={activeRow} hasCallout={hasCallout} activePinId={activePinId} setActivePinId={setActivePinId} onChartStageClick={handleChartStageClick} />

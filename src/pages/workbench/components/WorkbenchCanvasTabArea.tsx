@@ -13,6 +13,11 @@ import { ErrorBoundary } from "../../../components/ui/ErrorBoundary";
 import { findOrphanNodes } from "../../../features/flow/utils/graph-analysis";
 import { VisualClarificationModal } from "../../../features/sdi/components/VisualClarificationModal";
 import {
+  BrandVisualStudioModal,
+  HiddenSpecDrawer,
+  useBrandStudioController,
+} from "../../../features/brand-studio";
+import {
   LockedRuleChangeReceiptCard,
   StageSkinToggleBar,
   SteeringChipsBar,
@@ -177,9 +182,9 @@ const COMPACT_TOOLBAR_STRIP_STYLE: React.CSSProperties = {
   flexWrap: "nowrap",
   alignItems: "center",
   justifyContent: "space-between",
-  gap: "6px",
+  gap: "4px",
   height: "34px",
-  padding: "0 10px",
+  padding: "0 8px",
   boxSizing: "border-box",
   position: "relative",
   overflow: "visible",
@@ -264,7 +269,8 @@ const SteeringChipsPopover: React.FC<{
 
 const SketchPolishToolbarStrip: React.FC<{
   polish: ReturnType<typeof useSketchPolishController>;
-}> = ({ polish }) => (
+  brandStudio: ReturnType<typeof useBrandStudioController>;
+}> = ({ polish, brandStudio }) => (
   <div className="sp-toolbar-strip" data-testid="sketch-polish-strip" style={COMPACT_TOOLBAR_STRIP_STYLE}>
     <StageSkinToggleBar
       skin={polish.stageSkin}
@@ -277,6 +283,8 @@ const SketchPolishToolbarStrip: React.FC<{
       oklchWarning={polish.oklchWarning}
       lastSwapMs={polish.lastSwapMs}
       onOpenClarify={polish.handleAdvanceToStyle}
+      onOpenBrandStudio={brandStudio.openStudio}
+      onOpenHiddenSpecs={brandStudio.openHiddenSpec}
     />
     <SteeringChipsPopover polish={polish} />
   </div>
@@ -290,6 +298,11 @@ export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = ({
 }) => {
   const { t, locale } = useTranslation();
   const [isDeploying, setIsDeploying] = useState(false);
+  const [appliedBrandStage, setAppliedBrandStage] = useState<{
+    proposalId: string;
+    modeId: string;
+    cssVars: Record<string, string>;
+  } | null>(null);
   const handleDeployDraft = async () => { if (!isDeploying) { setIsDeploying(true); try { await store.syncDeployDraft(projectId); } finally { setIsDeploying(false); } } };
   const handleSynthesizedFlow = (plan: SynthesizedFlowPlan) => {
     const mapped = mapSynthesizedPlanToWorkbenchGraph(plan);
@@ -301,17 +314,54 @@ export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = ({
     screenId: state.selectedNodeId || state.nodes[0]?.id || "default",
     locale: locale === "vi" ? "vi" : "en",
   });
+  const brandStudio = useBrandStudioController({
+    projectId,
+    screenId: state.selectedNodeId || state.nodes[0]?.id || "default",
+    locale: locale === "vi" ? "vi" : "en",
+    initialThemeModes: polish.themeModes,
+    onApplyBrandTokens: (proposal, activeModeId) => {
+      const mode = proposal.themeModes.find((m) => m.modeId === activeModeId) ?? proposal.themeModes[0];
+      const cssVars: Record<string, string> = {
+        ...(mode?.tokens ?? {}),
+        "--font-heading": proposal.fontPairing.heading,
+        "--font-body": proposal.fontPairing.body,
+        "--font-mono": proposal.fontPairing.mono,
+      };
+      setAppliedBrandStage({ proposalId: proposal.id, modeId: activeModeId, cssVars });
+      polish.handleChangeSkin("brand-color", cssVars);
+    },
+    onSyncToMainChat: (summaryText) => {
+      onAddQuoteChip?.(summaryText);
+    },
+  });
   const isDeckFocus = activeTabId.includes("slide") || activeTabId.includes("deck");
-  const sketchPolishBarNode = isDeckFocus ? null : <SketchPolishToolbarStrip polish={polish} />;
+  const sketchPolishBarNode = isDeckFocus ? null : (
+    <SketchPolishToolbarStrip polish={polish} brandStudio={brandStudio} />
+  );
+  const stageMainStyle: React.CSSProperties = {
+    flex: 1,
+    minWidth: 0,
+    height: "100%",
+    overflow: "hidden",
+    position: "relative",
+    backgroundColor: "var(--bg-canvas)",
+    ...(appliedBrandStage?.cssVars as React.CSSProperties | undefined),
+  };
 
   return (
-    <main style={{ flex: 1, minWidth: 0, height: "100%", overflow: "hidden", position: "relative", backgroundColor: "var(--bg-canvas)" }}>
+    <main
+      data-brand-proposal={appliedBrandStage?.proposalId}
+      data-brand-mode={appliedBrandStage?.modeId}
+      style={stageMainStyle}
+    >
       <CompanionCanvasTab projectId={projectId} sessionId={sessionId} sessionEntryKind={sessionEntryKind} activeTabId={activeTabId} onTabChange={onTabChange} selectedNodeId={state.selectedNodeId} onSelectNode={(id) => store.selectNode(id, false)} nodes={state.nodes} isDraftDirty={state.isDraftDirty} orphanCount={orphanCount} conflictState={state.conflictState} canUndo={(state.undoStack?.length || 0) > 0} canRedo={(state.redoStack?.length || 0) > 0} onUndo={() => store.undo()} onRedo={() => store.redo()} onResolveConflict={(c) => { void store.resolveConflict(c); }} onDeployDraft={() => { void handleDeployDraft(); }} onDiscardDraft={() => store.discardDraft()} onAttachRegionToChat={onCommentOnNode} onQuoteText={onAddQuoteChip} onSelectNodeSubState={(nid, sub) => store.setNodeSubState(nid, sub)} proposalController={proposalController} stageSkin={polish.stageSkin} sketchPolishBarNode={sketchPolishBarNode} onRegisterStageSkinSwap={polish.onRegisterStageSkinSwap} onRegisterStageApplyHtml={polish.onRegisterStageApplyHtml} onLockedRuleReceipt={polish.handleLockedRuleNotice}>
         <ErrorBoundary fallbackTitle={t("errors.dagCanvasRender", "Lỗi hiển thị Canvas 2D DAG")} onReset={() => store.discardDraft()}>
           <DagCanvas2D state={state} projectId={projectId} sessionId={sessionId} onUpdatePosition={graphHandlers.handleUpdatePosition} onSetViewport={graphHandlers.handleSetViewport} onSelectNode={(id, multi) => store.selectNode(id, multi)} onSelectTransition={(id) => store.selectTransition(id)} onAddNode={graphHandlers.handleAddNode} onAutoLayout={() => store.autoLayoutNodes()} onSelectSubState={(id, sub) => store.setNodeSubState(id, sub)} onDuplicateNode={(id) => store.duplicateNode(id)} onRenameNode={(id, title) => store.renameNode(id, title)} onDeleteNode={(id) => store.deleteNode(id)} onAddTransition={graphHandlers.handleAddTransition} onUpdateTransition={(id, u) => store.updateTransition(id, u)} onReverseTransition={graphHandlers.handleReverseTransition} onDeleteTransition={(id) => store.deleteTransition(id)} onUpdateNodeNote={(id, note) => store.updateNodeNote(id, note)} onToggleMinimap={() => store.toggleMinimap()} onUndo={() => store.undo()} onRedo={() => store.redo()} onCommentOnNode={onCommentOnNode} onSynthesizedFlow={handleSynthesizedFlow} />
         </ErrorBoundary>
       </CompanionCanvasTab>
       <SketchPolishOverlayModals polish={polish} />
+      <BrandVisualStudioModal controller={brandStudio} />
+      <HiddenSpecDrawer controller={brandStudio} />
       <FloatingChatOverlay
         visible={isLeftChatCollapsed}
         activeTabId={activeTabId}

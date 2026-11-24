@@ -37,13 +37,16 @@ Tách bạch tuyệt đối 3 vùng sở hữu tri thức để chấm dứt spl
    - Lưu nguyên bản byte-for-byte các repo cộng đồng có giấy phép mở hợp lệ kèm tệp metadata mỏng `upstream.json` (khai báo `repoUrl`, `pinnedCommit`, `license`, `cronSchedule`) để **Story `08.4` GitHub Cron Sync Scheduler** tự động quét cập nhật.
    - Gói tiên phong: `abdiraimov-otabek/dashboard-design-skill` (MIT, pinned `a31edee`, Cron `0 0 3 * * *`).
 
-### 2.2. Chuẩn hóa Layer 1 Data Storytelling & Chart/Dashboard Studio (`FR-34`)
-- Kết hợp 2 lớp tri thức chuẩn `agentskills.io`:
-  - **Upstream Verbatim Peer:** `dashboard-design` (bố cục dashboard executive, grid hierarchy, anti-clutter rules, 10 references + 3 HTML examples).
-  - **Canonical Storytelling Skill:** `data-viz-storyteller v2.0` (`SKILL.md <= 100 tok` frontmatter) + 3 tài liệu tham chiếu nạp lười (Tier-3 JIT):
-    - `references/storytelling-arc.md` (Action Title, 3-Act Arc `Context -> Tension -> Resolution`, `CEO 3s` vs `Analyst` mode).
-    - `references/chart-selection-matrix.md` (Ma trận chọn 10 hình thái biểu đồ & cấm dùng Pie/Donut khi `>5` lát hoặc tổng lệch `100 ± 0.05`).
-    - `references/html-canvas-contract.md` (Hợp đồng `data-ff-id`, Light/Dark AAA CSS variables, Zero-CDN CSP-B SVG).
+### 2.2. Chuẩn hóa Layer 1 Data Storytelling, Semantic Role Contract & Triết lý Minimum Floor cho Toàn Bộ Skills (`FR-34`, `FR-39`)
+- **Hiến chương Kỹ năng & Tài liệu Tham chiếu (Zero Hardcode, Zero Hardlink, Minimum Floor — Never Maximum Ceiling):**
+  - **Zero Hardcode / Zero Domain Leak:** Mọi `SKILL.md` và `references/*.md` tuyệt đối không khóa cứng ID nghiệp vụ demo (như `kpi-revenue-card`, `Q4 Revenue`), không hardcode mã màu hex, không chốt cứng tên token CSS mâu thuẫn nhau giữa các skill (`--surface-primary` vs `--bg-surface`), và không chốt con số tĩnh lỗi thời trong prompt (`67 styles`, `50 palettes`, `24 verbs`, `1280x720`) — luôn đọc động từ `tokens.css` / catalog hoặc đặt sàn `>= N`.
+  - **Zero Hardlink / Standalone Purity:** Mọi skill thuộc `packages/design-craft/` phải tự khép kín 100% (không trỏ sang thư mục legacy `packages/builtin-skills/skills/` như 3 liên kết đứt `flow-state-completer`, `reference-design-contract`, `self-healing-eval-gate` trước đó; không dùng đường dẫn tuyệt đối `/Users/...` hay `../../`).
+  - **Minimum Floor, Never Maximum Ceiling:** Mọi skill chia rõ 3 tầng: (1) *Non-Negotiable Minimum Floor* (`>= N` tiêu chuẩn trung thực/an toàn bắt buộc), (2) *Recommended Core Patterns*, và (3) *Open-Ended Extensible Palette* trao quyền cho Agent tự do suy diễn và sáng tạo thêm pattern mới phù hợp với đặc thù dữ liệu/domain.
+  - **Progressive Disclosure Đạt Chuẩn (Loại bỏ Stub 9 dòng):** Nâng cấp 7 Craft Skills đang ở dạng stub 9 dòng (`archify-diagram`, `dashboard-ux`, `impeccable-polish`, `oklch-palette`, `sketch-monochrome`, `stageshow-slide`, `typography`) thành `SKILL.md` (`<= 100 tok` frontmatter) + `references/*.md` chuyên sâu (và hợp nhất 4 cặp skill trùng ngữ nghĩa với thư mục legacy `skills/`).
+- **Nâng cấp `data-viz-storyteller v2.1` (3-Tier Semantic Role & Full 5+8 Storytelling Patterns):**
+  - **Upstream Verbatim Peer:** `dashboard-design` (MIT nguyên bản, 10 references + 3 HTML examples, auto-sync Cron `08.4`).
+  - **Semantic Role HTML Contract (`references/html-canvas-contract.md`):** Thay thế 5 anchor hardcode demo bằng hợp đồng vai trò ngữ nghĩa bất biến theo domain (`data-ff-role="action-title | kpi-card | chart-panel | data-datum | annotation-callout | breakdown-panel | provenance-footnote"`, `data-row-id`, `data-whatif-handle`, `data-ff-callout-for`, `data-ff-compare-pair`, `data-audience-mode="ceo-3s | detailed"`), kèm bảng chuẩn **5 quy tắc Honest & Wordless Auto-Fix + Undo** và bất biến `sourceRows` divergence.
+  - **Narrative & Extensible Pattern Catalog (`references/storytelling-arc.md` & `chart-selection-matrix.md`):** Phủ đủ **5 Core UX Patterns** (`AI Lens Strip >= 3`, `Contextual Point Actions 1-điểm & 2-điểm`, `Honest & Wordless 1-Click Auto-Fix`, `What-If Scenario Drag + Divergence Banner + Save Slide`, `Audience Mode CEO 3s ⇄ Chi tiết`) **CỘNG** **8 Extensible Patterns gợi mở** (`Small Multiples`, `Event-Marker / Regime-Shift Bands`, `Cross-Filtering`, `Scrollytelling Reveal`, `Variance Waterfall`, `Distribution & Uncertainty Encoding`, `Slopegraph & Benchmark Bands`, `Interactive Sensitivity Sliders`) — khẳng định rõ Agent có toàn quyền sáng tạo thêm.
 - Khớp 1:1 với bề mặt **Option D v2 Resizable Master-Detail `Studio Biểu đồ & Dashboard`** (`RightDrawer <= 85vw`, Control Plane 2 cấp + Bảng nhập trực tiếp + Divergence Banner + Undo/Redo + Sub-Chat đồng bộ về Main Chat SQLite + Toolbar Canvas hợp nhất 2 hàng).
 
 ### 2.3. Zero-Hardcode AI Harness Spine (`Story 08.7` — Pre-Wave C)

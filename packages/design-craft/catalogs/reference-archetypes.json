@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "1.0",
+  "purpose": "Offline Design-Only fallback archetypes used when optional upstream REA is not installed or network extraction is disabled.",
+  "upstreamPeerId": "rea-upstream",
+  "archetypes": [
+    {
+      "id": "linear-precision",
+      "label": "Linear Precision Workspace",
+      "density": "compact",
+      "visualGrammar": {
+        "borderStyle": "1px hairline subtle dividers",
+        "radiusPx": 6,
+        "baseHue": 265,
+        "accentChroma": 0.14,
+        "typographyPair": {
+          "display": "Inter, system-ui, sans-serif",
+          "body": "Inter, system-ui, sans-serif",
+          "mono": "JetBrains Mono, ui-monospace, monospace"
+        }
+      },
+      "keep": [
+        "keyboard-first list navigation",
+        "hairline surface separation",
+        "compact status badges and tabular numbers"
+      ],
+      "change": [
+        "brand accent hue and semantic palette tokens",
+        "domain terminology and navigation hierarchy"
+      ],
+      "doNotCopy": [
+        "proprietary trademarks, logos, and brand copy",
+        "vendor-specific shortcut marketing artwork"
+      ]
+    },
+    {
+      "id": "stripe-editorial",
+      "label": "Editorial Precision Fintech",
+      "density": "balanced",
+      "visualGrammar": {
+        "borderStyle": "elevated soft shadow + crisp 1px edge",
+        "radiusPx": 10,
+        "baseHue": 248,
+        "accentChroma": 0.17,
+        "typographyPair": {
+          "display": "Plus Jakarta Sans, system-ui, sans-serif",
+          "body": "Inter, system-ui, sans-serif",
+          "mono": "IBM Plex Mono, ui-monospace, monospace"
+        }
+      },
+      "keep": [
+        "high-contrast data hierarchy",
+        "clear visual separation between analytical summaries and operational tables",
+        "generous reading cadence"
+      ],
+      "change": [
+        "color ramp to match target brand",
+        "illustrations, copy, and product domain taxonomy"
+      ],
+      "doNotCopy": [
+        "proprietary mesh gradients or brand emblems",
+        "verbatim marketing headlines"
+      ]
+    },
+    {
+      "id": "editorial-warm-studio",
+      "label": "Warm Editorial Studio",
+      "density": "airy",
+      "visualGrammar": {
+        "borderStyle": "soft tactile borders on paper-warm surfaces",
+        "radiusPx": 12,
+        "baseHue": 58,
+        "accentChroma": 0.12,
+        "typographyPair": {
+          "display": "Fraunces, Georgia, serif",
+          "body": "Source Sans 3, system-ui, sans-serif",
+          "mono": "JetBrains Mono, ui-monospace, monospace"
+        }
+      },
+      "keep": [
+        "editorial serif-to-sans typographic contrast",
+        "calm generous whitespace rhythm",
+        "warm low-glare reading surfaces"
+      ],
+      "change": [
+        "accent hue and surface temperature per user themeModes",
+        "domain content and custom iconography"
+      ],
+      "doNotCopy": [
+        "third-party photography or licensed illustrations",
+        "third-party brand names"
+      ]
+    },
+    {
+      "id": "executive-keynote-16-9",
+      "label": "Executive Keynote 16:9",
+      "density": "presentation",
+      "visualGrammar": {
+        "borderStyle": "minimalist grid alignment without heavy card chrome",
+        "radiusPx": 8,
+        "baseHue": 220,
+        "accentChroma": 0.15,
+        "typographyPair": {
+          "display": "Space Grotesk, system-ui, sans-serif",
+          "body": "Inter, system-ui, sans-serif",
+          "mono": "JetBrains Mono, ui-monospace, monospace"
+        }
+      },
+      "keep": [
+        "single-message-per-slide composition",
+        "large focal KPI numerals with concise annotations",
+        "minimum 30% open canvas whitespace"
+      ],
+      "change": [
+        "theme modes and brand palette",
+        "narrative structure and charts"
+      ],
+      "doNotCopy": [
+        "external corporate templates or logos",
+        "copyrighted slide stock visuals"
+      ]
+    }
+  ]
+}

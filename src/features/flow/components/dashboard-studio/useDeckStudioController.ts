@@ -28,7 +28,12 @@ import {
   computeRowDeltaPct,
   deriveBackendBrief,
   mapFfIdToControlView,
+  runHonestDataQaAudit,
 } from "./studioStorytellingUtils";
+import {
+  detectStudioOverrideCorrection,
+  emitStudioCorrectionNonBlocking,
+} from "./studioCorrectionClient";
 import { applySubChatCommand } from "./studioSubChatEngine";
 import {
   createInitialSnapshot,
@@ -40,8 +45,8 @@ import {
   type SubChatMessage,
   type UploadedFileState,
 } from "./types";
+import { useStudioDrawerLayout } from "../../../../components/ui/studio-drawer";
 import { useStudioHistory } from "./useStudioHistory";
-import { useStudioLayout } from "./useStudioLayout";
 
 export interface ToastNotice {
   tone: CowokToastTone;
@@ -80,15 +85,6 @@ const INITIAL_ASSISTANT_MSG: SubChatMessage = {
   role: "assistant",
   text: "Nhập yêu cầu hoặc chọn điểm trên biểu đồ (VD: 'Chuyển biểu đồ đường', 'Mục tiêu 1200', 'Giải thích Direct').",
 };
-
-function useEscapeClose(isOpen: boolean, onClose: () => void): void {
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKeyDown = (ev: KeyboardEvent) => { if (ev.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isOpen, onClose]);
-}
 
 function useFileAndPasteActions(deps: SourceActionDeps) {
   const { t } = useTranslation();
@@ -215,21 +211,27 @@ function useStudioUiState(initialRows: StudioDataRow[]) {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastNotice | null>(null);
   const [interactionMode, setInteractionMode] = useState<StudioInteractionMode>("interact");
-  const [selectedFfId, setSelectedFfId] = useState<string | null>("kpi-revenue-card");
+  const [selectedFfId, setSelectedFfId] = useState<string | null>("viz-kpi-primary");
   const [controlView, setControlView] = useState<StudioControlView>("general");
   const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
   const [subChatInput, setSubChatInput] = useState("");
+  const [subChatAttachmentChips, setSubChatAttachmentChips] = useState<string[]>([]);
+  const [syncToMainChatEnabled, setSyncToMainChatEnabled] = useState(true);
   const [messages, setMessages] = useState<SubChatMessage[]>([INITIAL_ASSISTANT_MSG]);
   return {
     sourceRows, setSourceRows, pastedData, setPastedData, uploadedFile, setUploadedFile,
     normalizedChart, setNormalizedChart, generatedSummary, setGeneratedSummary,
     submitting, setSubmitting, toast, setToast, interactionMode, setInteractionMode,
     selectedFfId, setSelectedFfId, controlView, setControlView,
-    highlightedRowId, setHighlightedRowId, subChatInput, setSubChatInput, messages, setMessages,
+    highlightedRowId, setHighlightedRowId, subChatInput, setSubChatInput,
+    subChatAttachmentChips, setSubChatAttachmentChips,
+    syncToMainChatEnabled, toggleSyncToMainChat: () => setSyncToMainChatEnabled((v) => !v),
+    messages, setMessages,
   };
 }
 
 function useStorytellingActions(
+  projectId: string,
   history: ReturnType<typeof useStudioHistory>,
   ui: ReturnType<typeof useStudioUiState>,
   dispatchSubChatPrompt: (prompt: string) => void
@@ -247,9 +249,17 @@ function useStorytellingActions(
   }, [history, ui]);
 
   const handleAutoFixQa = useCallback(() => {
+    const issueCount = runHonestDataQaAudit(history.snapshot).length;
+    const chartType = history.snapshot.chartType;
     history.commit((prev) => autoFixHonestDataIssues(prev));
+    emitStudioCorrectionNonBlocking({
+      projectId,
+      correctionKind: "qa_autofix_click",
+      fromValue: `${chartType}-issues-${issueCount}`,
+      toValue: "autofixed",
+    });
     ui.setToast({ tone: "success", message: "Đã chuẩn hóa Action Title, Chiếu điểm & số liệu bằng 1 chạm." });
-  }, [history, ui]);
+  }, [history, projectId, ui]);
 
   const handleToggleCallout = useCallback((row: StudioDataRow) => {
     history.commit((prev) => {
@@ -292,13 +302,27 @@ function useSubChatAndEmbedActions(
     if (res.highlightRowId !== undefined) ui.setHighlightedRowId(res.highlightRowId);
     const stamp = Date.now();
     ui.setMessages((prev) => [...prev, { id: `u-${stamp}`, role: "user", text: prompt, targetFfId: ui.selectedFfId ?? undefined }, { id: `a-${stamp}`, role: "assistant", text: res.reply }]);
-  }, [history, ui]);
+    if (ui.syncToMainChatEnabled) {
+      params.onSyncToMainChat?.(`[Dashboard Studio] ${prompt} → ${res.reply}`);
+    }
+  }, [history, params, ui]);
 
   const handleSubChatSend = useCallback(() => {
-    if (!ui.subChatInput.trim()) return;
-    dispatchSubChatPrompt(ui.subChatInput);
+    const chipCtx = ui.subChatAttachmentChips.length > 0 ? `[${ui.subChatAttachmentChips.join(", ")}] ` : "";
+    const fullPrompt = `${chipCtx}${ui.subChatInput.trim()}`.trim();
+    if (!fullPrompt) return;
+    dispatchSubChatPrompt(fullPrompt);
     ui.setSubChatInput("");
+    ui.setSubChatAttachmentChips([]);
   }, [dispatchSubChatPrompt, ui]);
+
+  const handleAttachSubChatFiles = useCallback((fileNames: string[]) => {
+    ui.setSubChatAttachmentChips((prev) => Array.from(new Set([...prev, ...fileNames])));
+  }, [ui]);
+
+  const handleRemoveSubChatChip = useCallback((chip: string) => {
+    ui.setSubChatAttachmentChips((prev) => prev.filter((c) => c !== chip));
+  }, [ui]);
 
   const handleEmbedIntoSlide = useCallback(() => {
     params.onEmbedIntoActiveSlide?.(buildEmbeddableDashboardHtml(history.snapshot), history.snapshot.title);
@@ -306,17 +330,53 @@ function useSubChatAndEmbedActions(
     ui.setToast({ tone: "success", message: `Đã gắn dashboard "${history.snapshot.title}" vào Slide hiện tại.` });
   }, [history.snapshot, params, ui]);
 
-  return { dispatchSubChatPrompt, handleSubChatSend, handleEmbedIntoSlide };
+  const handleRecordCommentPin = useCallback((targetLabel: string, commentText: string, pinNum: number) => {
+    const trimmed = commentText.trim();
+    if (!trimmed) return;
+    ui.setMessages((prev) => [
+      ...prev,
+      {
+        id: `dc-${Date.now()}-${pinNum}`,
+        role: "user",
+        kind: "comment",
+        pinNumber: pinNum,
+        text: `[${targetLabel}] ${trimmed}`,
+      },
+    ]);
+    if (ui.syncToMainChatEnabled) {
+      params.onSyncToMainChat?.(`[Dashboard Studio · Ghim #${pinNum} · ${targetLabel}] ${trimmed}`);
+    }
+  }, [params, ui]);
+
+  return { dispatchSubChatPrompt, handleSubChatSend, handleAttachSubChatFiles, handleRemoveSubChatChip, handleEmbedIntoSlide, handleRecordCommentPin };
 }
 
 export function useDeckStudioController(params: StudioControllerParams) {
   const initial = useMemo(() => createInitialSnapshot(), []);
   const history = useStudioHistory(initial, params.isOpen);
-  const layout = useStudioLayout();
+  const handleManualPatch = useCallback(
+    (patch: Partial<StudioSnapshot>) => {
+      const prev = history.snapshot;
+      const next: StudioSnapshot = { ...prev, ...patch };
+      // Emit Bridge 1 strictly OUTSIDE the useReducer updater (zero React StrictMode double-fire)
+      // and strictly for explicit manual user UI controls (never AI Lens or SubChat).
+      const override = detectStudioOverrideCorrection(params.projectId, prev, next);
+      if (override) {
+        emitStudioCorrectionNonBlocking({
+          projectId: override.projectId,
+          correctionKind: override.correctionKind,
+          fromValue: override.fromValue,
+          toValue: override.toValue,
+          skillId: override.skillId,
+        });
+      }
+      history.commit((cur) => ({ ...cur, ...patch }));
+    },
+    [history, params.projectId]
+  );
+  const layout = useStudioDrawerLayout();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const ui = useStudioUiState(initial.rows);
-
-  useEscapeClose(params.isOpen, params.onClose);
   const divergence = useMemo(() => computeSourceDivergence(ui.sourceRows, history.snapshot.rows), [ui.sourceRows, history.snapshot.rows]);
   const srcDeps: SourceActionDeps = {
     projectId: params.projectId, snapshot: history.snapshot, commit: history.commit, isDivergent: divergence.isDivergent,
@@ -332,11 +392,11 @@ export function useDeckStudioController(params: StudioControllerParams) {
     setGeneratedSummary: ui.setGeneratedSummary, setNormalizedChart: ui.setNormalizedChart,
     setSubmitting: ui.setSubmitting, setToast: ui.setToast,
   });
-  const { dispatchSubChatPrompt, handleSubChatSend, handleEmbedIntoSlide } = useSubChatAndEmbedActions(params, history, ui);
-  const storyActions = useStorytellingActions(history, ui, dispatchSubChatPrompt);
+  const { dispatchSubChatPrompt, handleSubChatSend, handleAttachSubChatFiles, handleRemoveSubChatChip, handleEmbedIntoSlide, handleRecordCommentPin } = useSubChatAndEmbedActions(params, history, ui);
+  const storyActions = useStorytellingActions(params.projectId, history, ui, dispatchSubChatPrompt);
 
   return {
-    history, layout, fileInputRef, ...ui, divergence,
-    ...fileActions, ...storyActions, handlePreviewChart, handleSubChatSend, handleEmbedIntoSlide, handleSubmit,
+    history, layout, fileInputRef, ...ui, divergence, handleManualPatch,
+    ...fileActions, ...storyActions, handlePreviewChart, handleSubChatSend, handleAttachSubChatFiles, handleRemoveSubChatChip, handleEmbedIntoSlide, handleRecordCommentPin, handleSubmit,
   };
 }

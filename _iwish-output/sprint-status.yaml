@@ -39,13 +39,13 @@ start_date: '2026-07-24'
 "Story 04.6 - SQLite V4/V16 Chat Persistence, CAS Binary/CSV Intake, <svg viewBox> Normalizer & In-Chat Zero-Leak Key Vault": completed
 
 # Epic 05: Option 5 2D Storyboard, Cognitive Sketch-to-Polish, Shared lol_html & 3-Tier Auto Flow DAG
-"Epic 05 - Option 5 2D Storyboard, Cognitive Sketch-to-Polish, Shared lol_html & 3-Tier Auto Flow DAG": in-progress
+"Epic 05 - Option 5 2D Storyboard, Cognitive Sketch-to-Polish, Shared lol_html & 3-Tier Auto Flow DAG": completed
 "Story 05.1 - Project Launchpad (4-Path), Option 5 Action-Linked 2D Storyboard <-> Entry-First 4-SubState HTML, Shared AppShell, Sample Data Studio & Gap-Driven Discovery (GAP-04, GAP-07..11)": completed
 "Story 05.2 - Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup": completed
 "Story 05.3 - Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17)": completed
 "Story 05.4 - Cognitive Sketch-to-Polish, Steering Chips, Shared lol_html + reconcile_ff_ids Surgical Editing & 2-Tier Auto-Apply": completed
 "Story 05.5 - End-to-End /simulate-user (8D) & /edge-case-guardian (FMEA) -> 3-Tier Interactive Flow DAG": completed
-"Story 05.6 - Phase 2 Brand & Component Visual Studio, User-Driven Theme Modes, Bidirectional Hidden Spec Drawer & FE Data Contract": backlog
+"Story 05.6 - Phase 2 Brand & Component Visual Studio, User-Driven Theme Modes, Bidirectional Hidden Spec Drawer & FE Data Contract": completed
 
 # ==================================================
 # Feature Group: VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio
@@ -70,14 +70,14 @@ start_date: '2026-07-24'
 # ==================================================
 
 # Epic 08: agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN
-"Epic 08 - agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN": in-progress
+"Epic 08 - agentskills.io Repackager, Split DE+DR Runtime, 7 Built-in DE Tools, Controlled Tool Jail & LEARN": completed
 "Story 08.1 - Xây dựng Hệ thống Năng lực Mở Đa Trục & Bộ Kỹ năng Built-in chuẩn agentskills.io (packages/builtin-skills & crates/plugin-host)": completed
 "Story 08.2 - Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills)": completed
 "Story 08.3 - Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core)": completed
 "Story 08.4 - SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI": completed
 "Story 08.5 - Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 LEARN Loop": completed
 "Story 08.6 - Standalone Open-Source Default Plugin Repo (design-craft) — 4-Pillar Assembly, Optional Upstream REA Peer & Multi-Harness Export": completed
-"Story 08.7 - Zero-Hardcode AI Harness Spine — UnifiedSkillCatalog, 2-Breakpoint Provider Prompt Caching, Dynamic Model Registry, 3-Bucket Skill Separation & Studio-to-Ledger Bridge (ADR-009)": backlog
+"Story 08.7 - Zero-Hardcode AI Harness Spine — UnifiedSkillCatalog, 2-Breakpoint Provider Prompt Caching, Dynamic Model Registry, 3-Bucket Skill Separation & Studio-to-Ledger Bridge (ADR-009)": completed
 
 # Epic 09: Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)
 "Epic 09 - Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)": completed

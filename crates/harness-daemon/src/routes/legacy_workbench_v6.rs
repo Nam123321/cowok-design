@@ -995,7 +995,7 @@ pub async fn handle_update_viewport(
     let nid = check_non_empty_id(&node_id, "node_id")?;
     if !matches!(
         req.viewport_preset.as_str(),
-        "desktop-1440" | "tablet-768" | "mobile-390"
+        "desktop-1440" | "tablet-768" | "fold-inner-712" | "mobile-390" | "fold-outer-344"
     ) {
         return Err(json_err(
             StatusCode::BAD_REQUEST,
