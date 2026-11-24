@@ -1,4 +1,4 @@
-// @story 06.3
+// @story 06.3, 06.5
 // @implements AC-01, AC-02, AC-03, AC-04
 use std::collections::HashMap;
 
@@ -8,10 +8,14 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use bot_fleet::{ByokGatewayRouter, PostExecutionNormalizer};
 use chrono::Utc;
 use presentation_cms::{
-    is_valid_ff_id, is_valid_slide_uid, patch_slide_slots_lol_html, validate_chart_json_str,
-    ChartKind2D, ChartSpecV12, CmsPatcherError, CmsSlotKind, SlotPatchInput,
+    count_words, is_valid_ff_id, is_valid_slide_uid, largest_remainder_percentages,
+    normalize_chart_source, patch_slide_slots_lol_html, synthesize_slide_rewrite,
+    validate_chart_json_str, ChartKind2D, ChartNormalizeOptions, ChartSourceFormat, ChartSpecV12,
+    CmsPatcherError, CmsSlotKind, NormalizedChartKind, SlideRewriteInput, SlotPatchInput,
+    StageshowFramePreset,
 };
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::{Deserialize, Serialize};
@@ -1524,107 +1528,244 @@ fn extract_prompt_numeric_values(prompt: &str) -> Vec<f64> {
     vals
 }
 
-fn build_copilot_worker_chart_json(
+fn map_chart_kind_2d_to_normalized(kind: ChartKind2D) -> NormalizedChartKind {
+    match kind {
+        ChartKind2D::Pie => NormalizedChartKind::Pie,
+        ChartKind2D::Donut => NormalizedChartKind::Donut,
+        ChartKind2D::Funnel => NormalizedChartKind::Funnel,
+        ChartKind2D::Line => NormalizedChartKind::Line,
+        ChartKind2D::Bar | ChartKind2D::Area | ChartKind2D::OneHundredStacked => {
+            NormalizedChartKind::Bar
+        }
+    }
+}
+
+pub(crate) fn synthesize_copilot_chart_json(
     prompt: &str,
     requested_kind: Option<ChartKind2D>,
     existing_charts_json: Option<&str>,
-) -> String {
-    let extracted = extract_prompt_numeric_values(prompt);
-    let kind_str: String = match requested_kind {
-        Some(ChartKind2D::Pie) => "pie".to_string(),
-        Some(ChartKind2D::Donut) => "donut".to_string(),
-        Some(ChartKind2D::OneHundredStacked) => "100_stacked".to_string(),
-        Some(ChartKind2D::Bar) => "bar".to_string(),
-        Some(ChartKind2D::Line) => "line".to_string(),
-        Some(ChartKind2D::Area) => "area".to_string(),
-        Some(ChartKind2D::Funnel) => "funnel".to_string(),
-        None => {
-            if let Some(raw) = existing_charts_json {
-                serde_json::from_str::<serde_json::Value>(raw)
-                    .ok()
-                    .and_then(|v| {
-                        v.get("kind")
-                            .and_then(|k| k.as_str())
-                            .map(ToString::to_string)
-                    })
-                    .unwrap_or_else(|| "bar".to_string())
-            } else {
-                "bar".to_string()
+    slide_slots: &[WordingSlotV12],
+    llm_output: Option<&str>,
+) -> Result<String, (&'static str, String)> {
+    // 1. If BYOK LLM returned a valid ChartSpecV12 JSON object, honor it directly after validation
+    if let Some(raw_llm) = llm_output {
+        let norm = PostExecutionNormalizer::normalize(raw_llm);
+        if let Some(val) = norm.extracted_json {
+            if let Ok(serialized) = serde_json::to_string(&val) {
+                if validate_chart_json_str(&serialized).is_ok() {
+                    return Ok(serialized);
+                }
             }
         }
-    };
-    let is_proportional = matches!(
-        kind_str.as_str(),
-        "pie" | "donut" | "100_stacked" | "funnel"
-    );
+    }
+
+    let resolved_kind = requested_kind.unwrap_or_else(|| {
+        existing_charts_json
+            .and_then(|raw| serde_json::from_str::<ChartSpecV12>(raw).ok())
+            .map(|spec| spec.kind)
+            .unwrap_or(ChartKind2D::Bar)
+    });
+
+    // 2. If prompt embeds tabular CSV/TSV lines, normalize through canonical ChartSpecV12 normalizer
+    if prompt.contains('\n') && (prompt.contains(',') || prompt.contains('\t')) {
+        let fmt = if prompt.contains('\t') {
+            ChartSourceFormat::Tsv
+        } else {
+            ChartSourceFormat::Csv
+        };
+        if let Ok(normalized) = normalize_chart_source(
+            prompt.as_bytes(),
+            fmt,
+            &ChartNormalizeOptions {
+                title: None,
+                chart_kind: map_chart_kind_2d_to_normalized(resolved_kind),
+                max_series: 12,
+                max_points: 200,
+            },
+        ) {
+            return Ok(normalized.canonical_charts_json);
+        }
+    }
+
+    let extracted = extract_prompt_numeric_values(prompt);
+    let kind_str = resolved_kind.as_str();
+    let is_proportional = resolved_kind.is_proportional();
     let color_cycle = [
         "human-accent",
         "agent-accent",
         "state-success",
         "state-info",
     ];
-    if is_proportional {
-        let points: Vec<serde_json::Value> = if extracted.len() >= 2 {
-            extracted
+    let chart_title = synthesize_slide_rewrite(&SlideRewriteInput {
+        prompt: prompt.to_string(),
+        current_text: String::new(),
+        slot_kind: "heading".to_string(),
+        target_ff_id: "ff-chart-title".to_string(),
+        frame_preset: StageshowFramePreset::Stage,
+        llm_output: None,
+        existing_other_slots_words: 0,
+    })
+    .primary_text
+    .chars()
+    .take(64)
+    .collect::<String>();
+
+    // 3. Explicit numeric values in prompt: preserve exact values so invalid proportional sums fail closed
+    if extracted.len() >= 2 {
+        let points: Vec<serde_json::Value> = extracted
+            .iter()
+            .enumerate()
+            .map(|(i, val)| {
+                serde_json::json!({
+                    "label": format!("Segment {}", i + 1),
+                    "value": val,
+                    "colorToken": color_cycle[i % color_cycle.len()],
+                })
+            })
+            .collect();
+        let mut obj = serde_json::json!({
+            "kind": kind_str,
+            "title": chart_title,
+            "series": [{
+                "name": if is_proportional { "Distribution" } else { "Metrics" },
+                "points": points
+            }]
+        });
+        if is_proportional {
+            obj["unit"] = serde_json::json!("%");
+        }
+        return Ok(obj.to_string());
+    }
+
+    // 4. Re-project existing real chart data into the requested chart kind when available
+    if let Some(existing_raw) = existing_charts_json {
+        if let Ok(mut existing_spec) = serde_json::from_str::<ChartSpecV12>(existing_raw) {
+            existing_spec.kind = resolved_kind;
+            existing_spec.title = chart_title.clone();
+            if is_proportional {
+                existing_spec.unit = Some("%".to_string());
+                for series in &mut existing_spec.series {
+                    let vals: Vec<f64> = series.points.iter().map(|p| p.value.max(0.0)).collect();
+                    if let Ok(pcts) = largest_remainder_percentages(&vals) {
+                        for (pt, pct) in series.points.iter_mut().zip(pcts) {
+                            pt.value = pct;
+                        }
+                    }
+                }
+            }
+            if let Ok(serialized) = serde_json::to_string(&existing_spec) {
+                if validate_chart_json_str(&serialized).is_ok() {
+                    return Ok(serialized);
+                }
+            }
+        }
+    }
+
+    // 5. Derive chart from real numeric metric/body slots already present on the slide (zero hardcoded stubs)
+    let mut slide_metrics: Vec<(String, String, f64)> = Vec::new();
+    for slot in slide_slots {
+        if slot.slot_kind == "heading"
+            || slot.slot_kind == "chart_json"
+            || slot.ff_id.ends_with("-eyebrow")
+            || slot.ff_id.ends_with("-headline")
+        {
+            continue;
+        }
+        if let Some(val) = extract_prompt_numeric_values(&slot.text_value)
+            .into_iter()
+            .next()
+        {
+            slide_metrics.push((slot.slot_label.clone(), slot.text_value.clone(), val));
+        }
+    }
+    if slide_metrics.len() >= 2 {
+        let raw_vals: Vec<f64> = slide_metrics.iter().map(|(_, _, v)| *v).collect();
+        let plotted_vals = if is_proportional {
+            largest_remainder_percentages(&raw_vals).ok()
+        } else {
+            Some(raw_vals)
+        };
+        if let Some(vals) = plotted_vals {
+            let points: Vec<serde_json::Value> = slide_metrics
                 .iter()
+                .zip(vals.iter())
                 .enumerate()
-                .map(|(i, val)| {
+                .map(|(i, ((lbl, raw_text, _), &val))| {
+                    let point_label: String =
+                        format!("{lbl} ({raw_text})").chars().take(120).collect();
                     serde_json::json!({
-                        "label": format!("Segment {}", i + 1),
+                        "label": point_label,
                         "value": val,
                         "colorToken": color_cycle[i % color_cycle.len()],
                     })
                 })
-                .collect()
-        } else {
-            vec![
-                serde_json::json!({ "label": "Primary", "value": 60.0, "colorToken": "human-accent" }),
-                serde_json::json!({ "label": "Secondary", "value": 40.0, "colorToken": "agent-accent" }),
-            ]
-        };
-        serde_json::json!({
-            "kind": kind_str,
-            "title": prompt.chars().take(64).collect::<String>(),
-            "unit": "%",
-            "series": [{
-                "name": "Distribution",
-                "points": points
-            }]
-        })
-        .to_string()
+                .collect();
+            let mut obj = serde_json::json!({
+                "kind": kind_str,
+                "title": chart_title,
+                "series": [{
+                    "name": if is_proportional { "Slide Metrics" } else { "Metrics" },
+                    "points": points
+                }]
+            });
+            if is_proportional {
+                obj["unit"] = serde_json::json!("%");
+            }
+            let serialized = obj.to_string();
+            if validate_chart_json_str(&serialized).is_ok() {
+                return Ok(serialized);
+            }
+        }
+    }
+
+    // 6. Fail closed when no real LLM/CSV/prompt/existing/slide numeric data exists (zero synthetic stubs)
+    Err((
+        "E_CHART_DATA_REQUIRED",
+        "Chart generation requires real numeric data (BYOK LLM ChartSpecV12, CSV/TSV table, explicit prompt numbers, existing chart data, or numeric slide metrics).".to_string(),
+    ))
+}
+
+async fn try_synthesize_copilot_via_byok(
+    state: &DaemonAppState,
+    tenant_id: &str,
+    prompt: &str,
+    current_text: &str,
+    slot_kind: &str,
+) -> Option<String> {
+    let state_clone = state.clone();
+    let tid = tenant_id.to_string();
+    let (creds, _) = tokio::task::spawn_blocking(move || {
+        crate::routes::bot_fleet::load_tenant_byok_credentials(&state_clone, &tid)
+    })
+    .await
+    .ok()?;
+    if creds.is_empty() {
+        return None;
+    }
+    let scrubbed_prompt = crate::routes::chat_cas_storage::redact_secrets(prompt);
+    let scrubbed_current = crate::routes::chat_cas_storage::redact_secrets(current_text);
+    let system_prompt = format!(
+        "You are a concise stageshow slide copilot. Rewrite slot_kind='{slot_kind}' strictly <= 30 words, 3-7 words per bullet. Current content: '{scrubbed_current}'. Instruction: '{scrubbed_prompt}'. Output only the rewritten text or valid ChartSpecV12 JSON."
+    );
+    let router = ByokGatewayRouter::new(crate::routes::bot_fleet::shared_cooldown_tracker());
+    let res = router
+        .execute_with_failover(tenant_id, &system_prompt, None, None, &creds, 12_000)
+        .await
+        .ok()?;
+    let norm = PostExecutionNormalizer::normalize(&res.raw_content);
+    let trimmed = norm.normalized_content.trim();
+    if trimmed.is_empty() {
+        None
     } else {
-        let points: Vec<serde_json::Value> = if extracted.len() >= 2 {
-            extracted
-                .iter()
-                .enumerate()
-                .map(|(i, val)| {
-                    serde_json::json!({
-                        "label": format!("P{}", i + 1),
-                        "value": val,
-                        "colorToken": color_cycle[i % color_cycle.len()],
-                    })
-                })
-                .collect()
-        } else {
-            vec![
-                serde_json::json!({ "label": "Q1", "value": 34.0, "colorToken": "human-accent" }),
-                serde_json::json!({ "label": "Q2", "value": 52.0, "colorToken": "agent-accent" }),
-                serde_json::json!({ "label": "Q3", "value": 68.0, "colorToken": "state-success" }),
-            ]
-        };
-        serde_json::json!({
-            "kind": kind_str,
-            "title": prompt.chars().take(64).collect::<String>(),
-            "series": [{
-                "name": "Series 1",
-                "points": points
-            }]
-        })
-        .to_string()
+        Some(trimmed.to_string())
     }
 }
 
-fn execute_single_copilot_job(state: &DaemonAppState, job_id: &str) -> Result<(), String> {
+fn execute_single_copilot_job(
+    state: &DaemonAppState,
+    job_id: &str,
+    llm_output: Option<String>,
+) -> Result<(), String> {
     let conn = state
         .registry
         .pool()
@@ -1662,8 +1803,9 @@ fn execute_single_copilot_job(state: &DaemonAppState, job_id: &str) -> Result<()
         &slide_uid,
         job_id,
         fence,
+        llm_output,
     );
-    if let Err(ref err_msg) = res {
+    if let Err((ref err_code, ref err_msg, ref target_ff)) = res {
         if let Ok(mut fail_conn) = state.registry.pool().connection() {
             mark_copilot_job_failed(
                 &mut fail_conn,
@@ -1671,16 +1813,16 @@ fn execute_single_copilot_job(state: &DaemonAppState, job_id: &str) -> Result<()
                 &project_id,
                 &slide_uid,
                 job_id,
-                "",
+                target_ff,
                 fence,
                 &state.auth.daemon_nonce,
-                "COPILOT_WORKER_FAILED",
+                err_code,
                 err_msg,
             );
             let _ = state.sse_tx.send(project_id);
         }
     }
-    res
+    res.map_err(|(code, msg, _)| format!("{code}: {msg}"))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1692,12 +1834,15 @@ fn execute_single_copilot_job_inner(
     slide_uid: &str,
     job_id: &str,
     fence: i64,
-) -> Result<(), String> {
-    let conn = state
-        .registry
-        .pool()
-        .connection()
-        .map_err(|e| format!("{e}"))?;
+    llm_output: Option<String>,
+) -> Result<(), (String, String, String)> {
+    let conn = state.registry.pool().connection().map_err(|e| {
+        (
+            "COPILOT_WORKER_FAILED".to_string(),
+            format!("{e}"),
+            String::new(),
+        )
+    })?;
     let init_payload: Option<String> = conn
         .query_row(
             "SELECT payload_text FROM execution_events
@@ -1707,7 +1852,13 @@ fn execute_single_copilot_job_inner(
             |r| r.get(0),
         )
         .optional()
-        .map_err(|e| format!("{e}"))?;
+        .map_err(|e| {
+            (
+                "COPILOT_WORKER_FAILED".to_string(),
+                format!("{e}"),
+                String::new(),
+            )
+        })?;
     let parsed_init: serde_json::Value = init_payload
         .as_deref()
         .and_then(|s| serde_json::from_str(s).ok())
@@ -1715,7 +1866,7 @@ fn execute_single_copilot_job_inner(
     let prompt = parsed_init
         .get("prompt")
         .and_then(|v| v.as_str())
-        .unwrap_or("Update slide slot")
+        .unwrap_or("Refine executive narrative")
         .trim();
     let comment_id = parsed_init
         .get("commentId")
@@ -1726,7 +1877,13 @@ fn execute_single_copilot_job_inner(
         .and_then(|v| serde_json::from_value(v.clone()).ok());
 
     let snap = load_slide_slots_snapshot(&conn, project_id, tenant_id, deck_id, slide_uid)
-        .map_err(|e| format!("Load snap failed: {e:?}"))?;
+        .map_err(|e| {
+            (
+                "COPILOT_WORKER_FAILED".to_string(),
+                format!("Load snap failed: {e:?}"),
+                String::new(),
+            )
+        })?;
     drop(conn);
     let effective_rev = if snap.deck_mode == "one-page" {
         snap.deck_revision
@@ -1754,7 +1911,11 @@ fn execute_single_copilot_job_inner(
         existing_slot.map(|s| s.ff_id.clone()).unwrap_or_default()
     };
     if !is_valid_ff_id(&target_ff_id) {
-        return Err("INVALID_TARGET_FF_ID".to_string());
+        return Err((
+            "INVALID_TARGET_FF_ID".to_string(),
+            "INVALID_TARGET_FF_ID".to_string(),
+            target_ff_id,
+        ));
     }
     let slot_kind =
         if requested_kind.is_some() || existing_slot.is_some_and(|s| s.slot_kind == "chart_json") {
@@ -1765,20 +1926,42 @@ fn execute_single_copilot_job_inner(
                 .unwrap_or_else(|| "text".to_string())
         };
     let charts_json = if slot_kind == "chart_json" {
-        Some(build_copilot_worker_chart_json(
+        match synthesize_copilot_chart_json(
             prompt,
             requested_kind,
             existing_slot.map(|s| s.charts_json.as_str()),
-        ))
+            &snap.slots,
+            llm_output.as_deref(),
+        ) {
+            Ok(json) => Some(json),
+            Err((code, msg)) => return Err((code.to_string(), msg, target_ff_id)),
+        }
     } else {
         None
     };
+    let existing_other_slots_words: usize = snap
+        .slots
+        .iter()
+        .filter(|s| s.ff_id != target_ff_id && s.slot_kind != "chart_json")
+        .map(|s| count_words(&s.text_value))
+        .sum();
     let text_value = if slot_kind == "chart_json" {
         existing_slot
             .map(|s| s.text_value.clone())
             .unwrap_or_default()
     } else {
-        prompt.chars().take(160).collect::<String>()
+        let rewritten = synthesize_slide_rewrite(&SlideRewriteInput {
+            prompt: prompt.to_string(),
+            current_text: existing_slot
+                .map(|s| s.text_value.clone())
+                .unwrap_or_default(),
+            slot_kind: slot_kind.clone(),
+            target_ff_id: target_ff_id.clone(),
+            frame_preset: StageshowFramePreset::Stage,
+            llm_output,
+            existing_other_slots_words,
+        });
+        rewritten.primary_text
     };
 
     commit_slide_copilot_turn(
@@ -1791,45 +1974,127 @@ fn execute_single_copilot_job_inner(
         fence,
         effective_rev,
         &[CopilotSlotMutation {
-            ff_id: target_ff_id,
+            ff_id: target_ff_id.clone(),
             slot_kind,
             text_value,
             charts_json,
         }],
         comment_id.as_deref(),
-    )?;
+    )
+    .map_err(|err| ("COPILOT_WORKER_FAILED".to_string(), err, target_ff_id))?;
     Ok(())
 }
 
 /// Processes active `RUNNING` Slide Copilot lease jobs asynchronously in the background worker loop.
 pub async fn run_pending_slide_copilot_jobs(state: &DaemonAppState) -> usize {
     let pool = state.registry.pool().clone();
-    let pending_ids: Vec<String> = tokio::task::spawn_blocking(move || {
-        let Ok(conn) = pool.connection() else {
-            return Vec::new();
-        };
-        let now_ms = Utc::now().timestamp_millis();
-        let mut stmt = match conn.prepare(
-            "SELECT id FROM node_execution_jobs
-             WHERE status = 'RUNNING'
-               AND lease_owner LIKE 'slide-copilot:%'
-               AND (stale_after_timestamp IS NULL OR stale_after_timestamp >= ?1)
-             ORDER BY created_at ASC LIMIT 4",
-        ) {
-            Ok(s) => s,
-            Err(_) => return Vec::new(),
-        };
-        stmt.query_map(params![now_ms], |r| r.get::<_, String>(0))
-            .map(|rows| rows.flatten().collect())
-            .unwrap_or_default()
-    })
-    .await
-    .unwrap_or_default();
+    let pending_rows: Vec<(String, String, String, String, String)> =
+        tokio::task::spawn_blocking(move || {
+            let Ok(conn) = pool.connection() else {
+                return Vec::new();
+            };
+            let now_ms = Utc::now().timestamp_millis();
+            let mut stmt = match conn.prepare(
+                "SELECT j.id, j.tenant_id, j.project_id, j.node_id,
+                        COALESCE((SELECT e.payload_text FROM execution_events e
+                                  WHERE e.job_id = j.id AND e.event_kind IN ('lease_acquired', 'enqueued')
+                                  ORDER BY e.seq_no ASC LIMIT 1), '{}'),
+                        COALESCE(j.lease_owner, '')
+                 FROM node_execution_jobs j
+                 WHERE j.status = 'RUNNING'
+                   AND j.lease_owner LIKE 'slide-copilot:%'
+                   AND (j.stale_after_timestamp IS NULL OR j.stale_after_timestamp >= ?1)
+                 ORDER BY j.created_at ASC LIMIT 4",
+            ) {
+                Ok(s) => s,
+                Err(_) => return Vec::new(),
+            };
+            let raw_rows: Vec<(String, String, String, String, String, String)> = stmt
+                .query_map(params![now_ms], |r| {
+                    Ok((
+                        r.get::<_, String>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, String>(2)?,
+                        r.get::<_, String>(3)?,
+                        r.get::<_, String>(4)?,
+                        r.get::<_, String>(5)?,
+                    ))
+                })
+                .map(|rows| rows.flatten().collect())
+                .unwrap_or_default();
+
+            raw_rows
+                .into_iter()
+                .map(
+                    |(jid, tenant_id, project_id, slide_uid, payload_text, lease_owner)| {
+                        let parsed: serde_json::Value = serde_json::from_str(&payload_text)
+                            .unwrap_or_else(|_| serde_json::json!({}));
+                        let raw_target_ff = parsed
+                            .get("targetFfId")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        let deck_id = lease_owner
+                            .strip_prefix("slide-copilot:")
+                            .and_then(|rest| rest.split_once(':'))
+                            .map(|(did, _)| did)
+                            .unwrap_or("");
+                        let (current_text, slot_kind) = if !deck_id.is_empty() {
+                            if let Ok(snap) = load_slide_slots_snapshot(
+                                &conn,
+                                &project_id,
+                                &tenant_id,
+                                deck_id,
+                                &slide_uid,
+                            ) {
+                                let matched = snap
+                                    .slots
+                                    .iter()
+                                    .find(|s| s.ff_id == raw_target_ff)
+                                    .or_else(|| snap.slots.first());
+                                let txt = matched
+                                    .map(|s| s.text_value.clone())
+                                    .unwrap_or_default();
+                                let kind = if parsed
+                                    .get("requestedChartKind")
+                                    .is_some_and(|v| !v.is_null())
+                                {
+                                    "chart_json".to_string()
+                                } else {
+                                    matched
+                                        .map(|s| s.slot_kind.clone())
+                                        .unwrap_or_else(|| "text".to_string())
+                                };
+                                (txt, kind)
+                            } else {
+                                (String::new(), "text".to_string())
+                            }
+                        } else {
+                            (String::new(), "text".to_string())
+                        };
+                        (jid, tenant_id, payload_text, current_text, slot_kind)
+                    },
+                )
+                .collect()
+        })
+        .await
+        .unwrap_or_default();
 
     let mut processed = 0usize;
-    for jid in pending_ids {
+    for (jid, tenant_id, payload_text, current_text, slot_kind) in pending_rows {
+        let parsed: serde_json::Value =
+            serde_json::from_str(&payload_text).unwrap_or_else(|_| serde_json::json!({}));
+        let prompt = parsed
+            .get("prompt")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .trim();
+        let llm_output =
+            try_synthesize_copilot_via_byok(state, &tenant_id, prompt, &current_text, &slot_kind)
+                .await;
         let st = state.clone();
-        let res = tokio::task::spawn_blocking(move || execute_single_copilot_job(&st, &jid)).await;
+        let res =
+            tokio::task::spawn_blocking(move || execute_single_copilot_job(&st, &jid, llm_output))
+                .await;
         if let Ok(Ok(())) = res {
             processed += 1;
         }

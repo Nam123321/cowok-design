@@ -12,6 +12,8 @@ use crate::routes::chat_cas_vault::chat_cas_vault_routes;
 use crate::routes::context_assemble::{handle_context_assemble, handle_get_context_telemetry};
 use crate::routes::de_runtime::build_de_runtime_router;
 use crate::routes::decision::build_decision_router;
+use crate::routes::deck_generation::build_deck_generation_router;
+use crate::routes::flow_synthesize::build_flow_synthesize_router;
 use crate::routes::fs_jail;
 use crate::routes::github_ide_integrations::integration_routes;
 use crate::routes::legacy_proposals::{
@@ -39,6 +41,7 @@ use crate::routes::legacy_specs::{
     handle_list_projects, handle_list_specs, handle_put_spec, handle_synthesize_specs,
     handle_update_project,
 };
+use crate::routes::orchestrator::build_orchestrator_router;
 use crate::routes::presentation::presentation_routes;
 use crate::routes::project_trash::handle_restore_project;
 use crate::routes::rea_bridge::build_rea_bridge_router;
@@ -50,6 +53,7 @@ use crate::routes::ssot_registry::{
     handle_export_ssot, handle_get_ssot_components, handle_mutate_appshell_lock,
     handle_route_skills,
 };
+use crate::routes::support_telemetry::build_support_telemetry_router;
 use crate::routes::DaemonAppState;
 
 fn legacy_project_spec_routes() -> Router<DaemonAppState> {
@@ -269,6 +273,10 @@ pub(crate) fn build_protected_legacy_router(state: DaemonAppState) -> Router<Dae
         .merge(build_bot_fleet_router())
         .merge(build_rea_bridge_router())
         .merge(build_decision_router())
+        .merge(build_flow_synthesize_router())
+        .merge(build_deck_generation_router())
+        .merge(build_orchestrator_router())
+        .merge(build_support_telemetry_router())
         .route_layer(middleware::from_fn_with_state(
             state,
             legacy_project_auth_middleware,

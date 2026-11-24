@@ -10,6 +10,7 @@ export interface DraftDeployBannerProps {
   isDraftDirty: boolean;
   orphanCount?: number;
   conflictState?: ConflictState | null;
+  floatingOnCanvas?: boolean;
   onDeployDraft?: () => void;
   onDiscardDraft?: () => void;
   onResolveConflict?: (choice: "keep_mine" | "take_agent" | "inspect_collisions") => void;
@@ -25,6 +26,33 @@ const DRAFT_BAR_STYLE: React.CSSProperties = {
   justifyContent: "space-between",
   flexWrap: "wrap",
   gap: "8px",
+};
+
+const FLOATING_DRAFT_Z_INDEX = 25;
+
+const FLOATING_CANVAS_WRAP_STYLE: React.CSSProperties = {
+  position: "absolute",
+  bottom: "12px",
+  left: "12px",
+  zIndex: FLOATING_DRAFT_Z_INDEX,
+  maxWidth: "calc(100% - 24px)",
+  display: "flex",
+  flexDirection: "column",
+  gap: "6px",
+  pointerEvents: "auto",
+};
+
+const FLOATING_DRAFT_PILL_STYLE: React.CSSProperties = {
+  padding: "4px 8px",
+  backgroundColor: "var(--bg-elevated, var(--bg-surface))",
+  border: "1px solid var(--action-primary)",
+  borderLeft: "3px solid var(--action-primary)",
+  borderRadius: "var(--radius-sm)",
+  boxShadow: "var(--shadow-md)",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "8px",
+  flexWrap: "wrap",
 };
 
 const DRAFT_BADGE_STYLE: React.CSSProperties = {
@@ -184,14 +212,12 @@ const DraftBannerActions: React.FC<{
   );
 };
 
-export const DraftDeployBanner: React.FC<DraftDeployBannerProps> = ({
-  isDraftDirty,
-  orphanCount = 0,
-  conflictState,
-  onDeployDraft,
-  onDiscardDraft,
-  onResolveConflict,
-}) => {
+function wrapFloating(floating: boolean, node: React.ReactNode): React.ReactNode {
+  return floating ? <div style={FLOATING_CANVAS_WRAP_STYLE}>{node}</div> : node;
+}
+
+export const DraftDeployBanner: React.FC<DraftDeployBannerProps> = (props) => {
+  const { isDraftDirty, orphanCount = 0, conflictState, floatingOnCanvas = false } = props;
   const { t } = useTranslation();
   const [confirmOrphanDeploy, setConfirmOrphanDeploy] = useState(false);
 
@@ -200,35 +226,25 @@ export const DraftDeployBanner: React.FC<DraftDeployBannerProps> = ({
   }, [isDraftDirty, orphanCount]);
 
   const handleDeployClick = () => {
-    if (!onDeployDraft) return;
-    if (orphanCount > 0 && !confirmOrphanDeploy) {
-      setConfirmOrphanDeploy(true);
-      return;
-    }
+    if (!props.onDeployDraft) return;
+    if (orphanCount > 0 && !confirmOrphanDeploy) { setConfirmOrphanDeploy(true); return; }
     setConfirmOrphanDeploy(false);
-    onDeployDraft();
+    props.onDeployDraft();
   };
 
   if (!isDraftDirty && orphanCount <= 0) {
-    return conflictState ? <AntiFrankenConflictBanner conflictState={conflictState} onResolveConflict={onResolveConflict} /> : null;
+    return conflictState ? wrapFloating(floatingOnCanvas, <AntiFrankenConflictBanner conflictState={conflictState} onResolveConflict={props.onResolveConflict} />) : null;
   }
 
-  return (
+  return wrapFloating(floatingOnCanvas, (
     <>
-      {conflictState && <AntiFrankenConflictBanner conflictState={conflictState} onResolveConflict={onResolveConflict} />}
-      <div id="dagDraftBar" data-testid="dag-draft-bar" style={DRAFT_BAR_STYLE}>
-        <DraftBannerStatus isDraftDirty={isDraftDirty} orphanCount={orphanCount} draftNoticeLabel={t("canvas.draftNotice", "Thay đổi cấu trúc đồ thị chưa triển khai")} />
+      {conflictState && <AntiFrankenConflictBanner conflictState={conflictState} onResolveConflict={props.onResolveConflict} />}
+      <div id="dagDraftBar" data-testid="dag-draft-bar" onMouseDown={floatingOnCanvas ? (e) => e.stopPropagation() : undefined} style={floatingOnCanvas ? FLOATING_DRAFT_PILL_STYLE : DRAFT_BAR_STYLE}>
+        <DraftBannerStatus isDraftDirty={isDraftDirty} orphanCount={orphanCount} draftNoticeLabel={floatingOnCanvas ? "" : t("canvas.draftNotice", "Thay đổi cấu trúc đồ thị chưa triển khai")} />
         {isDraftDirty && (
-          <DraftBannerActions
-            showConfirm={confirmOrphanDeploy && orphanCount > 0}
-            onDeployClick={handleDeployClick}
-            onConfirmOrphanDeploy={() => { setConfirmOrphanDeploy(false); onDeployDraft?.(); }}
-            onCancelOrphanDeploy={() => setConfirmOrphanDeploy(false)}
-            onDeployDraft={onDeployDraft}
-            onDiscardDraft={onDiscardDraft}
-          />
+          <DraftBannerActions showConfirm={confirmOrphanDeploy && orphanCount > 0} onDeployClick={handleDeployClick} onConfirmOrphanDeploy={() => { setConfirmOrphanDeploy(false); props.onDeployDraft?.(); }} onCancelOrphanDeploy={() => setConfirmOrphanDeploy(false)} onDeployDraft={props.onDeployDraft} onDiscardDraft={props.onDiscardDraft} />
         )}
       </div>
     </>
-  );
+  ));
 };

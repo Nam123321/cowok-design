@@ -24,7 +24,9 @@ import { CowokToast } from "../../../components/ui/CowokToast";
 import { usePresenterSessionController } from "../hooks/usePresenterSessionController";
 import { usePresenterInlineCollapse } from "../hooks/usePresenterInlineCollapse";
 import type { ChartSpecV12 } from "../../../lib/validations/presentation-chart-specs";
+import type { GenerateDeckResponse } from "../../../lib/validations/deck-generation";
 import type { PresenterBlackoutMode } from "../../../lib/validations/presentation-presenter";
+import { sharedChatStore, toSessionChatKey } from "../store/shared-chat-sync";
 
 const SPLITTER_Z_INDEX = 15;
 
@@ -121,13 +123,13 @@ function useInlineHtmlEditorActions(p: StageProps, model: ReturnType<typeof useD
   return { handleToggleInlineCode, handleApplyHtml, handleRegionClick: (id: string) => vp.setHighlightedRegionId(id) };
 }
 
-function buildLiveRightPaneProps(opts: { p: StageProps; model: ReturnType<typeof useDualPanePreviewModel>; editor: ReturnType<typeof useInlineHtmlEditorActions>; isDeckResolving: boolean }): React.ComponentProps<typeof CompanionLiveHtmlRightPane> {
-  const { p, model, editor, isDeckResolving } = opts;
+function buildLiveRightPaneProps(opts: { p: StageProps; model: ReturnType<typeof useDualPanePreviewModel>; editor: ReturnType<typeof useInlineHtmlEditorActions>; isDeckResolving: boolean; onDeckGenerated?: (response: GenerateDeckResponse) => void; onSyncToMainChat?: (summaryText: string) => void; onEmbedIntoActiveSlide?: (htmlSnippet: string, title: string) => void }): React.ComponentProps<typeof CompanionLiveHtmlRightPane> {
+  const { p, model, editor, isDeckResolving, onDeckGenerated, onSyncToMainChat, onEmbedIntoActiveSlide } = opts;
   const { activeTab, vp } = p;
   const { selectedNode, activeScreenData, activeSlide, isHistoricalReadOnly, customRawHtml, effectiveStageLens } = model;
   const isInlineReadOnly = isHistoricalReadOnly || isDeckResolving;
   return {
-    projectId: p.projectId, activeTab, structureLens: effectiveStageLens, selectedNodeId: p.selectedNodeId, selectedNodeKey: selectedNode?.screenKey || undefined,
+    projectId: p.projectId, onDeckGenerated, onSyncToMainChat, onEmbedIntoActiveSlide, activeTab, structureLens: effectiveStageLens, selectedNodeId: p.selectedNodeId, selectedNodeKey: selectedNode?.screenKey || undefined,
     activeSlide, activeScreenData, activeSubState: normalizeFixtureRef(selectedNode?.activeSubState ?? vp.activeSubState),
     onSelectSubState: guardReadOnlyAction(isHistoricalReadOnly, p.onGuardedSubStateSelect), pointerMode: vp.pointerMode,
     onSetPointerMode: (m) => (m === "interact" || !isHistoricalReadOnly) && p.onGuardedModeSelect(m), isInlineCodeOpen: vp.isInlineCodeOpen,
@@ -150,6 +152,28 @@ function buildLiveRightPaneProps(opts: { p: StageProps; model: ReturnType<typeof
   };
 }
 
+function syncDashboardSummaryToMainChat(opts: {
+  projectId?: string;
+  chatProjectId?: string;
+  sessionId?: string;
+  summaryText: string;
+}): void {
+  const scopeKey = toSessionChatKey(opts.chatProjectId ?? opts.projectId, opts.sessionId);
+  const nowMs = Date.now();
+  const msg = {
+    id: `studio-sync-${nowMs}`,
+    sender: "agent" as const,
+    text: opts.summaryText,
+    timestamp: new Date(nowMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    createdAtMs: nowMs,
+  };
+  if (opts.sessionId) {
+    void sharedChatStore.persistAndAppend(scopeKey, opts.sessionId, msg, opts.projectId).catch(() => {});
+  } else {
+    sharedChatStore.appendMessage(scopeKey, msg);
+  }
+}
+
 function useStageCmsBindings(p: StageProps, isDeckTab: boolean) {
   const { vp } = p;
   const isHistoricalReadOnly = isHistoricalPreviewReadOnly(p.historicalPreviewTurn?.id);
@@ -163,11 +187,21 @@ function useStageCmsBindings(p: StageProps, isDeckTab: boolean) {
   const onUpdateSlideById = useCallback((slideId: string, patch: Partial<typeof activeSlide>) => { if (!isHistoricalReadOnly) vp.setSlides((prev) => prev.map((it) => (it.id === slideId ? { ...it, ...patch } : it))); }, [isHistoricalReadOnly, vp]);
   const onHydrateCommittedHtml = useCallback((slideId: string, sanitizedHtml: string) => { if (sanitizedHtml) vp.setCustomHtmlForTarget(`${p.activeTab.id}::slide-cms::${slideId}`, sanitizedHtml); }, [p.activeTab.id, vp]);
   const onDiscardReloadDeck = useCallback(() => setDeckReloadToken((n) => n + 1), []);
+  const onDeckGenerated = useCallback((_res: GenerateDeckResponse) => {
+    vp.setActiveSlideIndex(0);
+    setDeckReloadToken((n) => n + 1);
+  }, [vp]);
   const cmsController = useCmsSlideEditorController({ projectId: p.projectId, deckId: persistedDeckId, activeSlide, isDrawerOpen: vp.isCmsDrawerOpen, isReadOnly: isCmsReadOnly, isDeckLoading: isDeckResolving, onUpdateActiveSlide, onUpdateSlideById, onHydrateCommittedHtml, onDiscardReloadDeck, postPatchByFfIdRef });
   useEffect(() => { p.onCmsDirtyChange?.(isDeckTab && cmsController.hasAnyDirtySlides); }, [cmsController.hasAnyDirtySlides, isDeckTab, p.onCmsDirtyChange]);
   useEffect(() => { p.onRegisterCmsGuardActions?.({ flushAll: cmsController.flushAllPendingNow, discardAll: cmsController.discardAllPendingNow, applyCustomHtml: (rawHtml) => cmsController.applyInlineCustomHtml(rawHtml, true) }); return () => p.onRegisterCmsGuardActions?.(null); }, [cmsController.applyInlineCustomHtml, cmsController.discardAllPendingNow, cmsController.flushAllPendingNow, p.onRegisterCmsGuardActions]);
+  const onSyncToMainChat = useCallback((summaryText: string) => {
+    syncDashboardSummaryToMainChat({ projectId: p.projectId, sessionId: p.sessionId, summaryText });
+  }, [p.projectId, p.sessionId]);
+  const onEmbedIntoActiveSlide = useCallback((htmlSnippet: string) => {
+    void cmsController.applyInlineCustomHtml(htmlSnippet, true);
+  }, [cmsController]);
   const pinnedSlideIds = useMemo(() => [activeSlide?.id, vp.slides[vp.activeSlideIndex + 1]?.id].filter((id): id is string => Boolean(id)), [activeSlide?.id, vp.activeSlideIndex, vp.slides]);
-  return { cmsController, postPatchByFfIdRef, onRegisterPatchByFfId, pinnedSlideIds, isDeckResolving, isHistoricalReadOnly };
+  return { cmsController, postPatchByFfIdRef, onRegisterPatchByFfId, pinnedSlideIds, isDeckResolving, isHistoricalReadOnly, onDeckGenerated, onDiscardReloadDeck, onSyncToMainChat, onEmbedIntoActiveSlide };
 }
 
 function buildSpeakerNotesMap(slides: StageProps["vp"]["slides"], isDeckTab: boolean, activeSlideId: string, cmsSpeakerNotes: string) {
@@ -301,7 +335,7 @@ export function DualPaneHtmlStage(p: StageProps) {
   const { vp, splitContainerRef } = p;
   const isDeckTab = p.activeTab.format === "slide-cms";
   const showSplitter = !vp.isLeftStructureHidden && !vp.isRightPreviewHidden && !vp.isPresenting;
-  const { cmsController, postPatchByFfIdRef, onRegisterPatchByFfId, pinnedSlideIds, isDeckResolving, isHistoricalReadOnly } = useStageCmsBindings(p, isDeckTab);
+  const { cmsController, postPatchByFfIdRef, onRegisterPatchByFfId, pinnedSlideIds, isDeckResolving, isHistoricalReadOnly, onDeckGenerated, onDiscardReloadDeck, onSyncToMainChat, onEmbedIntoActiveSlide } = useStageCmsBindings(p, isDeckTab);
   const { selectedNode, baseScreenData } = resolveBaseScreenDataForStage(p);
   const appCms = useAppScreenCmsState({ projectId: p.projectId, nodes: p.nodes, selectedNodeId: p.selectedNodeId, baseScreenData, isReadOnly: isHistoricalReadOnly, postPatchByFfIdRef, onLockedRuleReceipt: p.onLockedRuleReceipt });
   const [cmsFilterFfIds, setCmsFilterFfIds] = useState<string[]>([]);
@@ -311,7 +345,7 @@ export function DualPaneHtmlStage(p: StageProps) {
   const copilot = useSlideCopilotController({ enabled: isDeckTab && vp.structureLens === "slide-cms", projectId: p.projectId, deckId: cmsController.deckId, slideUid: cmsController.slideUid, isReadOnly: deckReadOnly, slots: cmsController.slots, flushSlideBeforeDispatch: cmsController.flushPendingBatchNow, getSlideCommitSnapshot: cmsController.getSlideCommitSnapshot, reloadServerRevision: cmsController.reloadServerRevision, applyCopilotBatchCommit: cmsController.applyCopilotBatchCommit });
   const model = useDualPanePreviewModel(p, isDeckTab, selectedNode, isDeckTab ? baseScreenData : appCms.mergedScreenData);
   const editor = useInlineHtmlEditorActions(p, model);
-  const paneProps = buildLiveRightPaneProps({ p, model, editor, isDeckResolving: isDeckTab && isDeckResolving });
+  const paneProps = buildLiveRightPaneProps({ p, model, editor, isDeckResolving: isDeckTab && isDeckResolving, onDeckGenerated, onSyncToMainChat, onEmbedIntoActiveSlide });
   const { presenter, onRegisterDeckBlackout, presenterToastNode } = useStagePresenterSession({
     p, isDeckTab, deckId: cmsController.deckId, activeSlideId: model.activeSlide.id,
     cmsSpeakerNotes: cmsController.speakerNotes, isHistoricalReadOnly: model.isHistoricalReadOnly,
@@ -326,7 +360,7 @@ export function DualPaneHtmlStage(p: StageProps) {
       <StageLeftStructureSection p={p} isDeckTab={isDeckTab} cmsController={cmsController} appCms={appCms} copilot={copilot} isDeckResolving={isDeckResolving} cmsFilterFfIds={cmsFilterFfIds} onClearCmsFilter={() => setCmsFilterFfIds([])} onRenderChartStage={(ffId, spec, ariaLabel) => render2DChartRef.current?.({ slideUid: cmsController.slideUid, ffId, spec, ariaLabel })} />
       {showSplitter && <StageSplitter isDragging={vp.isDraggingInternalSplit} onDragStart={() => vp.setIsDraggingInternalSplit(true)} />}
       {!vp.isRightPreviewHidden && (
-        <DualPaneRightStage p={p} isDeckTab={isDeckTab} selectedNode={selectedNode} baseScreenData={baseScreenData} cmsController={cmsController} appCms={appCms} copilot={copilot} onRegisterPatchByFfId={onRegisterPatchByFfId} onRegisterRender2DChart={onRegisterRender2DChart} pinnedSlideIds={pinnedSlideIds} isDeckResolving={isDeckResolving} onOpenRegionCmsEdit={(ids) => { vp.setIsLeftStructureHidden(false); vp.setStructureLens("slide-cms"); vp.setIsCmsDrawerOpen(true); setCmsFilterFfIds(ids); }} paneProps={paneProps} isHistoricalReadOnly={model.isHistoricalReadOnly} slideCode={model.activeSlide.code} onApplyHtmlWithCms={handleApplyHtmlWithCms} blackoutMode={presenter.blackoutMode} isPresenterActive={presenter.isPresenterActive} onOpenPresenter={presenter.openPresenterView} onRegisterDeckBlackout={onRegisterDeckBlackout} presenterToastNode={presenterToastNode} />
+        <DualPaneRightStage p={p} isDeckTab={isDeckTab} selectedNode={selectedNode} baseScreenData={baseScreenData} cmsController={cmsController} appCms={appCms} copilot={copilot} onRegisterPatchByFfId={onRegisterPatchByFfId} onRegisterRender2DChart={onRegisterRender2DChart} pinnedSlideIds={pinnedSlideIds} isDeckResolving={isDeckResolving} onOpenRegionCmsEdit={(ids) => { vp.setIsLeftStructureHidden(false); vp.setStructureLens("slide-cms"); vp.setIsCmsDrawerOpen(true); setCmsFilterFfIds(ids); }} paneProps={paneProps} isHistoricalReadOnly={model.isHistoricalReadOnly} slideCode={model.activeSlide.code} onApplyHtmlWithCms={handleApplyHtmlWithCms} onReloadDeck={onDiscardReloadDeck} blackoutMode={presenter.blackoutMode} isPresenterActive={presenter.isPresenterActive} onOpenPresenter={presenter.openPresenterView} onRegisterDeckBlackout={onRegisterDeckBlackout} presenterToastNode={presenterToastNode} />
       )}
       <StageInlinePresenterDock p={p} presenter={presenter} />
     </div>

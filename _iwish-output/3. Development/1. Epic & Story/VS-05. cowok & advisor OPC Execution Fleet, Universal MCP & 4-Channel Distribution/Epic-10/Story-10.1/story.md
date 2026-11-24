@@ -4,7 +4,7 @@ id: "10.1"
 title: "Story 10.1: Xây dựng cowok Master Orchestrator & Embedded PTY $UIUX_LIVE_SPEC (<50ms Hot-Apply + Cmd+Z)"
 description: "Thiết lập cowok làm Agent điều phối trung tâm duy nhất giao tiếp với người dùng; tích hợp portable-pty tiêm tự động biến $UIUX_LIVE_SPEC cho phép các Execution Agents cập nhật thiết kế trực tiếp lên Canvas trong <50ms kèm hoàn tác 1 bước (Cmd+Z)."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-10/Story-10.1/story.md"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: core
 adr_ref: "ADR-006"
@@ -33,7 +33,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-24, FR-25: cowok Master Orchestrator, 3-Lane Router, MPSC SQLite Write Actor & $UIUX_LIVE_SPEC (<50ms + Cmd+Z)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 10: cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design Tournament](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-10/epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context

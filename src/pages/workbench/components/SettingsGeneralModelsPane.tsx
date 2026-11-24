@@ -2,9 +2,13 @@
 // @implements AC-04 (Settings Models Pane with Live BYOK Verifier, Storage Mode & Permissions)
 import React, { useEffect, useState } from "react";
 import { CowokSelect } from "../../../components/ui/CowokSelect";
+import { BrandIcon } from "../../../components/ui/BrandIcon";
+import { useFormatter } from "../../../hooks/useFormatter";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { useDoctorProvidersUsage } from "../../../hooks/useDoctorProvidersUsage";
+import { apiSupport } from "../../../api/support";
 import { apiWorkbenchSettings } from "../../../api/workbench-settings";
+import type { TelemetryPreferences } from "../../../lib/validations/support";
 import type { CliDiagnosticItem } from "../../../lib/validations/workbench-settings";
 import { SettingsDetectedProvidersPanel } from "./SettingsDetectedProvidersPanel";
 import {
@@ -95,6 +99,175 @@ const choiceBtnStyle = (active: boolean): React.CSSProperties => ({
   cursor: "pointer",
 });
 
+const TelemetryPrivacyCard: React.FC<{ locale: string }> = ({ locale }) => {
+  const { t } = useTranslation(locale);
+  const fmt = useFormatter({ locale });
+  const [prefs, setPrefs] = useState<TelemetryPreferences | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "offline">("loading");
+  const [saving, setSaving] = useState(false);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoadState("loading");
+    void apiSupport
+      .getTelemetryPreferences()
+      .then((res) => {
+        if (!active) return;
+        setPrefs(res.data);
+        setLoadState("ready");
+      })
+      .catch(() => {
+        if (!active) return;
+        setLoadState("offline");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const isReady = loadState === "ready" && prefs !== null;
+  const isEnabled = isReady && prefs.effectiveEnabled;
+  const isLocked = Boolean(prefs?.envLocked);
+  const isDisabled = !isReady || isLocked || saving;
+
+  const handleToggle = async () => {
+    if (isDisabled || !prefs) return;
+    const nextEnabled = !prefs.telemetryEnabled;
+    setSaving(true);
+    setStatusNotice(null);
+    try {
+      const res = await apiSupport.updateTelemetryPreferences({ telemetryEnabled: nextEnabled });
+      setPrefs(res.data);
+      setStatusNotice(
+        res.data.effectiveEnabled
+          ? t("support.telemetrySavedEnabled", "Đã bật gửi thống kê ẩn danh cải thiện sản phẩm.")
+          : t("support.telemetrySavedDisabled", "Đã tắt hoàn toàn telemetry ra ngoài (0 kết nối).")
+      );
+    } catch (err) {
+      setStatusNotice(
+        err instanceof Error
+          ? err.message
+          : t("support.telemetrySaveFailed", "Không thể cập nhật thiết lập quyền riêng tư.")
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      data-testid="settings-telemetry-privacy-card"
+      style={{
+        padding: "10px 12px",
+        borderRadius: "var(--radius-sm)",
+        border: "1px solid var(--border-subtle)",
+        backgroundColor: "var(--bg-workspace)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+          <span style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--text-primary)" }}>
+            {t("support.privacySectionTitle", "Quyền riêng tư & Telemetry")}
+          </span>
+          <span style={{ fontSize: "10.5px", color: "var(--text-muted)", lineHeight: 1.4 }}>
+            {t(
+              "support.privacySectionDesc",
+              "Chia sẻ sự kiện kích hoạt ẩn danh giúp cải thiện cowok-design. Tự động xóa API key, mật khẩu và đường dẫn cá nhân."
+            )}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          role="switch"
+          aria-checked={isEnabled}
+          aria-busy={loadState === "loading"}
+          aria-label={t("support.privacyToggleAria", "Bật hoặc tắt gửi telemetry ẩn danh")}
+          data-testid="settings-telemetry-optin-toggle"
+          disabled={isDisabled}
+          onClick={() => void handleToggle()}
+          style={{
+            flexShrink: 0,
+            minWidth: "42px",
+            height: "24px",
+            padding: "2px",
+            borderRadius: "var(--radius-pill)",
+            border: "1px solid var(--border-default)",
+            backgroundColor: isEnabled ? "var(--action-primary)" : "var(--bg-subtle)",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: isEnabled ? "flex-end" : "flex-start",
+            cursor: isDisabled ? "not-allowed" : "pointer",
+            opacity: isDisabled ? 0.6 : 1,
+          }}
+        >
+          <span
+            style={{
+              width: "18px",
+              height: "18px",
+              borderRadius: "50%",
+              backgroundColor: isEnabled ? "var(--action-primary-fg)" : "var(--text-muted)",
+              display: "inline-block",
+            }}
+          />
+        </button>
+      </div>
+
+      {loadState === "loading" && (
+        <div data-testid="settings-telemetry-loading" style={{ fontSize: "10.5px", color: "var(--text-muted)" }}>
+          {t("support.telemetryLoading", "Đang tải trạng thái quyền riêng tư từ daemon...")}
+        </div>
+      )}
+
+      {loadState === "offline" && (
+        <div data-testid="settings-telemetry-offline" style={{ fontSize: "10.5px", color: "var(--state-warning)" }}>
+          {t("support.telemetryOffline", "Daemon đang ngoại tuyến — không thể đọc hoặc thay đổi thiết lập telemetry.")}
+        </div>
+      )}
+
+      {isLocked && (
+        <div
+          data-testid="settings-telemetry-env-locked-badge"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "4px 8px",
+            borderRadius: "var(--radius-xs)",
+            backgroundColor: "var(--state-warning-soft)",
+            color: "var(--state-warning)",
+            fontSize: "10.5px",
+            fontWeight: 600,
+          }}
+        >
+          <BrandIcon name="warning" size={12} color="currentColor" />
+          <span>
+            {`${t("support.telemetryEnvLocked", "Bị khóa tắt bởi biến môi trường")}: ${prefs?.lockedReason ?? "COWOK_TELEMETRY=0"}`}
+          </span>
+        </div>
+      )}
+
+      {prefs && (
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+          <span>{`${t("support.installIdLabel", "Install ID")}: ${prefs.installId}`}</span>
+          <span>•</span>
+          <span>{`${t("support.outboxPendingLabel", "Hàng đợi chờ gửi")}: ${fmt.formatNumber(prefs.pendingOutboxCount)}`}</span>
+        </div>
+      )}
+
+      {statusNotice && (
+        <div role="status" data-testid="settings-telemetry-status" style={{ fontSize: "10.5px", color: "var(--text-secondary)" }}>
+          {statusNotice}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const GeneralAppearanceSection: React.FC<
   Pick<
     SettingsGeneralModelsPaneProps,
@@ -143,14 +316,16 @@ const GeneralAppearanceSection: React.FC<
             <button
               key={sz.value}
               type="button"
+              aria-label={`${sz.value} — ${t(sz.labelKey, sz.fallback)}`}
               onClick={() => p.onFontSizeChange(sz.value)}
               style={{ ...choiceBtnStyle(p.currentFontSize === sz.value), flex: 1, padding: "6px 8px" }}
             >
-              {sz.value} — {t(sz.labelKey, sz.fallback)}
+              {sz.value}
             </button>
           ))}
         </div>
       </div>
+      <TelemetryPrivacyCard locale={p.currentLocale} />
     </>
   );
 };

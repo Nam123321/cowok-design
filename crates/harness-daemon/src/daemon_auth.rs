@@ -1310,13 +1310,25 @@ pub async fn legacy_project_auth_middleware(
             Err(resp) => return resp,
         }
     } else {
-        let b = match to_bytes(body, MAX_BODY_BYTES * 2).await {
+        let is_deck_data_route = parts.method == axum::http::Method::POST
+            && (parts.uri.path() == "/api/v1/decks/generate"
+                || parts.uri.path() == "/api/v1/decks/normalize-chart-source");
+        let max_bytes = if is_deck_data_route {
+            7_500_000
+        } else {
+            MAX_BODY_BYTES * 2
+        };
+        let b = match to_bytes(body, max_bytes).await {
             Ok(b) => b,
             Err(_) => {
                 return auth_err_resp(
                     StatusCode::PAYLOAD_TOO_LARGE,
                     "PAYLOAD_TOO_LARGE",
-                    "Body exceeds 2 MiB",
+                    if is_deck_data_route {
+                        "Body exceeds 7.5 MB deck source limit"
+                    } else {
+                        "Body exceeds 2 MiB"
+                    },
                 )
             }
         };
@@ -1441,6 +1453,10 @@ pub async fn legacy_project_auth_middleware(
     let requires_strict_non_legacy_bearer = path.starts_with("/api/v1/bot-fleet/")
         || path.starts_with("/api/v1/rea/")
         || path.starts_with("/api/v1/decision/")
+        || path.starts_with("/api/v1/flows/")
+        || path.starts_with("/api/v1/orchestrator/")
+        || path.starts_with("/api/v1/support/")
+        || path.starts_with("/api/v1/telemetry/")
         || path == "/api/v1/de/run"
         || path == "/api/v1/plugins/import-repo"
         || path == "/api/v1/plugins/ephemeral-tools/execute"

@@ -16,7 +16,7 @@ use html_forge::{
     reconcile_ff_ids, sanitize_html_with_profile, HtmlForgeError, HtmlPatchOperation,
     OklchContrastReport, SanitizeProfile, DEFAULT_RECONCILE_MIN_CONFIDENCE, WCAG_AA_MIN_CONTRAST,
 };
-use rusqlite::{params, OptionalExtension, TransactionBehavior};
+use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use spec_registry::locks::is_valid_ssot_portal;
 use spec_registry::skill_router::{CachePreservingSkillRouter, SkillRouteCommand};
@@ -24,6 +24,7 @@ use uuid::Uuid;
 
 use super::execution_reaper::{discard_shadow_dir, terminate_pgid_checked};
 use super::legacy_specs::verify_anti_idor_with_caller;
+use super::orchestrator::{map_actor_error_to_response, shared_write_actor_for_pool};
 use super::DaemonAppState;
 use crate::daemon_auth::{LegacyAuthKind, VerifiedLegacyIngress};
 
@@ -551,8 +552,7 @@ struct LockedSlotCheckInput<'a> {
 fn check_active_locked_slot(
     tx: &rusqlite::Transaction<'_>,
     input: &LockedSlotCheckInput<'_>,
-    request_id: &str,
-) -> Result<Option<LockedRuleChangeReceipt>, Response> {
+) -> Result<Option<LockedRuleChangeReceipt>, String> {
     let lock_row: Option<(String, i64, String)> = tx
         .query_row(
             "SELECT lock_owner_id, fencing_token, locked_slots_json
@@ -567,28 +567,11 @@ fn check_active_locked_slot(
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )
         .optional()
-        .map_err(|e| {
-            error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "STORAGE_ERROR",
-                &format!("Failed to verify active AppShell lock: {e}"),
-                None,
-                None,
-                request_id.to_string(),
-            )
-        })?;
+        .map_err(|e| format!("Failed to verify active AppShell lock: {e}"))?;
 
     if let Some((owner_id, fencing_token, locked_slots_json)) = lock_row {
-        let slots: Vec<String> = serde_json::from_str(&locked_slots_json).map_err(|e| {
-            error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "STORAGE_ERROR",
-                &format!("Corrupted AppShell locked_slots_json (fail-closed): {e}"),
-                None,
-                None,
-                request_id.to_string(),
-            )
-        })?;
+        let slots: Vec<String> = serde_json::from_str(&locked_slots_json)
+            .map_err(|e| format!("Corrupted AppShell locked_slots_json (fail-closed): {e}"))?;
         let touches_locked = slots.iter().any(|s| {
             s == input.ff_id
                 || s == "*"
@@ -623,6 +606,39 @@ fn check_active_locked_slot(
         }));
     }
     Ok(None)
+}
+
+enum ClarifyWriteOutcome {
+    Committed {
+        session_id: String,
+        status: String,
+        generation_epoch: i64,
+    },
+    StaleEpoch {
+        expected: i64,
+        current: i64,
+        uninitialized: bool,
+    },
+}
+
+enum PatchOpError {
+    InvalidRequest {
+        message: String,
+        field: &'static str,
+    },
+    HtmlForge(HtmlForgeError),
+}
+
+enum PatchWriteOutcome {
+    Committed(Box<SurgicalPatchResultData>),
+    HtmlError(HtmlForgeError),
+    ApiError {
+        status: StatusCode,
+        code: &'static str,
+        message: String,
+        field: Option<&'static str>,
+        details: Option<serde_json::Value>,
+    },
 }
 
 struct ClarifySessionRow {
@@ -866,67 +882,63 @@ pub async fn handle_sdi_clarify(
     let directions_json = serde_json::to_string(&directions).unwrap_or_else(|_| "[]".to_string());
     let skills_json = serde_json::to_string(&routed_skills).unwrap_or_else(|_| "[]".to_string());
 
-    let (session_id, status, generation_epoch) = {
-        let mut conn = match state.registry.pool().connection() {
-            Ok(c) => c,
-            Err(_) => {
-                return error_response(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "STORAGE_BUSY",
-                    "Storage connection unavailable",
-                    None,
-                    None,
-                    request_id,
-                );
-            }
-        };
+    let pool_state = state.clone();
+    let actor_req_id = request_id.clone();
+    let actor = match tokio::task::spawn_blocking(move || {
+        shared_write_actor_for_pool(pool_state.registry.pool())
+    })
+    .await
+    {
+        Ok(Ok(a)) => a,
+        Ok(Err(err)) => return map_actor_error_to_response(err, actor_req_id),
+        Err(_) => {
+            return error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL_ERROR",
+                "Write actor lookup worker failed unexpectedly",
+                None,
+                None,
+                actor_req_id,
+            );
+        }
+    };
 
-        let tx = match conn.transaction_with_behavior(TransactionBehavior::Immediate) {
-            Ok(t) => t,
-            Err(_) => {
-                return error_response(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "STORAGE_BUSY",
-                    "Failed to acquire write transaction",
-                    None,
-                    None,
-                    request_id,
-                );
-            }
-        };
+    let tid_w = tenant_id.clone();
+    let pid_w = req.project_id.clone();
+    let goal_w = goal_prompt.to_string();
+    let locale_w = locale.clone();
+    let active_dir_w = active_direction_id.clone();
+    let expected_epoch = req.expected_generation_epoch;
+    let preempt_pgid_raw = req.preempt_pgid;
+    let has_preempt = validated_preempt_pgid.is_some();
 
+    let receipt = match actor.try_enqueue_immediate(move |tx| {
         let existing: Option<(String, String, i64)> = tx
             .query_row(
                 "SELECT id, active_direction_id, generation_epoch
                  FROM sdi_clarification_sessions
                  WHERE tenant_id = ?1 AND project_id = ?2",
-                params![tenant_id, req.project_id],
+                params![tid_w, pid_w],
                 |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
             .optional()
             .unwrap_or(None);
 
-        let triple = match existing {
+        match existing {
             Some((existing_id, prev_dir, prev_epoch)) => {
-                if let Some(exp_epoch) = req.expected_generation_epoch {
+                if let Some(exp_epoch) = expected_epoch {
                     if exp_epoch != prev_epoch {
-                        return error_response(
-                            StatusCode::CONFLICT,
-                            "STALE_GENERATION_EPOCH",
-                            "Generation epoch is stale and was preempted by a newer direction",
-                            Some("expectedGenerationEpoch".to_string()),
-                            Some(serde_json::json!({
-                                "expectedGenerationEpoch": exp_epoch,
-                                "currentGenerationEpoch": prev_epoch,
-                            })),
-                            request_id,
-                        );
+                        return Ok(ClarifyWriteOutcome::StaleEpoch {
+                            expected: exp_epoch,
+                            current: prev_epoch,
+                            uninitialized: false,
+                        });
                     }
                 }
-                let switched = prev_dir != active_direction_id || validated_preempt_pgid.is_some();
+                let switched = prev_dir != active_dir_w || has_preempt;
                 let next_epoch = prev_epoch + 1;
                 let next_status = if switched { "preempted" } else { "clarifying" };
-                if let Err(e) = tx.execute(
+                tx.execute(
                     "UPDATE sdi_clarification_sessions
                      SET status = ?1,
                          goal_prompt = ?2,
@@ -940,52 +952,41 @@ pub async fn handle_sdi_clarify(
                      WHERE id = ?10 AND tenant_id = ?11",
                     params![
                         next_status,
-                        goal_prompt,
-                        locale,
-                        active_direction_id,
+                        goal_w,
+                        locale_w,
+                        active_dir_w,
                         directions_json,
                         next_epoch,
-                        req.preempt_pgid,
+                        preempt_pgid_raw,
                         skills_json,
                         now_ms,
                         existing_id,
-                        tenant_id,
+                        tid_w,
                     ],
-                ) {
-                    return error_response(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "STORAGE_ERROR",
-                        &format!("Failed to update clarification session: {e}"),
-                        None,
-                        None,
-                        request_id,
-                    );
-                }
-                (existing_id, next_status.to_string(), next_epoch)
+                )?;
+                Ok(ClarifyWriteOutcome::Committed {
+                    session_id: existing_id,
+                    status: next_status.to_string(),
+                    generation_epoch: next_epoch,
+                })
             }
             None => {
-                if let Some(exp_epoch) = req.expected_generation_epoch {
+                if let Some(exp_epoch) = expected_epoch {
                     if exp_epoch != 0 {
-                        return error_response(
-                            StatusCode::CONFLICT,
-                            "STALE_GENERATION_EPOCH",
-                            "Expected generation epoch does not match uninitialized session (0)",
-                            Some("expectedGenerationEpoch".to_string()),
-                            Some(serde_json::json!({
-                                "expectedGenerationEpoch": exp_epoch,
-                                "currentGenerationEpoch": 0,
-                            })),
-                            request_id,
-                        );
+                        return Ok(ClarifyWriteOutcome::StaleEpoch {
+                            expected: exp_epoch,
+                            current: 0,
+                            uninitialized: true,
+                        });
                     }
                 }
                 let new_id = Uuid::new_v4().to_string();
-                let next_status = if validated_preempt_pgid.is_some() {
+                let next_status = if has_preempt {
                     "preempted"
                 } else {
                     "clarifying"
                 };
-                if let Err(e) = tx.execute(
+                tx.execute(
                     "INSERT INTO sdi_clarification_sessions (
                         id, tenant_id, project_id, status, goal_prompt, locale,
                         active_direction_id, directions_json, generation_epoch,
@@ -993,43 +994,71 @@ pub async fn handle_sdi_clarify(
                      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?10, ?11, ?11)",
                     params![
                         new_id,
-                        tenant_id,
-                        req.project_id,
+                        tid_w,
+                        pid_w,
                         next_status,
-                        goal_prompt,
-                        locale,
-                        active_direction_id,
+                        goal_w,
+                        locale_w,
+                        active_dir_w,
                         directions_json,
-                        req.preempt_pgid,
+                        preempt_pgid_raw,
                         skills_json,
                         now_ms,
                     ],
-                ) {
-                    return error_response(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "STORAGE_ERROR",
-                        &format!("Failed to create clarification session: {e}"),
-                        None,
-                        None,
-                        request_id,
-                    );
-                }
-                (new_id, next_status.to_string(), 1)
+                )?;
+                Ok(ClarifyWriteOutcome::Committed {
+                    session_id: new_id,
+                    status: next_status.to_string(),
+                    generation_epoch: 1,
+                })
+            }
+        }
+    }) {
+        Ok(r) => r,
+        Err(err) => return map_actor_error_to_response(err, request_id),
+    };
+
+    let (session_id, status, generation_epoch) =
+        match tokio::task::spawn_blocking(move || receipt.wait()).await {
+            Ok(Ok(ClarifyWriteOutcome::Committed {
+                session_id,
+                status,
+                generation_epoch,
+            })) => (session_id, status, generation_epoch),
+            Ok(Ok(ClarifyWriteOutcome::StaleEpoch {
+                expected,
+                current,
+                uninitialized,
+            })) => {
+                let message = if uninitialized {
+                    "Expected generation epoch does not match uninitialized session (0)"
+                } else {
+                    "Generation epoch is stale and was preempted by a newer direction"
+                };
+                return error_response(
+                    StatusCode::CONFLICT,
+                    "STALE_GENERATION_EPOCH",
+                    message,
+                    Some("expectedGenerationEpoch".to_string()),
+                    Some(serde_json::json!({
+                        "expectedGenerationEpoch": expected,
+                        "currentGenerationEpoch": current,
+                    })),
+                    request_id,
+                );
+            }
+            Ok(Err(err)) => return map_actor_error_to_response(err, request_id),
+            Err(_) => {
+                return error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "INTERNAL_ERROR",
+                    "Clarification session write actor worker failed unexpectedly",
+                    None,
+                    None,
+                    request_id,
+                );
             }
         };
-
-        if let Err(e) = tx.commit() {
-            return error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "STORAGE_ERROR",
-                &format!("Failed to commit clarification session: {e}"),
-                None,
-                None,
-                request_id,
-            );
-        }
-        triple
-    };
 
     // Zero-Trust -PGID preemption runs ONLY AFTER epoch OCC check & commit succeed,
     // inside spawn_blocking so terminate_pgid_checked never blocks Tokio worker threads.
@@ -1311,283 +1340,275 @@ pub async fn handle_apply_sketch_patch(
         Err(resp) => return resp,
     };
 
-    let mut conn = match state.registry.pool().connection() {
-        Ok(c) => c,
+    let pool_state = state.clone();
+    let actor_req_id = request_id.clone();
+    let actor = match tokio::task::spawn_blocking(move || {
+        shared_write_actor_for_pool(pool_state.registry.pool())
+    })
+    .await
+    {
+        Ok(Ok(a)) => a,
+        Ok(Err(err)) => return map_actor_error_to_response(err, actor_req_id),
         Err(_) => {
             return error_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "STORAGE_BUSY",
-                "Storage connection unavailable",
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "INTERNAL_ERROR",
+                "Write actor lookup worker failed unexpectedly",
                 None,
                 None,
-                request_id,
+                actor_req_id,
             );
         }
     };
 
-    let tx = match conn.transaction_with_behavior(TransactionBehavior::Immediate) {
-        Ok(t) => t,
-        Err(_) => {
-            return error_response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "STORAGE_BUSY",
-                "Failed to acquire write transaction",
-                None,
-                None,
-                request_id,
-            );
-        }
-    };
+    let screen_id_owned = screen_id.to_string();
+    let receipt = match actor.try_enqueue_immediate(move |tx| {
+        let screen_id = screen_id_owned.as_str();
+        let latest: Option<(i64, String, String)> = tx
+            .query_row(
+                "SELECT ast_revision, result_artifact_sha, html_snapshot
+                 FROM screen_artifact_patches
+                 WHERE tenant_id = ?1 AND project_id = ?2 AND screen_id = ?3
+                 ORDER BY ast_revision DESC
+                 LIMIT 1",
+                params![tenant_id, req.project_id, screen_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .optional()
+            .unwrap_or(None);
 
-    let latest: Option<(i64, String, String)> = tx
-        .query_row(
-            "SELECT ast_revision, result_artifact_sha, html_snapshot
-             FROM screen_artifact_patches
-             WHERE tenant_id = ?1 AND project_id = ?2 AND screen_id = ?3
-             ORDER BY ast_revision DESC
-             LIMIT 1",
-            params![tenant_id, req.project_id, screen_id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-        )
-        .optional()
-        .unwrap_or(None);
-
-    let current_rev = latest.as_ref().map(|r| r.0).unwrap_or(0);
-    if let Some((rev, ref latest_sha, _)) = latest {
-        let sha_mismatch = latest_sha != &req.base_artifact_sha256;
-        let rev_mismatch = req.expected_ast_revision.is_some_and(|exp| exp != rev);
-        if sha_mismatch || rev_mismatch {
-            return error_response(
-                StatusCode::CONFLICT,
-                "STALE_MAPPING",
-                "Concurrent screen edit detected; baseArtifactSha256 or astRevision is stale",
-                Some("baseArtifactSha256".to_string()),
-                Some(serde_json::json!({
-                    "currentAstRevision": rev,
-                    "currentArtifactSha256": latest_sha,
+        let current_rev = latest.as_ref().map(|r| r.0).unwrap_or(0);
+        if let Some((rev, ref latest_sha, _)) = latest {
+            let sha_mismatch = latest_sha != &req.base_artifact_sha256;
+            let rev_mismatch = req.expected_ast_revision.is_some_and(|exp| exp != rev);
+            if sha_mismatch || rev_mismatch {
+                return Ok(PatchWriteOutcome::ApiError {
+                    status: StatusCode::CONFLICT,
+                    code: "STALE_MAPPING",
+                    message:
+                        "Concurrent screen edit detected; baseArtifactSha256 or astRevision is stale"
+                            .to_string(),
+                    field: Some("baseArtifactSha256"),
+                    details: Some(serde_json::json!({
+                        "currentAstRevision": rev,
+                        "currentArtifactSha256": latest_sha,
+                        "expectedAstRevision": req.expected_ast_revision,
+                    })),
+                });
+            }
+        } else if req.expected_ast_revision.is_some_and(|exp| exp != 0) {
+            return Ok(PatchWriteOutcome::ApiError {
+                status: StatusCode::CONFLICT,
+                code: "STALE_MAPPING",
+                message: "Expected astRevision does not match uninitialized screen revision (0)"
+                    .to_string(),
+                field: Some("expectedAstRevision"),
+                details: Some(serde_json::json!({
+                    "currentAstRevision": 0,
                     "expectedAstRevision": req.expected_ast_revision,
                 })),
-                request_id,
-            );
+            });
         }
-    } else if req.expected_ast_revision.is_some_and(|exp| exp != 0) {
-        return error_response(
-            StatusCode::CONFLICT,
-            "STALE_MAPPING",
-            "Expected astRevision does not match uninitialized screen revision (0)",
-            Some("expectedAstRevision".to_string()),
-            Some(serde_json::json!({
-                "currentAstRevision": 0,
-                "expectedAstRevision": req.expected_ast_revision,
-            })),
-            request_id,
-        );
-    }
 
-    let raw_working_html = match latest.as_ref().filter(|r| !r.2.trim().is_empty()) {
-        Some((_, _, snap)) => snap.clone(),
-        None => req
-            .base_html
-            .clone()
-            .filter(|s| !s.trim().is_empty())
-            .unwrap_or_else(|| default_starter_screen_html(screen_id, &req.ff_id)),
-    };
-
-    let (mut working_html, _) =
-        match sanitize_html_with_profile(&raw_working_html, SanitizeProfile::AppPreview) {
-            Ok(pair) => pair,
-            Err(err) => return map_html_forge_error(err, request_id),
+        let raw_working_html = match latest.as_ref().filter(|r| !r.2.trim().is_empty()) {
+            Some((_, _, snap)) => snap.clone(),
+            None => req
+                .base_html
+                .clone()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or_else(|| default_starter_screen_html(screen_id, &req.ff_id)),
         };
 
-    let now_ms = Utc::now().timestamp_millis();
-    let locked_rule_receipt = match check_active_locked_slot(
-        &tx,
-        &LockedSlotCheckInput {
-            tenant_id: &tenant_id,
-            project_id: &req.project_id,
-            portal_id: &req.portal_id,
-            ff_id: &req.ff_id,
-            op_kind: &req.op_kind,
-            now_ms,
-            confirm_override: req.confirm_locked_rule_override,
-        },
-        &request_id,
-    ) {
-        Ok(r) => r,
-        Err(resp) => return resp,
-    };
-    let apply_tier = if locked_rule_receipt.is_some() {
-        "LOCKED_RULE_RECEIPT"
-    } else {
-        "INSTANT_UNDO"
-    };
+        let (mut working_html, _) =
+            match sanitize_html_with_profile(&raw_working_html, SanitizeProfile::AppPreview) {
+                Ok(pair) => pair,
+                Err(err) => return Ok(PatchWriteOutcome::HtmlError(err)),
+            };
 
-    let mut oklch_guard: Option<OklchContrastReport> = None;
-    let should_apply_mutation = locked_rule_receipt
-        .as_ref()
-        .map(|r| r.applied)
-        .unwrap_or(true);
+        let now_ms = Utc::now().timestamp_millis();
+        let locked_rule_receipt = match check_active_locked_slot(
+            tx,
+            &LockedSlotCheckInput {
+                tenant_id: &tenant_id,
+                project_id: &req.project_id,
+                portal_id: &req.portal_id,
+                ff_id: &req.ff_id,
+                op_kind: &req.op_kind,
+                now_ms,
+                confirm_override: req.confirm_locked_rule_override,
+            },
+        ) {
+            Ok(r) => r,
+            Err(msg) => {
+                return Ok(PatchWriteOutcome::ApiError {
+                    status: StatusCode::INTERNAL_SERVER_ERROR,
+                    code: "STORAGE_ERROR",
+                    message: msg,
+                    field: None,
+                    details: None,
+                });
+            }
+        };
+        let apply_tier = if locked_rule_receipt.is_some() {
+            "LOCKED_RULE_RECEIPT"
+        } else {
+            "INSTANT_UNDO"
+        };
 
-    let mut reconciled_ff_ids = 0usize;
-    if should_apply_mutation {
-        if let Some(ref candidate_next_html) = req.next_html {
-            if !candidate_next_html.trim().is_empty() {
-                let (sanitized_next, _) = match sanitize_html_with_profile(
-                    candidate_next_html,
-                    SanitizeProfile::AppPreview,
-                ) {
-                    Ok(pair) => pair,
-                    Err(err) => return map_html_forge_error(err, request_id),
-                };
-                match reconcile_ff_ids(
-                    &working_html,
-                    &sanitized_next,
-                    DEFAULT_RECONCILE_MIN_CONFIDENCE,
-                ) {
-                    Ok(report) => {
-                        let (verified_html, _) = match sanitize_html_with_profile(
-                            &report.reconciled_html,
-                            SanitizeProfile::AppPreview,
-                        ) {
-                            Ok(pair) => pair,
-                            Err(err) => return map_html_forge_error(err, request_id),
-                        };
-                        working_html = verified_html;
-                        reconciled_ff_ids = report.total_ff_ids;
+        let mut oklch_guard: Option<OklchContrastReport> = None;
+        let should_apply_mutation = locked_rule_receipt
+            .as_ref()
+            .map(|r| r.applied)
+            .unwrap_or(true);
+
+        let mut reconciled_ff_ids = 0usize;
+        if should_apply_mutation {
+            if let Some(ref candidate_next_html) = req.next_html {
+                if !candidate_next_html.trim().is_empty() {
+                    let (sanitized_next, _) = match sanitize_html_with_profile(
+                        candidate_next_html,
+                        SanitizeProfile::AppPreview,
+                    ) {
+                        Ok(pair) => pair,
+                        Err(err) => return Ok(PatchWriteOutcome::HtmlError(err)),
+                    };
+                    match reconcile_ff_ids(
+                        &working_html,
+                        &sanitized_next,
+                        DEFAULT_RECONCILE_MIN_CONFIDENCE,
+                    ) {
+                        Ok(report) => {
+                            let (verified_html, _) = match sanitize_html_with_profile(
+                                &report.reconciled_html,
+                                SanitizeProfile::AppPreview,
+                            ) {
+                                Ok(pair) => pair,
+                                Err(err) => return Ok(PatchWriteOutcome::HtmlError(err)),
+                            };
+                            working_html = verified_html;
+                            reconciled_ff_ids = report.total_ff_ids;
+                        }
+                        Err(err) => return Ok(PatchWriteOutcome::HtmlError(err)),
                     }
-                    Err(err) => return map_html_forge_error(err, request_id),
                 }
             }
         }
-    }
 
-    let mut persisted_payload = req.payload_json.clone();
-    let (result_html, result_sha, exec_micros) = if !should_apply_mutation {
-        let sha = compute_sha256_hex(working_html.as_bytes());
-        (working_html, sha, 0u64)
-    } else if req.op_kind == "UNDO" {
-        let restored = resolve_monotonic_undo_snapshot(
-            &tx,
-            &tenant_id,
-            &req.project_id,
-            screen_id,
-            current_rev,
-            &working_html,
-            &mut persisted_payload,
-        );
-        let sha = compute_sha256_hex(restored.as_bytes());
-        (restored, sha, 0u64)
-    } else {
-        let patch_op = match build_patch_operation(&req, &mut oklch_guard, &request_id) {
-            Ok(op) => op,
-            Err(resp) => return resp,
-        };
-        match patch_html_element(
-            &working_html,
-            &req.ff_id,
-            &patch_op,
-            SanitizeProfile::AppPreview,
-        ) {
-            Ok(out) if out.patched_count == 0 => {
-                return error_response(
-                    StatusCode::CONFLICT,
-                    "STALE_MAPPING",
-                    &format!(
-                        "Target data-ff-id '{}' was not found in screen HTML",
-                        req.ff_id
-                    ),
-                    Some("ffId".to_string()),
-                    Some(serde_json::json!({
-                        "missingFfId": req.ff_id,
-                        "currentAstRevision": current_rev,
-                    })),
-                    request_id,
-                );
-            }
-            Ok(out) => (
-                out.patched_html,
-                out.content_sha256,
-                out.execution_time_micros,
-            ),
-            Err(err) => return map_html_forge_error(err, request_id),
-        }
-    };
-
-    let next_rev = current_rev + 1;
-    let patch_id = Uuid::new_v4().to_string();
-    let payload_serialized =
-        serde_json::to_string(&persisted_payload).unwrap_or_else(|_| "{}".to_string());
-    let locked_serialized = locked_rule_receipt
-        .as_ref()
-        .and_then(|r| serde_json::to_string(r).ok());
-
-    if let Err(e) = tx.execute(
-        "INSERT INTO screen_artifact_patches (
-            id, tenant_id, project_id, screen_id, ast_revision, base_artifact_sha,
-            result_artifact_sha, ff_id, op_kind, apply_tier, reconciled_ff_ids,
-            payload_json, html_snapshot, locked_rule_json, created_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
-        params![
-            patch_id,
-            tenant_id,
-            req.project_id,
-            screen_id,
-            next_rev,
-            req.base_artifact_sha256,
-            result_sha,
-            req.ff_id,
-            req.op_kind,
-            apply_tier,
-            reconciled_ff_ids as i64,
-            payload_serialized,
-            result_html,
-            locked_serialized,
-            now_ms,
-        ],
-    ) {
-        let is_unique_conflict = matches!(
-            e,
-            rusqlite::Error::SqliteFailure(ref sf, _)
-                if sf.code == rusqlite::ErrorCode::ConstraintViolation
-                    && (sf.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE
-                        || sf.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_PRIMARYKEY)
-        );
-        if is_unique_conflict {
-            return error_response(
-                StatusCode::CONFLICT,
-                "STALE_MAPPING",
-                &format!("Concurrent screen revision conflict: {e}"),
-                None,
-                None,
-                request_id,
+        let mut persisted_payload = req.payload_json.clone();
+        let (result_html, result_sha, exec_micros) = if !should_apply_mutation {
+            let sha = compute_sha256_hex(working_html.as_bytes());
+            (working_html, sha, 0u64)
+        } else if req.op_kind == "UNDO" {
+            let restored = resolve_monotonic_undo_snapshot(
+                tx,
+                &tenant_id,
+                &req.project_id,
+                screen_id,
+                current_rev,
+                &working_html,
+                &mut persisted_payload,
             );
+            let sha = compute_sha256_hex(restored.as_bytes());
+            (restored, sha, 0u64)
+        } else {
+            let patch_op = match build_patch_operation(&req, &mut oklch_guard) {
+                Ok(op) => op,
+                Err(PatchOpError::InvalidRequest { message, field }) => {
+                    return Ok(PatchWriteOutcome::ApiError {
+                        status: StatusCode::UNPROCESSABLE_ENTITY,
+                        code: "INVALID_REQUEST",
+                        message,
+                        field: Some(field),
+                        details: None,
+                    });
+                }
+                Err(PatchOpError::HtmlForge(err)) => return Ok(PatchWriteOutcome::HtmlError(err)),
+            };
+            match patch_html_element(
+                &working_html,
+                &req.ff_id,
+                &patch_op,
+                SanitizeProfile::AppPreview,
+            ) {
+                Ok(out) if out.patched_count == 0 => {
+                    return Ok(PatchWriteOutcome::ApiError {
+                        status: StatusCode::CONFLICT,
+                        code: "STALE_MAPPING",
+                        message: format!(
+                            "Target data-ff-id '{}' was not found in screen HTML",
+                            req.ff_id
+                        ),
+                        field: Some("ffId"),
+                        details: Some(serde_json::json!({
+                            "missingFfId": req.ff_id,
+                            "currentAstRevision": current_rev,
+                        })),
+                    });
+                }
+                Ok(out) => (
+                    out.patched_html,
+                    out.content_sha256,
+                    out.execution_time_micros,
+                ),
+                Err(err) => return Ok(PatchWriteOutcome::HtmlError(err)),
+            }
+        };
+
+        let next_rev = current_rev + 1;
+        let patch_id = Uuid::new_v4().to_string();
+        let payload_serialized =
+            serde_json::to_string(&persisted_payload).unwrap_or_else(|_| "{}".to_string());
+        let locked_serialized = locked_rule_receipt
+            .as_ref()
+            .and_then(|r| serde_json::to_string(r).ok());
+
+        if let Err(e) = tx.execute(
+            "INSERT INTO screen_artifact_patches (
+                id, tenant_id, project_id, screen_id, ast_revision, base_artifact_sha,
+                result_artifact_sha, ff_id, op_kind, apply_tier, reconciled_ff_ids,
+                payload_json, html_snapshot, locked_rule_json, created_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            params![
+                patch_id,
+                tenant_id,
+                req.project_id,
+                screen_id,
+                next_rev,
+                req.base_artifact_sha256,
+                result_sha,
+                req.ff_id,
+                req.op_kind,
+                apply_tier,
+                reconciled_ff_ids as i64,
+                payload_serialized,
+                result_html,
+                locked_serialized,
+                now_ms,
+            ],
+        ) {
+            let is_unique_conflict = matches!(
+                e,
+                rusqlite::Error::SqliteFailure(ref sf, _)
+                    if sf.code == rusqlite::ErrorCode::ConstraintViolation
+                        && (sf.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE
+                            || sf.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_PRIMARYKEY)
+            );
+            if is_unique_conflict {
+                return Ok(PatchWriteOutcome::ApiError {
+                    status: StatusCode::CONFLICT,
+                    code: "STALE_MAPPING",
+                    message: format!("Concurrent screen revision conflict: {e}"),
+                    field: None,
+                    details: None,
+                });
+            }
+            return Err(e);
         }
-        return error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "STORAGE_ERROR",
-            &format!("Failed to persist patch atomically: {e}"),
-            None,
-            None,
-            request_id,
-        );
-    }
 
-    if let Err(e) = tx.commit() {
-        return error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "STORAGE_ERROR",
-            &format!("Failed to commit patch transaction: {e}"),
-            None,
-            None,
-            request_id,
-        );
-    }
-
-    ok_response(
-        SurgicalPatchResultData {
+        Ok(PatchWriteOutcome::Committed(Box::new(SurgicalPatchResultData {
             patch_id,
             project_id: req.project_id,
-            screen_id: screen_id.to_string(),
+            screen_id: screen_id_owned,
             ast_revision: next_rev,
             base_artifact_sha256: req.base_artifact_sha256,
             result_artifact_sha256: result_sha,
@@ -1601,9 +1622,39 @@ pub async fn handle_apply_sketch_patch(
             undo_available: apply_tier == "INSTANT_UNDO",
             execution_time_micros: exec_micros,
             created_at: now_ms,
-        },
-        request_id,
-    )
+        })))
+    }) {
+        Ok(r) => r,
+        Err(err) => return map_actor_error_to_response(err, request_id),
+    };
+
+    match tokio::task::spawn_blocking(move || receipt.wait()).await {
+        Ok(Ok(PatchWriteOutcome::Committed(data))) => ok_response(*data, request_id),
+        Ok(Ok(PatchWriteOutcome::HtmlError(err))) => map_html_forge_error(err, request_id),
+        Ok(Ok(PatchWriteOutcome::ApiError {
+            status,
+            code,
+            message,
+            field,
+            details,
+        })) => error_response(
+            status,
+            code,
+            &message,
+            field.map(str::to_string),
+            details,
+            request_id,
+        ),
+        Ok(Err(err)) => map_actor_error_to_response(err, request_id),
+        Err(_) => error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "INTERNAL_ERROR",
+            "Surgical patch write actor worker failed unexpectedly",
+            None,
+            None,
+            request_id,
+        ),
+    }
 }
 
 fn is_unapplied_locked_receipt(apply_tier: &str, locked_rule_json: Option<&str>) -> bool {
@@ -1674,23 +1725,16 @@ fn resolve_monotonic_undo_snapshot(
 fn build_patch_operation(
     req: &HttpSurgicalPatchRequest,
     oklch_guard: &mut Option<OklchContrastReport>,
-    request_id: &str,
-) -> Result<HtmlPatchOperation, Response> {
+) -> Result<HtmlPatchOperation, PatchOpError> {
     match req.op_kind.as_str() {
         "TEXT_EDIT" => {
             let text = req
                 .payload_json
                 .get("text")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| {
-                    error_response(
-                        StatusCode::UNPROCESSABLE_ENTITY,
-                        "INVALID_REQUEST",
-                        "TEXT_EDIT requires payloadJson.text string",
-                        Some("payloadJson.text".to_string()),
-                        None,
-                        request_id.to_string(),
-                    )
+                .ok_or_else(|| PatchOpError::InvalidRequest {
+                    message: "TEXT_EDIT requires payloadJson.text string".to_string(),
+                    field: "payloadJson.text",
                 })?;
             Ok(HtmlPatchOperation::TextEdit {
                 text: text.to_string(),
@@ -1703,7 +1747,7 @@ fn build_patch_operation(
                 req.payload_json.get("bgHex").and_then(|v| v.as_str()),
             ) {
                 let report = evaluate_oklch_contrast_guard(fg, bg, WCAG_AA_MIN_CONTRAST)
-                    .map_err(|e| map_html_forge_error(e, request_id.to_string()))?;
+                    .map_err(PatchOpError::HtmlForge)?;
                 css_vars.insert(
                     "--stage-fg-safe".to_string(),
                     report.adjusted_fg_hex.clone(),
@@ -1743,14 +1787,10 @@ fn build_patch_operation(
                 Ok(HtmlPatchOperation::StylePatch { safe_styles })
             }
         }
-        _ => Err(error_response(
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "INVALID_REQUEST",
-            "Unsupported opKind",
-            Some("opKind".to_string()),
-            None,
-            request_id.to_string(),
-        )),
+        _ => Err(PatchOpError::InvalidRequest {
+            message: "Unsupported opKind".to_string(),
+            field: "opKind",
+        }),
     }
 }
 

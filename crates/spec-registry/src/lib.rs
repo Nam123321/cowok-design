@@ -22,6 +22,7 @@ pub mod reverse_sync;
 pub mod skill_router;
 pub mod sync;
 pub mod watcher;
+pub mod write_actor;
 
 pub use context_slicer::{estimate_tokens, ContextSlicer};
 pub use errors::{is_sqlite_busy_or_locked, map_sqlite_error, retry_on_busy};
@@ -35,6 +36,11 @@ pub use sync::{
     validate_candidate_spec_path,
 };
 pub use watcher::SpecWatcher;
+pub use write_actor::{
+    SqliteActorError, SqliteWriteActor, SqliteWriteActorHandle, WriteReceipt,
+    DEFAULT_BACKPRESSURE_RETRY_AFTER_SECS, DEFAULT_WRITE_ACTOR_BUSY_TIMEOUT_MS,
+    DEFAULT_WRITE_ACTOR_CAPACITY,
+};
 
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")

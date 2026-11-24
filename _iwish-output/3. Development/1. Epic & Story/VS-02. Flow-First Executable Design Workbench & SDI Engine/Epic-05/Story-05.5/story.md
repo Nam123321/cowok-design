@@ -4,7 +4,7 @@ id: "05.5"
 title: "Story 05.5: End-to-End /simulate-user (8D) & /edge-case-guardian (FMEA) -> 3-Tier Interactive Flow DAG"
 description: "Tích hợp /simulate-user 8 chiều và /edge-case-guardian FMEA vào bộ tổng hợp DAG tương tác 3 tầng (/api/v1/flows/synthesize <-> 3-Tier DAG Synthesizer -> SQLite flow_nodes/flow_edges), giữ mặc định <=8 happy-path nodes/cluster cho app 10 màn hình kèm công tắc [Show Edge-Case Flows], 4-SubState pills trong từng node (DEFAULT/LOADING/EMPTY/ERROR), SampleDataStudio fixtures và 0 heuristic float leaks."
 resource: "iwish://uxui-os/development/epic-05/story-05.5"
-status: refactored
+status: completed
 risk_tier: 2
 delivery: core
 timestamp: "2026-11-20T20:45:00+07:00"
@@ -29,7 +29,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-33: Cognitive Sketch-to-Polish, Steering Chips, Shared lol_html & 3-Tier Flow DAG](file:///Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 05: Option 5 2D Storyboard, Cognitive Sketch-to-Polish, Shared lol_html & 3-Tier Auto Flow DAG](../epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `2`
 
 ## 1. Story Description & Context

@@ -173,7 +173,23 @@ async function dispatchMiddlewareRequest(
     return;
   }
   const isCasUpload = method === "POST" && parsedUrl.pathname === "/api/v1/cas/upload";
-  const rawBuf = await readRawBody(req, isCasUpload ? MAX_CAS_UPLOAD_BODY_BYTES : MAX_BODY_BYTES);
+  const isDeckDataUpload =
+    method === "POST" &&
+    (parsedUrl.pathname === "/api/v1/decks/generate" ||
+      parsedUrl.pathname === "/api/decks/generate" ||
+      parsedUrl.pathname === "/api/v1/decks/normalize-chart-source" ||
+      parsedUrl.pathname === "/api/decks/normalize-chart-source");
+  const isSupportTicketUpload =
+    method === "POST" &&
+    (parsedUrl.pathname === "/api/v1/support/tickets" || parsedUrl.pathname === "/api/support/tickets");
+  const maxAllowedBodyBytes = isCasUpload
+    ? MAX_CAS_UPLOAD_BODY_BYTES
+    : isDeckDataUpload
+      ? 7_500_000
+      : isSupportTicketUpload
+        ? 8_388_608
+        : MAX_BODY_BYTES;
+  const rawBuf = await readRawBody(req, maxAllowedBodyBytes);
   if (rawBuf === "TOO_LARGE") {
     if (isCasUpload) {
       return writeJson(res, HTTP_PAYLOAD_TOO_LARGE, {

@@ -22,6 +22,7 @@ import {
   SLIDE_STAGE_MIN_SCALE,
 } from "./CompanionPreviewDeviceFrame";
 import type { ElementCommentResponse } from "../../../lib/validations/element-comment";
+import type { GenerateDeckResponse } from "../../../lib/validations/deck-generation";
 import type { IframeToHostDeckMessage, WordingSlotDto } from "../../../lib/validations/presentation";
 import {
   validateUserHtmlPayload,
@@ -53,6 +54,9 @@ const INVALID_HTML_MSG_MAP: Record<"empty" | "too_large" | "invalid_html", { key
 
 export interface CompanionLiveHtmlRightPaneProps {
   projectId?: string;
+  onDeckGenerated?: (response: GenerateDeckResponse) => void;
+  onSyncToMainChat?: (summaryText: string) => void;
+  onEmbedIntoActiveSlide?: (htmlSnippet: string, title: string) => void;
   activeTab: CanvasTabItem;
   structureLens: "userflow" | "slide-cms";
   selectedNodeId?: string | null;
@@ -555,6 +559,10 @@ export const CompanionLiveHtmlRightPane: React.FC<CompanionLiveHtmlRightPaneProp
   return (
     <div id="htmlSubPane" className="canvas-live-html-right-pane" data-stage-skin={props.stageSkin ?? "brand-color"} aria-label={c.t("canvas.liveHtmlPane", "Live HTML Preview Sandbox")} style={{ flex: 1, minWidth: 0, height: "100%", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-surface)", overflow: "hidden", position: "relative" }}>
       <HtmlPreviewToolbar
+        projectId={props.projectId}
+        onDeckGenerated={props.onDeckGenerated}
+        onSyncToMainChat={props.onSyncToMainChat}
+        onEmbedIntoActiveSlide={props.onEmbedIntoActiveSlide}
         structureLens={props.structureLens}
         pointerMode={props.pointerMode} onSetPointerMode={props.onSetPointerMode} activeSubState={c.activeSubState}
         onSelectSubState={(v) => { void c.actions.handleSelectFixtureVariant(v); }} isInlineCodeOpen={props.isInlineCodeOpen}

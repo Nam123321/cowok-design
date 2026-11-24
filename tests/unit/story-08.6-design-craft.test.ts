@@ -211,7 +211,7 @@ describe("Story 08.6: Standalone design-craft 4-Pillar Assembly & Runtime", () =
     ])) as Array<{ id: number; result: { tools?: unknown[]; isError?: boolean; content?: Array<{ text: string }> } }>;
 
     expect(responses[0].result).toBeDefined();
-    expect(responses[1].result.tools).toHaveLength(13);
+    expect(responses[1].result.tools).toHaveLength(14);
 
     const okPayload = JSON.parse(responses[2].result.content?.[0].text ?? "{}");
     expect(responses[2].result.isError).toBe(false);

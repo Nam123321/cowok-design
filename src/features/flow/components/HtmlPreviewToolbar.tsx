@@ -5,6 +5,7 @@ import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useFormatter } from "../../../hooks/useFormatter";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { normalizeViewportPreset, type FixtureVariant, type ViewportPreset } from "../../../lib/validations/screen-fixture";
+import type { GenerateDeckResponse } from "../../../lib/validations/deck-generation";
 import type { ExportInitialSection } from "../../snapshots/components/ExportBundleModal";
 import { resolveStageMode, STAGE_CAPABILITY_BY_MODE } from "../utils/stage-capability";
 import { SlideAspectAndZoomControls, ViewportSwitcherControl } from "./HtmlPreviewSlideControls";
@@ -67,6 +68,10 @@ const BADGE_DOT_BASE: React.CSSProperties = {
 };
 
 export interface HtmlPreviewToolbarProps {
+  projectId?: string;
+  onDeckGenerated?: (response: GenerateDeckResponse) => void;
+  onSyncToMainChat?: (summaryText: string) => void;
+  onEmbedIntoActiveSlide?: (htmlSnippet: string, title: string) => void;
   structureLens?: "userflow" | "slide-cms";
   pointerMode: "interact" | "click-dom" | "drag-box";
   onSetPointerMode: (mode: "interact" | "click-dom" | "drag-box") => void;
@@ -358,7 +363,7 @@ const RowTwoIconUtilityStrip: React.FC<HtmlPreviewToolbarProps & { isCompactRowT
       <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "nowrap", flexShrink: 0 }}>
         {capability.showViewportPresets && <ViewportSwitcherControl activePreset={activePreset} isReadOnly={p.isReadOnly} isCompact={p.isCompactRowTwo} onSetViewportPreset={p.onSetViewportPreset} />}
         {capability.showSlideAspectAndZoom ? (
-          <SlideAspectAndZoomControls aspectRatio={p.aspectRatio} zoomMode={p.zoomMode} isCompact={p.isCompactRowTwo} onSetAspectRatio={p.onSetAspectRatio} onSetZoomMode={p.onSetZoomMode} />
+          <SlideAspectAndZoomControls aspectRatio={p.aspectRatio} zoomMode={p.zoomMode} isCompact={p.isCompactRowTwo} projectId={p.projectId} onSetAspectRatio={p.onSetAspectRatio} onSetZoomMode={p.onSetZoomMode} onDeckGenerated={p.onDeckGenerated} onSyncToMainChat={p.onSyncToMainChat} onEmbedIntoActiveSlide={p.onEmbedIntoActiveSlide} />
         ) : (
           <button
             type="button"

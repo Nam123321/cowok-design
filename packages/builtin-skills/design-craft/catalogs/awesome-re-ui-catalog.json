@@ -3,7 +3,7 @@
   "upstreamRepo": "https://github.com/alexgaoth/awesome-reverse-engineered",
   "upstreamCommit": "80f551625282c47c2984bde35280c32d0aa4be58",
   "licenseFirewallApplied": true,
-  "totalEntries": 300,
+  "totalEntries": 301,
   "items": [
     {
       "slug": "photocraft",
@@ -5324,6 +5324,27 @@
         "codeberg"
       ],
       "layoutArchetype": "chat-messenger"
+    },
+    {
+      "slug": "baocut",
+      "name": "BaoCut",
+      "repoUrl": "https://github.com/JimLiu/baocut",
+      "category": "Desktop Software Reimplementations",
+      "subcategory": "Video & Motion Presentation",
+      "stars": 1798,
+      "licenseSpdx": "MIT",
+      "firewallVerdict": "ADOPT_PRIOR_ART",
+      "lang": "TypeScript",
+      "description": "Clean-room browser video & motion timeline editor for data storytelling and interactive presentation reels",
+      "topics": [
+        "video-editor",
+        "timeline",
+        "motion",
+        "canvas",
+        "presentation",
+        "web"
+      ],
+      "layoutArchetype": "canvas-editor"
     }
   ]
 }

@@ -5,7 +5,7 @@ import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "@/hooks/useTranslation";
 import { WorkbenchNode, NodeSubState } from "../store/flow-workbench-store";
 import type { NodeJobStatus } from "../store/keyed-parallel-coordinator";
-import { FIXTURE_VARIANTS, normalizeFixtureRef } from "../../../lib/validations/screen-fixture";
+import { normalizeFixtureRef } from "../../../lib/validations/screen-fixture";
 import { DagNodeHeader, DagNodePorts, PortMouseDownArgs } from "./DagNodeHeaderAndPorts";
 
 export type { PortMouseDownArgs };
@@ -32,54 +32,63 @@ export interface DagNodeCardProps {
   onHoverCta?: (ffId: string, hovered: boolean) => void;
   nodeWidth: number;
   nodeHeight: number;
+  substateFixtures?: Partial<Record<NodeSubState, string>>;
+  flowTier?: "PRIMARY" | "EDGE_CASE";
+  severityBand?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   executionStatus?: {
     status: NodeJobStatus;
     queuePosition?: number;
   };
 }
 
-const getNodeBorder = (isSelected: boolean, isDraft: boolean): string => {
+const getNodeBorder = (
+  isSelected: boolean,
+  isDraft: boolean,
+  flowTier?: "PRIMARY" | "EDGE_CASE"
+): string => {
   if (isSelected) return "2px solid var(--action-primary)";
+  if (flowTier === "EDGE_CASE") return "1.5px dashed var(--state-warning)";
   if (isDraft) return "1.5px dashed var(--action-primary)";
   return "1px solid var(--border-subtle)";
 };
 
+const ORDERED_SUBSTATE_VARIANTS: readonly NodeSubState[] = ["DEFAULT", "LOADING", "EMPTY", "ERROR"];
+const PILL_ACTIVE_FONT_WEIGHT = 600;
+const PILL_IDLE_FONT_WEIGHT = 400;
+
 const DagNodeSubStatePills: React.FC<{
   nodeId: string;
   activeSubState: NodeSubState;
+  substateFixtures?: Partial<Record<NodeSubState, string>>;
   onSelectSubState?: (nodeId: string, subState: NodeSubState) => void;
-}> = ({ nodeId, activeSubState, onSelectSubState }) => {
+}> = ({ nodeId, activeSubState, substateFixtures, onSelectSubState }) => {
+  const { t } = useTranslation();
   const normalizedActive = normalizeFixtureRef(activeSubState);
+  const fixtureTooltipPrefix = t("flowSynthesize.substateFixtureTooltip", "Mẫu dữ liệu");
   return (
-    <div
-      className="dag-node-substate-switcher"
-      data-testid={`dag-node-substates-${nodeId}`}
-      style={{ display: "flex", gap: "3px", marginBottom: "6px", flexWrap: "wrap" }}
-    >
-      {FIXTURE_VARIANTS.map(({ variant, label }) => {
+    <div className="dag-node-substate-switcher" data-ff-id="dag-flow-node-substate-pills" data-testid={`dag-node-substates-${nodeId}`} style={{ display: "flex", gap: "3px", marginBottom: "6px", flexWrap: "wrap" }}>
+      {ORDERED_SUBSTATE_VARIANTS.map((variant) => {
         const isActive = variant === normalizedActive;
+        const boundFixtureId = substateFixtures?.[variant];
         return (
           <button
             key={variant}
             type="button"
             className={`dag-substate-pill ${isActive ? "active" : ""}`}
             data-testid={`dag-substate-${variant.toLowerCase()}-${nodeId}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelectSubState?.(nodeId, variant);
-            }}
+            data-fixture-id={boundFixtureId || undefined}
+            aria-pressed={isActive}
+            title={boundFixtureId ? `${variant} · ${fixtureTooltipPrefix}: ${boundFixtureId}` : variant}
+            onClick={(e) => { e.stopPropagation(); onSelectSubState?.(nodeId, variant); }}
             style={{
-              fontSize: "9px",
-              padding: "1px 5px",
-              borderRadius: "var(--radius-xs)",
+              fontSize: "9px", padding: "1px 5px", borderRadius: "var(--radius-xs)", cursor: "pointer",
               border: isActive ? "1px solid var(--action-primary)" : "1px solid var(--border-subtle)",
               backgroundColor: isActive ? "var(--bg-selected)" : "transparent",
               color: isActive ? "var(--text-primary)" : "var(--text-muted)",
-              cursor: "pointer",
-              fontWeight: isActive ? 600 : 400,
+              fontWeight: isActive ? PILL_ACTIVE_FONT_WEIGHT : PILL_IDLE_FONT_WEIGHT,
             }}
           >
-            {label}
+            {variant}
           </button>
         );
       })}
@@ -242,6 +251,43 @@ const DagNodeTitleEditor: React.FC<{
     </div>
   );
 
+const EDGE_CASE_ICON_SIZE = 9;
+const EDGE_CASE_STROKE_WIDTH = 1.85;
+const EDGE_CASE_FONT_WEIGHT = 600;
+
+const DagNodeEdgeCaseBadge: React.FC<{
+  nodeId: string;
+  severityBand?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+}> = ({ nodeId, severityBand }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      data-testid={`dag-node-edgecase-badge-${nodeId}`}
+      style={{
+        fontSize: "8.5px",
+        fontFamily: "var(--font-mono)",
+        fontWeight: EDGE_CASE_FONT_WEIGHT,
+        padding: "1px 5px",
+        borderRadius: "var(--radius-xs)",
+        backgroundColor: "var(--state-warning-soft)",
+        color: "var(--state-warning)",
+        border: "1px dashed var(--state-warning)",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "4px",
+        alignSelf: "flex-start",
+        marginBottom: "4px",
+      }}
+    >
+      <BrandIcon name="warning" size={EDGE_CASE_ICON_SIZE} strokeWidth={EDGE_CASE_STROKE_WIDTH} color="currentColor" />
+      <span>
+        {t("flowSynthesize.edgeCaseBadge", "EDGE_CASE")}
+        {severityBand ? ` · ${severityBand}` : ""}
+      </span>
+    </div>
+  );
+};
+
 const DagNodeBody: React.FC<{
   node: WorkbenchNode;
   isOrphan?: boolean;
@@ -254,6 +300,9 @@ const DagNodeBody: React.FC<{
   onUpdateNote: (nodeId: string, note: string) => void;
   onSelectSubState?: (nodeId: string, subState: NodeSubState) => void;
   onHoverCta?: (ffId: string, hovered: boolean) => void;
+  substateFixtures?: Partial<Record<NodeSubState, string>>;
+  flowTier?: "PRIMARY" | "EDGE_CASE";
+  severityBand?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 }> = (p) => {
   const { t } = useTranslation();
   const activeSubState: NodeSubState = normalizeFixtureRef(p.node.activeSubState);
@@ -264,6 +313,7 @@ const DagNodeBody: React.FC<{
 
   return (
     <div style={{ padding: "8px 10px", flex: 1, display: "flex", flexDirection: "column" }}>
+      {p.flowTier === "EDGE_CASE" && <DagNodeEdgeCaseBadge nodeId={p.node.id} severityBand={p.severityBand} />}
       {resolvedAppShell && (
         <div
           data-testid={`appshell-badge-${p.node.id}`}
@@ -338,6 +388,7 @@ const DagNodeBody: React.FC<{
       <DagNodeSubStatePills
         nodeId={p.node.id}
         activeSubState={activeSubState}
+        substateFixtures={p.substateFixtures}
         onSelectSubState={p.onSelectSubState}
       />
 
@@ -388,7 +439,7 @@ export const DagNodeCard: React.FC<DagNodeCardProps> = (props) => {
     width: `${props.nodeWidth}px`,
     minHeight: `${props.nodeHeight}px`,
     backgroundColor: "var(--bg-surface)",
-    border: getNodeBorder(props.isSelected, isDraft),
+    border: getNodeBorder(props.isSelected, isDraft, props.flowTier),
     borderRadius: "var(--radius-md)",
     boxShadow: props.isSelected ? "var(--shadow-md)" : "var(--shadow-sm)",
     pointerEvents: "auto",
@@ -403,6 +454,7 @@ export const DagNodeCard: React.FC<DagNodeCardProps> = (props) => {
     <div
       className="dag-node-card"
       data-testid={`dag-node-${props.node.id}`}
+      data-flow-tier={props.flowTier || "PRIMARY"}
       aria-label={t("flow.nodeCard", `Node ${props.node.screenKey}`)}
       onMouseDown={(e) => props.onNodeMouseDown(e, props.node)}
       style={cardStyle}
@@ -428,6 +480,9 @@ export const DagNodeCard: React.FC<DagNodeCardProps> = (props) => {
         onUpdateNote={props.onUpdateNote}
         onSelectSubState={props.onSelectSubState}
         onHoverCta={props.onHoverCta}
+        substateFixtures={props.substateFixtures}
+        flowTier={props.flowTier}
+        severityBand={props.severityBand}
       />
       <DagNodePorts
         node={props.node}

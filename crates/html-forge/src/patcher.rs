@@ -46,6 +46,8 @@ const ALLOWED_INLINE_CSS_PROPS: &[&str] = &[
     "justify-content",
     "flex-direction",
     "flex-wrap",
+    "width",
+    "height",
     "max-width",
     "box-shadow",
 ];
@@ -515,6 +517,18 @@ fn is_valid_css_length_token(tok: &str) -> bool {
     !num.is_empty() && num.parse::<f64>().is_ok_and(f64::is_finite)
 }
 
+fn is_valid_bounded_px_dimension(val: &str) -> bool {
+    let Some(digits) = val.strip_suffix("px") else {
+        return false;
+    };
+    if digits.is_empty() || digits.len() > 4 || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
+    digits
+        .parse::<u32>()
+        .is_ok_and(|px| (1..=4096).contains(&px))
+}
+
 fn is_valid_css_value(prop: &str, raw_val: &str) -> bool {
     let val = raw_val.trim();
     if val.is_empty() || val.len() > 256 {
@@ -522,6 +536,9 @@ fn is_valid_css_value(prop: &str, raw_val: &str) -> bool {
     }
     if val.to_ascii_lowercase().contains("!important") {
         return false;
+    }
+    if matches!(prop, "width" | "height") {
+        return is_valid_bounded_px_dimension(val);
     }
     if is_valid_css_var(val) {
         return true;

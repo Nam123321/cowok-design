@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-06"
 title: "Epic 06: Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen"
-status: in-progress
+status: completed
 track: "Stream-3"
 wave: 2
 provides: ["16:9 HTML Slide Stage", "Dual-Pane <16ms CMS Editor", "Contextual Slide Copilot & Offline 2D Charts", "Dual-Screen Presenter Mode", "End-to-End AI Multi-Slide Deck Generation & CSV/PDF->ChartSpecV12"]
@@ -62,7 +62,7 @@ Epic 06 xây dựng bộ máy trình chiếu & báo cáo điều hành HTML-Nati
 | **Story 06.2** | Dual-Pane Slide-Over CMS Workbench (`inert`), Two-Tier `<16ms` Non-Reloading Sync, `lol_html` + `html5ever` mXSS & Crash Recovery | `completed` | `3` | `['06.1', '03.3']` |
 | **Story 06.3** | Contextual Slide Copilot (`KeyedParallelCoordinator` Lease) & Offline CSP-B 2D Live Interactive Charts | `completed` | `3` | `['06.2', '04.4']` |
 | **Story 06.4** | Dual-Screen Presenter Mode, Out-of-Band `BroadcastChannel` Security, Pace Timer & Fallback Modes | `completed` | `3` | `['06.1', '06.2']` |
-| **Story 06.5** | End-to-End AI Multi-Slide Deck Generation, CSV/PDF-to-`ChartSpecV12` Normalizer & `<Stage>/<Window>/<Phone>` (`stageshow`) Flow | `refactored` | `3` | `['06.1', '06.3', '09.2', '11.1']` |
+| **Story 06.5** | End-to-End AI Multi-Slide Deck Generation, Option D Chart & Dashboard Studio v2, CSV/PDF-to-`ChartSpecV12` Normalizer & `<Stage>/<Window>/<Phone>` (`stageshow`) Flow | `completed` | `3` | `['06.1', '06.3', '09.2', '11.1']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 

@@ -143,8 +143,17 @@ test.describe("Story 05.4 Full E2E Cognitive Progressive Userflow", () => {
     };
 
     // STEP 1 (Phase 1 — Artistic Warm Sketch + Minimalist Cognitive Stepper + Steering Chip Persistence)
+    const ensureSteeringPopoverOpen = async () => {
+      const bar = page.locator("[data-ff-id='steering-chips-bar']");
+      if (!(await bar.isVisible().catch(() => false))) {
+        await page.getByTestId("steering-chips-popover-btn").click();
+      }
+      await expect(bar).toBeVisible({ timeout: 10000 });
+    };
+
     await expect(page.locator("[data-ff-id='stage-skin-toggle']")).toBeVisible({ timeout: 15000 });
-    await expect(page.locator("[data-ff-id='steering-chips-bar']")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("steering-chips-popover-btn")).toBeVisible({ timeout: 10000 });
+    await ensureSteeringPopoverOpen();
     await expect(page.getByTestId("cognitive-phase-stepper")).toBeVisible();
     await expect(page.getByTestId("promote-sketch-to-style-btn")).toBeVisible();
     await expect(page.getByTestId("toggle-sketch-lens-btn")).toHaveCount(0);
@@ -177,9 +186,11 @@ test.describe("Story 05.4 Full E2E Cognitive Progressive Userflow", () => {
     // Reload (F5) -> verify active minimalist steering chip hydrates from SQLite WAL
     await page.reload({ waitUntil: "networkidle" });
     await dismissOnboardingWizard(page);
+    await ensureSteeringPopoverOpen();
     await expect(page.getByTestId("steering-chip-more-whitespace")).toHaveAttribute("aria-pressed", "true", {
       timeout: 10000,
     });
+    await page.keyboard.press("Escape");
     await page.waitForTimeout(450);
 
     // STEP 2 (Phase 1 — Night Mode Semantic Blueprint Sketch)
@@ -293,6 +304,7 @@ test.describe("Story 05.4 Full E2E Cognitive Progressive Userflow", () => {
       { projectId: DEFAULT_PROJECT_ID, token: sessionToken, nonce: qaNonce }
     );
 
+    await ensureSteeringPopoverOpen();
     await page.getByTestId("steering-chip-softer-corners").click();
     const receiptCard = page.locator("[data-ff-id='locked-rule-receipt-card']");
     await expect(receiptCard).toBeVisible({ timeout: 8000 });

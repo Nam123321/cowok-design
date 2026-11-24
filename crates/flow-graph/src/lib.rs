@@ -11,6 +11,7 @@ pub mod models;
 mod mutations;
 mod node_batch;
 mod queries;
+pub mod synthesizer;
 
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 

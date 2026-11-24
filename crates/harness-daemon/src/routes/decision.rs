@@ -17,12 +17,13 @@ use domain::decision::{
     VerdictShieldOutput,
 };
 use domain::HarnessError;
-use rusqlite::{params, TransactionBehavior};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::bot_fleet::load_tenant_byok_credentials;
 use super::legacy_specs::verify_anti_idor_with_caller;
+use super::orchestrator::{map_actor_error_to_response, shared_write_actor_for_pool};
 use super::DaemonAppState;
 use crate::daemon_auth::{
     is_valid_superadmin_bearer, FlowPrincipal, LegacyAuthKind, VerifiedLegacyIngress,
@@ -322,46 +323,71 @@ async fn verify_project_tenant_access_async(
     })?
 }
 
-fn persist_decision_audit_immediate(
-    state: &DaemonAppState,
-    record: &DecisionAuditRecord,
-) -> Result<(), HarnessError> {
-    let mut conn = state
-        .registry
-        .pool()
-        .connection()
-        .map_err(|e| HarnessError::SqliteBusy {
-            details: format!("pool connection failed: {e}"),
-        })?;
-    spec_registry::retry_on_busy("decision_audit_log.insert", || {
-        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let rubric_int: Option<i64> = record.rubric_swap_consistent.map(i64::from);
-        let breaker_int: i64 = i64::from(record.breaker_tripped);
-        tx.execute(
-            "INSERT INTO decision_audit_log (
-                id, tenant_id, project_id, cascade_stage, tier_used, confidence_kind,
-                verdict_label, rubric_swap_consistent, attempt_number, breaker_tripped,
-                stale_file_sha256, latency_ms, created_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
-            params![
-                record.id,
-                record.tenant_id,
-                record.project_id,
-                record.cascade_stage.as_db_str(),
-                record.tier_used.as_db_str(),
-                record.confidence_kind.as_db_str(),
-                record.verdict_label,
-                rubric_int,
-                i64::from(record.attempt_number),
-                breaker_int,
-                record.stale_file_sha256,
-                record.latency_ms as i64,
-                record.created_at,
-            ],
-        )?;
-        tx.commit()?;
-        Ok(())
+async fn persist_decision_audit_via_actor(
+    state: DaemonAppState,
+    record: DecisionAuditRecord,
+    request_id: String,
+) -> Result<(), Response> {
+    let pool_state = state.clone();
+    let actor_req_id = request_id.clone();
+    let actor = tokio::task::spawn_blocking(move || {
+        shared_write_actor_for_pool(pool_state.registry.pool())
     })
+    .await
+    .map_err(|_| {
+        error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "INTERNAL_ERROR",
+            "Write actor lookup worker failed unexpectedly",
+            None,
+            None,
+            actor_req_id.clone(),
+        )
+    })?
+    .map_err(|err| map_actor_error_to_response(err, actor_req_id))?;
+
+    let receipt = actor
+        .try_enqueue_immediate(move |tx| {
+            let rubric_int: Option<i64> = record.rubric_swap_consistent.map(i64::from);
+            let breaker_int: i64 = i64::from(record.breaker_tripped);
+            tx.execute(
+                "INSERT INTO decision_audit_log (
+                    id, tenant_id, project_id, cascade_stage, tier_used, confidence_kind,
+                    verdict_label, rubric_swap_consistent, attempt_number, breaker_tripped,
+                    stale_file_sha256, latency_ms, created_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                params![
+                    record.id,
+                    record.tenant_id,
+                    record.project_id,
+                    record.cascade_stage.as_db_str(),
+                    record.tier_used.as_db_str(),
+                    record.confidence_kind.as_db_str(),
+                    record.verdict_label,
+                    rubric_int,
+                    i64::from(record.attempt_number),
+                    breaker_int,
+                    record.stale_file_sha256,
+                    record.latency_ms as i64,
+                    record.created_at,
+                ],
+            )?;
+            Ok(())
+        })
+        .map_err(|err| map_actor_error_to_response(err, request_id.clone()))?;
+
+    match tokio::task::spawn_blocking(move || receipt.wait()).await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(err)) => Err(map_actor_error_to_response(err, request_id)),
+        Err(_) => Err(error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "INTERNAL_ERROR",
+            "Decision audit persistence worker failed unexpectedly",
+            None,
+            None,
+            request_id,
+        )),
+    }
 }
 
 /// `POST /api/v1/decision/route`
@@ -491,39 +517,13 @@ pub async fn handle_decision_route(
         created_at: Utc::now().timestamp_millis(),
     };
 
-    let persist_state = state.clone();
-    let persist_res = tokio::task::spawn_blocking(move || {
-        persist_decision_audit_immediate(&persist_state, &record)
-    })
-    .await;
-
-    match persist_res {
-        Ok(Ok(())) => ok_response(DecisionRouteResponseData { audit_id, output }, request_id),
-        Ok(Err(HarnessError::SqliteBusy { details })) => error_response(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "STORAGE_BUSY",
-            &format!("Storage busy persisting V21 decision_audit_log: {details}"),
-            None,
-            None,
-            request_id,
-        ),
-        Ok(Err(err)) => error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "STORAGE_ERROR",
-            &format!("Failed persisting V21 decision_audit_log: {err}"),
-            None,
-            None,
-            request_id,
-        ),
-        Err(_) => error_response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "INTERNAL_ERROR",
-            "Decision audit persistence worker failed unexpectedly",
-            None,
-            None,
-            request_id,
-        ),
+    if let Err(resp) =
+        persist_decision_audit_via_actor(state.clone(), record, request_id.clone()).await
+    {
+        return resp;
     }
+
+    ok_response(DecisionRouteResponseData { audit_id, output }, request_id)
 }
 
 /// `GET /api/v1/decision/audit`
