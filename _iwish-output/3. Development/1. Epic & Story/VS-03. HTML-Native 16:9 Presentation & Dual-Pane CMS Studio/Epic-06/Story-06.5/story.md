@@ -4,7 +4,7 @@ id: "06.5"
 title: "Story 06.5: End-to-End AI Multi-Slide Deck Generation, CSV/PDF-to-ChartSpecV12 Normalizer & <Stage>/<Window>/<Phone> (stageshow) Flow"
 description: "Hoàn thiện chặng cuối cho Epic 06 hậu PR #14: gỡ bỏ hoàn toàn stub echo trong presentation_copilot.rs:1767-1782 (prompt.chars().take(160) & số Q1..Q3 giả), nối Slide Copilot & Deck Launchpad qua crates/bot-fleet (11.1) + 5-Stage Sandwich (09.2) + stageshow-slide (<Stage>/<Window>/<Phone>, 3-7 word budget, <=30 words/slide), và bộ chuẩn hóa .csv/.tsv/.pdf -> ChartSpecV12 tự cân tỷ trọng 100 +/- 0.05 giữ đơn vị gốc."
 resource: "iwish://uxui-os/development/epic-06/story-06.5"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: core
 adr_ref: "ADR-006"
@@ -34,7 +34,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-34: End-to-End AI Multi-Slide Deck Generation & CSV/PDF-to-ChartSpecV12](file:///Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 06: Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen](../epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context

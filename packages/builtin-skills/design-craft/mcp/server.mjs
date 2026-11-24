@@ -1,8 +1,17 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { BUILDER_TOOL_REGISTRY } from "../engine/builder-tools.mjs";
+import {
+  generateFeedbackTicketCode,
+  scrubFeedbackFields,
+  VALID_FEEDBACK_CATEGORIES,
+  VALID_FEEDBACK_CHANNELS,
+  validateOptionalFeedbackEmail,
+  writeFeedbackOutboxFile,
+} from "../engine/feedback-scrubber.mjs";
 import { QC_TOOL_REGISTRY } from "../engine/qc-tools.mjs";
 import { PathJailError } from "../engine/path-jail.mjs";
 
@@ -10,9 +19,92 @@ const PROTOCOL_VERSION = "2024-11-05";
 const SERVER_INFO = { name: "design-craft-mcp", version: "1.0.0" };
 export const MAX_LINE_BYTES = 1_048_576;
 
+const FEEDBACK_CATEGORIES = VALID_FEEDBACK_CATEGORIES;
+const FEEDBACK_CHANNELS = VALID_FEEDBACK_CHANNELS;
+
+export function cowokSubmitFeedback(args = {}, ctx = {}) {
+  const category = String(args.category ?? "bug_report").trim();
+  if (!FEEDBACK_CATEGORIES.includes(category)) {
+    throw new PathJailError(
+      "INVALID_PARAMS",
+      `Unsupported feedback category '${category}'. Valid: ${FEEDBACK_CATEGORIES.join(", ")}`
+    );
+  }
+  const envHost = String(ctx.env?.COWOK_PLUGIN_HOST ?? "").trim();
+  const channel = String(args.channel ?? (FEEDBACK_CHANNELS.includes(envHost) ? envHost : "claude_code")).trim();
+  if (!FEEDBACK_CHANNELS.includes(channel)) {
+    throw new PathJailError(
+      "INVALID_PARAMS",
+      `Unsupported feedback channel '${channel}'. Valid: ${FEEDBACK_CHANNELS.join(", ")}`
+    );
+  }
+  const rawTitle = String(args.title ?? "").trim();
+  const rawDesc = String(args.description ?? "").trim();
+  if (rawTitle.length < 3 || rawTitle.length > 160) {
+    throw new PathJailError("INVALID_PARAMS", "title must be 3..=160 characters");
+  }
+  if (rawDesc.length < 5 || rawDesc.length > 4000) {
+    throw new PathJailError("INVALID_PARAMS", "description must be 5..=4000 characters");
+  }
+
+  const emailCheck = validateOptionalFeedbackEmail(args.email);
+  if (!emailCheck.ok) {
+    throw new PathJailError("INVALID_PARAMS", emailCheck.error);
+  }
+
+  const scrubbed = scrubFeedbackFields({
+    title: rawTitle,
+    description: rawDesc,
+    locale: args.locale ?? "en-US",
+    recentErrorCodes: Array.isArray(args.recentErrorCodes) ? args.recentErrorCodes : [],
+    activeSkills: Array.isArray(args.activeSkills) ? args.activeSkills : [],
+  });
+
+  const ticketCode = generateFeedbackTicketCode();
+  const airgapped = ["1", "true", "yes"].includes(String(ctx.env?.COWOK_AIRGAPPED ?? "").trim().toLowerCase());
+  const record = {
+    ticketCode,
+    category,
+    channel,
+    title: scrubbed.title,
+    description: scrubbed.description,
+    contactEmail: emailCheck.value,
+    status: "submitted",
+    syncStatus: airgapped ? "local_only" : "queued",
+    scrubbedRedactions: scrubbed.redactionCount,
+    diagnostics: {
+      appVersion: SERVER_INFO.version,
+      channel,
+      os: os.platform(),
+      locale: scrubbed.locale,
+      recentErrorCodes: scrubbed.recentErrorCodes,
+      activeSkills: scrubbed.activeSkills,
+      redactionCount: scrubbed.redactionCount,
+    },
+    createdAt: Date.now(),
+  };
+
+  if (ctx.rootDir && fs.existsSync(ctx.rootDir)) {
+    try {
+      writeFeedbackOutboxFile(ctx.rootDir, ticketCode, record);
+    } catch (err) {
+      if (err instanceof PathJailError) {
+        throw err;
+      }
+      if (!err || (err.code !== "EACCES" && err.code !== "EROFS")) {
+        throw err;
+      }
+      // Non-fatal if workspace is read-only (EACCES/EROFS); scrubbed receipt is still returned.
+    }
+  }
+
+  return { ok: true, ...record };
+}
+
 const ALL_TOOLS = {
   ...BUILDER_TOOL_REGISTRY,
   ...QC_TOOL_REGISTRY,
+  cowok_submit_feedback: cowokSubmitFeedback,
 };
 
 function isPlainObject(value) {
@@ -33,13 +125,33 @@ const TOOL_DESCRIPTIONS = {
   "qc-chart-and-data": "Validates chart titles, units, finite data points, accessible labels, and pie/donut slice caps.",
   "qc-spec-parity": "Measures coverage parity between declared spec requirements and actual screens/states/themeModes.",
   "qc-popular-coverage": "Evaluates reuse of canonical popular FE or 16:9 Deck catalog components.",
+  cowok_submit_feedback:
+    "Submits a Zero-PII scrubbed non-tech bug report, feature request, skill/template request, or question attributed to the host channel (claude_code, codex, antigravity, cursor, cowok_ai, cli, desktop, docker).",
+};
+
+const TOOL_INPUT_SCHEMAS = {
+  cowok_submit_feedback: {
+    type: "object",
+    required: ["category", "title", "description"],
+    properties: {
+      category: { type: "string", enum: FEEDBACK_CATEGORIES },
+      title: { type: "string", minLength: 3, maxLength: 160 },
+      description: { type: "string", minLength: 5, maxLength: 4000 },
+      email: { type: "string" },
+      channel: { type: "string", enum: FEEDBACK_CHANNELS },
+      locale: { type: "string" },
+      recentErrorCodes: { type: "array", items: { type: "string" } },
+      activeSkills: { type: "array", items: { type: "string" } },
+    },
+    additionalProperties: false,
+  },
 };
 
 export function listToolDefinitions() {
   return Object.keys(ALL_TOOLS).map((name) => ({
     name,
     description: TOOL_DESCRIPTIONS[name] ?? name,
-    inputSchema: {
+    inputSchema: TOOL_INPUT_SCHEMAS[name] ?? {
       type: "object",
       additionalProperties: true,
     },

@@ -12,6 +12,7 @@ pub mod adapters;
 pub mod byok_gateway;
 pub mod decision_cascade;
 pub mod normalizer;
+pub mod orchestrator;
 pub mod posix_sandbox;
 pub mod session_dir;
 
@@ -34,6 +35,14 @@ pub use decision_cascade::{
 pub use normalizer::{
     coerce_json_value, extract_fenced_or_raw_json, normalize_svg_viewboxes, strip_ansi_sequences,
     NormalizationReport, PostExecutionNormalizer,
+};
+pub use orchestrator::{
+    build_lane2_pty_env, deduplicate_provenance_backlinks, parse_live_spec_jsonl,
+    read_live_spec_file_nofollow, resolve_jailed_live_spec_path, CanvasPatchSnapshot,
+    CowokOrchestrator, LivePatchApplyOutcome, LiveSpecBridgeState, LiveSpecPatchLine,
+    OrchestratorCommandKind, OrchestratorError, OrchestratorLane, OrchestratorRouteInput,
+    OrchestratorRouteOutput, ProvenanceBacklink, UndoOutcome, LIVE_SPEC_DEFAULT_FILENAME,
+    LIVE_SPEC_ENV_VAR, LIVE_SPEC_MAX_BYTES, LIVE_SPEC_REL_DIR,
 };
 pub use posix_sandbox::{
     redact_secrets_from_text, PgidProcessSupervisor, PromptTransport, SandboxExecutionOutput,

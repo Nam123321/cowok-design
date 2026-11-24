@@ -13,6 +13,7 @@ import { DEFAULT_FLOW_PROJECT_ID, DEFAULT_INITIAL_NODES, DEFAULT_INITIAL_TRANSIT
 import { useTranslation } from "../../hooks/useTranslation";
 import { apiWorkbenchSettings } from "../../api/workbench-settings";
 import { CowokToast } from "../../components/ui/CowokToast";
+import { SupportRequestDrawer } from "../../features/support/SupportRequestDrawer";
 
 export type { ThemeMode };
 
@@ -52,12 +53,15 @@ export const WorkbenchSettingsDialog: React.FC<{
 const WorkbenchConnectedBody: React.FC<{
   shell: ReturnType<typeof useWorkbenchShellState>;
   isOnboardingOpen: boolean;
+  isSupportDrawerOpen: boolean;
   resolvedProjectName: string;
   resolvedProjectId: string;
   defaultSessionTitle: string;
-}> = ({ shell, isOnboardingOpen, resolvedProjectName, resolvedProjectId, defaultSessionTitle }) => {
+}> = ({ shell, isOnboardingOpen, isSupportDrawerOpen, resolvedProjectName, resolvedProjectId, defaultSessionTitle }) => {
   const { settings, sessionManager: sm, store, state } = shell;
-  const anyShellModalOpen = Boolean(settings.isSettingsOpen || sm.isNewConvoModalOpen || sm.pickerState.isOpen || isOnboardingOpen);
+  const anyShellModalOpen = Boolean(
+    settings.isSettingsOpen || sm.isNewConvoModalOpen || sm.pickerState.isOpen || isOnboardingOpen || isSupportDrawerOpen
+  );
   return (
     <WorkbenchBodyLayout
       projectName={resolvedProjectName} projectId={resolvedProjectId} projects={sm.projects} sessions={sm.sessions}
@@ -163,6 +167,7 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
   const resolvedProjectId = activeProjObj?.id || sessionManager.activeProjectId || projectId;
 
   const [isOnboardingOpen, setIsOnboardingOpen] = React.useState<boolean>(false);
+  const [isSupportDrawerOpen, setIsSupportDrawerOpen] = React.useState<boolean>(false);
   const [daemonWarning, setDaemonWarning] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (typeof window === "undefined") return;
@@ -187,9 +192,10 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
 
   return (
     <div className={`workbench-shell theme-${settings.themeMode}`} data-theme={settings.themeMode} data-flow-hydrated={shell.isFlowHydrated ? "true" : "false"} style={createWorkbenchShellStyle(settings.currentFontSize)}>
-      <WorkbenchTopNav projectId={resolvedProjectId} projectName={resolvedProjectName} activeSessionTitle={activeSession?.title} isStandaloneConversation={!activeSession?.projectId} themeMode={settings.themeMode} />
-      <WorkbenchConnectedBody shell={shell} isOnboardingOpen={isOnboardingOpen} resolvedProjectName={resolvedProjectName} resolvedProjectId={resolvedProjectId} defaultSessionTitle={t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới")} />
+      <WorkbenchTopNav projectId={resolvedProjectId} projectName={resolvedProjectName} activeSessionTitle={activeSession?.title} isStandaloneConversation={!activeSession?.projectId} themeMode={settings.themeMode} onOpenSupportDrawer={() => setIsSupportDrawerOpen(true)} />
+      <WorkbenchConnectedBody shell={shell} isOnboardingOpen={isOnboardingOpen} isSupportDrawerOpen={isSupportDrawerOpen} resolvedProjectName={resolvedProjectName} resolvedProjectId={resolvedProjectId} defaultSessionTitle={t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới")} />
       <WorkbenchModalsAndToasts shell={shell} resolvedProjectId={resolvedProjectId} isOnboardingOpen={isOnboardingOpen} daemonWarning={daemonWarning} onCloseOnboarding={closeOnboarding} onSetDaemonWarning={setDaemonWarning} />
+      <SupportRequestDrawer isOpen={isSupportDrawerOpen} onClose={() => setIsSupportDrawerOpen(false)} locale={settings.currentLocale} />
     </div>
   );
 };

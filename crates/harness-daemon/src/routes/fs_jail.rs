@@ -921,7 +921,10 @@ pub fn write_file_in_dir_fd(
         file.write_all(bytes)
             .map_err(|e| HarnessError::ValidationFailed {
                 reason: format!("WRITE_FILE_FAILED [{label}]: {e}"),
-            })
+            })?;
+        file.sync_all().map_err(|e| HarnessError::ValidationFailed {
+            reason: format!("FSYNC_FILE_FAILED [{label}]: {e}"),
+        })
     })
 }
 

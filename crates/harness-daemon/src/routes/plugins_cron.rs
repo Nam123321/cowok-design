@@ -1533,6 +1533,9 @@ pub async fn spawn_plugin_cron_runtime(
     sse_tx: Option<tokio::sync::broadcast::Sender<String>>,
     mut shutdown_rx: watch::Receiver<bool>,
 ) {
+    // Seed default cron schedules for builtin skills pinned to upstream GitHub repos (idempotent)
+    crate::routes::plugins::seed_builtin_upstream_cron_schedules(&pool, &workspace_root);
+
     // Run startup orphan reaper immediately before scheduling ticks
     if reap_stale_cron_leases(&pool, Utc::now().timestamp_millis()).unwrap_or(0) > 0 {
         broadcast_all_cron_projects(&pool, sse_tx.as_ref());

@@ -44,7 +44,7 @@ start_date: '2026-07-24'
 "Story 05.2 - Per-Node / Batch ChangeProposal, cowok-design-diff (pixelmatch + SSIM + changed_bbox), Designer Talk (T) & Zero-Tailwind Cleanup": completed
 "Story 05.3 - Immutable Turn Snapshots, Conversation Forking, Real GitHub PR, cowok-handoff-manifest.json & 1-Click Open in IDE (GAP-16, GAP-17)": completed
 "Story 05.4 - Cognitive Sketch-to-Polish, Steering Chips, Shared lol_html + reconcile_ff_ids Surgical Editing & 2-Tier Auto-Apply": completed
-"Story 05.5 - End-to-End /simulate-user (8D) & /edge-case-guardian (FMEA) -> 3-Tier Interactive Flow DAG": refactored
+"Story 05.5 - End-to-End /simulate-user (8D) & /edge-case-guardian (FMEA) -> 3-Tier Interactive Flow DAG": completed
 "Story 05.6 - Phase 2 Brand & Component Visual Studio, User-Driven Theme Modes, Bidirectional Hidden Spec Drawer & FE Data Contract": backlog
 
 # ==================================================
@@ -52,12 +52,12 @@ start_date: '2026-07-24'
 # ==================================================
 
 # Epic 06: Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen
-"Epic 06 - Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen": in-progress
+"Epic 06 - Dual-Pane 16:9 HTML Presentation, Non-Tech CMS Workbench & AI Multi-Slide Deck Gen": completed
 "Story 06.1 - Khung trình chiếu HTML Slide Engine (`16:9`/`16:10`/`Auto`), 8 Layout Templates, `V12` Schema Foundation & `HostRuntimeContract`": completed
 "Story 06.2 - Dual-Pane Slide-Over CMS Workbench (`inert`-Guarded), Two-Tier `<16ms` Non-Reloading Sync, `lol_html` + `html5ever` mXSS & Crash Recovery": completed
 "Story 06.3 - Contextual Slide Copilot (`KeyedParallelCoordinator` Lease) & Offline CSP-B 2D Live Interactive Charts": completed
 "Story 06.4 - Dual-Screen Presenter Mode, Out-of-Band `BroadcastChannel` Security, Pace Timer & Fallback Modes": completed
-"Story 06.5 - End-to-End AI Multi-Slide Deck Generation, CSV/PDF-to-ChartSpecV12 Normalizer & <Stage>/<Window>/<Phone> (stageshow) Flow": refactored
+"Story 06.5 - End-to-End AI Multi-Slide Deck Generation, Option D Chart & Dashboard Studio v2, CSV/PDF-to-ChartSpecV12 Normalizer & <Stage>/<Window>/<Phone> (stageshow) Flow": completed
 
 # Epic 07: Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter
 "Epic 07 - Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter": in-progress
@@ -75,13 +75,14 @@ start_date: '2026-07-24'
 "Story 08.2 - Động cơ Đóng gói lại Repo GitHub, Discovery Stubs & Frame-Cited Video Intake (crates/plugin-host & packages/builtin-skills)": completed
 "Story 08.3 - Quản lý Vòng đời Plugin 6 Trạng thái & Vòng Tự học LEARN có Van Duyệt Con Người (crates/plugin-host Domain Core)": completed
 "Story 08.4 - SQLite Additive Convergence, Daemon HUMAN_ONLY Auth, GitHub Cron Sync Scheduler & Workbench Plugin/LEARN UI": completed
-"Story 08.5 - Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 LEARN Loop": refactored
-"Story 08.6 - Standalone Open-Source Default Plugin Repo (design-craft) — 4-Pillar Assembly, Optional Upstream REA Peer & Multi-Harness Export": backlog
+"Story 08.5 - Split DE+DR Plugin Runtime, 7 Built-in DE Tools, Controlled Ephemeral Tool Jail & System-1 LEARN Loop": completed
+"Story 08.6 - Standalone Open-Source Default Plugin Repo (design-craft) — 4-Pillar Assembly, Optional Upstream REA Peer & Multi-Harness Export": completed
+"Story 08.7 - Zero-Hardcode AI Harness Spine — UnifiedSkillCatalog, 2-Breakpoint Provider Prompt Caching, Dynamic Model Registry, 3-Bucket Skill Separation & Studio-to-Ledger Bridge (ADR-009)": backlog
 
 # Epic 09: Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)
-"Epic 09 - Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)": in-progress
-"Story 09.1 - Design-Only /rea DNA Forge, Two-Store /rea + /awesome-re Library & License/ToS Firewall": refactored
-"Story 09.2 - 5-Stage DE -> Decision #1 -> DR/DE -> DE -> Decision #2 Flow, Rust DecisionCascadeClient & RubricShield": refactored
+"Epic 09 - Two-Store /rea DNA Forge & 5-Stage Rust DecisionCascadeClient (RubricShield)": completed
+"Story 09.1 - Design-Only /rea DNA Forge, Two-Store /rea + /awesome-re Library & License/ToS Firewall": completed
+"Story 09.2 - 5-Stage DE -> Decision #1 -> DR/DE -> DE -> Decision #2 Flow, Rust DecisionCascadeClient & RubricShield": completed
 "Story 09.3 - Tích hợp window.__jevFast + elementFromPoint Occlusion Guard, StaleFile OCC & 3-Strike Breaker": cancelled
 
 # ==================================================
@@ -90,21 +91,21 @@ start_date: '2026-07-24'
 
 # Epic 10: cowok Master Orchestrator, File Leases, Builder!=Scorer & CMP-07 Design Tournament
 "Epic 10 - cowok Master Orchestrator, File Leases, Builder!=Scorer & CMP-07 Design Tournament": in-progress
-"Story 10.1 - cowok Master Orchestrator, 3-Lane Router, MPSC SQLite Write Actor & $UIUX_LIVE_SPEC (<50ms + Cmd+Z)": refactored
+"Story 10.1 - cowok Master Orchestrator, 3-Lane Router, MPSC SQLite Write Actor & $UIUX_LIVE_SPEC (<50ms + Cmd+Z)": completed
 "Story 10.2 - Parallel Builder != Scorer Swarm Coordination, File Leases, 429 Clamp & Tier-3 Design Jury": refactored
-"Story 10.3 - Stage-B Anti-Clone Design Tournament (CMP-07), Blind Wipe, Cross-Variant Borrow, /crystallize & advisor Loop": refactored
+"Story 10.3 - Stage-B Anti-Clone Design Tournament (CMP-07), Blind Wipe, Cross-Variant Borrow, /crystallize & advisor Reflective Skill PR Loop": refactored
 
 # Epic 11: POSIX BYOS/BYOK Runner (0o600 FD + -PGID), Cross-CLI Normalizer & Universal Open MCP Gateway
 "Epic 11 - POSIX BYOS/BYOK Runner (0o600 FD + -PGID), Cross-CLI Normalizer & Universal Open MCP Gateway": in-progress
-"Story 11.1 - POSIX BYOS CLI Runner (0o600 FD + -PGID Reaper), BYOK Unified Gateway & Cross-CLI Normalizer": refactored
+"Story 11.1 - POSIX BYOS CLI Runner (0o600 FD + -PGID Reaper), BYOK Unified Gateway & Cross-CLI Normalizer": completed
 "Story 11.2 - Compiler-Grade Bidirectional Open MCP Server (4 Auth Tiers) & 1-Click Host Installer UI": refactored
 "Story 11.3 - Compiler-Grade Bidirectional Open MCP Server & 1-Click Host Installer UI": cancelled
 
-# Epic 12: 4-Channel Packaging, Standalone /api/* Parity & OCI Distribution
-"Epic 12 - 4-Channel Packaging, Standalone /api/* Parity & OCI Distribution": in-progress
-"Story 12.1 - Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench với /api/* Standalone Parity": refactored
-"Story 12.2 - Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Gói Native Plugin cho Cowok.ai": refactored
-"Story 12.3 - Kênh 4 — Container Image (Docker / OCI) kèm Pooled Headless Chromium cho Đội nhóm & CI/CD": refactored
+# Epic 12: 4-Channel cowok-design Packaging, Universal Multi-Harness Plugin Pack & OCI Distribution
+"Epic 12 - 4-Channel cowok-design Packaging, Universal Multi-Harness Plugin Pack & OCI Distribution": in-progress
+"Story 12.1 - Kênh 1 — Single-Binary CLI (cowok-design) & Local Web Workbench với /api/* Standalone Parity": refactored
+"Story 12.2 - Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (.dmg/.msi/.AppImage) & Universal Multi-Harness Plugin Pack (Cowok.ai, Claude, Codex, Antigravity, Cursor)": refactored
+"Story 12.3 - Kênh 4 — Container Image (Docker / OCI) kèm Pooled Headless Chromium & Air-Gapped Mode cho Đội nhóm & CI/CD": refactored
 
 # ==================================================
 # Feature Group: VS-06. Release Certification & Anti-Goodhart Evaluation
@@ -112,4 +113,14 @@ start_date: '2026-07-24'
 
 # Epic 13: End-to-End Sealed Anti-Goodhart Benchmark & 25-Case /simulate-user Certification Suite
 "Epic 13 - End-to-End Sealed Anti-Goodhart Benchmark & 25-Case /simulate-user Certification Suite": in-progress
-"Story 13.1 - End-to-End Sealed Anti-Goodhart Benchmark Runner & 25-Case /simulate-user M1..M5 Certification Suite": refactored
+"Story 13.1 - End-to-End Sealed Anti-Goodhart Benchmark Runner, design-craft SemVer Gate & 25-Case /simulate-user M1..M5 Certification Suite": refactored
+
+# ==================================================
+# Feature Group: VS-07. Cloud Control Plane, Non-Tech Support Desk & SuperAdmin Portal
+# ==================================================
+
+# Epic 14: Cloud Control Plane, Non-Tech Support Desk & SuperAdmin Portal (cowok-design)
+"Epic 14 - Cloud Control Plane, Non-Tech Support Desk & SuperAdmin Portal (cowok-design)": in-progress
+"Story 14.1 - Client Edge — In-App Non-Tech Support/Request Drawer (No-GitHub), Zero-PII Diagnostic Scrubber & Multi-Channel Telemetry Outbox": completed
+"Story 14.2 - Cloud Ingestion API & SuperAdmin Portal MVP — OIDC/MFA/RBAC, 2-Way Non-Tech Helpdesk, Feature Request Clustering, Activation Funnel & Crash Center": backlog
+"Story 14.3 - 4-Channel Distribution Ops — Canary Rollout, Ed25519 Signed Updater & Skill Quarantine Advisory, Offline Licenses & Cowok.ai Federation": backlog

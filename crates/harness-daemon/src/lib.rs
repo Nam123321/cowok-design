@@ -9,6 +9,7 @@ pub mod flow_routes;
 pub mod flow_transition_handlers;
 pub mod lockfile;
 pub mod routes;
+pub mod support_edge;
 pub mod synthesis;
 pub mod vault;
 
@@ -67,6 +68,7 @@ impl DaemonServer {
         )?;
         let state =
             DaemonAppState::with_auth(registry, lock_info.host.clone(), lock_info.port, auth);
+        let _ = crate::routes::orchestrator::shared_write_actor_for_pool(&pool);
         let active_workers = state.active_workers.clone();
         let sse_tx = state.sse_tx.clone();
         let app_state = state.clone();
@@ -126,6 +128,8 @@ impl DaemonServer {
             )
             .await;
         });
+        let telemetry_flusher =
+            crate::support_edge::spawn_telemetry_background_flusher(self.pool.clone());
         let tokio_listener = tokio::net::TcpListener::from_std(self.listener).map_err(|e| {
             HarnessError::ValidationFailed {
                 reason: format!("DAEMON_TOKIO_LISTENER_FAILED: {e}"),
@@ -137,6 +141,7 @@ impl DaemonServer {
             }
         });
         let _ = shutdown_tx.send(true);
+        telemetry_flusher.abort();
         serve_res
     }
 }

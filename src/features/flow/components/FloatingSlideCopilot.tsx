@@ -1,9 +1,11 @@
-// @story 06.3
-// @implements AC-02, AC-04 (Floating Slide Copilot Drawer — 0 useEffect, --agent-accent 3px rail)
+// @story 06.3, 06.5
+// @implements AC-02, AC-04 (Floating Slide Copilot Drawer — 0 useEffect, --agent-accent 3px rail, <=30w rewrite hook)
 import React, { useState } from "react";
+import { rewriteSlideWithCopilot } from "../../../api/deck-generation";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { CowokSelect } from "../../../components/ui/CowokSelect";
 import { AgentChatComposer, ChatStreamItem } from "../../../components/workbench/ChatPrimitivesBridge";
+import type { CopilotRewriteSlideResponse } from "../../../lib/validations/deck-generation";
 import { ChartKind2DSchema, type ChartKind2D } from "../../../lib/validations/presentation-chart-specs";
 import { useFormatter } from "../../../hooks/useFormatter";
 import { useTranslation } from "../../../hooks/useTranslation";
@@ -24,6 +26,9 @@ export interface FloatingSlideCopilotProps {
   isOpen: boolean;
   isCollapsed: boolean;
   isReadOnly: boolean;
+  projectId?: string;
+  deckId?: string;
+  slideRevision?: number;
   slideCode: string;
   slideUid: string;
   targetFfId: string | null;
@@ -35,6 +40,7 @@ export interface FloatingSlideCopilotProps {
   maxGlobalSlots: number;
   onDraftPromptChange: (value: string) => void;
   onSendPrompt: (chartKind?: ChartKind2D) => void;
+  onRewriteCommitted?: (result: CopilotRewriteSlideResponse) => void;
   onCancelLease: () => void;
   onCollapse: () => void;
   onExpand: () => void;
@@ -198,10 +204,63 @@ const CopilotOutputKindBar: React.FC<{
   );
 };
 
+function useQuickSlideRewrite(
+  props: FloatingSlideCopilotProps,
+  selectedChartKind: ChartKind2D | ""
+) {
+  const { t } = useTranslation();
+  const [rewriting, setRewriting] = useState(false);
+  const [rewriteError, setRewriteError] = useState<string | null>(null);
+  const canQuickRewrite = Boolean(props.projectId && props.deckId && props.targetFfId && props.draftPrompt.trim());
+
+  const runQuickRewrite = async () => {
+    if (!canQuickRewrite || !props.projectId || !props.deckId || !props.targetFfId) return;
+    setRewriting(true);
+    setRewriteError(null);
+    try {
+      const result = await rewriteSlideWithCopilot({
+        projectId: props.projectId,
+        deckId: props.deckId,
+        slideUid: props.slideUid,
+        targetFfId: props.targetFfId,
+        prompt: props.draftPrompt.trim(),
+        expectedRevision: props.slideRevision ?? 1,
+        requestedChartKind: selectedChartKind || undefined,
+        autoSplitOnOverflow: true,
+      });
+      props.onRewriteCommitted?.(result);
+    } catch (err) {
+      setRewriteError(err instanceof Error ? err.message : t("presentation.copilot.rewriteFailed", "Slide rewrite failed."));
+    } finally {
+      setRewriting(false);
+    }
+  };
+
+  return { rewriting, rewriteError, canQuickRewrite, runQuickRewrite };
+}
+
+const CopilotQuickRewriteRow: React.FC<{
+  visible: boolean;
+  disabled: boolean;
+  rewriting: boolean;
+  onClick: () => void;
+}> = ({ visible, disabled, rewriting, onClick }) => {
+  const { t } = useTranslation();
+  if (!visible) return null;
+  return (
+    <div style={{ padding: "4px 10px 0 10px", display: "flex", justifyContent: "flex-end" }}>
+      <button type="button" disabled={disabled} data-testid="slide-copilot-quick-rewrite-btn" className="cowok-btn ff-cms-mini-btn" onClick={onClick}>
+        {rewriting ? t("presentation.copilot.rewriting", "Rewriting...") : t("presentation.copilot.quickRewrite", "Rewrite <=30w")}
+      </button>
+    </div>
+  );
+};
+
 export const FloatingSlideCopilot: React.FC<FloatingSlideCopilotProps> = (props) => {
   const { t, locale } = useTranslation();
   const { formatTime } = useFormatter({ locale });
   const [selectedChartKind, setSelectedChartKind] = useState<ChartKind2D | "">("");
+  const rewrite = useQuickSlideRewrite(props, selectedChartKind);
   const geo = useFloatingWindowGeometry(props.isCollapsed, "cowok_slide_copilot_geometry", "right");
   if (!props.isOpen) return null;
   const defaultRightX = typeof window !== "undefined" ? Math.max(24, window.innerWidth - geo.width - 24) : 24;
@@ -217,15 +276,18 @@ export const FloatingSlideCopilot: React.FC<FloatingSlideCopilotProps> = (props)
     if (typeof next.x === "number" || typeof next.bottom === "number") geo.setAnchor({ x: next.x ?? curX, bottom: next.bottom ?? curBottom });
   };
   const chips = props.attachedComment ? [`#${props.attachedComment.elementFfId}: ${props.attachedComment.commentBody.slice(0, 48)}`] : [];
+  const bannerText = props.activeLease.errorBanner
+    ? `${props.activeLease.errorBanner.code}: ${props.activeLease.errorBanner.message}`
+    : rewrite.rewriteError;
 
   return (
-    <div className="ff-copilot-window" data-testid="floating-slide-copilot" role="dialog" aria-label={t("presentation.copilot.dialogLabel", "Slide Copilot")} style={{ left: `${bounded.x}px`, bottom: `${bounded.bottom}px`, width: `${bounded.width}px`, height: `${bounded.height}px` }}>
+    <div className="ff-copilot-window" data-ff-id="slide-copilot-panel" data-testid="floating-slide-copilot" role="dialog" aria-label={t("presentation.copilot.dialogLabel", "Slide Copilot")} style={{ left: `${bounded.x}px`, bottom: `${bounded.bottom}px`, width: `${bounded.width}px`, height: `${bounded.height}px` }}>
       <div className="ff-copilot-resize-n" onMouseDown={(e) => startResizeDrag(e, "n", bounded, applyResize)} />
       <div className="ff-copilot-resize-w" onMouseDown={(e) => startResizeDrag(e, "w", bounded, applyResize)} />
       <CopilotWindowHeader slideCode={props.slideCode} onHeaderMouseDown={geo.handleHeaderMouseDown} onCollapse={props.onCollapse} onClose={props.onClose} />
       <CopilotMetricLine targetFfId={props.targetFfId} activeLease={props.activeLease} activeGlobalSlots={props.activeGlobalSlots} maxGlobalSlots={props.maxGlobalSlots} onCancelLease={props.onCancelLease} />
-      {props.activeLease.errorBanner && (
-        <div className="ff-copilot-error-banner" role="alert" data-testid="copilot-error-banner"><BrandIcon name="shield-alert" size={12} color="var(--state-danger)" /><span>{props.activeLease.errorBanner.code}: {props.activeLease.errorBanner.message}</span></div>
+      {bannerText && (
+        <div className="ff-copilot-error-banner" role="alert" data-testid="copilot-error-banner"><BrandIcon name="shield-alert" size={12} color="var(--state-danger)" /><span>{bannerText}</span></div>
       )}
       {props.isReadOnly && (
         <div className="ff-copilot-readonly-guard" role="note" data-testid="slide-copilot-readonly-guard"><BrandIcon name="info" size={12} color="var(--text-secondary)" /><span>{t("presentation.copilot.snapshotReadOnly", "Historical snapshot is read-only. Copilot dispatch disabled.")}</span></div>
@@ -236,6 +298,7 @@ export const FloatingSlideCopilot: React.FC<FloatingSlideCopilotProps> = (props)
       {!props.isReadOnly && (
         <>
           <CopilotOutputKindBar selectedChartKind={selectedChartKind} onChangeKind={setSelectedChartKind} />
+          <CopilotQuickRewriteRow visible={Boolean(props.projectId && props.deckId)} disabled={!rewrite.canQuickRewrite || rewrite.rewriting} rewriting={rewrite.rewriting} onClick={() => { void rewrite.runQuickRewrite(); }} />
           <AgentChatComposer testIdPrefix="slide-copilot" compact={true} inputValue={props.draftPrompt} onInputChange={props.onDraftPromptChange} onSend={() => props.onSendPrompt(selectedChartKind || undefined)} attachmentChips={chips} onRemoveAttachmentChip={props.onClearAttachedComment} placeholder={t("presentation.copilot.composerPlaceholder", "Ask Slide Copilot to rewrite text or update 2D chart...")} />
         </>
       )}

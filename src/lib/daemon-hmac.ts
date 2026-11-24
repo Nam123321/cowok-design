@@ -138,13 +138,22 @@ export async function relayDaemonResponse(
   if (bundleSha) responseHeaders["X-Cowok-Bundle-Sha256"] = bundleSha;
   const retryAfter = upstream.headers.get("retry-after");
   if (retryAfter) responseHeaders["Retry-After"] = retryAfter;
+  const noSniff = upstream.headers.get("x-content-type-options");
+  if (noSniff) responseHeaders["X-Content-Type-Options"] = noSniff;
+  const cacheControl = upstream.headers.get("cache-control");
+  if (cacheControl) responseHeaders["Cache-Control"] = cacheControl;
 
   if (contentType.includes("text/event-stream") && upstream.body) {
     responseHeaders["Cache-Control"] = "no-cache";
     responseHeaders.Connection = "keep-alive";
     return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
   }
-  if (contentType.includes("application/zip") || contentType.includes("application/octet-stream")) {
+  if (
+    contentType.includes("application/zip") ||
+    contentType.includes("application/octet-stream") ||
+    contentType.startsWith("image/") ||
+    contentType.startsWith("video/")
+  ) {
     return new Response(await upstream.arrayBuffer(), { status: upstream.status, headers: responseHeaders });
   }
   return new Response(await upstream.text(), { status: upstream.status, headers: responseHeaders });

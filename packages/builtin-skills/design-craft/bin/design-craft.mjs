@@ -1,10 +1,21 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { BUILDER_TOOL_REGISTRY } from "../engine/builder-tools.mjs";
+import {
+  generateFeedbackTicketCode,
+  scrubFeedbackFields,
+  scrubFeedbackPii,
+  VALID_FEEDBACK_CATEGORIES,
+  VALID_FEEDBACK_CHANNELS,
+  validateLoopbackDaemonUrl,
+  validateOptionalFeedbackEmail,
+  writeFeedbackOutboxFile,
+} from "../engine/feedback-scrubber.mjs";
 import { QC_TOOL_REGISTRY } from "../engine/qc-tools.mjs";
-import { writeJailedFile } from "../engine/path-jail.mjs";
+import { PathJailError, readJailedFile, writeJailedFile } from "../engine/path-jail.mjs";
 import { startStdioServer } from "../mcp/server.mjs";
 
 const BIN_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -12,6 +23,8 @@ const BUNDLE_ROOT = path.resolve(BIN_DIR, "..");
 const VALID_TARGETS = ["cowok", "claude", "codex", "cursor", "antigravity", "openclaw"];
 const AGENT_NAME_RE = /^[a-z0-9-]+$/;
 const GITHUB_REPO_URL_RE = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/;
+
+export { scrubFeedbackPii };
 
 export function isValidGitHubRepoUrl(url) {
   if (typeof url !== "string") return false;
@@ -260,7 +273,157 @@ export function runInstallCommand(options) {
   };
 }
 
-function main() {
+export async function runFeedbackCommand(options = {}) {
+  const category = String(options.category ?? "bug_report").trim();
+  if (!VALID_FEEDBACK_CATEGORIES.includes(category)) {
+    throw new Error(
+      `Unsupported feedback category '${category}'. Valid categories: ${VALID_FEEDBACK_CATEGORIES.join(", ")}`
+    );
+  }
+  const channel = String(options.channel ?? "cli").trim();
+  if (!VALID_FEEDBACK_CHANNELS.includes(channel)) {
+    throw new Error(
+      `Unsupported feedback channel '${channel}'. Valid channels: ${VALID_FEEDBACK_CHANNELS.join(", ")}`
+    );
+  }
+  const rawTitle = String(options.title ?? "").trim();
+  const rawDesc = String(options.description ?? "").trim();
+  if (rawTitle.length < 3 || rawTitle.length > 160) {
+    throw new Error("Feedback --title must be between 3 and 160 characters");
+  }
+  if (rawDesc.length < 5 || rawDesc.length > 4000) {
+    throw new Error("Feedback --description must be between 5 and 4000 characters");
+  }
+
+  const emailCheck = validateOptionalFeedbackEmail(options.email);
+  if (!emailCheck.ok) {
+    throw new Error(emailCheck.error);
+  }
+  const email = emailCheck.value;
+
+  const scrubbed = scrubFeedbackFields({
+    title: rawTitle,
+    description: rawDesc,
+    locale: options.locale ?? "en-US",
+    recentErrorCodes: Array.isArray(options.recentErrorCodes) ? options.recentErrorCodes : [],
+    activeSkills: Array.isArray(options.activeSkills) ? options.activeSkills : ["design-craft"],
+  });
+  const redactionCount = scrubbed.redactionCount;
+  const env = options.env ?? process.env;
+  const airgapped = ["1", "true", "yes"].includes(String(env?.COWOK_AIRGAPPED ?? "").trim().toLowerCase());
+  const rootDir = path.resolve(options.dir ?? process.cwd());
+
+  const payload = {
+    category,
+    title: scrubbed.title,
+    description: scrubbed.description,
+    contactEmail: email ?? "",
+    channel,
+    locale: scrubbed.locale,
+    includeDiagnostics: options.includeDiagnostics !== false,
+    recentErrorCodes: scrubbed.recentErrorCodes,
+    activeSkills: scrubbed.activeSkills,
+  };
+
+  const explicitDaemonRaw =
+    typeof options.daemonUrl === "string" && options.daemonUrl.trim()
+      ? options.daemonUrl.trim()
+      : String(env?.COWOK_DAEMON_URL ?? "").trim();
+  let daemonBase = explicitDaemonRaw ? validateLoopbackDaemonUrl(explicitDaemonRaw) : "";
+
+  if (!daemonBase && !airgapped && fs.existsSync(rootDir)) {
+    try {
+      const lockRaw = readJailedFile(rootDir, ".cowok-design/daemon.lock");
+      const lock = JSON.parse(lockRaw);
+      if (lock.host === "127.0.0.1" && Number.isInteger(lock.port) && lock.port >= 1 && lock.port <= 65535) {
+        daemonBase = `http://127.0.0.1:${lock.port}`;
+      }
+    } catch (err) {
+      if (err instanceof PathJailError) {
+        throw err;
+      }
+      // Fall back to local outbox when lockfile is absent or unreadable.
+    }
+  }
+
+  if (daemonBase && !airgapped && typeof (options.fetchImpl ?? globalThis.fetch) === "function") {
+    const doFetch = options.fetchImpl ?? globalThis.fetch;
+    let res;
+    try {
+      const headers = { "Content-Type": "application/json", Accept: "application/json" };
+      const sessTok = options.sessionToken ?? env?.COWOK_SESSION_TOKEN;
+      if (sessTok) {
+        headers["X-Cowok-Session-Token"] = String(sessTok);
+      }
+      res = await doFetch(`${daemonBase}/api/v1/support/tickets`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      res = null;
+    }
+
+    if (res) {
+      if (res.ok) {
+        const body = await res.json();
+        return {
+          ok: true,
+          mode: "daemon",
+          scrubbedRedactions: redactionCount,
+          ticket: body?.data ?? body,
+        };
+      }
+      if (res.status >= 400 && res.status < 500) {
+        let detail = `HTTP ${res.status}`;
+        try {
+          const errBody = await res.json();
+          detail = errBody?.error?.message ?? errBody?.message ?? detail;
+        } catch {
+          // Use status fallback if body is non-JSON.
+        }
+        throw new Error(`Daemon rejected feedback (${res.status}): ${detail}`);
+      }
+      // 5xx falls through to local scrubbed outbox.
+    }
+  }
+
+  const ticketCode = generateFeedbackTicketCode();
+  const offlineTicket = {
+    ticketCode,
+    category,
+    channel,
+    title: scrubbed.title,
+    description: scrubbed.description,
+    contactEmail: email,
+    status: "submitted",
+    syncStatus: airgapped ? "local_only" : "queued",
+    scrubbedRedactions: redactionCount,
+    diagnostics: {
+      appVersion: "1.0.0",
+      channel,
+      os: os.platform(),
+      locale: scrubbed.locale,
+      recentErrorCodes: scrubbed.recentErrorCodes,
+      activeSkills: scrubbed.activeSkills,
+      redactionCount,
+    },
+    createdAt: Date.now(),
+  };
+
+  if (!options.noWrite && fs.existsSync(rootDir)) {
+    writeFeedbackOutboxFile(rootDir, ticketCode, offlineTicket);
+  }
+
+  return {
+    ok: true,
+    mode: "local_outbox",
+    scrubbedRedactions: redactionCount,
+    ticket: offlineTicket,
+  };
+}
+
+async function main() {
   const [, , command, ...rest] = process.argv;
   const flags = parseFlags(rest);
   if (command === "mcp") {
@@ -268,8 +431,28 @@ function main() {
     return;
   }
   if (command === "list-tools") {
-    const tools = [...Object.keys(BUILDER_TOOL_REGISTRY), ...Object.keys(QC_TOOL_REGISTRY)];
+    const tools = [...Object.keys(BUILDER_TOOL_REGISTRY), ...Object.keys(QC_TOOL_REGISTRY), "cowok_submit_feedback"];
     process.stdout.write(`${JSON.stringify({ tools }, null, 2)}\n`);
+    return;
+  }
+  if (command === "feedback") {
+    const receipt = await runFeedbackCommand({
+      category: flags.category,
+      title: flags.title,
+      description: flags.description,
+      email: flags.email,
+      channel: flags.channel,
+      locale: flags.locale,
+      dir: flags.dir,
+      daemonUrl: flags["daemon-url"],
+      includeDiagnostics: flags["no-diagnostics"] ? false : true,
+    });
+    if (flags.json) {
+      process.stdout.write(`${JSON.stringify(receipt, null, 2)}\n`);
+    } else {
+      const code = receipt.ticket?.ticketCode ?? "CWK-LOCAL";
+      process.stdout.write(`Submitted feedback ${code} via ${receipt.mode} (redacted ${receipt.scrubbedRedactions} secret/path items)\n`);
+    }
     return;
   }
   if (command === "install") {
@@ -298,7 +481,7 @@ function main() {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
   }
-  process.stderr.write("Usage: design-craft <install|run|mcp|list-tools> [options]\n");
+  process.stderr.write("Usage: design-craft <install|run|mcp|list-tools|feedback> [options]\n");
   process.exit(1);
 }
 
@@ -314,5 +497,8 @@ function isDirectInvocation() {
 }
 
 if (isDirectInvocation()) {
-  main();
+  void main().catch((err) => {
+    process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(1);
+  });
 }

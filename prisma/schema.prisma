@@ -1308,3 +1308,66 @@ model DecisionAuditLog {
   @@index([tenantId, projectId, createdAt], map: "idx_decision_audit_log_tenant_project")
   @@map("decision_audit_log")
 }
+
+model FlowNodeSubstate {
+  nodeId       String @map("node_id")
+  projectId    String @map("project_id")
+  substate     String
+  fixtureId    String @map("fixture_id")
+  flowTier     String @default("PRIMARY") @map("flow_tier")
+  clusterId    String @default("cluster-1") @map("cluster_id")
+  severityBand String @default("LOW") @map("severity_band")
+  updatedAt    BigInt @map("updated_at")
+
+  @@id([nodeId, substate])
+  @@index([projectId, flowTier], map: "idx_flow_node_substates_project_tier")
+  @@map("flow_node_substates")
+}
+
+model TelemetryOutbox {
+  id           String  @id
+  installId    String  @map("install_id")
+  channel      String
+  eventGroup   String  @map("event_group")
+  eventName    String  @map("event_name")
+  payloadJson  String  @default("{}") @map("payload_json")
+  status       String  @default("pending")
+  attemptCount Int     @default(0) @map("attempt_count")
+  nextRetryAt  BigInt  @default(0) @map("next_retry_at")
+  lastError    String? @map("last_error")
+  createdAt    BigInt  @map("created_at")
+
+  @@index([status, nextRetryAt], map: "idx_telemetry_outbox_status_retry")
+  @@index([createdAt], map: "idx_telemetry_outbox_created_at")
+  @@map("telemetry_outbox")
+}
+
+model LocalSupportTicket {
+  id               String  @id
+  ticketCode       String  @unique @map("ticket_code")
+  installId        String  @map("install_id")
+  channel          String
+  category         String
+  title            String
+  description      String
+  contactEmail     String? @map("contact_email")
+  screenshotSha256 String? @map("screenshot_sha256")
+  diagnosticsJson  String  @default("{}") @map("diagnostics_json")
+  status           String  @default("submitted")
+  adminRepliesJson String  @default("[]") @map("admin_replies_json")
+  syncStatus       String  @default("queued") @map("sync_status")
+  createdAt        BigInt  @map("created_at")
+  updatedAt        BigInt  @map("updated_at")
+
+  @@index([status, updatedAt], map: "idx_local_support_tickets_status")
+  @@map("local_support_tickets")
+}
+
+model TelemetryPreference {
+  id               String @id
+  installId        String @map("install_id")
+  telemetryEnabled Int    @default(1) @map("telemetry_enabled")
+  updatedAt        BigInt @map("updated_at")
+
+  @@map("telemetry_preferences")
+}

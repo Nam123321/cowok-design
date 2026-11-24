@@ -315,8 +315,10 @@ export const CompanionStructureLeftPane: React.FC<{
           {props.walkthroughStepLabel && <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px" }}>{props.walkthroughStepLabel}</span>}
         </div>
       )}
-      <DraftDeployBanner isDraftDirty={props.isDraftDirty} orphanCount={props.orphanCount} conflictState={props.conflictState} onDeployDraft={props.onDeployDraft} onDiscardDraft={props.onDiscardDraft} onResolveConflict={props.onResolveConflict} />
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        {props.structureLens === "userflow" && (
+          <DraftDeployBanner floatingOnCanvas isDraftDirty={props.isDraftDirty} orphanCount={props.orphanCount} conflictState={props.conflictState} onDeployDraft={props.onDeployDraft} onDiscardDraft={props.onDiscardDraft} onResolveConflict={props.onResolveConflict} />
+        )}
         {props.structureLens === "userflow" ? props.children : (
           <SlideCmsStudioBody
             structureLens={props.structureLens}

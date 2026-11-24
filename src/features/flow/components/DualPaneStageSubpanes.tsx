@@ -139,6 +139,7 @@ export function DualPaneRightStage(props: {
   pinnedSlideIds: string[]; isDeckResolving: boolean; onOpenRegionCmsEdit: (coveredFfIds: string[]) => void;
   paneProps: React.ComponentProps<typeof CompanionLiveHtmlRightPane>; isHistoricalReadOnly: boolean; slideCode: string;
   onApplyHtmlWithCms: (nextHtml: string) => Promise<string | null | void>;
+  onReloadDeck?: () => void;
   blackoutMode?: "none" | "black" | "white";
   isPresenterActive?: boolean;
   onOpenPresenter?: () => void;
@@ -178,7 +179,7 @@ export function DualPaneRightStage(props: {
         onElementRectsChange={setLiveElementRects}
         copilotToastNode={isDeckTab ? <SlideCopilotToastBanner toast={copilot.receiptToast} onDismiss={dismissReceiptToast} /> : null}
         floatingCopilotNode={isDeckTab ? (
-          <FloatingSlideCopilot isOpen={copilot.isOpen} isCollapsed={copilot.isCollapsed} isReadOnly={copilotReadOnly} slideCode={props.slideCode} slideUid={cmsController.slideUid} targetFfId={copilot.targetFfId} draftPrompt={copilot.draftPrompt} attachedComment={copilot.attachedComment} activeLease={copilot.activeLease} messages={copilot.messages} activeGlobalSlots={copilot.activeGlobalSlots} maxGlobalSlots={copilot.maxGlobalSlots} onDraftPromptChange={setDraftPrompt} onSendPrompt={(kind) => { void submitPrompt(copilot.draftPrompt, kind); }} onCancelLease={() => { void cancelCopilot(); }} onCollapse={() => setIsCollapsed(true)} onExpand={() => setIsCollapsed(false)} onClose={() => setIsOpen(false)} onClearAttachedComment={clearAttachedComment} />
+          <FloatingSlideCopilot isOpen={copilot.isOpen} isCollapsed={copilot.isCollapsed} isReadOnly={copilotReadOnly} projectId={p.projectId} deckId={cmsController.deckId !== "local-deck" ? cmsController.deckId : undefined} slideRevision={cmsController.revision} slideCode={props.slideCode} slideUid={cmsController.slideUid} targetFfId={copilot.targetFfId} draftPrompt={copilot.draftPrompt} attachedComment={copilot.attachedComment} activeLease={copilot.activeLease} messages={copilot.messages} activeGlobalSlots={copilot.activeGlobalSlots} maxGlobalSlots={copilot.maxGlobalSlots} onDraftPromptChange={setDraftPrompt} onSendPrompt={(kind) => { void submitPrompt(copilot.draftPrompt, kind); }} onRewriteCommitted={(result) => { setDraftPrompt(""); void cmsController.reloadServerRevision(); if (result.continuationSlides.length > 0) props.onReloadDeck?.(); }} onCancelLease={() => { void cancelCopilot(); }} onCollapse={() => setIsCollapsed(true)} onExpand={() => setIsCollapsed(false)} onClose={() => setIsOpen(false)} onClearAttachedComment={clearAttachedComment} />
         ) : null}
       />
       <DesignerTalkOverlay isOpen={p.isDesignerTalkOpen} tradeoffs={p.activeProposal?.tradeoffs ?? []} elementRects={liveElementRects} drawerWidth={p.isProposalDrawerOpen ? PROPOSAL_DRAWER_WIDTH_PX : 0} isModalOpen={p.isModalOpen} isInlineEditorOpen={vp.isInlineCodeOpen} onClose={p.onCloseDesignerTalk} onDecide={p.onDecideTradeoff} />

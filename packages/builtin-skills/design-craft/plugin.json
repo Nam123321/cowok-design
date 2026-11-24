@@ -45,6 +45,16 @@
       "installHint": "git clone https://github.com/nicobailey/reverse-engineer-anything",
       "purpose": "Extract live UI tokens, visual hierarchy & interaction behavior from target apps/websites via Design-Only boundary (reference-design-contract)",
       "fallback": "catalogs/reference-archetypes.json"
+    },
+    {
+      "id": "dashboard-design-upstream",
+      "kind": "upstream-github-skill",
+      "repoUrl": "https://github.com/abdiraimov-otabek/dashboard-design-skill",
+      "commitSha": "a31edee26ceec7c935169185c9785c0b10412468",
+      "licenseSpdx": "MIT",
+      "cronSchedule": "0 0 3 * * *",
+      "purpose": "Verbatim upstream dashboard-design skill for clean, honest, wordless KPI cards, charts, heatmaps, bullet graphs, ranked breakdowns, and QA audits",
+      "fallback": "skills/craft/dashboard-ux/SKILL.md"
     }
   ],
   "capabilities": {

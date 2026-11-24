@@ -1,6 +1,6 @@
 // @story 05.4
 // @implements AC-01, AC-02 (Cognitive Progressive Phase Stepper + <16ms Designer Wireframe Lens + OKLCH AA Guard)
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { BrandIcon } from "../../components/ui/BrandIcon";
 import { useTranslation } from "../../hooks/useTranslation";
 
@@ -8,7 +8,10 @@ export type StageSkinMode = "sketch-paper" | "brand-color";
 export type CognitivePhase = "sketch" | "style" | "polish" | "approved";
 
 const ICON_SIZE_SM = 13;
+const ICON_SIZE_XS = 11;
 const STROKE_WIDTH_MONO = 1.85;
+const FONT_WEIGHT_SEMIBOLD = 600;
+const PHASE_MENU_Z_INDEX = 45;
 
 const PHASE_ORDER: readonly CognitivePhase[] = ["sketch", "style", "polish", "approved"];
 
@@ -48,38 +51,125 @@ function getPhaseStepClass(isActive: boolean, isDone: boolean): string {
   return "sp-phase-step";
 }
 
+const PHASE_MENU_STYLE: React.CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 4px)",
+  left: 0,
+  minWidth: "160px",
+  padding: "4px",
+  borderRadius: "var(--radius-sm)",
+  backgroundColor: "var(--bg-surface)",
+  border: "1px solid var(--border-default)",
+  boxShadow: "var(--shadow-lg)",
+  zIndex: PHASE_MENU_Z_INDEX,
+  display: "flex",
+  flexDirection: "column",
+  gap: "2px",
+};
+
+const PHASE_DROPDOWN_BTN_STYLE: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "5px",
+  height: "24px",
+  padding: "0 8px",
+  borderRadius: "var(--radius-xs)",
+  border: "1px solid var(--border-default)",
+  backgroundColor: "var(--bg-surface)",
+  color: "var(--text-primary)",
+  fontSize: "11px",
+  fontWeight: FONT_WEIGHT_SEMIBOLD,
+  whiteSpace: "nowrap",
+  cursor: "pointer",
+};
+
+function useDismissMenu(
+  isOpen: boolean,
+  ref: React.RefObject<HTMLDivElement | null>,
+  onClose: () => void
+): void {
+  useEffect(() => {
+    if (!isOpen) return;
+    const onPointerDown = (evt: MouseEvent) => {
+      if (ref.current && !ref.current.contains(evt.target as Node)) onClose();
+    };
+    const onKeyDown = (evt: KeyboardEvent) => {
+      if (evt.key === "Escape") onClose();
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isOpen, ref, onClose]);
+}
+
+const PhaseDropdownMenu: React.FC<{
+  phase: CognitivePhase;
+  onChoose: (next: CognitivePhase) => void;
+}> = ({ phase, onChoose }) => {
+  const { t } = useTranslation();
+  const activeIdx = PHASE_ORDER.indexOf(phase);
+  return (
+    <div role="menu" data-testid="cognitive-phase-menu" style={PHASE_MENU_STYLE}>
+      {PHASE_ORDER.map((step, idx) => {
+        const isActive = step === phase;
+        const isDone = idx < activeIdx;
+        return (
+          <button
+            key={step}
+            type="button"
+            role="menuitem"
+            className={getPhaseStepClass(isActive, isDone)}
+            aria-current={isActive ? "step" : undefined}
+            data-testid={`phase-step-${step}`}
+            onClick={() => onChoose(step)}
+            style={{ width: "100%", justifyContent: "flex-start", whiteSpace: "nowrap" }}
+          >
+            {isDone && <BrandIcon name="check" size={ICON_SIZE_SM} strokeWidth={STROKE_WIDTH_MONO} />}
+            <span>{getPhaseLabel(step, t)}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
 const CognitivePhaseStepper: React.FC<{
   phase: CognitivePhase;
   onSelectPhase?: (next: CognitivePhase) => void;
 }> = ({ phase, onSelectPhase }) => {
   const { t } = useTranslation();
-  const activeIdx = PHASE_ORDER.indexOf(phase);
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  useDismissMenu(isOpen, containerRef, () => setIsOpen(false));
+
   return (
     <div
-      className="sp-phase-stepper"
+      ref={containerRef}
       role="group"
       aria-label={t("sketchPolish.phaseStepperLabel", "Tiến trình thiết kế")}
       data-testid="cognitive-phase-stepper"
+      style={{ position: "relative", display: "inline-flex", alignItems: "center", flexShrink: 0 }}
     >
-      {PHASE_ORDER.map((step, idx) => {
-        const isActive = step === phase;
-        const isDone = idx < activeIdx;
-        return (
-          <React.Fragment key={step}>
-            {idx > 0 && <span className="sp-phase-sep" aria-hidden="true">›</span>}
-            <button
-              type="button"
-              className={getPhaseStepClass(isActive, isDone)}
-              aria-current={isActive ? "step" : undefined}
-              data-testid={`phase-step-${step}`}
-              onClick={() => onSelectPhase?.(step)}
-            >
-              {isDone && <BrandIcon name="check" size={ICON_SIZE_SM} strokeWidth={STROKE_WIDTH_MONO} />}
-              <span>{getPhaseLabel(step, t)}</span>
-            </button>
-          </React.Fragment>
-        );
-      })}
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        data-testid="cognitive-phase-dropdown"
+        onClick={() => setIsOpen((prev) => !prev)}
+        style={PHASE_DROPDOWN_BTN_STYLE}
+      >
+        <span>{getPhaseLabel(phase, t)}</span>
+        <BrandIcon name="chevron-down" size={ICON_SIZE_XS} strokeWidth={STROKE_WIDTH_MONO} color="var(--text-secondary)" />
+      </button>
+      {isOpen && (
+        <PhaseDropdownMenu
+          phase={phase}
+          onChoose={(step) => { onSelectPhase?.(step); setIsOpen(false); }}
+        />
+      )}
     </div>
   );
 };
@@ -216,7 +306,12 @@ export const StageSkinToggleBar: React.FC<StageSkinToggleBarProps> = ({
   const handleToggleLens = onToggleSketchLens ?? (() => onChangeSkin(isSketch ? "brand-color" : "sketch-paper"));
 
   return (
-    <div className="sp-toolbar-group" data-ff-id="stage-skin-toggle" data-testid="stage-skin-toggle">
+    <div
+      className="sp-toolbar-group"
+      data-ff-id="stage-skin-toggle"
+      data-testid="stage-skin-toggle"
+      style={{ display: "inline-flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", gap: "6px", whiteSpace: "nowrap", minWidth: 0 }}
+    >
       <CognitivePhaseStepper phase={effectivePhase} onSelectPhase={onSelectPhase} />
       <PhaseActionControls
         phase={effectivePhase}

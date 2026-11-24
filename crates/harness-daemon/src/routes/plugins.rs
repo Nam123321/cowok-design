@@ -483,25 +483,178 @@ fn builtin_scoped_plugin_id(tenant_id: &str, project_id: &str, slug: &str) -> St
     }
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BuiltinUpstreamMeta {
+    pub version: Option<String>,
+    pub description: Option<String>,
+    pub upstream_repo_url: Option<String>,
+    pub upstream_commit_sha: Option<String>,
+    pub cron_schedule: Option<String>,
+}
+
+pub(crate) fn load_builtin_upstream_meta(
+    ws_root: &Path,
+    slug: &str,
+) -> Option<BuiltinUpstreamMeta> {
+    if validate_safe_segment("slug", slug).is_err() {
+        return None;
+    }
+    for subdir in ["upstream-skills", "skills"] {
+        let path = ws_root
+            .join("packages")
+            .join("builtin-skills")
+            .join(subdir)
+            .join(slug)
+            .join("upstream.json");
+        let Ok(meta) = std::fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if !meta.file_type().is_file() || meta.len() > 16_384 {
+            continue;
+        }
+        if let Ok(raw) = std::fs::read_to_string(&path) {
+            if let Ok(parsed) = serde_json::from_str::<BuiltinUpstreamMeta>(&raw) {
+                return Some(parsed);
+            }
+        }
+    }
+    None
+}
+
+fn list_bundled_upstream_skills(ws_root: &Path) -> Vec<(String, BuiltinUpstreamMeta)> {
+    let dir = ws_root
+        .join("packages")
+        .join("builtin-skills")
+        .join("upstream-skills");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for entry in entries.flatten() {
+        let Ok(ft) = entry.file_type() else {
+            continue;
+        };
+        if !ft.is_dir() {
+            continue;
+        }
+        let slug = entry.file_name().to_string_lossy().to_string();
+        if validate_safe_segment("slug", &slug).is_err() {
+            continue;
+        }
+        let skill_md = entry.path().join("SKILL.md");
+        if std::fs::symlink_metadata(&skill_md)
+            .map(|m| m.file_type().is_file())
+            .unwrap_or(false)
+        {
+            if let Some(meta) = load_builtin_upstream_meta(ws_root, &slug) {
+                out.push((slug, meta));
+            }
+        }
+    }
+    out
+}
+
+pub(crate) fn seed_builtin_upstream_cron_schedules(
+    pool: &spec_registry::SqlitePool,
+    ws_root: &Path,
+) {
+    let Ok(conn) = pool.connection() else {
+        return;
+    };
+    let tenant_id = "default";
+    let project_id = "global";
+    for (slug, up) in list_bundled_upstream_skills(ws_root) {
+        let (Some(repo_url), Some(cron_expr)) =
+            (up.upstream_repo_url.as_deref(), up.cron_schedule.as_deref())
+        else {
+            continue;
+        };
+        if validate_ssrf_safe_url(repo_url, false).is_err()
+            || validate_cron_expression(cron_expr).is_err()
+        {
+            continue;
+        }
+        let scoped_id = builtin_scoped_plugin_id(tenant_id, project_id, &slug);
+        if get_cron_schedule_scoped(&conn, tenant_id, project_id, &scoped_id)
+            .ok()
+            .flatten()
+            .is_some()
+        {
+            continue;
+        }
+        let version = up.version.clone().unwrap_or_else(|| "1.0.0".to_string());
+        let description = up.description.clone().unwrap_or_default();
+        let manifest_json = serde_json::json!({
+            "name": slug,
+            "version": version,
+            "description": description,
+            "entry_point": "SKILL.md",
+            "risk_tier": 1,
+            "tags": ["upstream-verbatim", "dashboard-design"]
+        })
+        .to_string();
+        let row = SkillPluginRow {
+            id: scoped_id.clone(),
+            tenant_id: tenant_id.to_string(),
+            project_id: project_id.to_string(),
+            plugin_slug: slug.clone(),
+            version,
+            lifecycle_state: "ACTIVE".to_string(),
+            source_type: "github".to_string(),
+            source_repo_url: repo_url.to_string(),
+            upstream_repo_url: Some(repo_url.to_string()),
+            upstream_commit_sha: up.upstream_commit_sha.clone(),
+            cron_schedule: Some(cron_expr.to_string()),
+            skill_md_path: "SKILL.md".to_string(),
+            plugin_json_path: "upstream.json".to_string(),
+            manifest_json,
+            last_synced_at: None,
+            revision: 1,
+            staging_version: None,
+            staging_manifest_json: None,
+            staging_diff_reasons_json: None,
+            staging_bundle_dir: None,
+            staging_package_sha256: None,
+            breaking_change_isolated: false,
+            quarantined: false,
+            quarantine_reason: None,
+            updated_at: Utc::now().timestamp_millis(),
+        };
+        if insert_plugin_if_absent(pool, &row, None).is_ok() {
+            let _ = upsert_cron_schedule(
+                pool, tenant_id, project_id, &scoped_id, cron_expr, repo_url, None,
+            );
+        }
+    }
+}
+
 fn builtin_manifest_to_summary_dto(
+    ws_root: &Path,
     tenant_id: &str,
     project_id: &str,
     manifest: &SkillManifest,
 ) -> PluginSummaryDto {
     let eff_pid = effective_builtin_project_id(project_id);
+    let upstream = load_builtin_upstream_meta(ws_root, &manifest.name);
     PluginSummaryDto {
         id: builtin_scoped_plugin_id(tenant_id, eff_pid, &manifest.name),
         tenant_id: tenant_id.to_string(),
         project_id: eff_pid.to_string(),
         plugin_slug: manifest.name.clone(),
-        version: manifest.version.clone(),
+        version: upstream
+            .as_ref()
+            .and_then(|u| u.version.clone())
+            .unwrap_or_else(|| manifest.version.clone()),
         lifecycle_state: "ACTIVE".to_string(),
         enabled: true,
         source_type: "builtin".to_string(),
         source_repo_url: format!("builtin://packages/builtin-skills/skills/{}", manifest.name),
-        upstream_repo_url: None,
-        upstream_commit_sha: None,
-        cron_schedule: None,
+        upstream_repo_url: upstream.as_ref().and_then(|u| u.upstream_repo_url.clone()),
+        upstream_commit_sha: upstream
+            .as_ref()
+            .and_then(|u| u.upstream_commit_sha.clone()),
+        cron_schedule: upstream.as_ref().and_then(|u| u.cron_schedule.clone()),
         revision: 1,
         breaking_change_isolated: false,
         staging_version: None,
@@ -552,9 +705,49 @@ pub async fn handle_get_plugin_registry(
         let scope_pid = pid_opt.as_deref().unwrap_or("global");
         for manifest in builtin_reg.list() {
             if !overridden_slugs.contains(&manifest.name) {
+                overridden_slugs.insert(manifest.name.clone());
                 dtos.push(builtin_manifest_to_summary_dto(
-                    &tenant_id, scope_pid, manifest,
+                    &ws_root, &tenant_id, scope_pid, manifest,
                 ));
+            }
+        }
+        for (slug, up) in list_bundled_upstream_skills(&ws_root) {
+            if !overridden_slugs.contains(&slug) {
+                let eff_pid = effective_builtin_project_id(scope_pid);
+                let version = up.version.clone().unwrap_or_else(|| "1.0.0".to_string());
+                let description = up.description.clone().unwrap_or_default();
+                let repo_url = up.upstream_repo_url.clone().unwrap_or_else(|| {
+                    format!("builtin://packages/builtin-skills/upstream-skills/{slug}")
+                });
+                dtos.push(PluginSummaryDto {
+                    id: builtin_scoped_plugin_id(&tenant_id, eff_pid, &slug),
+                    tenant_id: tenant_id.clone(),
+                    project_id: eff_pid.to_string(),
+                    plugin_slug: slug.clone(),
+                    version: version.clone(),
+                    lifecycle_state: "ACTIVE".to_string(),
+                    enabled: true,
+                    source_type: "github".to_string(),
+                    source_repo_url: repo_url,
+                    upstream_repo_url: up.upstream_repo_url,
+                    upstream_commit_sha: up.upstream_commit_sha,
+                    cron_schedule: up.cron_schedule,
+                    revision: 1,
+                    breaking_change_isolated: false,
+                    staging_version: None,
+                    staging_diff_reasons: Vec::new(),
+                    quarantined: false,
+                    quarantine_reason: None,
+                    manifest_json: serde_json::json!({
+                        "name": slug,
+                        "version": version,
+                        "description": description,
+                        "entry_point": "SKILL.md",
+                        "risk_tier": 1,
+                        "tags": ["upstream-verbatim"]
+                    }),
+                    updated_at: "1970-01-01T00:00:00+00:00".to_string(),
+                });
             }
         }
         if only_enabled {
@@ -627,20 +820,30 @@ fn materialize_builtin_plugin_if_virtual(
             e.to_string(),
         )
     })?;
+    let upstream = load_builtin_upstream_meta(pool.workspace_root(), &slug);
     let row = SkillPluginRow {
         id: scoped_id,
         tenant_id: tenant_id.to_string(),
         project_id: project_id.to_string(),
         plugin_slug: slug.clone(),
-        version: manifest.version.clone(),
+        version: upstream
+            .as_ref()
+            .and_then(|u| u.version.clone())
+            .unwrap_or_else(|| manifest.version.clone()),
         lifecycle_state: "ACTIVE".to_string(),
         source_type: "builtin".to_string(),
         source_repo_url: format!("builtin://packages/builtin-skills/skills/{slug}"),
-        upstream_repo_url: None,
-        upstream_commit_sha: None,
-        cron_schedule: None,
+        upstream_repo_url: upstream.as_ref().and_then(|u| u.upstream_repo_url.clone()),
+        upstream_commit_sha: upstream
+            .as_ref()
+            .and_then(|u| u.upstream_commit_sha.clone()),
+        cron_schedule: upstream.as_ref().and_then(|u| u.cron_schedule.clone()),
         skill_md_path: "SKILL.md".to_string(),
-        plugin_json_path: "plugin.json".to_string(),
+        plugin_json_path: if upstream.is_some() {
+            "upstream.json".to_string()
+        } else {
+            "plugin.json".to_string()
+        },
         manifest_json,
         last_synced_at: None,
         revision: 1,

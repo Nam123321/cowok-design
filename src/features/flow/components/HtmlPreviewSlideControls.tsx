@@ -1,10 +1,12 @@
-// @story 04.1, 06.1
-// @implements AC-01, AC-02, AC-06 (Responsive Viewport Switcher & Slide Aspect/Zoom Controls)
-import React from "react";
+// @story 04.1, 06.1, 06.5
+// @implements AC-01, AC-02, AC-06 (Responsive Viewport Switcher, Slide Aspect/Zoom Controls & AI CSV/PDF Deck Generator Trigger)
+import React, { useState } from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useFormatter } from "../../../hooks/useFormatter";
 import { useTranslation } from "../../../hooks/useTranslation";
+import type { GenerateDeckResponse } from "../../../lib/validations/deck-generation";
 import type { ViewportPreset } from "../../../lib/validations/screen-fixture";
+import { DeckCsvGeneratorModal } from "./DeckCsvGeneratorModal";
 import { CompactOptionDropdown, TOOLBAR_ICON_BTN_BASE } from "./HtmlPreviewToolbarControls";
 
 const ICON_SIZE_SM = 12;
@@ -182,15 +184,63 @@ const ZoomControl: React.FC<{
   );
 };
 
+function toDeckAspectRatio(ar: "auto" | "16-9" | "16-10"): "16:9" | "16:10" | "Auto" {
+  if (ar === "16-10") return "16:10";
+  if (ar === "auto") return "Auto";
+  return "16:9";
+}
+
+function buildDeckTriggerStyle(
+  isOpen: boolean,
+  isCompact: boolean,
+  hasProject: boolean
+): React.CSSProperties {
+  return {
+    ...TOOLBAR_ICON_BTN_BASE,
+    height: "24px",
+    padding: isCompact ? "0 6px" : "0 8px",
+    gap: "4px",
+    border: "1px solid var(--border-default)",
+    borderRadius: "var(--radius-xs)",
+    backgroundColor: isOpen ? "var(--bg-selected)" : "var(--bg-workspace)",
+    color: isOpen ? "var(--action-primary)" : "var(--text-secondary)",
+    fontSize: "10.5px",
+    fontWeight: FONT_WEIGHT_SEMIBOLD,
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+    opacity: hasProject ? 1 : DISABLED_OPACITY,
+    cursor: hasProject ? "pointer" : "not-allowed",
+  };
+}
+
 export const SlideAspectAndZoomControls: React.FC<{
   aspectRatio: "auto" | "16-9" | "16-10";
   zoomMode?: "fit" | "pan-100";
   isCompact: boolean;
+  projectId?: string;
   onSetAspectRatio: (ar: "auto" | "16-9" | "16-10") => void;
   onSetZoomMode?: (mode: "fit" | "pan-100") => void;
-}> = ({ aspectRatio, zoomMode, isCompact, onSetAspectRatio, onSetZoomMode }) => (
-  <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", flexWrap: "nowrap" }}>
-    <AspectControl aspectRatio={aspectRatio} isCompact={isCompact} onSetAspectRatio={onSetAspectRatio} />
-    <ZoomControl zoomMode={zoomMode} isCompact={isCompact} onSetZoomMode={onSetZoomMode} />
-  </div>
-);
+  onDeckGenerated?: (response: GenerateDeckResponse) => void;
+  onSyncToMainChat?: (summaryText: string) => void;
+  onEmbedIntoActiveSlide?: (htmlSnippet: string, title: string) => void;
+}> = (p) => {
+  const { t } = useTranslation();
+  const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
+  const resolvedProjectId = p.projectId?.trim() || "";
+  const hasProject = resolvedProjectId.length > 0;
+  const triggerLabel = t("deckGen.openGeneratorBtn", "AI Deck");
+  const triggerTitle = t("deckGen.openGeneratorTooltip", "Tạo bộ Slide đa trang từ Brief & CSV/TSV/PDF (stageshow)");
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", flexWrap: "nowrap" }}>
+      <AspectControl aspectRatio={p.aspectRatio} isCompact={p.isCompact} onSetAspectRatio={p.onSetAspectRatio} />
+      <ZoomControl zoomMode={p.zoomMode} isCompact={p.isCompact} onSetZoomMode={p.onSetZoomMode} />
+      <button type="button" disabled={!hasProject} data-testid="open-deck-csv-generator-btn" aria-label={triggerTitle} title={triggerTitle} onClick={() => hasProject && setIsGeneratorOpen(true)} style={buildDeckTriggerStyle(isGeneratorOpen, p.isCompact, hasProject)}>
+        <BrandIcon name="sparkles" size={ICON_SIZE_SM} color="currentColor" />
+        {!p.isCompact && <span>{triggerLabel}</span>}
+      </button>
+      {hasProject && (
+        <DeckCsvGeneratorModal isOpen={isGeneratorOpen} projectId={resolvedProjectId} aspectRatio={toDeckAspectRatio(p.aspectRatio)} onClose={() => setIsGeneratorOpen(false)} onDeckGenerated={p.onDeckGenerated} onSyncToMainChat={p.onSyncToMainChat} onEmbedIntoActiveSlide={p.onEmbedIntoActiveSlide} />
+      )}
+    </div>
+  );
+};

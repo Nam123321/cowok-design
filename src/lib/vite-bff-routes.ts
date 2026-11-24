@@ -64,6 +64,17 @@ import * as reaCatalogRoute from "../app/api/v1/rea/catalog/route";
 import * as reaExportProofRoute from "../app/api/v1/rea/export-proof/route";
 import * as decisionRouteHandler from "../app/api/v1/decision/route/route";
 import * as decisionAuditRoute from "../app/api/v1/decision/audit/route";
+import * as flowSynthesizeRoute from "../app/api/v1/flows/synthesize/route";
+import * as deckGenerateRoute from "../app/api/v1/decks/generate/route";
+import * as deckNormalizeChartSourceRoute from "../app/api/v1/decks/normalize-chart-source/route";
+import * as slideCopilotRewriteRoute from "../app/api/v1/slides/copilot/rewrite/route";
+import * as orchestratorChatRoute from "../app/api/v1/orchestrator/chat/route";
+import * as orchestratorLivePatchRoute from "../app/api/v1/orchestrator/live-patch/route";
+import * as orchestratorAssetsRoute from "../app/api/v1/orchestrator/assets/route";
+import * as supportTicketsRoute from "../app/api/v1/support/tickets/route";
+import * as supportTicketAttachmentRoute from "../app/api/v1/support/tickets/[id]/attachment/route";
+import * as telemetryEventsRoute from "../app/api/v1/telemetry/events/route";
+import * as telemetryPreferencesRoute from "../app/api/v1/telemetry/preferences/route";
 import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize/route";
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
 import * as versionSnapshotsRoute from "../app/api/projects/[id]/snapshots/route";
@@ -213,6 +224,20 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/rea\/export-proof$/, extractParams: noParams, resolveHandler: () => reaExportProofRoute.POST },
   { method: "POST", pattern: /^\/api\/decision\/route$/, extractParams: noParams, resolveHandler: () => decisionRouteHandler.POST },
   { method: "GET", pattern: /^\/api\/decision\/audit$/, extractParams: noParams, resolveHandler: () => decisionAuditRoute.GET },
+  { method: "POST", pattern: /^\/api\/flows\/synthesize$/, extractParams: noParams, resolveHandler: () => flowSynthesizeRoute.POST },
+  { method: "GET", pattern: /^\/api\/flows\/substates$/, extractParams: noParams, resolveHandler: () => flowSynthesizeRoute.GET },
+  { method: "POST", pattern: /^\/api\/decks\/generate$/, extractParams: noParams, resolveHandler: () => deckGenerateRoute.POST },
+  { method: "POST", pattern: /^\/api\/decks\/normalize-chart-source$/, extractParams: noParams, resolveHandler: () => deckNormalizeChartSourceRoute.POST },
+  { method: "POST", pattern: /^\/api\/slides\/copilot\/rewrite$/, extractParams: noParams, resolveHandler: () => slideCopilotRewriteRoute.POST },
+  { method: "POST", pattern: /^\/api\/orchestrator\/chat$/, extractParams: noParams, resolveHandler: () => orchestratorChatRoute.POST },
+  { method: "POST", pattern: /^\/api\/orchestrator\/live-patch$/, extractParams: noParams, resolveHandler: () => orchestratorLivePatchRoute.POST },
+  { method: "GET", pattern: /^\/api\/orchestrator\/assets$/, extractParams: noParams, resolveHandler: () => orchestratorAssetsRoute.GET },
+  { method: "GET", pattern: /^\/api\/support\/tickets$/, extractParams: noParams, resolveHandler: () => supportTicketsRoute.GET },
+  { method: "POST", pattern: /^\/api\/support\/tickets$/, extractParams: noParams, resolveHandler: () => supportTicketsRoute.POST },
+  { method: "GET", pattern: /^\/api\/support\/tickets\/([^/]+)\/attachment$/, extractParams: idOnly, resolveHandler: () => supportTicketAttachmentRoute.GET },
+  { method: "POST", pattern: /^\/api\/telemetry\/events$/, extractParams: noParams, resolveHandler: () => telemetryEventsRoute.POST },
+  { method: "GET", pattern: /^\/api\/telemetry\/preferences$/, extractParams: noParams, resolveHandler: () => telemetryPreferencesRoute.GET },
+  { method: "PUT", pattern: /^\/api\/telemetry\/preferences$/, extractParams: noParams, resolveHandler: () => telemetryPreferencesRoute.PUT },
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.POST },
   { method: "PUT", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/reorder$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]) }), resolveHandler: () => deckReorderRoute.PUT },

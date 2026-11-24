@@ -1,10 +1,12 @@
 // @story 04.1, 04.4, 04.5
 // @implements AC-01, AC-02, AC-06, AC-07, AC-08
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { useTranslation } from "../../../hooks/useTranslation";
 import { FlowWorkbenchState, createNewFlowWorkbenchStore } from "../../../features/flow/store/flow-workbench-store";
 import { CompanionCanvasTab, CanvasTabItem } from "../../../features/flow/components/CompanionCanvasTab";
-import { DagCanvas2D } from "../../../features/flow/components/DagCanvas2D";
+import { DagCanvas2D, mapSynthesizedPlanToWorkbenchGraph } from "../../../features/flow/components/DagCanvas2D";
+import type { SynthesizedFlowPlan } from "../../../lib/validations/flow-synthesize";
 import { ContextualNodeFloatingChat } from "../../../features/flow/components/ContextualNodeFloatingChat";
 import type { useNodeProposalController } from "../../../features/proposals/hooks/useNodeProposalController";
 import { ErrorBoundary } from "../../../components/ui/ErrorBoundary";
@@ -163,10 +165,107 @@ const SketchPolishOverlayModals: React.FC<{
   </>
 );
 
+const TOOLBAR_STRIP_Z_INDEX = 35;
+const STEERING_POPOVER_Z_INDEX = 40;
+const ICON_SIZE_COMPACT = 12;
+const ICON_SIZE_CHEVRON = 11;
+const ICON_STROKE_MONO = 1.85;
+
+const COMPACT_TOOLBAR_STRIP_STYLE: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "row",
+  flexWrap: "nowrap",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "6px",
+  height: "34px",
+  padding: "0 10px",
+  boxSizing: "border-box",
+  position: "relative",
+  overflow: "visible",
+  zIndex: TOOLBAR_STRIP_Z_INDEX,
+  backgroundColor: "var(--bg-surface)",
+  borderBottom: "1px solid var(--border-default)",
+};
+
+const STEERING_POPOVER_PANEL_STYLE: React.CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 6px)",
+  right: 0,
+  minWidth: "240px",
+  padding: "8px",
+  borderRadius: "var(--radius-sm)",
+  backgroundColor: "var(--bg-surface)",
+  border: "1px solid var(--border-default)",
+  boxShadow: "var(--shadow-lg)",
+  zIndex: STEERING_POPOVER_Z_INDEX,
+};
+
+function useDismissPopover(
+  isOpen: boolean,
+  ref: React.RefObject<HTMLDivElement | null>,
+  onClose: () => void
+): void {
+  useEffect(() => {
+    if (!isOpen) return;
+    const onPointerDown = (evt: MouseEvent) => {
+      if (ref.current && !ref.current.contains(evt.target as Node)) onClose();
+    };
+    const onKeyDown = (evt: KeyboardEvent) => {
+      if (evt.key === "Escape") onClose();
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isOpen, ref, onClose]);
+}
+
+const SteeringChipsPopover: React.FC<{
+  polish: ReturnType<typeof useSketchPolishController>;
+}> = ({ polish }) => {
+  const { t } = useTranslation();
+  const [isOpen, setIsOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
+  useDismissPopover(isOpen, popoverRef, () => setIsOpen(false));
+  const hasActive = Boolean(polish.activeChipId);
+
+  return (
+    <div ref={popoverRef} style={{ position: "relative", display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
+      <button
+        type="button"
+        className={`sp-chip-btn${hasActive || isOpen ? " sp-chip-btn--active" : ""}`}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        data-testid="steering-chips-popover-btn"
+        onClick={() => setIsOpen((prev) => !prev)}
+        style={{ whiteSpace: "nowrap" }}
+      >
+        <BrandIcon name="sliders" size={ICON_SIZE_COMPACT} strokeWidth={ICON_STROKE_MONO} color="currentColor" />
+        <span>{t("sketchPolish.steeringPopoverBtn", "Tinh chỉnh")}</span>
+        <BrandIcon name="chevron-down" size={ICON_SIZE_CHEVRON} strokeWidth={ICON_STROKE_MONO} color="currentColor" />
+      </button>
+      {isOpen && (
+        <div role="dialog" aria-label={t("sketchPolish.steeringChipsLabel", "Tinh chỉnh nhanh")} data-testid="steering-chips-popover-panel" style={STEERING_POPOVER_PANEL_STYLE}>
+          <SteeringChipsBar
+            activeChipId={polish.activeChipId}
+            isApplying={polish.isApplying}
+            canUndo={polish.canUndo}
+            onSelectChip={polish.handleSelectChip}
+            onUndo={polish.handleUndo}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SketchPolishToolbarStrip: React.FC<{
   polish: ReturnType<typeof useSketchPolishController>;
 }> = ({ polish }) => (
-  <div className="sp-toolbar-strip" data-testid="sketch-polish-strip">
+  <div className="sp-toolbar-strip" data-testid="sketch-polish-strip" style={COMPACT_TOOLBAR_STRIP_STYLE}>
     <StageSkinToggleBar
       skin={polish.stageSkin}
       cognitivePhase={polish.cognitivePhase}
@@ -179,13 +278,7 @@ const SketchPolishToolbarStrip: React.FC<{
       lastSwapMs={polish.lastSwapMs}
       onOpenClarify={polish.handleAdvanceToStyle}
     />
-    <SteeringChipsBar
-      activeChipId={polish.activeChipId}
-      isApplying={polish.isApplying}
-      canUndo={polish.canUndo}
-      onSelectChip={polish.handleSelectChip}
-      onUndo={polish.handleUndo}
-    />
+    <SteeringChipsPopover polish={polish} />
   </div>
 );
 
@@ -198,6 +291,10 @@ export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = ({
   const { t, locale } = useTranslation();
   const [isDeploying, setIsDeploying] = useState(false);
   const handleDeployDraft = async () => { if (!isDeploying) { setIsDeploying(true); try { await store.syncDeployDraft(projectId); } finally { setIsDeploying(false); } } };
+  const handleSynthesizedFlow = (plan: SynthesizedFlowPlan) => {
+    const mapped = mapSynthesizedPlanToWorkbenchGraph(plan);
+    store.hydrate(mapped.nodes, mapped.transitions);
+  };
   const orphanCount = findOrphanNodes(state.nodes.map((n) => ({ id: n.id })), state.transitions.map((tr) => ({ source: tr.sourceNodeId, target: tr.targetNodeId }))).length;
   const polish = useSketchPolishController({
     projectId,
@@ -211,7 +308,7 @@ export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = ({
     <main style={{ flex: 1, minWidth: 0, height: "100%", overflow: "hidden", position: "relative", backgroundColor: "var(--bg-canvas)" }}>
       <CompanionCanvasTab projectId={projectId} sessionId={sessionId} sessionEntryKind={sessionEntryKind} activeTabId={activeTabId} onTabChange={onTabChange} selectedNodeId={state.selectedNodeId} onSelectNode={(id) => store.selectNode(id, false)} nodes={state.nodes} isDraftDirty={state.isDraftDirty} orphanCount={orphanCount} conflictState={state.conflictState} canUndo={(state.undoStack?.length || 0) > 0} canRedo={(state.redoStack?.length || 0) > 0} onUndo={() => store.undo()} onRedo={() => store.redo()} onResolveConflict={(c) => { void store.resolveConflict(c); }} onDeployDraft={() => { void handleDeployDraft(); }} onDiscardDraft={() => store.discardDraft()} onAttachRegionToChat={onCommentOnNode} onQuoteText={onAddQuoteChip} onSelectNodeSubState={(nid, sub) => store.setNodeSubState(nid, sub)} proposalController={proposalController} stageSkin={polish.stageSkin} sketchPolishBarNode={sketchPolishBarNode} onRegisterStageSkinSwap={polish.onRegisterStageSkinSwap} onRegisterStageApplyHtml={polish.onRegisterStageApplyHtml} onLockedRuleReceipt={polish.handleLockedRuleNotice}>
         <ErrorBoundary fallbackTitle={t("errors.dagCanvasRender", "Lỗi hiển thị Canvas 2D DAG")} onReset={() => store.discardDraft()}>
-          <DagCanvas2D state={state} projectId={projectId} sessionId={sessionId} onUpdatePosition={graphHandlers.handleUpdatePosition} onSetViewport={graphHandlers.handleSetViewport} onSelectNode={(id, multi) => store.selectNode(id, multi)} onSelectTransition={(id) => store.selectTransition(id)} onAddNode={graphHandlers.handleAddNode} onAutoLayout={() => store.autoLayoutNodes()} onSelectSubState={(id, sub) => store.setNodeSubState(id, sub)} onDuplicateNode={(id) => store.duplicateNode(id)} onRenameNode={(id, title) => store.renameNode(id, title)} onDeleteNode={(id) => store.deleteNode(id)} onAddTransition={graphHandlers.handleAddTransition} onUpdateTransition={(id, u) => store.updateTransition(id, u)} onReverseTransition={graphHandlers.handleReverseTransition} onDeleteTransition={(id) => store.deleteTransition(id)} onUpdateNodeNote={(id, note) => store.updateNodeNote(id, note)} onToggleMinimap={() => store.toggleMinimap()} onUndo={() => store.undo()} onRedo={() => store.redo()} onCommentOnNode={onCommentOnNode} />
+          <DagCanvas2D state={state} projectId={projectId} sessionId={sessionId} onUpdatePosition={graphHandlers.handleUpdatePosition} onSetViewport={graphHandlers.handleSetViewport} onSelectNode={(id, multi) => store.selectNode(id, multi)} onSelectTransition={(id) => store.selectTransition(id)} onAddNode={graphHandlers.handleAddNode} onAutoLayout={() => store.autoLayoutNodes()} onSelectSubState={(id, sub) => store.setNodeSubState(id, sub)} onDuplicateNode={(id) => store.duplicateNode(id)} onRenameNode={(id, title) => store.renameNode(id, title)} onDeleteNode={(id) => store.deleteNode(id)} onAddTransition={graphHandlers.handleAddTransition} onUpdateTransition={(id, u) => store.updateTransition(id, u)} onReverseTransition={graphHandlers.handleReverseTransition} onDeleteTransition={(id) => store.deleteTransition(id)} onUpdateNodeNote={(id, note) => store.updateNodeNote(id, note)} onToggleMinimap={() => store.toggleMinimap()} onUndo={() => store.undo()} onRedo={() => store.redo()} onCommentOnNode={onCommentOnNode} onSynthesizedFlow={handleSynthesizedFlow} />
         </ErrorBoundary>
       </CompanionCanvasTab>
       <SketchPolishOverlayModals polish={polish} />

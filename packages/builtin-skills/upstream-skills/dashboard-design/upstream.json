@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0",
+  "slug": "dashboard-design",
+  "version": "2.1.0",
+  "description": "Clean, honest, wordless dashboard UI for web & HTML presentations (KPI cards, charts, heatmaps, bullet graphs, ranked breakdowns, date pickers, QA salience checks)",
+  "licenseSpdx": "MIT",
+  "upstreamRepoUrl": "https://github.com/abdiraimov-otabek/dashboard-design-skill",
+  "upstreamCommitSha": "a31edee26ceec7c935169185c9785c0b10412468",
+  "upstreamSubpath": "skills/dashboard-design",
+  "cronSchedule": "0 0 3 * * *",
+  "verbatimUpstream": true
+}

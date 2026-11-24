@@ -193,6 +193,24 @@ pub fn v21_migration_checksum() -> String {
     static CACHE: OnceLock<String> = OnceLock::new();
     cached_migration_sha256(&CACHE, V21_MIGRATION_SQL)
 }
+
+pub const V22_MIGRATION_SQL: &str =
+    include_str!("../migrations/V22__story_05_5_flow_node_substates.sql");
+pub const V22_MIGRATION_NAME: &str = "V22__story_05_5_flow_node_substates.sql";
+
+pub fn v22_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V22_MIGRATION_SQL)
+}
+
+pub const V23_MIGRATION_SQL: &str =
+    include_str!("../migrations/V23__story_14_1_support_telemetry_outbox.sql");
+pub const V23_MIGRATION_NAME: &str = "V23__story_14_1_support_telemetry_outbox.sql";
+
+pub fn v23_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V23_MIGRATION_SQL)
+}
 /// Configuration for the embedded SQLite WAL connection pool.
 #[derive(Debug, Clone)]
 pub struct SqliteWalConfig {
@@ -473,6 +491,8 @@ impl SqlitePool {
             Self::apply_v19_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v20_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v21_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v22_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v23_migration_if_needed(&mut conn, &config.db_path)?;
         }
         harden_sqlite_files(&config.db_path)?;
 
@@ -1250,6 +1270,10 @@ impl SqlitePool {
             .map_err(|e| map_sqlite_error(e, "genesis_v20"))?;
         tx.execute_batch(V21_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "genesis_v21"))?;
+        tx.execute_batch(V22_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v22"))?;
+        tx.execute_batch(V23_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v23"))?;
 
         let now = Utc::now().timestamp_millis();
         for (version, name, sha) in [
@@ -1272,6 +1296,8 @@ impl SqlitePool {
             (19i64, V19_MIGRATION_NAME, v19_migration_checksum()),
             (20i64, V20_MIGRATION_NAME, v20_migration_checksum()),
             (21i64, V21_MIGRATION_NAME, v21_migration_checksum()),
+            (22i64, V22_MIGRATION_NAME, v22_migration_checksum()),
+            (23i64, V23_MIGRATION_NAME, v23_migration_checksum()),
         ] {
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
@@ -2531,6 +2557,96 @@ impl SqlitePool {
         .map_err(|e| map_sqlite_error(e, "insert_v21_schema_migration"))?;
         tx.commit()
             .map_err(|e| map_sqlite_error(e, "commit_v21_migration"))?;
+        Ok(())
+    }
+
+    fn apply_v22_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v22_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 22",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v22_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V22]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v22"))?;
+        tx.execute_batch(V22_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v22_sql"))?;
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (22, ?1, ?2, ?3)",
+            params![
+                V22_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
+        )
+        .map_err(|e| map_sqlite_error(e, "insert_v22_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v22_migration"))?;
+        Ok(())
+    }
+
+    fn apply_v23_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        let expected_sha = v23_migration_checksum();
+        let recorded_sha: Option<String> = conn
+            .query_row(
+                "SELECT checksum_sha256 FROM schema_migrations WHERE version = 23",
+                [],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| map_sqlite_error(e, "read_v23_migration_ledger"))?;
+
+        if let Some(actual_sha) = recorded_sha {
+            if actual_sha != expected_sha {
+                return Err(HarnessError::ValidationFailed {
+                    reason: format!(
+                        "MIGRATION_CHECKSUM_MISMATCH [V23]: expected {expected_sha}, found {actual_sha}"
+                    ),
+                });
+            }
+            return Ok(());
+        }
+
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| map_sqlite_error(e, "begin_immediate_v23"))?;
+        tx.execute_batch(V23_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "execute_v23_sql"))?;
+        tx.execute(
+            "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
+             VALUES (23, ?1, ?2, ?3)",
+            params![
+                V23_MIGRATION_NAME,
+                expected_sha,
+                Utc::now().timestamp_millis()
+            ],
+        )
+        .map_err(|e| map_sqlite_error(e, "insert_v23_schema_migration"))?;
+        tx.commit()
+            .map_err(|e| map_sqlite_error(e, "commit_v23_migration"))?;
         Ok(())
     }
 

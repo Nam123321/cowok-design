@@ -20,6 +20,7 @@ export interface DagSvgEdgesProps {
   wiringCurrentPos: Point2D | null;
   nodeWidth: number;
   nodeHeight: number;
+  edgeTiers?: Map<string, string>;
 }
 
 const CLUSTER_PADDING_X = 24;
@@ -63,7 +64,19 @@ export const DagSvgEdges: React.FC<DagSvgEdgesProps> = (p) => {
         const source = p.nodes.find((n) => n.id === tr.sourceNodeId);
         const target = p.nodes.find((n) => n.id === tr.targetNodeId);
         if (!source || !target) return null;
-        return <DagTransitionEdge key={tr.id} transition={tr} source={source} target={target} isSelected={p.selectedTransitionId === tr.id} onSelectTransition={p.onSelectTransition} nodeWidth={p.nodeWidth} nodeHeight={p.nodeHeight} />;
+        return (
+          <DagTransitionEdge
+            key={tr.id}
+            transition={tr}
+            source={source}
+            target={target}
+            isSelected={p.selectedTransitionId === tr.id}
+            onSelectTransition={p.onSelectTransition}
+            nodeWidth={p.nodeWidth}
+            nodeHeight={p.nodeHeight}
+            flowTier={p.edgeTiers?.get(tr.id)}
+          />
+        );
       })}
       {wirePath && <path d={wirePath} fill="none" stroke="var(--action-primary)" strokeWidth="2" strokeDasharray="4,4" markerEnd="url(#arrow-main)" />}
     </svg>
