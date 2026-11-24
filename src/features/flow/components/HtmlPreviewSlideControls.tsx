@@ -7,7 +7,7 @@ import { useTranslation } from "../../../hooks/useTranslation";
 import type { GenerateDeckResponse } from "../../../lib/validations/deck-generation";
 import type { ViewportPreset } from "../../../lib/validations/screen-fixture";
 import { DeckCsvGeneratorModal } from "./DeckCsvGeneratorModal";
-import { CompactOptionDropdown, TOOLBAR_ICON_BTN_BASE } from "./HtmlPreviewToolbarControls";
+import { CompactOptionDropdown, TOOLBAR_BTN_BASE, TOOLBAR_ICON_BTN_BASE } from "./HtmlPreviewToolbarControls";
 
 const ICON_SIZE_SM = 12;
 const DESKTOP_PX = 1440;
@@ -196,7 +196,8 @@ function buildDeckTriggerStyle(
   hasProject: boolean
 ): React.CSSProperties {
   return {
-    ...TOOLBAR_ICON_BTN_BASE,
+    ...TOOLBAR_BTN_BASE,
+    width: "auto",
     height: "24px",
     padding: isCompact ? "0 6px" : "0 8px",
     gap: "4px",

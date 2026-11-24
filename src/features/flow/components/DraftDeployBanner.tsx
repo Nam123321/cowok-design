@@ -46,6 +46,7 @@ const FLOATING_DRAFT_PILL_STYLE: React.CSSProperties = {
   padding: "4px 8px",
   backgroundColor: "var(--bg-elevated, var(--bg-surface))",
   border: "1px solid var(--action-primary)",
+  borderLeft: "3px solid var(--action-primary)",
   borderRadius: "var(--radius-sm)",
   boxShadow: "var(--shadow-md)",
   display: "inline-flex",
