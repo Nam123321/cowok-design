@@ -40,7 +40,7 @@ links_to:
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
 | [Story-10.1](./Story-10.1/story.md) | `cowok` Master Orchestrator, `3-Lane Router`, MPSC SQLite Write Actor & `$UIUX_LIVE_SPEC` (`<50ms` + `Cmd+Z`) | `completed` | `3` | `['04.4', '09.2', '11.1']` |
-| [Story-10.2](./Story-10.2/story.md) | Parallel `Builder != Scorer` Swarm Coordination, File Leases, `429` Clamp & Tier-3 `Design Jury` | `refactored` | `3` | `['10.1', '07.1']` |
+| [Story-10.2](./Story-10.2/story.md) | Parallel `Builder != Scorer` Swarm Coordination, File Leases, `429` Clamp & Tier-3 `Design Jury` | `completed` | `3` | `['10.1', '07.1']` |
 | [Story-10.3](./Story-10.3/story.md) | Stage-B Anti-Clone Design Tournament (`CMP-07`), `Blind Wipe`, Cross-Variant Borrow, `/crystallize` & `advisor` Loop | `refactored` | `3` | `['05.4', '09.2', '10.2']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)

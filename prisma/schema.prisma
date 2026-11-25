@@ -1461,3 +1461,199 @@ model HiddenSpecDocument {
   @@index([tenantId, projectId, specKey], map: "idx_hidden_spec_documents_tenant_proj")
   @@map("hidden_spec_documents")
 }
+
+model QcGateRun {
+  id             String @id @default(uuid())
+  projectId      String @map("project_id")
+  targetKind     String @map("target_kind")
+  targetId       String @map("target_id")
+  layoutSha1     String @map("layout_sha1")
+  viewportsJson  String @map("viewports_json")
+  verdict        String
+  p0Count        Int    @default(0) @map("p0_count")
+  p1Count        Int    @default(0) @map("p1_count")
+  ssimScore      Float? @map("ssim_score")
+  issuesJson     String @default("[]") @map("issues_json")
+  autofixAttempt Int    @default(0) @map("autofix_attempt")
+  createdAt      BigInt @map("created_at")
+
+  @@index([projectId, layoutSha1, createdAt], map: "idx_qc_gate_runs_cache")
+  @@map("qc_gate_runs")
+}
+
+model WorkerFileLease {
+  leaseId        String @id @map("lease_id")
+  projectId      String @map("project_id")
+  workerId       String @map("worker_id")
+  workerRole     String @map("worker_role")
+  workerPgid     Int?   @map("worker_pgid")
+  fencingToken   BigInt @map("fencing_token")
+  ownedPathsJson String @map("owned_paths_json")
+  expiresAt      BigInt @map("expires_at")
+  released       Int    @default(0)
+  createdAt      BigInt @map("created_at")
+
+  @@index([projectId, released, expiresAt], map: "idx_worker_file_leases_active")
+  @@map("worker_file_leases")
+}
+
+model FleetJuryVerdict {
+  id                   String  @id
+  projectId            String  @map("project_id")
+  builderWorkerId      String  @map("builder_worker_id")
+  scorerWorkerId       String  @map("scorer_worker_id")
+  generationFence      BigInt  @map("generation_fence")
+  freezeSnapshotSha256 String  @map("freeze_snapshot_sha256")
+  qcRunId              String? @map("qc_run_id")
+  e1E4CatchRate        Float   @map("e1_e4_catch_rate")
+  verdict              String
+  violationsJson       String  @default("[]") @map("violations_json")
+  ledgerEntryId        String? @map("ledger_entry_id")
+  createdAt            BigInt  @map("created_at")
+
+  @@index([projectId, createdAt], map: "idx_fleet_jury_project")
+  @@map("fleet_jury_verdicts")
+}
+
+model McpToolPolicy {
+  toolName       String @id @map("tool_name")
+  permissionTier String @map("permission_tier")
+  enabled        Int    @default(1)
+  mcpCallable    Int    @default(1) @map("mcp_callable")
+  updatedAt      BigInt @map("updated_at")
+
+  @@map("mcp_tool_policies")
+}
+
+model McpExternalActivityLog {
+  id             String  @id
+  projectId      String? @map("project_id")
+  actorKind      String  @map("actor_kind")
+  hostClient     String  @map("host_client")
+  methodName     String  @map("method_name")
+  toolName       String? @map("tool_name")
+  permissionTier String  @map("permission_tier")
+  status         String
+  jsonrpcCode    Int?    @map("jsonrpc_code")
+  latencyMs      Int     @default(0) @map("latency_ms")
+  idempotencyKey String? @map("idempotency_key")
+  summary        String  @default("")
+  createdAt      BigInt  @map("created_at")
+
+  @@index([createdAt], map: "idx_mcp_activity_created")
+  @@map("mcp_external_activity_logs")
+}
+
+model McpHostInstallBackup {
+  id           String @id
+  hostId       String @map("host_id")
+  configPath   String @map("config_path")
+  backupPath   String @map("backup_path")
+  beforeSha256 String @map("before_sha256")
+  afterSha256  String @map("after_sha256")
+  rolledBack   Int    @default(0) @map("rolled_back")
+  createdAt    BigInt @map("created_at")
+
+  @@map("mcp_host_install_backups")
+}
+
+model CloudSupportTicket {
+  id                   String  @id
+  installId            String  @map("install_id")
+  clientTicketId       String? @map("client_ticket_id")
+  category             String
+  priority             String  @default("P2")
+  status               String  @default("open")
+  title                String
+  descriptionSanitized String  @map("description_sanitized")
+  diagnosticBundleJson String  @default("{}") @map("diagnostic_bundle_json")
+  attachmentSha256     String? @map("attachment_sha256")
+  attachmentMime       String? @map("attachment_mime")
+  attachmentBytes      Int?    @map("attachment_bytes")
+  clusterId            String? @map("cluster_id")
+  channel              String  @default("cli")
+  hostClient           String  @default("standalone") @map("host_client")
+  appVersion           String  @default("0.1.0") @map("app_version")
+  idempotencyKey       String? @unique @map("idempotency_key")
+  createdAt            BigInt  @map("created_at")
+  updatedAt            BigInt  @map("updated_at")
+
+  @@index([status, priority, updatedAt], map: "idx_cloud_support_tickets_status_priority")
+  @@index([installId, createdAt], map: "idx_cloud_support_tickets_install_id")
+  @@index([clusterId], map: "idx_cloud_support_tickets_cluster_id")
+  @@map("cloud_support_tickets")
+}
+
+model CloudTicketReply {
+  id             String @id
+  ticketId       String @map("ticket_id")
+  authorActor    String @map("author_actor")
+  authorRole     String @map("author_role")
+  bodySanitized  String @map("body_sanitized")
+  syncedToClient Int    @default(0) @map("synced_to_client")
+  createdAt      BigInt @map("created_at")
+
+  @@index([ticketId, createdAt], map: "idx_cloud_ticket_replies_ticket_id")
+  @@map("cloud_ticket_replies")
+}
+
+model CloudFeatureCluster {
+  id             String  @id
+  title          String
+  summary        String  @default("")
+  ticketCount    Int     @default(0) @map("ticket_count")
+  githubIssueUrl String? @map("github_issue_url")
+  status         String  @default("open")
+  createdAt      BigInt  @map("created_at")
+  updatedAt      BigInt  @map("updated_at")
+
+  @@index([status, updatedAt], map: "idx_cloud_feature_clusters_status_updated")
+  @@map("cloud_feature_clusters")
+}
+
+model CloudTelemetryEvent {
+  id             String  @id
+  installId      String  @map("install_id")
+  eventName      String  @map("event_name")
+  funnelStage    String? @map("funnel_stage")
+  channel        String  @default("cli")
+  hostClient     String  @default("standalone") @map("host_client")
+  appVersion     String  @default("0.1.0") @map("app_version")
+  propertiesJson String  @default("{}") @map("properties_json")
+  occurredAt     BigInt  @map("occurred_at")
+
+  @@index([occurredAt], map: "idx_cloud_telemetry_events_occurred_at")
+  @@index([installId, funnelStage, occurredAt], map: "idx_cloud_telemetry_events_install_stage")
+  @@index([channel, hostClient], map: "idx_cloud_telemetry_events_channel_host")
+  @@map("cloud_telemetry_events")
+}
+
+model CloudCrashGroup {
+  fingerprint          String @id
+  appVersion           String @map("app_version")
+  errorSignature       String @map("error_signature")
+  sampleStackSanitized String @map("sample_stack_sanitized")
+  occurrenceCount      Int    @default(1) @map("occurrence_count")
+  affectedInstalls     Int    @default(1) @map("affected_installs")
+  status               String @default("open")
+  firstSeenAt          BigInt @map("first_seen_at")
+  lastSeenAt           BigInt @map("last_seen_at")
+
+  @@index([appVersion, lastSeenAt], map: "idx_cloud_crash_groups_version_last_seen")
+  @@map("cloud_crash_groups")
+}
+
+model AdminAuditLog {
+  id             String @id
+  actorSubject   String @map("actor_subject")
+  actorRole      String @map("actor_role")
+  mfaVerified    Int    @default(1) @map("mfa_verified")
+  action         String
+  targetResource String @map("target_resource")
+  detailsJson    String @default("{}") @map("details_json")
+  createdAt      BigInt @map("created_at")
+
+  @@index([createdAt], map: "idx_admin_audit_logs_created_at")
+  @@index([actorSubject, action, createdAt], map: "idx_admin_audit_logs_actor_action")
+  @@map("admin_audit_logs")
+}

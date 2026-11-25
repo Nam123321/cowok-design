@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-11"
 title: "Epic 11: POSIX BYOS/BYOK Runner (0o600 FD + -PGID), Cross-CLI Normalizer & Universal Open MCP Gateway"
-status: in-progress
+status: completed
 track: "Stream-5"
 wave: 4
 provides: ["crates/bot-fleet POSIX BYOS Runner (0o600 FD + -PGID Reaper) + BYOK Gateway + Post-Execution Normalizer", "crates/mcp-gateway Bidirectional Open MCP Server (4 Permission Tiers + 1-Click Host Installer UI)"]
@@ -39,7 +39,7 @@ links_to:
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
 | [Story-11.1](./Story-11.1/story.md) | POSIX BYOS CLI Runner (`0o600` FD + `-PGID` Reaper), BYOK Unified Gateway & Cross-CLI Normalizer | `completed` | `3` | `['04.3', '04.4', '02.1']` |
-| [Story-11.2](./Story-11.2/story.md) | Compiler-Grade Bidirectional Open MCP Server (4 Auth Tiers) & 1-Click Host Installer UI | `refactored` | `3` | `['10.1', '11.1', '08.5']` |
+| [Story-11.2](./Story-11.2/story.md) | Compiler-Grade Bidirectional Open MCP Server (4 Auth Tiers) & 1-Click Host Installer UI | `completed` | `3` | `['10.1', '11.1', '08.5']` |
 | [Story-11.3](./Story-11.3/story.md) | *(Superseded by `Story 11.2`)* Bidirectional Open MCP Server | `cancelled` | `3` | `['11.1', '10.2']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)

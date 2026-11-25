@@ -197,7 +197,9 @@ const LearnQueueHeader: React.FC<{ usedTokens: number }> = ({ usedTokens }) => {
         <span className="plugin-eco-badge" data-testid="learn-token-budget">
           {t("learn.budgetLabel", "Prompt Budget")}: {formatNumber(usedTokens)}/{formatNumber(MAX_LEARN_TOKENS)}
         </span>
-        <span className="plugin-eco-badge plugin-eco-badge-human">HUMAN_ONLY</span>
+        <span className="plugin-eco-badge plugin-eco-badge-human">
+          {t("mcpGateway.tierHumanOnly", "Chỉ người dùng thao tác")}
+        </span>
       </div>
     </div>
   );

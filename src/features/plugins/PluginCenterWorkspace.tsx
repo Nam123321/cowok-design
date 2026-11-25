@@ -1,9 +1,8 @@
-// @story 08.4
+// @story 08.4, 11.2
 // @implements AC-01, AC-04, AC-05
 import React, { useState } from "react";
 import { useTranslation } from "../../hooks/useTranslation";
 import {
-  PLUGIN_CENTER_CARDS,
   validateCronSchedules,
   validateLearnCards,
   validatePluginCards,
@@ -16,6 +15,10 @@ import { DeToolsStatusList } from "../plugin-center/DeToolsStatusList";
 import { EphemeralToolAuditDrawerPanel } from "../plugin-center/EphemeralToolAuditDrawerPanel";
 import { LearnLedgerQueueList } from "../plugin-center/LearnLedgerQueueList";
 import { RepoImportForm } from "../plugin-center/RepoImportForm";
+import { ExternalActivityTable } from "../mcp-gateway/ExternalActivityTable";
+import { HostInstallerList } from "../mcp-gateway/HostInstallerList";
+import { McpToolPermissionTable } from "../mcp-gateway/McpToolPermissionTable";
+import { useMcpGatewayController } from "../mcp-gateway/useMcpGatewayController";
 
 export interface PluginCenterWorkspaceProps {
   projectId: string;
@@ -36,15 +39,72 @@ function updateTabQueryParam(nextScope: "mcp" | "automations", preserveLearnTab:
   window.history.replaceState({}, "", `${url.pathname}${url.search}`);
 }
 
+const BANNER_ERROR_STYLE: React.CSSProperties = {
+  padding: "8px 12px",
+  borderRadius: "var(--radius-xs)",
+  backgroundColor: "var(--state-danger-soft)",
+  border: "1px solid var(--state-danger)",
+  color: "var(--state-danger)",
+  fontSize: "11.5px",
+};
+
+const BANNER_SUCCESS_STYLE: React.CSSProperties = {
+  padding: "8px 12px",
+  borderRadius: "var(--radius-xs)",
+  backgroundColor: "var(--state-success-soft)",
+  border: "1px solid var(--state-success)",
+  color: "var(--state-success)",
+  fontSize: "11.5px",
+};
+
+const PluginCenterMcpGatewaySection: React.FC<{
+  gateway: ReturnType<typeof useMcpGatewayController>;
+}> = ({ gateway }) => (
+  <div className="plugin-eco-section" data-testid="plugin-center-mcp-gateway">
+    {gateway.error && (
+      <div role="alert" data-testid="mcp-gateway-error" style={BANNER_ERROR_STYLE}>
+        {gateway.error}
+      </div>
+    )}
+    {gateway.feedback && (
+      <div role="status" data-testid="mcp-gateway-feedback" style={BANNER_SUCCESS_STYLE}>
+        {gateway.feedback}
+      </div>
+    )}
+    <HostInstallerList
+      hosts={gateway.hosts}
+      serverUrl={gateway.serverUrl}
+      busyHostId={gateway.busyHostId}
+      loading={gateway.loading}
+      onInstall={(hostId) => void gateway.installHost(hostId)}
+      onRollback={(hostId, backupId) => void gateway.rollbackHost(hostId, backupId)}
+    />
+    <McpToolPermissionTable
+      policies={gateway.policies}
+      busyToolName={gateway.busyToolName}
+      onToggle={(policy, nextEnabled) => void gateway.toggleTool(policy, nextEnabled)}
+    />
+    <ExternalActivityTable
+      activities={gateway.activities}
+      loading={gateway.loading}
+      statusFilter={gateway.statusFilter}
+      onFilterChange={gateway.setStatusFilter}
+      onRefresh={() => void gateway.refresh()}
+    />
+  </div>
+);
+
 const PluginCenterMcpContent: React.FC<{
   projectId: string;
   registry: ReturnType<typeof usePluginRegistry>;
+  gateway: ReturnType<typeof useMcpGatewayController>;
   initialLearnFilter: "ALL" | "PROPOSED" | "ACCEPTED" | "REJECTED";
-}> = ({ projectId, registry, initialLearnFilter }) => {
+}> = ({ projectId, registry, gateway, initialLearnFilter }) => {
   const pluginCheck = validatePluginCards(registry.plugins);
   const cardCheck = validateLearnCards(registry.learnCards);
   return (
     <>
+      <PluginCenterMcpGatewaySection gateway={gateway} />
       <PluginRegistryPanel
         plugins={pluginCheck.valid}
         loading={registry.loading}
@@ -104,6 +164,26 @@ const PluginCenterHeader: React.FC<{
   );
 };
 
+const PluginCenterAutomationsBody: React.FC<{
+  registry: ReturnType<typeof usePluginRegistry>;
+}> = ({ registry }) => {
+  const cronPlugins = registry.plugins.filter((p) => p.sourceType !== "builtin" || Boolean(p.upstreamRepoUrl));
+  const cronScheduleCheck = validateCronSchedules(registry.schedulesByPlugin);
+  return (
+    <CronSyncStatus
+      plugins={cronPlugins}
+      schedulesByPlugin={cronScheduleCheck.valid}
+      loading={registry.loading}
+      error={registry.cronError ?? cronScheduleCheck.error}
+      pendingActionId={registry.actionPendingId}
+      actionFeedback={registry.actionFeedback}
+      onRefresh={() => void registry.refreshAll()}
+      onSyncNow={(plugin, refreshAuth) => void registry.triggerSyncNow(plugin, refreshAuth)}
+      onSaveSchedule={(plugin, cronExpr, url) => registry.saveSchedule(plugin, cronExpr, url)}
+    />
+  );
+};
+
 export const PluginCenterWorkspace: React.FC<PluginCenterWorkspaceProps> = ({
   projectId,
   hostSlotId,
@@ -114,12 +194,11 @@ export const PluginCenterWorkspace: React.FC<PluginCenterWorkspaceProps> = ({
 }) => {
   const [scope, setScope] = useState<"mcp" | "automations">(initialScope);
   const registry = usePluginRegistry(projectId, scope);
+  const mcpGateway = useMcpGatewayController(scope === "mcp");
   const switchScope = (next: "mcp" | "automations") => {
     setScope(next);
     updateTabQueryParam(next, initialLearnFilter === "PROPOSED");
   };
-  const cronPlugins = registry.plugins.filter((p) => p.sourceType !== "builtin" || Boolean(p.upstreamRepoUrl));
-  const cronScheduleCheck = validateCronSchedules(registry.schedulesByPlugin);
 
   return (
     <main
@@ -128,27 +207,18 @@ export const PluginCenterWorkspace: React.FC<PluginCenterWorkspaceProps> = ({
       data-host-tabs={headerTabIds.join(",")}
       data-card-schema={cardSchemaVersion}
       data-project-id={projectId}
-      style={{ maxWidth: "960px", margin: "24px auto" }}
+      style={{ maxWidth: "1120px", margin: "24px auto" }}
     >
       <PluginCenterHeader scope={scope} onSwitchScope={switchScope} />
       {scope === "mcp" ? (
         <PluginCenterMcpContent
           projectId={projectId}
           registry={registry}
+          gateway={mcpGateway}
           initialLearnFilter={initialLearnFilter}
         />
       ) : (
-        <CronSyncStatus
-          plugins={cronPlugins}
-          schedulesByPlugin={cronScheduleCheck.valid}
-          loading={registry.loading}
-          error={registry.cronError ?? cronScheduleCheck.error}
-          pendingActionId={registry.actionPendingId}
-          actionFeedback={registry.actionFeedback}
-          onRefresh={() => void registry.refreshAll()}
-          onSyncNow={(plugin, refreshAuth) => void registry.triggerSyncNow(plugin, refreshAuth)}
-          onSaveSchedule={(plugin, cronExpr, url) => registry.saveSchedule(plugin, cronExpr, url)}
-        />
+        <PluginCenterAutomationsBody registry={registry} />
       )}
     </main>
   );

@@ -8,7 +8,7 @@ wave: "Wave-B..Wave-D"
 provides:
   - "In-App Non-Tech Support & Request Drawer (No-GitHub) + Zero-PII Scrubber + SQLite Telemetry Outbox (14.1)"
   - "Cloud Ingestion API & SuperAdmin Portal MVP (OIDC/MFA/RBAC, 2-Way Helpdesk, Feature Clustering, Funnel & Crash Center) (14.2)"
-  - "4-Channel Ed25519 Signed Rollout, Global Skill Quarantine Advisory, Offline Licenses & Cowok.ai Federation (14.3)"
+  - "4-Channel Ed25519 Signed Rollout, Default & Recommended GitHub Plugin Catalog Lifecycle, Deterministic A/B Experiments, Global Skill Quarantine Advisory, Offline Licenses & Cowok.ai Federation (14.3)"
 consumes: ["Epic 04", "Epic 08", "Epic 11"]
 links_to:
   - "file:///Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md"
@@ -27,7 +27,7 @@ links_to:
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
 | [Story-14.1](./Story-14.1/story.md) | Client Edge — In-App Non-Tech Support/Request Drawer (No-GitHub), Zero-PII Diagnostic Scrubber & Multi-Channel Telemetry Outbox | `completed` | `2` | `['04.6', '08.5']` |
-| [Story-14.2](./Story-14.2/story.md) | Cloud Ingestion API & SuperAdmin Portal MVP — OIDC/MFA/RBAC, 2-Way Non-Tech Helpdesk, Feature Request Clustering, Activation Funnel & Crash Center | `backlog` | `3` | `['14.1']` |
+| [Story-14.2](./Story-14.2/story.md) | Cloud Ingestion API & SuperAdmin Portal MVP — OIDC/MFA/RBAC, 2-Way Non-Tech Helpdesk, Feature Request Clustering, Activation Funnel & Crash Center | `completed` | `3` | `['14.1']` |
 | [Story-14.3](./Story-14.3/story.md) | 4-Channel Distribution Ops — Canary Rollout, Ed25519 Signed Updater & Skill Quarantine Advisory, Offline Licenses & Cowok.ai Federation | `backlog` | `3` | `['14.2', '08.6']` |
 
 ## 3. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)

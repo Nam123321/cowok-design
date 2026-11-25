@@ -869,6 +869,7 @@ dependencies = [
  "html-forge",
  "http-body-util",
  "libc",
+ "mcp-gateway",
  "plugin-host",
  "presentation-cms",
  "rand 0.8.8",
@@ -1423,7 +1424,15 @@ checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
 name = "mcp-gateway"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "domain",
+ "libc",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "uuid",
 ]
 
 [[package]]

@@ -4,7 +4,7 @@ id: "10.2"
 title: "Story 10.2: Parallel Swarm Dispatch, Disjoint V17 worker_file_leases, 429 Semaphore Clamp & Independent Builder != Scorer QC (E1..E4 >= 95%)"
 description: "Điều phối đa Execution Agents (Claude, Codex, AGY, Grok, Muse, Duet, Dot) qua hộp thư .cowok-design/coordination/ (ONE_JOB + NEVER), khóa đường dẫn rời rạc V17b worker_file_leases (fencing_token + canonical prefix overlap guard), 429 clamp 3->1, tách biệt tuyệt đối Builder != Scorer E1..E4 (>=95% catch) và Tier-3 Single-Session Design Jury."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-10/Story-10.2/story.md"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: core
 adr_ref: "ADR-006"
@@ -32,7 +32,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-25: Hộp thư Điều phối, V17 Disjoint Worker File Leases, 429 Clamp & Thang Kiểm chứng Độc lập E1..E4 (Builder != Scorer)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 10: cowok Master Orchestrator, advisor Meta-Agent, OPC Execution Fleet & Design Tournament](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-10/epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context

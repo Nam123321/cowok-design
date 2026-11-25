@@ -106,7 +106,9 @@ export const StagingDiffCard: React.FC<StagingDiffCardProps> = ({
             {t("plugins.stagingHeader", "Isolated Staging Candidate")}: v{plugin.stagingVersion} (v{plugin.version})
           </span>
         </div>
-        <span className="plugin-eco-badge plugin-eco-badge-human">HUMAN_ONLY</span>
+        <span className="plugin-eco-badge plugin-eco-badge-human">
+          {t("mcpGateway.tierHumanOnly", "Chỉ người dùng thao tác")}
+        </span>
       </div>
       <p className="plugin-eco-meta" data-testid={`staging-impact-summary-${plugin.pluginSlug}`} style={{ margin: 0 }}>
         {impactSummary}

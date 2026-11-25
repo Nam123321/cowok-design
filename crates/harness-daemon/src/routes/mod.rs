@@ -5,6 +5,8 @@ pub mod chat_cas_archive;
 pub mod chat_cas_storage;
 pub mod chat_cas_upload_handler;
 pub mod chat_cas_vault;
+pub mod cloud_admin;
+pub mod cloud_admin_auth;
 pub mod cognitive_studio;
 pub mod context_assemble;
 pub mod de_runtime;
@@ -19,6 +21,7 @@ pub mod execution_reaper;
 pub mod execution_sessions;
 pub mod execution_stream;
 pub mod execution_sweeper;
+pub mod fleet_swarm;
 pub mod flow_synthesize;
 pub mod fs_jail;
 pub mod github_ide_integrations;
@@ -29,6 +32,7 @@ pub mod legacy_sdi;
 pub mod legacy_sessions;
 pub mod legacy_specs;
 pub mod legacy_workbench_v6;
+pub mod mcp_gateway;
 pub mod models_registry;
 pub mod orchestrator;
 pub mod plugins;
@@ -44,6 +48,7 @@ pub mod sketch_polish;
 pub mod skills_catalog;
 pub mod ssot_registry;
 pub mod support_telemetry;
+pub mod visual_qc;
 
 use std::sync::Arc;
 
@@ -206,6 +211,7 @@ pub fn build_router(state: DaemonAppState) -> Router {
         )
         .merge(protected_legacy_router)
         .merge(flow_router)
+        .merge(cloud_admin::cloud_admin_router())
         .layer(middleware::from_fn_with_state(
             cors_state,
             cors_and_loopback_middleware,

@@ -181,7 +181,10 @@ async function dispatchMiddlewareRequest(
       parsedUrl.pathname === "/api/decks/normalize-chart-source");
   const isSupportTicketUpload =
     method === "POST" &&
-    (parsedUrl.pathname === "/api/v1/support/tickets" || parsedUrl.pathname === "/api/support/tickets");
+    (parsedUrl.pathname === "/api/v1/support/tickets" ||
+      parsedUrl.pathname === "/api/support/tickets" ||
+      parsedUrl.pathname === "/api/v1/cloud-admin/ingest/tickets" ||
+      parsedUrl.pathname === "/api/cloud-admin/ingest/tickets");
   const maxAllowedBodyBytes = isCasUpload
     ? MAX_CAS_UPLOAD_BODY_BYTES
     : isDeckDataUpload
