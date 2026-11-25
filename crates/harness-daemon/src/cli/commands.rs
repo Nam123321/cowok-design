@@ -278,6 +278,70 @@ pub fn execute_cli_command(cmd: CliCommand) -> CliOutput {
                 CliOutput::ok(format!("{CLI_BIN_NAME} {CLI_VERSION}"))
             }
         }
+        CliCommand::Install {
+            target,
+            install_root,
+            workspace,
+            binary_path,
+            json,
+        } => {
+            let ws_root = workspace.unwrap_or_else(|| {
+                std::env::var_os("UXUI_OS_WORKSPACE_ROOT")
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|| {
+                        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+                    })
+            });
+            let target_root = install_root.unwrap_or_else(|| ws_root.clone());
+            match crate::plugin_pack::install_universal_pack(
+                &target,
+                &target_root,
+                &ws_root,
+                binary_path.as_deref(),
+            ) {
+                Ok(report) => {
+                    if json {
+                        CliOutput::ok(format_json_success(&report))
+                    } else {
+                        CliOutput::ok(format!(
+                            "Installed universal plugin pack for {} target(s) into {}",
+                            report.targets.len(),
+                            target_root.display()
+                        ))
+                    }
+                }
+                Err(err) => {
+                    let field = match err {
+                        crate::plugin_pack::PluginPackError::UnsupportedTarget(_) => Some("target"),
+                        _ => None,
+                    };
+                    cli_err(2, err.code(), &err.to_string(), field, json)
+                }
+            }
+        }
+        CliCommand::CiGate {
+            project_id,
+            target_id,
+            html_path,
+            max_memory_mb,
+            force_no_browser,
+            fail_on_unverified,
+            workspace,
+            json,
+        } => {
+            let req = crate::ci_gate::CiGateRequest {
+                project_id: project_id
+                    .unwrap_or_else(|| crate::ci_gate::DEFAULT_CI_PROJECT_ID.to_string()),
+                target_id: target_id
+                    .unwrap_or_else(|| crate::ci_gate::DEFAULT_CI_TARGET_ID.to_string()),
+                html_path,
+                max_memory_mb,
+                force_no_browser,
+                fail_on_unverified,
+                workspace,
+            };
+            crate::ci_gate::execute_ci_gate_cli(req, json)
+        }
         CliCommand::InspectPrompt {
             raw_args,
             workspace,

@@ -61,17 +61,26 @@ impl BoundLoopbackListener {
 pub fn bind_zero_collision_listener(
     preferred_port: Option<u16>,
 ) -> Result<BoundLoopbackListener, HarnessError> {
-    let loopback = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+    // Default strictly to loopback (`127.0.0.1`). Inside an isolated OCI bridge container whose
+    // host port publish is bound to `127.0.0.1:<port>:<port>`, both explicit opt-in flags allow
+    // binding `0.0.0.0` in the container netns so Docker's host loopback forwarder can connect.
+    let container_bind_all = std::env::var("COWOK_CONTAINER_MODE").as_deref() == Ok("1")
+        && std::env::var("COWOK_CONTAINER_BIND_ALL").as_deref() == Ok("1");
+    let bind_ip = if container_bind_all {
+        IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+    } else {
+        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
+    };
     let requested = preferred_port.unwrap_or(0);
 
     let listener = if requested == 0 {
-        TcpListener::bind(SocketAddr::new(loopback, 0)).map_err(|e| {
+        TcpListener::bind(SocketAddr::new(bind_ip, 0)).map_err(|e| {
             HarnessError::ValidationFailed {
                 reason: format!("DAEMON_EPHEMERAL_BIND_FAILED: {e}"),
             }
         })?
     } else {
-        match TcpListener::bind(SocketAddr::new(loopback, requested)) {
+        match TcpListener::bind(SocketAddr::new(bind_ip, requested)) {
             Ok(l) => l,
             Err(err)
                 if matches!(
@@ -79,7 +88,7 @@ pub fn bind_zero_collision_listener(
                     std::io::ErrorKind::AddrInUse | std::io::ErrorKind::PermissionDenied
                 ) =>
             {
-                TcpListener::bind(SocketAddr::new(loopback, 0)).map_err(|fe| {
+                TcpListener::bind(SocketAddr::new(bind_ip, 0)).map_err(|fe| {
                     HarnessError::ValidationFailed {
                         reason: format!(
                             "DAEMON_COLLISION_FALLBACK_BIND_FAILED (preferred={requested}): {fe}"

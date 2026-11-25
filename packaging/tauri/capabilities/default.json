@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.tauri.app/config/2/capability",
+  "identifier": "default",
+  "description": "Least-privilege Tauri v2 capability policy for Cowok Design. Raw filesystem access is strictly omitted; all workspace and dropped-asset operations cross into Rust main exclusively via ephemeral HMAC capability tokens.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "updater:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "binaries/cowok-design",
+          "sidecar": true,
+          "args": [
+            "up",
+            "--port",
+            "0",
+            "--no-open",
+            "--json"
+          ]
+        }
+      ]
+    }
+  ]
+}

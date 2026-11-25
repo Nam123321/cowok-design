@@ -1,0 +1,164 @@
+{
+  "schemaVersion": 1,
+  "packId": "cowok-design-universal-pack",
+  "version": "1.0.0",
+  "specStandard": "agentskills.io/v1",
+  "description": "Universal Multi-Harness Plugin & Skill Pack compiling 7 built-in design-craft skill families, 7 deterministic Rust DE tools, 5 canonical design agents, and Open MCP stdio server across Cowok.ai, Claude Code, Codex CLI, Google Antigravity IDE, and Cursor.",
+  "mcpCommand": "cowok-design",
+  "mcpArgs": [
+    "mcp",
+    "serve"
+  ],
+  "mcpTransport": "stdio",
+  "defaultDaemonUrl": "http://127.0.0.1:4170/api/v1/mcp/rpc",
+  "feedbackToolName": "cowok_submit_feedback",
+  "humanOnlyTools": [
+    "ephemeral_tool_forge",
+    "learn_card_promote",
+    "staging_plugin_promote",
+    "workspace_destructive_reset"
+  ],
+  "deTools": [
+    "de-phase-router",
+    "de-intake",
+    "de-scan-sketch",
+    "de-tokens-oklch",
+    "de-brand-preview",
+    "de-extract-contract",
+    "de-patch-dom"
+  ],
+  "skillIds": [
+    "phase-0-intent-framing",
+    "phase-1-structural-sketch",
+    "phase-2-brand-visual-studio",
+    "phase-3-synthesis-polish",
+    "phase-4-verify-handoff",
+    "craft/impeccable-polish",
+    "domain-business/business-requirements-distiller"
+  ],
+  "agents": [
+    "design-orchestrator",
+    "flow-architect",
+    "brand-stylist",
+    "ui-crafter",
+    "design-auditor"
+  ],
+  "mcpTools": [
+    {
+      "toolName": "get_app_state",
+      "permissionTier": "READ_ONLY",
+      "mcpCallable": true,
+      "lockedHumanOnly": false,
+      "description": "Read current Cowok-Design workspace canvas nodes, document version, and layout issues."
+    },
+    {
+      "toolName": "resolve_run_bundle",
+      "permissionTier": "READ_ONLY",
+      "mcpCallable": true,
+      "lockedHumanOnly": false,
+      "description": "Resolve the allowed tool bundle scoped to a specific design task."
+    },
+    {
+      "toolName": "query_predicate",
+      "permissionTier": "INSPECT",
+      "mcpCallable": true,
+      "lockedHumanOnly": false,
+      "description": "Query canvas nodes by predicate such as has-problem('text-truncated') or kind('card')."
+    },
+    {
+      "toolName": "banner_solver",
+      "permissionTier": "INSPECT",
+      "mcpCallable": true,
+      "lockedHumanOnly": false,
+      "description": "Compute collision-free banner grid layouts across presets G1-G15."
+    },
+    {
+      "toolName": "grounded_diagram_elk",
+      "permissionTier": "INSPECT",
+      "mcpCallable": true,
+      "lockedHumanOnly": false,
+      "description": "Compute deterministic layered architecture diagram layouts."
+    },
+    {
+      "toolName": "apply_batch",
+      "permissionTier": "REVISE_PROPOSE",
+      "mcpCallable": true,
+      "lockedHumanOnly": false,
+      "description": "Apply atomic canvas batch edits with @alias references, dry-run preview, diff image, and automatic rollback."
+    },
+    {
+      "toolName": "cowok_submit_feedback",
+      "permissionTier": "REVISE_PROPOSE",
+      "mcpCallable": true,
+      "lockedHumanOnly": false,
+      "description": "Submit a Zero-PII scrubbed local support ticket or feature request to the Cowok-Design support outbox."
+    },
+    {
+      "toolName": "ephemeral_tool_forge",
+      "permissionTier": "HUMAN_ONLY",
+      "mcpCallable": false,
+      "lockedHumanOnly": true,
+      "description": "Create isolated helper scripts (requires direct in-app human confirmation)."
+    },
+    {
+      "toolName": "learn_card_promote",
+      "permissionTier": "HUMAN_ONLY",
+      "mcpCallable": false,
+      "lockedHumanOnly": true,
+      "description": "Approve and promote learned design rules (requires direct in-app human confirmation)."
+    },
+    {
+      "toolName": "staging_plugin_promote",
+      "permissionTier": "HUMAN_ONLY",
+      "mcpCallable": false,
+      "lockedHumanOnly": true,
+      "description": "Promote staged extensions to the active workspace (requires direct in-app human confirmation)."
+    },
+    {
+      "toolName": "workspace_destructive_reset",
+      "permissionTier": "HUMAN_ONLY",
+      "mcpCallable": false,
+      "lockedHumanOnly": true,
+      "description": "Reset the entire workspace state (requires direct in-app human confirmation)."
+    }
+  ],
+  "hosts": {
+    "cowok": {
+      "channel": "cowok_ai",
+      "displayName": "Cowok.ai",
+      "emittedManifest": "plugin.json",
+      "mcpConfig": ".cowok-ai/mcp.json"
+    },
+    "claude": {
+      "channel": "claude_code",
+      "displayName": "Claude Code / Desktop",
+      "emittedManifest": ".claude-plugin/plugin.json",
+      "mcpConfig": ".mcp.json"
+    },
+    "codex": {
+      "channel": "codex",
+      "displayName": "OpenAI Codex CLI",
+      "emittedManifest": ".codex/config.toml",
+      "mcpConfig": ".codex/config.toml"
+    },
+    "antigravity": {
+      "channel": "antigravity",
+      "displayName": "Google Antigravity IDE",
+      "emittedManifest": "antigravity-plugin/plugin.json",
+      "mcpConfig": "antigravity-plugin/.mcp.json"
+    },
+    "cursor": {
+      "channel": "cursor",
+      "displayName": "Cursor",
+      "emittedManifest": ".cursor/rules/cowok-design.mdc",
+      "mcpConfig": ".cursor/mcp.json"
+    }
+  },
+  "securityInvariants": [
+    "HUMAN_ONLY_GATES_IMMUTABLE",
+    "O_NOFOLLOW_SYMLINK_REJECTED",
+    "NLINK_EQ_1_HARDLINK_REJECTED",
+    "ZERO_PII_FEEDBACK_SCRUBBER",
+    "SECRET_PRESERVING_DRIFT_REPAIR"
+  ]
+}

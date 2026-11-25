@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "1.0.0",
+  "storyId": "12.3",
+  "adrRef": "ADR-006",
+  "image": "ghcr.io/cowok-ai/uiux-os",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "user": {
+    "name": "cowok",
+    "uid": 10001,
+    "gid": 10001,
+    "nonRootRequired": true
+  },
+  "binaries": {
+    "primary": "/usr/local/bin/cowok-design",
+    "aliases": [
+      "/usr/local/bin/uiux-os",
+      "/usr/local/bin/harness-daemon"
+    ],
+    "chromium": "/usr/bin/chromium"
+  },
+  "pooledChromiumCdp": {
+    "mode": "pooled-1-chromium-cdp",
+    "maxConcurrency": 1,
+    "envChromeBin": "COWOK_CDP_CHROME_BIN",
+    "shmFallbackThresholdBytes": 268435456,
+    "defaultMaxMemoryMb": 512,
+    "maxMemoryEnv": "COWOK_MAX_MEMORY_MB",
+    "baseFlags": [
+      "--headless=new",
+      "--disable-gpu",
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--disable-background-networking",
+      "--disable-background-timer-throttling",
+      "--disable-extensions",
+      "--hide-scrollbars",
+      "--mute-audio"
+    ],
+    "lowShmFlag": "--disable-dev-shm-usage",
+    "containerNoSandboxFlag": "--no-sandbox",
+    "containerNoSandboxEnv": [
+      "COWOK_CONTAINER_MODE",
+      "COWOK_CHROMIUM_NO_SANDBOX"
+    ],
+    "containerNoSandboxJustification": "Enabled strictly inside non-root uid 10001 + read_only rootfs + cap_drop ALL + no-new-privileges container boundary"
+  },
+  "invariants": {
+    "zeroLibreoffice": true,
+    "forbiddenPackages": [
+      "libreoffice",
+      "libreoffice-core",
+      "libreoffice-impress",
+      "libreoffice-writer",
+      "libreoffice-calc",
+      "soffice"
+    ],
+    "zeroCircularDepOnStory13_1": true,
+    "readOnlyRootfsCompatible": true,
+    "sigtermGracefulReaper": true,
+    "tiniSubreaperFlag": "-s"
+  },
+  "endpoints": {
+    "defaultPort": 4170,
+    "containerBridgeBindEnv": "COWOK_CONTAINER_BIND_ALL",
+    "hostLoopbackPublish": "127.0.0.1:4170:4170",
+    "health": "/api/v1/health",
+    "standaloneHealthAlias": "/api/health",
+    "mcpRpc": "/api/v1/mcp/rpc",
+    "mcpRpcAlias": "/api/mcp/rpc",
+    "qcRun": "/api/v1/qc/run",
+    "qcRunAlias": "/api/qc/run",
+    "prohibitedPorts": [
+      3689,
+      5000,
+      6333,
+      6334,
+      6379,
+      6380,
+      6381,
+      6382,
+      6383,
+      6390,
+      7000,
+      11434,
+      54321,
+      54322,
+      54323,
+      54324
+    ]
+  },
+  "runtimeStaging": {
+    "workspaceMount": "/workspace",
+    "writableRuntimeDir": "/tmp/cowok-runtime",
+    "xdgDataHome": "/tmp/cowok-runtime/data",
+    "xdgStateHome": "/tmp/cowok-runtime/state",
+    "xdgCacheHome": "/tmp/cowok-runtime/cache"
+  }
+}

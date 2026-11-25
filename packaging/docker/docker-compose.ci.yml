@@ -1,0 +1,77 @@
+# Story 12.3: Hardened Multi-Arch OCI Team & CI/CD Composition
+# Non-root (uid 10001), read-only rootfs, bounded /dev/shm & memory cap, loopback-only host publish on port 4170.
+# Note: Image ENTRYPOINT already invokes `/usr/bin/tini -s --`, so `init: true` is omitted to avoid double-init warnings.
+
+services:
+  uiux-os-daemon:
+    image: ghcr.io/cowok-ai/uiux-os:latest
+    build:
+      context: ../..
+      dockerfile: packaging/docker/Dockerfile
+    user: "10001:10001"
+    read_only: true
+    shm_size: "256m"
+    mem_limit: "1g"
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - "ALL"
+    # Strictly host-loopback publish (`127.0.0.1:4170:4170`).
+    # Inside Docker bridge networking, container-side `COWOK_CONTAINER_BIND_ALL=1` (paired with
+    # `COWOK_CONTAINER_MODE=1`) opts into binding `0.0.0.0:4170` inside the isolated bridge namespace
+    # so host `127.0.0.1:4170` requests reach the daemon while never exposing the port off-host.
+    ports:
+      - "127.0.0.1:4170:4170"
+    volumes:
+      - "../../:/workspace:ro"
+    tmpfs:
+      - "/tmp:rw,noexec,nosuid,size=256m"
+    environment:
+      COWOK_CDP_CHROME_BIN: "/usr/bin/chromium"
+      # Safe ONLY inside this hardened non-root + read_only + cap_drop ALL + no-new-privileges container
+      COWOK_CONTAINER_MODE: "1"
+      COWOK_CHROMIUM_NO_SANDBOX: "1"
+      COWOK_CONTAINER_BIND_ALL: "1"
+      UXUI_OS_WORKSPACE_ROOT: "/workspace"
+      UXUI_OS_DAEMON_PORT: "4170"
+      XDG_DATA_HOME: "/tmp/cowok-runtime/data"
+      XDG_STATE_HOME: "/tmp/cowok-runtime/state"
+      XDG_CACHE_HOME: "/tmp/cowok-runtime/cache"
+      COWOK_MAX_MEMORY_MB: "512"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:4170/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    command: ["up", "--port", "4170", "--no-open"]
+
+  uiux-os-ci-gate:
+    profiles: ["ci"]
+    image: ghcr.io/cowok-ai/uiux-os:latest
+    build:
+      context: ../..
+      dockerfile: packaging/docker/Dockerfile
+    user: "10001:10001"
+    read_only: true
+    shm_size: "256m"
+    mem_limit: "1g"
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - "ALL"
+    volumes:
+      - "../../:/workspace:ro"
+    tmpfs:
+      - "/tmp:rw,noexec,nosuid,size=256m"
+    environment:
+      COWOK_CDP_CHROME_BIN: "/usr/bin/chromium"
+      # Safe ONLY inside this hardened non-root + read_only + cap_drop ALL + no-new-privileges container
+      COWOK_CONTAINER_MODE: "1"
+      COWOK_CHROMIUM_NO_SANDBOX: "1"
+      UXUI_OS_WORKSPACE_ROOT: "/workspace"
+      XDG_DATA_HOME: "/tmp/cowok-runtime/data"
+      XDG_STATE_HOME: "/tmp/cowok-runtime/state"
+      XDG_CACHE_HOME: "/tmp/cowok-runtime/cache"
+      COWOK_MAX_MEMORY_MB: "512"
+    command: ["ci", "gate", "--json", "--max-memory-mb", "512"]
