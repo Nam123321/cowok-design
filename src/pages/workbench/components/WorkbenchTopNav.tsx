@@ -2,7 +2,6 @@
 import React from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
 import { ContextMeterWidget } from "../../../features/context-meter/ContextMeterWidget";
-import { SsotToolbarStrip } from "../../../features/ssot-registry";
 import { useTranslation } from "../../../hooks/useTranslation";
 
 export type ThemeMode = "warm" | "dim" | "night" | "night-low" | "monochrome";
@@ -24,7 +23,10 @@ export interface WorkbenchTopNavProps {
   metrics?: Record<string, unknown>;
   onThemeChange?: (theme: ThemeMode) => void;
   onOpenSupportDrawer?: () => void;
+  /** @deprecated Moved to tab-local ContextualStageToolbar (PA 3). Kept optional for backward compatibility. */
   onOpenVisualQc?: () => void;
+  /** @deprecated Moved to tab-local ContextualStageToolbar (PA 3). Kept optional for backward compatibility. */
+  onOpenTournament?: () => void;
 }
 
 export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
@@ -33,7 +35,6 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
   activeSessionTitle,
   isStandaloneConversation = false,
   onOpenSupportDrawer,
-  onOpenVisualQc,
 }) => {
   const { t } = useTranslation();
   const pluginCenterHref = projectId ? `/plugins?projectId=${encodeURIComponent(projectId)}` : "/plugins";
@@ -41,6 +42,7 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
   return (
     <header
       className="workbench-top-nav"
+      data-testid="workbench-top-nav"
       style={{
         height: "36px",
         minHeight: "36px",
@@ -195,33 +197,9 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
         </nav>
       </div>
 
-      {/* Right Zone: Clean Global Window Context (Tab-specific DAG/Slide controls are strictly scoped inside the active tab) */}
+      {/* Right Zone: Slim 3-Item Global Window Controls (Tab-local tools live in ContextualStageToolbar) */}
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <ContextMeterWidget projectId={projectId} />
-        <SsotToolbarStrip projectId={projectId} />
-        {onOpenVisualQc && (
-          <button
-            type="button"
-            data-testid="nav-visual-qc-btn"
-            onClick={onOpenVisualQc}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "5px",
-              padding: "3px 8px",
-              fontSize: "11px",
-              fontWeight: 500,
-              color: "var(--text-secondary)",
-              borderRadius: "var(--radius-xs)",
-              border: "1px solid var(--border-subtle)",
-              backgroundColor: "var(--bg-workspace)",
-              cursor: "pointer",
-            }}
-          >
-            <BrandIcon name="check" size={11} color="currentColor" />
-            <span>{t("visualQc.navReadinessPill", "Visual QC")}</span>
-          </button>
-        )}
         <a
           href={pluginCenterHref}
           data-testid="nav-plugin-center"
@@ -240,7 +218,7 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
           }}
         >
           <BrandIcon name="plugin" size={11} color="currentColor" />
-          <span>{t("plugins.navLink", "Plugins")}</span>
+          <span>{t("plugins.navLink", "Tiện ích")}</span>
         </a>
         <button
           type="button"

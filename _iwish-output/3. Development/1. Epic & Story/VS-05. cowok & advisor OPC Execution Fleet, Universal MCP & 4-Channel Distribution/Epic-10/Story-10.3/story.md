@@ -4,7 +4,7 @@ id: "10.3"
 title: "Story 10.3: Anti-Slop Design Tournament (CMP-07, 4 Trục Trực giao <=15s, AST Distance <=0.78, Position-Swapped RubricShield), Cross-Variant Borrow & advisor 6-Step Loop"
 description: "Đấu trường thiết kế Anti-Slop (CMP-07 DesignTournamentArena): 4 trục trực giao <=15s, Pre-Judge AST Distance <=0.78 (clone_distance_passed), Blind Wipe + Position-Swapped RubricShield + Cross-Variant Borrow (reconcile_ff_ids + CSS tokens), V18b tournament_runs/variants/creative_memory_events, /crystallize và advisor 6-step loop khóa cứng deny tests/eval/sealed/ + Staging HUMAN_ONLY."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-10/Story-10.3/story.md"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: core
 adr_ref: "ADR-006, ADR-009"

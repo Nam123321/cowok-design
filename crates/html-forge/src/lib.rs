@@ -6,6 +6,7 @@
 //! OKLCH WCAG AA contrast clamping.
 
 pub mod brand_studio;
+pub mod export_bundler;
 pub mod fe_contract;
 pub mod oklch;
 pub mod patcher;

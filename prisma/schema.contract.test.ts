@@ -289,6 +289,24 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V30__story_07_2_split_export_audit.sql"),
+      "utf-8"
+    )
+  );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V31__story_10_3_design_tournament.sql"),
+      "utf-8"
+    )
+  );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V32__story_14_3_distribution_ops_catalog_ab.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
@@ -383,10 +401,19 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
     expect(mappedTables).toContain("cloud_telemetry_events");
     expect(mappedTables).toContain("cloud_crash_groups");
     expect(mappedTables).toContain("admin_audit_logs");
-    expect(mappedTables).toHaveLength(84);
+    expect(mappedTables).toContain("export_bundle_runs");
+    expect(mappedTables).toContain("tournament_runs");
+    expect(mappedTables).toContain("tournament_variants");
+    expect(mappedTables).toContain("creative_memory_events");
+    expect(mappedTables).toContain("cloud_release_rollouts");
+    expect(mappedTables).toContain("cloud_plugin_catalog_entries");
+    expect(mappedTables).toContain("cloud_ab_experiments");
+    expect(mappedTables).toContain("cloud_skill_advisories");
+    expect(mappedTables).toContain("cloud_offline_licenses");
+    expect(mappedTables).toHaveLength(93);
   });
 
-  it("UT-DB-02: executes V1-V29 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V32 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 

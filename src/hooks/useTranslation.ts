@@ -72,6 +72,29 @@ function resolveKey(dict: Record<string, any>, key: string): string | undefined 
   return typeof cur === "string" ? cur : undefined;
 }
 
+function interpolateVars(
+  template: string,
+  vars?: Record<string, string | number>
+): string {
+  if (!vars) return template;
+  return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, varKey: string) =>
+    Object.prototype.hasOwnProperty.call(vars, varKey) ? String(vars[varKey]) : match
+  );
+}
+
+export function translateGlobal(
+  key: string,
+  defaultVal?: string,
+  vars?: Record<string, string | number>
+): string {
+  const dict =
+    DICTS[currentGlobalLocale] ||
+    (currentGlobalLocale.startsWith("en") ? enDict : viDict);
+  const found = resolveKey(dict, key);
+  const raw = found !== undefined ? found : defaultVal || key;
+  return interpolateVars(raw, vars);
+}
+
 export function useTranslation(overrideLocale?: string) {
   const [locale, setLocale] = useState(overrideLocale || currentGlobalLocale);
 
@@ -93,9 +116,10 @@ export function useTranslation(overrideLocale?: string) {
   );
 
   const t = useCallback(
-    (key: string, defaultVal?: string) => {
+    (key: string, defaultVal?: string, vars?: Record<string, string | number>) => {
       const found = resolveKey(dict, key);
-      return found !== undefined ? found : defaultVal || key;
+      const raw = found !== undefined ? found : defaultVal || key;
+      return interpolateVars(raw, vars);
     },
     [dict]
   );

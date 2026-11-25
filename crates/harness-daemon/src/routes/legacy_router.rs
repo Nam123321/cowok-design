@@ -14,6 +14,7 @@ use crate::routes::context_assemble::{handle_context_assemble, handle_get_contex
 use crate::routes::de_runtime::build_de_runtime_router;
 use crate::routes::decision::build_decision_router;
 use crate::routes::deck_generation::build_deck_generation_router;
+use crate::routes::design_tournament::design_tournament_router;
 use crate::routes::fleet_swarm::fleet_swarm_router;
 use crate::routes::flow_synthesize::build_flow_synthesize_router;
 use crate::routes::fs_jail;
@@ -55,6 +56,7 @@ use crate::routes::sketch_polish::{
     handle_sdi_clarify,
 };
 use crate::routes::skills_catalog::build_skills_catalog_router;
+use crate::routes::split_export::split_export_router;
 use crate::routes::ssot_registry::{
     handle_export_ssot, handle_get_ssot_components, handle_mutate_appshell_lock,
     handle_route_skills,
@@ -289,7 +291,9 @@ pub(crate) fn build_protected_legacy_router(state: DaemonAppState) -> Router<Dae
         .merge(build_learn_studio_corrections_router())
         .merge(build_cognitive_studio_router())
         .merge(visual_qc_router())
+        .merge(split_export_router())
         .merge(fleet_swarm_router())
+        .merge(design_tournament_router())
         .merge(mcp_gateway_router())
         .route_layer(middleware::from_fn_with_state(
             state,

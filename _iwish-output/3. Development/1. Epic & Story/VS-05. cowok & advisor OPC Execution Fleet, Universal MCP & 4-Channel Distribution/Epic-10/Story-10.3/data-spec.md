@@ -26,7 +26,7 @@ links_to:
 
 Story `10.3` persists 4-axis tournament dispatches (`<=15s`) into `V18 tournament_runs` and `tournament_variants`, records `ast_similarity` + `clone_distance_passed` (`similarity <= 0.78`), executes position-swapped `RubricShield` blind judging (`(A,B)/(B,A)`), applies safe cross-variant element borrows using `reconcile_ff_ids` (`05.4`), and records preference/repair events in `V18 creative_memory_events` powering the regression-gated `advisor` 6-step loop and `/crystallize`.
 
-## 2. Additive SQLite WAL DDL (`V18`)
+## 2. Additive SQLite WAL DDL (`V31__story_10_3_design_tournament.sql`, logical `V18b` schema)
 
 ```sql
 CREATE TABLE IF NOT EXISTS tournament_runs (

@@ -264,6 +264,33 @@ pub fn v29_migration_checksum() -> String {
     static CACHE: OnceLock<String> = OnceLock::new();
     cached_migration_sha256(&CACHE, V29_MIGRATION_SQL)
 }
+
+pub const V30_MIGRATION_SQL: &str =
+    include_str!("../migrations/V30__story_07_2_split_export_audit.sql");
+pub const V30_MIGRATION_NAME: &str = "V30__story_07_2_split_export_audit.sql";
+
+pub fn v30_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V30_MIGRATION_SQL)
+}
+
+pub const V31_MIGRATION_SQL: &str =
+    include_str!("../migrations/V31__story_10_3_design_tournament.sql");
+pub const V31_MIGRATION_NAME: &str = "V31__story_10_3_design_tournament.sql";
+
+pub fn v31_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V31_MIGRATION_SQL)
+}
+
+pub const V32_MIGRATION_SQL: &str =
+    include_str!("../migrations/V32__story_14_3_distribution_ops_catalog_ab.sql");
+pub const V32_MIGRATION_NAME: &str = "V32__story_14_3_distribution_ops_catalog_ab.sql";
+
+pub fn v32_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V32_MIGRATION_SQL)
+}
 /// Configuration for the embedded SQLite WAL connection pool.
 #[derive(Debug, Clone)]
 pub struct SqliteWalConfig {
@@ -552,6 +579,9 @@ impl SqlitePool {
             Self::apply_v27_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v28_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v29_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v30_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v31_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v32_migration_if_needed(&mut conn, &config.db_path)?;
         }
         harden_sqlite_files(&config.db_path)?;
 
@@ -1345,6 +1375,12 @@ impl SqlitePool {
             .map_err(|e| map_sqlite_error(e, "genesis_v28"))?;
         tx.execute_batch(V29_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "genesis_v29"))?;
+        tx.execute_batch(V30_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v30"))?;
+        tx.execute_batch(V31_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v31"))?;
+        tx.execute_batch(V32_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v32"))?;
 
         let now = Utc::now().timestamp_millis();
         for (version, name, sha) in [
@@ -1375,6 +1411,9 @@ impl SqlitePool {
             (27i64, V27_MIGRATION_NAME, v27_migration_checksum()),
             (28i64, V28_MIGRATION_NAME, v28_migration_checksum()),
             (29i64, V29_MIGRATION_NAME, v29_migration_checksum()),
+            (30i64, V30_MIGRATION_NAME, v30_migration_checksum()),
+            (31i64, V31_MIGRATION_NAME, v31_migration_checksum()),
+            (32i64, V32_MIGRATION_NAME, v32_migration_checksum()),
         ] {
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
@@ -2913,6 +2952,48 @@ impl SqlitePool {
             V29_MIGRATION_NAME,
             V29_MIGRATION_SQL,
             v29_migration_checksum(),
+        )
+    }
+
+    fn apply_v30_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        Self::apply_simple_additive_migration_if_needed(
+            conn,
+            30,
+            "V30",
+            V30_MIGRATION_NAME,
+            V30_MIGRATION_SQL,
+            v30_migration_checksum(),
+        )
+    }
+
+    fn apply_v31_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        Self::apply_simple_additive_migration_if_needed(
+            conn,
+            31,
+            "V31",
+            V31_MIGRATION_NAME,
+            V31_MIGRATION_SQL,
+            v31_migration_checksum(),
+        )
+    }
+
+    fn apply_v32_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        Self::apply_simple_additive_migration_if_needed(
+            conn,
+            32,
+            "V32",
+            V32_MIGRATION_NAME,
+            V32_MIGRATION_SQL,
+            v32_migration_checksum(),
         )
     }
 

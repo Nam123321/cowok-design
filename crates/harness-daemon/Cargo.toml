@@ -31,6 +31,7 @@ sha2.workspace = true
 rusqlite.workspace = true
 libc = "0.2"
 base64 = "0.22"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 aes-gcm = "0.10"
 argon2 = "0.5"
 rand = "0.8"
