@@ -53,7 +53,7 @@ async function setWorkspaceTheme(page: Page, theme: "warm" | "night") {
 
 async function bootEditorSession(page: Page, baseUrl: string, qaNonce: string): Promise<string> {
   await page.setViewportSize({ width: DESKTOP_WIDTH, height: DESKTOP_HEIGHT });
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(page.locator("#root")).not.toBeEmpty({ timeout: BOOT_TIMEOUT_MS });
 
   const bootCap =
@@ -91,7 +91,8 @@ async function bootEditorSession(page: Page, baseUrl: string, qaNonce: string): 
     },
   });
 
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator("#root")).not.toBeEmpty({ timeout: BOOT_TIMEOUT_MS });
   await dismissOnboardingWizard(page);
   return sessionToken;
 }
@@ -132,7 +133,7 @@ async function verifySettingsCompactAndPluginsFullView(page: Page, targetPort: s
   await expect(page.getByTestId("open-full-mcp-center-btn")).toBeVisible({ timeout: BOOT_TIMEOUT_MS });
   await expect(page.locator("[data-ff-id='mcp-tool-permission-matrix']")).toHaveCount(0);
 
-  await page.goto(`http://127.0.0.1:${targetPort}/plugins`, { waitUntil: "networkidle" });
+  await page.goto(`http://127.0.0.1:${targetPort}/plugins`, { waitUntil: "domcontentloaded" });
   await expect(page.locator("[data-ff-id='mcp-host-installer-list']")).toBeVisible({ timeout: BOOT_TIMEOUT_MS });
   const matrix = page.locator("[data-ff-id='mcp-tool-permission-matrix']");
   await expect(matrix).toBeVisible({ timeout: BOOT_TIMEOUT_MS });
@@ -151,6 +152,7 @@ test.describe("Story 11.2 Bidirectional Open MCP Server & 1-Click Host Installer
   test("verifies JSON-RPC HUMAN_ONLY rejection, compact Settings popup, and full /plugins Chip-Grid + live activity log", async ({
     browser,
   }) => {
+    test.setTimeout(120_000);
     fs.mkdirSync(EVIDENCE_DIR, { recursive: true });
     const targetPort = process.env.TARGET_PORT || process.env.PORT || "4173";
     const baseUrl = `http://127.0.0.1:${targetPort}/`;

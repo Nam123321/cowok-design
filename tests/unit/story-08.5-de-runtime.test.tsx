@@ -130,7 +130,9 @@ describe("Story 08.5 Split DE+DR Plugin Runtime, Tool Jail & LEARN Ledger UI", (
 
     render(<EphemeralToolAuditDrawerPanel projectId={TEST_PROJECT_ID} />);
     expect(document.querySelector("[data-ff-id='ephemeral-tool-audit-drawer']")).not.toBeNull();
-    expect(screen.getByTestId("jail-human-only-badge").textContent).toContain("HUMAN_ONLY");
+    const jailBadge = screen.getByTestId("jail-human-only-badge");
+    expect(jailBadge.getAttribute("data-permission-tier")).toBe("HUMAN_ONLY");
+    expect(jailBadge.textContent).toMatch(/Chỉ người dùng thao tác|User-only action/i);
 
     fireEvent.click(screen.getByTestId("btn-execute-ephemeral-tool"));
     await waitFor(() => {
