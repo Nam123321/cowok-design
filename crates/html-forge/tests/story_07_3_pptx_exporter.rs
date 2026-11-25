@@ -43,7 +43,7 @@ fn verify_ooxml_zip_integrity(pptx_bytes: &[u8]) -> HashMap<String, String> {
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).expect("zip entry");
-        let name = file.name().to_string();
+        let name = file.name().expect("valid zip entry name").into_owned();
         all_entries.insert(name.clone());
         let mut buf = Vec::new();
         file.read_to_end(&mut buf).expect("read zip entry");
