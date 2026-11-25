@@ -52,7 +52,7 @@ export const WorkbenchTopNav: React.FC<WorkbenchTopNavProps> = ({
         alignItems: "center",
         justifyContent: "space-between",
         backgroundColor: "var(--bg-surface)",
-        zIndex: 10,
+        zIndex: 40,
         flexShrink: 0,
         boxSizing: "border-box",
         userSelect: "none",

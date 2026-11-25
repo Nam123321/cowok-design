@@ -324,7 +324,7 @@ async fn tc_05_3_01_and_02_schema_ancestry_turns_and_crash_safe_revert() {
     let ws = fs::canonicalize(&ws).unwrap();
     let (state, router, tok) = setup_daemon(&tmp);
 
-    assert_eq!(CURRENT_SCHEMA_VERSION, 29);
+    assert_eq!(CURRENT_SCHEMA_VERSION, 32);
     let (st_h, health) = send_req(&router, "GET", "/api/v1/health", &tok, None).await;
     assert_eq!(st_h, StatusCode::OK);
     assert_eq!(health["schema_version"], CURRENT_SCHEMA_VERSION);
