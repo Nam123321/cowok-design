@@ -85,6 +85,24 @@ import * as cognitiveFeDataContractRoute from "../app/api/v1/cognitive/fe-data-c
 import * as cognitiveSpecsRevealRoute from "../app/api/v1/cognitive/specs/reveal/route";
 import * as cognitiveHiddenSpecsRoute from "../app/api/v1/cognitive/hidden-specs/route";
 import * as cognitiveHeritagePacksRoute from "../app/api/v1/cognitive/heritage-packs/route";
+import * as qcRunRoute from "../app/api/v1/qc/run/route";
+import * as qcAutoFixRoute from "../app/api/v1/qc/auto-fix/route";
+import * as fleetDispatchRoute from "../app/api/v1/fleet/dispatch/route";
+import * as fleetLeasesAcquireRoute from "../app/api/v1/fleet/leases/acquire/route";
+import * as fleetJuryEvaluateRoute from "../app/api/v1/fleet/jury/evaluate/route";
+import * as mcpInstallRoute from "../app/api/v1/mcp/install/route";
+import * as mcpExternalActivityRoute from "../app/api/v1/mcp/external-activity/route";
+import * as mcpToolsToggleRoute from "../app/api/v1/mcp/tools/toggle/route";
+import * as mcpRpcRoute from "../app/api/v1/mcp/rpc/route";
+import * as cloudAdminIngestTicketsRoute from "../app/api/v1/cloud-admin/ingest/tickets/route";
+import * as cloudAdminIngestTelemetryRoute from "../app/api/v1/cloud-admin/ingest/telemetry/route";
+import * as cloudAdminAuthSessionRoute from "../app/api/v1/cloud-admin/auth/session/route";
+import * as cloudAdminTicketsRoute from "../app/api/v1/cloud-admin/tickets/route";
+import * as cloudAdminTicketReplyRoute from "../app/api/v1/cloud-admin/tickets/[id]/reply/route";
+import * as cloudAdminTicketAttachmentRoute from "../app/api/v1/cloud-admin/tickets/[id]/attachment/route";
+import * as cloudAdminClustersRoute from "../app/api/v1/cloud-admin/clusters/route";
+import * as cloudAdminAnalyticsFunnelRoute from "../app/api/v1/cloud-admin/analytics/funnel/route";
+import * as cloudAdminCrashesRoute from "../app/api/v1/cloud-admin/crashes/route";
 import * as synthesizeSpecsRoute from "../app/api/projects/[id]/specs/synthesize/route";
 import * as contextSliceRoute from "../app/api/projects/[id]/context-slice/route";
 import * as versionSnapshotsRoute from "../app/api/projects/[id]/snapshots/route";
@@ -260,6 +278,25 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "PUT", pattern: /^\/api\/cognitive\/hidden-specs$/, extractParams: noParams, resolveHandler: () => cognitiveHiddenSpecsRoute.PUT },
   { method: "GET", pattern: /^\/api\/cognitive\/heritage-packs$/, extractParams: noParams, resolveHandler: () => cognitiveHeritagePacksRoute.GET },
   { method: "POST", pattern: /^\/api\/cognitive\/heritage-packs$/, extractParams: noParams, resolveHandler: () => cognitiveHeritagePacksRoute.POST },
+  { method: "POST", pattern: /^\/api\/qc\/run$/, extractParams: noParams, resolveHandler: () => qcRunRoute.POST },
+  { method: "POST", pattern: /^\/api\/qc\/auto-fix$/, extractParams: noParams, resolveHandler: () => qcAutoFixRoute.POST },
+  { method: "POST", pattern: /^\/api\/fleet\/dispatch$/, extractParams: noParams, resolveHandler: () => fleetDispatchRoute.POST },
+  { method: "POST", pattern: /^\/api\/fleet\/leases\/acquire$/, extractParams: noParams, resolveHandler: () => fleetLeasesAcquireRoute.POST },
+  { method: "POST", pattern: /^\/api\/fleet\/jury\/evaluate$/, extractParams: noParams, resolveHandler: () => fleetJuryEvaluateRoute.POST },
+  { method: "POST", pattern: /^\/api\/mcp\/install$/, extractParams: noParams, resolveHandler: () => mcpInstallRoute.POST },
+  { method: "GET", pattern: /^\/api\/mcp\/external-activity$/, extractParams: noParams, resolveHandler: () => mcpExternalActivityRoute.GET },
+  { method: "POST", pattern: /^\/api\/mcp\/tools\/toggle$/, extractParams: noParams, resolveHandler: () => mcpToolsToggleRoute.POST },
+  { method: "POST", pattern: /^\/api\/mcp\/rpc$/, extractParams: noParams, resolveHandler: () => mcpRpcRoute.POST },
+  { method: "POST", pattern: /^\/api\/cloud-admin\/ingest\/tickets$/, extractParams: noParams, resolveHandler: () => cloudAdminIngestTicketsRoute.POST },
+  { method: "POST", pattern: /^\/api\/cloud-admin\/ingest\/telemetry$/, extractParams: noParams, resolveHandler: () => cloudAdminIngestTelemetryRoute.POST },
+  { method: "POST", pattern: /^\/api\/cloud-admin\/auth\/session$/, extractParams: noParams, resolveHandler: () => cloudAdminAuthSessionRoute.POST },
+  { method: "GET", pattern: /^\/api\/cloud-admin\/tickets$/, extractParams: noParams, resolveHandler: () => cloudAdminTicketsRoute.GET },
+  { method: "POST", pattern: /^\/api\/cloud-admin\/tickets\/([^/]+)\/reply$/, extractParams: idOnly, resolveHandler: () => cloudAdminTicketReplyRoute.POST },
+  { method: "GET", pattern: /^\/api\/cloud-admin\/tickets\/([^/]+)\/attachment$/, extractParams: idOnly, resolveHandler: () => cloudAdminTicketAttachmentRoute.GET },
+  { method: "GET", pattern: /^\/api\/cloud-admin\/clusters$/, extractParams: noParams, resolveHandler: () => cloudAdminClustersRoute.GET },
+  { method: "POST", pattern: /^\/api\/cloud-admin\/clusters$/, extractParams: noParams, resolveHandler: () => cloudAdminClustersRoute.POST },
+  { method: "GET", pattern: /^\/api\/cloud-admin\/analytics\/funnel$/, extractParams: noParams, resolveHandler: () => cloudAdminAnalyticsFunnelRoute.GET },
+  { method: "GET", pattern: /^\/api\/cloud-admin\/crashes$/, extractParams: noParams, resolveHandler: () => cloudAdminCrashesRoute.GET },
   { method: "GET", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.GET },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks$/, extractParams: idOnly, resolveHandler: () => decksRoute.POST },
   { method: "PUT", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/reorder$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]) }), resolveHandler: () => deckReorderRoute.PUT },

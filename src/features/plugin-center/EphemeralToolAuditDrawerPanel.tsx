@@ -155,8 +155,9 @@ const JailDrawerHeader: React.FC<{ expanded: boolean; onToggle: () => void }> = 
         <span
           className="plugin-eco-badge plugin-eco-badge-human-only"
           data-testid="jail-human-only-badge"
+          data-permission-tier="HUMAN_ONLY"
         >
-          HUMAN_ONLY • env_clear • O_NOFOLLOW • -PGID
+          {t("deRuntime.jailIsolationBadge", "Chạy cô lập · Chỉ người dùng thao tác")}
         </span>
         <button
           type="button"

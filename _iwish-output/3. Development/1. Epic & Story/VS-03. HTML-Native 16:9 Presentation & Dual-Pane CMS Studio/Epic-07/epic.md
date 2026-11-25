@@ -38,7 +38,7 @@ links_to:
 
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
-| [Story-07.1](./Story-07.1/story.md) | Pooled 1-Chromium Rust CDP Visual QC (`lib-audit` + `slides-check`), QC Overlay & 1-Click Auto-Fix | `refactored` | `3` | `['05.4', '06.2', '06.5']` |
+| [Story-07.1](./Story-07.1/story.md) | Pooled 1-Chromium Rust CDP Visual QC (`lib-audit` + `slides-check`), QC Overlay & 1-Click Auto-Fix | `completed` | `3` | `['05.4', '06.2', '06.5']` |
 | [Story-07.2](./Story-07.2/story.md) | Non-Tech Share & Present Export vs Developer Handoff *(Offline HTML + Vector PDF + Plugin PPTX)* | `refactored` | `2` | `['06.1', '06.5', '07.1']` |
 | [Story-07.3](./Story-07.3/story.md) | *(Superseded by `Story 07.2`)* Self-Contained Offline HTML Bundle & Vector PDF | `cancelled` | `2` | `['07.1', '06.3']` |
 

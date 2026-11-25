@@ -1,14 +1,14 @@
 ---
 type: I-Wish Data & Contract Spec
 story_id: "07.1"
-title: "Data & V17 Visual QC Gate Run Contract Specification: Story 07.1"
-status: refactored
+title: "Data & V26 Visual QC Gate Run Contract Specification: Story 07.1"
+status: active
 adr_ref: "../../../../2. Product Planning/ADRs/ADR-006-Decision-Cascade-Pooled-CDP-and-Shared-Html-Forge.md"
 data_decision_records:
   - model: QcGateRun
     action: NEW_AGGREGATE
     bounded_context: visual-qc
-    justification: "V17 qc_gate_runs stores immutable Pooled 1-Chromium CDP geometry/WCAG audits, Real RGBA SSIM metrics & SHA-1 layout cache entries"
+    justification: "V26 qc_gate_runs (additive SQLite WAL migration, succeeding V25) stores immutable Pooled 1-Chromium CDP geometry/WCAG audits, Real RGBA SSIM metrics & SHA-1 layout cache entries"
 links_to:
   - "../../../../2. Product Planning/2.2. database-spec.md"
   - "../../../../2. Product Planning/2.5. architecture.md"
@@ -22,7 +22,7 @@ links_to:
 
 Story `07.1` consolidates Pooled `<= 1` Chromium CDP audits (`lib-audit` across `1440/1024/768/390` + sweep `320..1440` and `slides-check` `1920x1080`), Real RGBA SSIM + `elementsFromPoint` occlusion checks, E2E Flow Completeness scans (`Dead-End CTAs`, `Orphan Screens`, missing `4-SubStates`), and `<10ms` deterministic `lint_fix` (`0` LLM tokens) vs `MAX_ATTEMPTS = 3` Agent Auto-Fix. When no Chromium binary is available, persists `UNVERIFIED_NO_BROWSER` honestly.
 
-## 2. Additive SQLite WAL DDL (`V17`)
+## 2. Additive SQLite WAL DDL (`V26__story_07_1_qc_gate_runs.sql`)
 
 ```sql
 CREATE TABLE IF NOT EXISTS qc_gate_runs (

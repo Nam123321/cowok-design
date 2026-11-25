@@ -4,7 +4,7 @@ id: "07.1"
 title: "Story 07.1: Pooled 1-Chromium Rust CDP Visual QC (lib-audit + slides-check), QC Overlay & 1-Click Auto-Fix"
 description: "Hợp nhất 07.1 + 07.2 + 09.3 occlusion thành lát cắt dọc Pooled <=1 Chromium Rust CDP (1440/1024/768/390 + 320..1440 sweep + 1920x1080 slides-check + elementsFromPoint occlusion + real RGBA SSIM thay drawWireframeCard) + iframe_bridge_fallback (UNVERIFIED_NO_BROWSER), Visual QC Overlay & 1-Click Auto-Fix -> V17 qc_gate_runs (SHA-1 cache)."
 resource: "iwish://uxui-os/development/epic-07/story-07.1"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: core
 adr_ref: "ADR-006"
@@ -30,7 +30,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-18: Bộ kiểm định 25+ Quy tắc Bố cục (Pooled CDP + Real SSIM), E2E Flow Completeness & Visual QC Overlay Auto-Fix](../../../../2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 07: 17-Rule Multi-Viewport Visual Eval Gate & Self-Contained HTML / Vector PDF Exporter](../epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context

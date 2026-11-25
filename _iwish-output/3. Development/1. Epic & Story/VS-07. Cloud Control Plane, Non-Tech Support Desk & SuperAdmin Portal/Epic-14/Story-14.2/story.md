@@ -4,7 +4,7 @@ id: "14.2"
 title: "Story 14.2: Cloud Ingestion API & SuperAdmin Portal MVP — OIDC/MFA/RBAC, 2-Way Non-Tech Helpdesk, Feature Request Clustering, Activation Funnel & Crash Center"
 description: "Xây dựng Cloud Control Plane tách biệt (api.cowok.design) và SuperAdmin Portal (admin.cowok.design) với OIDC+MFA+4-Role RBAC để tiếp nhận/trả lời ticket 2 chiều cho non-tech, gom cụm Feature Request, theo dõi phễu kích hoạt đa kênh và gom lỗi crash."
 resource: "iwish://cowok-design/development/epic-14/story-14.2"
-status: backlog
+status: completed
 risk_tier: 3
 delivery: cloud-control-plane
 adr_ref: "ADR-008"
@@ -31,7 +31,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-38: Cloud Control Plane, SuperAdmin Portal & Signed Distribution Ops](file:///Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 14: Cloud Control Plane, Non-Tech Support Desk & SuperAdmin Portal](../epic.md)
-- **Status:** `backlog`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context

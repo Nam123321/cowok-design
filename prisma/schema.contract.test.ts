@@ -265,6 +265,30 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V26__story_07_1_qc_gate_runs.sql"),
+      "utf-8"
+    )
+  );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V27__story_10_2_worker_file_leases.sql"),
+      "utf-8"
+    )
+  );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V28__story_11_2_mcp_external_activity.sql"),
+      "utf-8"
+    )
+  );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V29__story_14_2_cloud_control_plane.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
@@ -347,10 +371,22 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
     expect(mappedTables).toContain("brand_proposal_snapshots");
     expect(mappedTables).toContain("heritage_design_packs");
     expect(mappedTables).toContain("hidden_spec_documents");
-    expect(mappedTables).toHaveLength(72);
+    expect(mappedTables).toContain("qc_gate_runs");
+    expect(mappedTables).toContain("worker_file_leases");
+    expect(mappedTables).toContain("fleet_jury_verdicts");
+    expect(mappedTables).toContain("mcp_tool_policies");
+    expect(mappedTables).toContain("mcp_external_activity_logs");
+    expect(mappedTables).toContain("mcp_host_install_backups");
+    expect(mappedTables).toContain("cloud_support_tickets");
+    expect(mappedTables).toContain("cloud_ticket_replies");
+    expect(mappedTables).toContain("cloud_feature_clusters");
+    expect(mappedTables).toContain("cloud_telemetry_events");
+    expect(mappedTables).toContain("cloud_crash_groups");
+    expect(mappedTables).toContain("admin_audit_logs");
+    expect(mappedTables).toHaveLength(84);
   });
 
-  it("UT-DB-02: executes V1-V25 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V29 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 

@@ -4,7 +4,7 @@ id: "11.2"
 title: "Story 11.2: Compiler-Grade Bidirectional Open MCP Server, 1-Click Host Installer UI & Run-Scoped Tool Bundles"
 description: "Kế thừa phạm vi Open MCP Server + 1-Click Host Installer UI từ Story 11.3 cũ (phần Ephemeral Tool Forging đã chuyển sang Story 08.5 theo ADR-007): phơi bày 4 tầng phân quyền, get_app_state (<500ms), apply_batch (@alias/dry_run/diff_image), Self-Healing ToolError, Run-Scoped Tool Bundles (Banner Solver G1-G15, elk.js) và cài đặt 1-click vào Claude/Codex/Cursor/Antigravity/Cowok.ai."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-11/Story-11.2/story.md"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: hybrid
 adr_ref: "ADR-007"
@@ -38,7 +38,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-29: Universal Open MCP Server (stdio & Streamable HTTP/SSE) với 4 Tầng Phân quyền & 1-Click Host Installer](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 11: POSIX BYOS/BYOK Sandbox, Ephemeral Tool Forging & Universal Open MCP Server](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-11/epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context

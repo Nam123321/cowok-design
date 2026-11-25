@@ -14,6 +14,7 @@ use crate::routes::context_assemble::{handle_context_assemble, handle_get_contex
 use crate::routes::de_runtime::build_de_runtime_router;
 use crate::routes::decision::build_decision_router;
 use crate::routes::deck_generation::build_deck_generation_router;
+use crate::routes::fleet_swarm::fleet_swarm_router;
 use crate::routes::flow_synthesize::build_flow_synthesize_router;
 use crate::routes::fs_jail;
 use crate::routes::github_ide_integrations::integration_routes;
@@ -43,6 +44,7 @@ use crate::routes::legacy_specs::{
     handle_list_projects, handle_list_specs, handle_put_spec, handle_synthesize_specs,
     handle_update_project,
 };
+use crate::routes::mcp_gateway::mcp_gateway_router;
 use crate::routes::models_registry::build_models_registry_router;
 use crate::routes::orchestrator::build_orchestrator_router;
 use crate::routes::presentation::presentation_routes;
@@ -58,6 +60,7 @@ use crate::routes::ssot_registry::{
     handle_route_skills,
 };
 use crate::routes::support_telemetry::build_support_telemetry_router;
+use crate::routes::visual_qc::visual_qc_router;
 use crate::routes::DaemonAppState;
 
 fn legacy_project_spec_routes() -> Router<DaemonAppState> {
@@ -285,6 +288,9 @@ pub(crate) fn build_protected_legacy_router(state: DaemonAppState) -> Router<Dae
         .merge(build_models_registry_router())
         .merge(build_learn_studio_corrections_router())
         .merge(build_cognitive_studio_router())
+        .merge(visual_qc_router())
+        .merge(fleet_swarm_router())
+        .merge(mcp_gateway_router())
         .route_layer(middleware::from_fn_with_state(
             state,
             legacy_project_auth_middleware,

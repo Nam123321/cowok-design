@@ -11,6 +11,7 @@ pub mod oklch;
 pub mod patcher;
 pub mod reconcile;
 pub mod sketch_scanner;
+pub mod visual_qc;
 
 pub use brand_studio::{
     generate_default_brand_proposals, is_valid_theme_mode_id, render_tokenized_brand_preview,

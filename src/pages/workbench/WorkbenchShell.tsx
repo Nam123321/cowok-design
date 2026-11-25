@@ -14,6 +14,8 @@ import { useTranslation } from "../../hooks/useTranslation";
 import { apiWorkbenchSettings } from "../../api/workbench-settings";
 import { CowokToast } from "../../components/ui/CowokToast";
 import { SupportRequestDrawer } from "../../features/support/SupportRequestDrawer";
+import { ProjectReadinessModal } from "../../features/visual-qc/ProjectReadinessModal";
+import { useVisualQcController } from "../../features/visual-qc/useVisualQcController";
 
 export type { ThemeMode };
 
@@ -169,6 +171,12 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
   const [isOnboardingOpen, setIsOnboardingOpen] = React.useState<boolean>(false);
   const [isSupportDrawerOpen, setIsSupportDrawerOpen] = React.useState<boolean>(false);
   const [daemonWarning, setDaemonWarning] = React.useState<string | null>(null);
+  const visualQc = useVisualQcController({
+    projectId: resolvedProjectId,
+    targetId: shell.activeTabId || "workbench-stage",
+    targetKind: "APP_SCREEN",
+    html: "<main><section data-ff-id='workbench-root'><h1>Workspace</h1></section></main>",
+  });
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     let cancelled = false;
@@ -192,9 +200,10 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
 
   return (
     <div className={`workbench-shell theme-${settings.themeMode}`} data-theme={settings.themeMode} data-flow-hydrated={shell.isFlowHydrated ? "true" : "false"} style={createWorkbenchShellStyle(settings.currentFontSize)}>
-      <WorkbenchTopNav projectId={resolvedProjectId} projectName={resolvedProjectName} activeSessionTitle={activeSession?.title} isStandaloneConversation={!activeSession?.projectId} themeMode={settings.themeMode} onOpenSupportDrawer={() => setIsSupportDrawerOpen(true)} />
+      <WorkbenchTopNav projectId={resolvedProjectId} projectName={resolvedProjectName} activeSessionTitle={activeSession?.title} isStandaloneConversation={!activeSession?.projectId} themeMode={settings.themeMode} onOpenSupportDrawer={() => setIsSupportDrawerOpen(true)} onOpenVisualQc={() => visualQc.setIsReadinessOpen(true)} />
       <WorkbenchConnectedBody shell={shell} isOnboardingOpen={isOnboardingOpen} isSupportDrawerOpen={isSupportDrawerOpen} resolvedProjectName={resolvedProjectName} resolvedProjectId={resolvedProjectId} defaultSessionTitle={t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới")} />
       <WorkbenchModalsAndToasts shell={shell} resolvedProjectId={resolvedProjectId} isOnboardingOpen={isOnboardingOpen} daemonWarning={daemonWarning} onCloseOnboarding={closeOnboarding} onSetDaemonWarning={setDaemonWarning} />
+      <ProjectReadinessModal open={visualQc.isReadinessOpen} onClose={() => visualQc.setIsReadinessOpen(false)} runResult={visualQc.runResult} isRunning={visualQc.isRunning} onRunQc={() => void visualQc.runQc()} onDeterministicFix={() => void visualQc.runDeterministicFix()} />
       <SupportRequestDrawer isOpen={isSupportDrawerOpen} onClose={() => setIsSupportDrawerOpen(false)} locale={settings.currentLocale} />
     </div>
   );

@@ -18,8 +18,12 @@ dependencies: ["14.2", "08.6"]
 provides_apis:
   - "GET /v1/releases/latest.json"
   - "GET /v1/skills/advisories.json"
+  - "GET /v1/skills/catalog.json"
+  - "GET /v1/experiments/config.json"
   - "POST /v1/admin/releases/rollout"
   - "POST /v1/admin/skills/quarantine-global"
+  - "POST /v1/admin/skills/catalog"
+  - "POST /v1/admin/experiments"
   - "POST /v1/admin/licenses/issue"
 consumes_apis:
   - "GET /v1/admin/analytics/funnel"
@@ -40,24 +44,26 @@ Bổ sung tầng vận hành phát hành & quản trị chuỗi cung ứng chu�
 
 ## 3. Acceptance Criteria (AC)
 - **AC-01 (4-Channel Canary Rollout & Ed25519 Signed Updater Manifest):** SuperAdmin quản lý phát hành theo tỷ lệ (`5% -> 25% -> 100%`) và xuất bản `latest.json` ký số Ed25519 cho Tauri v2 (`Story 12.2`), kèm Kill-Switch & In-App Announcement cho phiên bản gặp lỗi nghiêm trọng.
-- **AC-02 (Curated Skill Registry & Global Quarantine Advisory):** `SKILL_CURATOR` duyệt/xuất bản gói skill chính thức (`design-craft` & cộng đồng) và có nút **Cách ly toàn cục** phát danh sách thu hồi ký Ed25519 (`advisories.json`) để daemon cục bộ tự động cảnh báo/khóa kích hoạt skill độc hại.
-- **AC-03 (Offline-Verifiable Ed25519 License Tokens & `Cowok.ai` Federation):** Cấp khóa bản quyền `Free / Pro / Team / Enterprise` ký Ed25519 (client xác thực 100% offline không cần ping server) và liên thông `cowok_org_id` khi chạy dưới dạng plugin trong `Cowok.ai`.
-- **AC-04 ([EDGE-CASE] Tampered Manifest / Expired Signature / Rollback Guard):** Client Edge từ chối ngay (fail-closed) mọi `latest.json`, `advisories.json` hoặc License Token bị sửa 1 byte, sai chữ ký Ed25519 hoặc bị downgrade version (rollback attack); SuperAdmin bắt buộc ghi lý do & audit log khi kích hoạt Global Quarantine hoặc dừng Canary rollout.
+- **AC-02 (Default & Recommended GitHub Plugin Catalog Lifecycle + Global Quarantine Advisory):** `SKILL_CURATOR` / `SUPER_ADMIN` quản lý vòng đời toàn bộ **Default Built-in Plugins** (`ACTIVE | INACTIVE | DEPRECATED | QUARANTINED`, cấu hình mặc định, phiên bản tối thiểu) và **Recommended GitHub Plugins** (`Add / Edit / Archive` repo URL kèm ghim cứng `tag/commit SHA` & mô tả 9 ngôn ngữ), xuất bản manifest `catalog.json` & `advisories.json` ký số **Ed25519**. Client tuân thủ tuyệt đối **Local Override > Cloud Default** (không âm thầm ghi đè công tắc user hay tự cài mã GitHub ngầm), chỉ cưỡng bức cảnh báo/khóa khi có lệnh **Cách ly toàn cục (`QUARANTINED`)**.
+- **AC-03 (Deterministic A/B Experiments & Feature Flags):** `SUPER_ADMIN` tạo/bật/tắt thử nghiệm A/B cho bộ plugin mặc định onboarding, xếp hạng plugin khuyến nghị hoặc UX variants theo tỷ lệ chia (`50/50`, `10/90`), xuất bản `experiments.json` ký **Ed25519**. Client chia nhóm tất định bằng `hash(install_id + experiment_key) % 100` (`0% PII`, chạy offline sau lần sync đầu) và gắn `experiment_variants[]` vào Telemetry để so sánh trực tiếp trên **5-Step Activation Funnel** & **Crash Center** kèm Kill-Switch tức thì.
+- **AC-04 (Offline-Verifiable Ed25519 License Tokens & `Cowok.ai` Federation):** Cấp khóa bản quyền `Free / Pro / Team / Enterprise` ký Ed25519 (client xác thực 100% offline không cần ping server) và liên thông `cowok_org_id` khi chạy dưới dạng plugin trong `Cowok.ai`.
+- **AC-05 ([EDGE-CASE] Tampered Manifest / Expired Signature / Rollback & Security Guard):** Client Edge từ chối ngay (fail-closed) mọi `latest.json`, `catalog.json`, `experiments.json`, `advisories.json` hoặc License Token bị sửa 1 byte, sai chữ ký Ed25519 hoặc bị downgrade version (rollback attack); cấm tuyệt đối A/B experiment nới lỏng bảo mật (`HUMAN_ONLY`, `Zero-PII Scrubber`, `O_NOFOLLOW`); SuperAdmin bắt buộc ghi lý do & audit log khi kích hoạt Global Quarantine, xuất bản Catalog/Experiment hoặc dừng Canary rollout.
 
 ## 4. Tasks
-- [ ] **Task 14.3.1**: Cài đặt Ed25519 signing/verification service cho `latest.json` (Canary rollout), `advisories.json` (Global Skill Quarantine) và Offline License Tokens (thỏa mãn `AC-01`, `AC-02`, `AC-03`, `AC-04`).
-- [ ] **Task 14.3.2**: Xây dựng UI quản trị Release Rollout, Skill Registry Governance & License Issuance trên SuperAdmin Portal (thỏa mãn `AC-01`, `AC-02`, `AC-03`).
-- [ ] **Task 14.3.3**: Tích hợp Client Edge verifier (`cowok-design` daemon) đọc signed advisory & offline license + đồng bộ federated `cowok_org_id` cho Kênh 3 (thỏa mãn `AC-02`, `AC-03`, `AC-04`).
-- [ ] **Task 14.3.4**: Viết cryptographic tamper/downgrade/replay tests & federation contract tests (thỏa mãn `AC-01..AC-04`).
+- [ ] **Task 14.3.1**: Cài đặt Ed25519 signing/verification service cho `latest.json` (Canary rollout), `catalog.json` (Default & Recommended GitHub Plugin Lifecycle), `experiments.json` (Deterministic A/B Experiments), `advisories.json` (Global Skill Quarantine) và Offline License Tokens (thỏa mãn `AC-01`, `AC-02`, `AC-03`, `AC-04`, `AC-05`).
+- [ ] **Task 14.3.2**: Nối backend thật vào khung UI SuperAdmin Portal (`src/portals/superadmin/`) cho Release Rollout, Default/Recommended Plugin Catalog CRUD, A/B Experiments (kết nối Activation Funnel & Crash Center), Global Quarantine & License Issuance (thỏa mãn `AC-01`, `AC-02`, `AC-03`, `AC-04`).
+- [ ] **Task 14.3.3**: Tích hợp Client Edge verifier (`cowok-design` daemon) đọc signed catalog/experiments/advisories/license theo nguyên tắc `Local Override > Cloud Default`, chia nhóm A/B tất định `hash(install_id + key) % 100` (`0% PII`) + đồng bộ federated `cowok_org_id` cho Kênh 3 (thỏa mãn `AC-02`, `AC-03`, `AC-04`, `AC-05`).
+- [ ] **Task 14.3.4**: Viết cryptographic tamper/downgrade/replay tests, deterministic A/B bucketing & Local-Override contract tests (thỏa mãn `AC-01..AC-05`).
 
 ## 5. AC-to-Task Traceability Matrix
 
 | Acceptance Criteria | Mapped Implementation Tasks | Verification Method |
 | :--- | :--- | :--- |
 | **AC-01** | `Task 14.3.1`, `Task 14.3.2`, `Task 14.3.4` | Canary Percentage & Signed `latest.json` Contract Test |
-| **AC-02** | `Task 14.3.1`, `Task 14.3.2`, `Task 14.3.3` | Global Quarantine Advisory Sync & Block Test |
-| **AC-03** | `Task 14.3.1`, `Task 14.3.3`, `Task 14.3.4` | Offline Ed25519 License & `Cowok.ai` Federation Test |
-| **AC-04 (`[EDGE-CASE]`)** | `Task 14.3.1`, `Task 14.3.3`, `Task 14.3.4` | 1-Byte Tamper & Rollback Attack Fail-Closed Test |
+| **AC-02** | `Task 14.3.1`, `Task 14.3.2`, `Task 14.3.3` | Default/GitHub Plugin Catalog Sync, Local-Override & Global Quarantine Block Test |
+| **AC-03** | `Task 14.3.1`, `Task 14.3.2`, `Task 14.3.3`, `Task 14.3.4` | Deterministic A/B Bucketing (`0% PII`), Funnel/Crash Attribution & Kill-Switch Test |
+| **AC-04** | `Task 14.3.1`, `Task 14.3.3`, `Task 14.3.4` | Offline Ed25519 License & `Cowok.ai` Federation Test |
+| **AC-05 (`[EDGE-CASE]`)** | `Task 14.3.1`, `Task 14.3.3`, `Task 14.3.4` | 1-Byte Tamper, Rollback Attack & Security-Flag Isolation Fail-Closed Test |
 
 ## 6. Cross-Feature Dependencies
 - **Story Dependencies:** `["14.2", "08.6"]`

@@ -11,11 +11,13 @@
 pub mod adapters;
 pub mod byok_gateway;
 pub mod decision_cascade;
+pub mod design_jury;
 pub mod model_registry;
 pub mod normalizer;
 pub mod orchestrator;
 pub mod posix_sandbox;
 pub mod session_dir;
+pub mod swarm_leases;
 
 use thiserror::Error;
 
