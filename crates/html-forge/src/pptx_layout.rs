@@ -623,10 +623,10 @@ pub fn sanitize_and_analyze_svg(raw_svg: &str) -> Option<SanitizedSvg> {
                     buf.clear();
                     continue;
                 }
-                let raw_txt = t
-                    .unescape()
+                let decoded_txt = String::from_utf8_lossy(t.as_ref());
+                let raw_txt = quick_xml::escape::unescape(&decoded_txt)
                     .map(|c| c.into_owned())
-                    .unwrap_or_else(|_| String::from_utf8_lossy(t.as_ref()).into_owned());
+                    .unwrap_or_else(|_| decoded_txt.into_owned());
                 if root_closed {
                     if !raw_txt.trim().is_empty() {
                         return None;
@@ -680,6 +680,34 @@ pub fn sanitize_and_analyze_svg(raw_svg: &str) -> Option<SanitizedSvg> {
                     || dt_lower.contains("//")
                 {
                     blocked_external_refs = true;
+                }
+            }
+            Ok(Event::GeneralRef(g)) => {
+                if skip_depth > 0 || !seen_root_svg {
+                    buf.clear();
+                    continue;
+                }
+                if root_closed {
+                    return None;
+                }
+                let resolved = if let Ok(Some(ch)) = g.resolve_char_ref() {
+                    Some(ch.to_string())
+                } else {
+                    let entity_bytes: &[u8] = g.as_ref();
+                    match entity_bytes {
+                        b"amp" => Some("&".to_string()),
+                        b"lt" => Some("<".to_string()),
+                        b"gt" => Some(">".to_string()),
+                        b"quot" => Some("\"".to_string()),
+                        b"apos" => Some("'".to_string()),
+                        _ => None, // Drop unknown/custom XML entities (XXE defense)
+                    }
+                };
+                if let Some(txt) = resolved {
+                    let clean = sanitize_xml_text(&txt);
+                    if !clean.is_empty() {
+                        events.push(SvgBufferedEvent::Text(clean));
+                    }
                 }
             }
             Ok(Event::Comment(_)) | Ok(Event::PI(_)) | Ok(Event::Decl(_)) => {}
@@ -758,10 +786,10 @@ fn sanitize_svg_attributes(
             continue;
         }
 
-        let raw_val = attr
-            .unescape_value()
+        let decoded_val = String::from_utf8_lossy(&attr.value);
+        let raw_val = quick_xml::escape::unescape(&decoded_val)
             .map(|c| c.into_owned())
-            .unwrap_or_else(|_| String::from_utf8_lossy(&attr.value).into_owned());
+            .unwrap_or_else(|_| decoded_val.into_owned());
         let mut clean_val = sanitize_xml_text(&raw_val);
 
         if matches!(local_lower, "href" | "src" | "action" | "formaction") {
