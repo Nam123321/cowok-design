@@ -187,6 +187,7 @@ describe("Story 07.2: Split Export UI Panels, QC Gate Banner & Tab Switcher", ()
           fileName: null,
           sha256: null,
           byteSize: 0,
+          fidelityWarnings: [],
           qcGateStatus: "UNSCANNED",
           qcOverrideAcknowledged: false,
           createdAt: 1730000000000,
@@ -562,5 +563,216 @@ describe("Story 07.2: Split Export UI Panels, QC Gate Banner & Tab Switcher", ()
     expect(result.current.overrideQcWarning).toBe(false);
     expect(result.current.htmlResult).toBeNull();
     expect(result.current.errorNotice).toBeNull();
+  });
+});
+
+describe("Story 07.3: Built-in Native Rust OOXML PPTX Exporter UI, Zod Contract & Download", () => {
+  it("renders 2-mode toggle, Pre-Export Limitations Disclosure, and Post-Export Fidelity Summary with zero raw enum codes", () => {
+    const onExportPptx = vi.fn();
+    render(
+      <SharePresentPanel
+        activeFormat={null}
+        htmlResult={null}
+        pdfResult={null}
+        pptxPluginInstalled={true}
+        pptxResult={{
+          exportId: "exp-073",
+          projectId: "proj-1",
+          audienceMode: "SHARE_PRESENT",
+          format: "PLUGIN_PPTX",
+          pluginInstalled: true,
+          pluginId: "builtin-native-rust-pptx-exporter",
+          pluginStatus: "BUILTIN_ACTIVE",
+          installAction: "/plugins",
+          message: "Built PowerPoint deck",
+          exportMode: "editable",
+          pptxBase64: "UEsDBBQAAAAIA",
+          fileName: "ke-hoach-quy-4.pptx",
+          sha256: "f".repeat(64),
+          byteSize: 4096,
+          slideCount: 4,
+          engine: "rust-ooxml-static-fallback",
+          usedStaticFallback: true,
+          fidelityWarnings: [
+            {
+              slideIndex: 2,
+              code: "BACKDROP_FILTER_RASTERIZED",
+              severity: "warning",
+              elementLabel: "div",
+              fallbackApplied: "raster_element_png",
+              message: "Backdrop blur converted",
+            },
+            {
+              slideIndex: 3,
+              code: "CSS_ANIMATION_OMITTED",
+              severity: "warning",
+              elementLabel: "stylesheet",
+              fallbackApplied: "omitted_keyframes",
+              message: "Animation omitted",
+            },
+          ],
+          qcGateStatus: "PASS",
+          qcOverrideAcknowledged: false,
+          createdAt: 1730000000000,
+        }}
+        onExportOfflineHtml={vi.fn()}
+        onExportVectorPdf={vi.fn()}
+        onExportPptx={onExportPptx}
+      />
+    );
+
+    const editableRadio = screen.getByTestId("pptx-mode-editable");
+    const visualExactRadio = screen.getByTestId("pptx-mode-visual-exact");
+    expect(editableRadio.getAttribute("aria-checked")).toBe("true");
+    expect(visualExactRadio.getAttribute("aria-checked")).toBe("false");
+
+    const notice = screen.getByTestId("pptx-limitations-notice");
+    expect(notice.textContent).toContain("Lưu ý khi xuất sang PowerPoint");
+    expect(notice.textContent).toContain("Trình chiếu HTML 1 tệp");
+
+    const summary = screen.getByTestId("pptx-fidelity-warnings");
+    expect(summary.textContent).toContain("ke-hoach-quy-4.pptx");
+    expect(summary.textContent).not.toContain("BACKDROP_FILTER_RASTERIZED");
+    expect(summary.textContent).not.toContain("CSS_ANIMATION_OMITTED");
+    expect(summary.textContent).not.toContain("OOXML");
+    expect(summary.textContent).not.toContain("ECMA-376");
+
+    // Toggle to visual_exact and click export -> forwards "visual_exact"
+    fireEvent.click(visualExactRadio);
+    expect(visualExactRadio.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByTestId("export-pptx-btn"));
+    expect(onExportPptx).toHaveBeenCalledWith("visual_exact");
+  });
+
+  it("enforces Zod validation on BUILTIN_ACTIVE PPTX payload and triggers browser .pptx Blob download", async () => {
+    const createObjectUrlSpy = vi.fn((_obj: Blob | MediaSource) => "blob:pptx-073");
+    const revokeObjectUrlSpy = vi.fn();
+    Object.defineProperty(globalThis.URL, "createObjectURL", {
+      value: createObjectUrlSpy,
+      configurable: true,
+    });
+    Object.defineProperty(globalThis.URL, "revokeObjectURL", {
+      value: revokeObjectUrlSpy,
+      configurable: true,
+    });
+
+    const capturedPayloads: Array<Record<string, unknown>> = [];
+    const mockFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/auth/local-session")) {
+        return new Response(JSON.stringify({ sessionToken: "tok-073" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url.includes("/api/v1/export/history")) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            requestId: "req-h-073",
+            data: {
+              projectId: "proj-073",
+              qcGate: { status: "PASS", p0Count: 0, p1Count: 0, latestRunId: null },
+              pptxPluginInstalled: true,
+              items: [],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/api/v1/export/pptx")) {
+        if (init?.body) {
+          capturedPayloads.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        }
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            pluginInstalled: true,
+            pluginId: "builtin-native-rust-pptx-exporter",
+            installAction: "/plugins",
+            message: "Built PowerPoint deck",
+            requestId: "req-pptx-073",
+            data: {
+              exportId: "exp-073-live",
+              projectId: "proj-073",
+              audienceMode: "SHARE_PRESENT",
+              format: "PLUGIN_PPTX",
+              pluginInstalled: true,
+              pluginId: "builtin-native-rust-pptx-exporter",
+              pluginStatus: "BUILTIN_ACTIVE",
+              installAction: "/plugins",
+              message: "Built PowerPoint deck",
+              exportMode: "visual_exact",
+              pptxBase64: "UEsDBBQAAAAIAA==",
+              fileName: "pitch-deck.pptx",
+              sha256: "e".repeat(64),
+              byteSize: 1024,
+              slideCount: 2,
+              engine: "rust-ooxml-static-fallback",
+              usedStaticFallback: true,
+              fidelityWarnings: [],
+              qcGateStatus: "PASS",
+              qcOverrideAcknowledged: false,
+              createdAt: 1730000000005,
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response("{}", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const client = new SplitExportApiClient({
+      baseUrl: "http://127.0.0.1:4170",
+      fetchImpl: mockFetch,
+    });
+
+    const { result } = renderHook(() =>
+      useSplitExport({
+        projectId: "proj-073",
+        projectTitle: "Pitch Deck",
+        previewHtml: '<section data-slide="1"><h1>Slide 1</h1></section>',
+        enabled: true,
+        client,
+        autoDownload: true,
+      })
+    );
+
+    expect(result.current.pptxPluginInstalled).toBe(true);
+    expect(result.current.pptxExportMode).toBe("editable");
+
+    await act(async () => {
+      await result.current.runPptxExport("visual_exact");
+    });
+
+    expect(capturedPayloads[0]?.exportMode).toBe("visual_exact");
+    expect(result.current.pptxResult?.pluginStatus).toBe("BUILTIN_ACTIVE");
+    expect(result.current.pptxResult?.slideCount).toBe(2);
+    expect(createObjectUrlSpy).toHaveBeenCalledTimes(1);
+    const downloadedBlob = createObjectUrlSpy.mock.calls[0]?.[0] as Blob | undefined;
+    expect(downloadedBlob?.type).toBe(
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    );
+
+    // Reject malformed BUILTIN_ACTIVE payload missing pptxBase64
+    expect(
+      PptxExportDataSchema.safeParse({
+        exportId: "exp-bad",
+        projectId: "proj-073",
+        audienceMode: "SHARE_PRESENT",
+        format: "PLUGIN_PPTX",
+        pluginInstalled: true,
+        pluginId: "builtin-native-rust-pptx-exporter",
+        pluginStatus: "BUILTIN_ACTIVE",
+        installAction: "/plugins",
+        message: "Missing payload",
+        fileName: "broken.pptx",
+        sha256: "a".repeat(64),
+        byteSize: 100,
+        qcGateStatus: "PASS",
+        qcOverrideAcknowledged: false,
+        createdAt: 1730000000005,
+      }).success
+    ).toBe(false);
   });
 });

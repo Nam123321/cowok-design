@@ -100,6 +100,17 @@ impl ActiveWorkerRegistry {
         }
         taken
     }
+    pub fn take_all(&self) -> Vec<ActiveWorkerEntry> {
+        if let Ok(mut hb_guard) = self.heartbeats.lock() {
+            for (_, tx) in hb_guard.drain() {
+                let _ = tx.send(true);
+            }
+        }
+        let Ok(mut guard) = self.inner.lock() else {
+            return Vec::new();
+        };
+        guard.drain().map(|(_, entry)| entry).collect()
+    }
 }
 
 fn validate_safe_segment(raw: &str, label: &str) -> Result<String, HarnessError> {

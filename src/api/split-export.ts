@@ -1,4 +1,4 @@
-// @story 07.2
+// @story 07.2, 07.3
 // @implements AC-01, AC-02, AC-03, AC-04
 import type { z } from "zod";
 import {
@@ -12,6 +12,7 @@ import {
   HtmlBundleExportRequestSchema,
   type HtmlBundleExportResponse,
   HtmlBundleExportResponseSchema,
+  PptxExportDataSchema,
   type PptxExportRequest,
   PptxExportRequestSchema,
   type PptxExportResponse,
@@ -141,12 +142,12 @@ export class SplitExportApiClient extends HarnessDaemonTransport {
     );
   }
 
-  exportPptx(
+  async exportPptx(
     payload: PptxExportRequest,
     signal?: AbortSignal
   ): Promise<PptxExportResponse> {
     const validated = PptxExportRequestSchema.parse(payload);
-    return this.requestValidated(
+    const parsed = await this.requestValidated(
       "/api/v1/export/pptx",
       {
         method: "POST",
@@ -156,6 +157,8 @@ export class SplitExportApiClient extends HarnessDaemonTransport {
       },
       PptxExportResponseSchema
     );
+    PptxExportDataSchema.parse(parsed.data);
+    return parsed;
   }
 
   exportDeveloperHandoff(

@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-07"
 title: "Epic 07: Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter"
-status: in-progress
+status: completed
 track: "Stream-3"
 wave: 3
 provides: ["Pooled 1-Chromium Rust CDP Visual QC (lib-audit + slides-check + elementsFromPoint + RGBA SSIM)", "Visual QC Overlay + 1-Click Auto-Fix", "Split Export: Share & Present (Offline HTML + Vector PDF + Plugin PPTX) vs Developer Handoff"]
@@ -30,7 +30,7 @@ links_to:
 - **In-Scope:**
   - `Story 07.1` (refactored — hợp nhất `07.2 + 09.3 occlusion`): Pooled 1-Chromium Rust CDP Visual QC, QC Overlay & 1-Click Auto-Fix.
   - `Story 07.2` (refactored — chuyển scope từ `07.3` cũ): Non-Tech Share & Present Export vs Developer Handoff.
-  - `Story 07.3`: `[DEPRECATED]` / `cancelled` (superseded by `Story 07.2`).
+  - `Story 07.3` (refactored — reactivated per `/rea` blueprint): Built-in Native Rust OOXML `.pptx` Exporter (Editable Native Shapes + Visual-Exact Fallback & Limitations Disclosure).
 - **Out-of-Scope:**
   - AI Multi-Slide Deck Generation (thuộc `Story 06.5`).
 
@@ -40,7 +40,7 @@ links_to:
 | :--- | :--- | :---: | :---: | :--- |
 | [Story-07.1](./Story-07.1/story.md) | Pooled 1-Chromium Rust CDP Visual QC (`lib-audit` + `slides-check`), QC Overlay & 1-Click Auto-Fix | `completed` | `3` | `['05.4', '06.2', '06.5']` |
 | [Story-07.2](./Story-07.2/story.md) | Non-Tech Share & Present Export vs Developer Handoff *(Offline HTML + Vector PDF + Plugin PPTX)* | `completed` | `2` | `['06.1', '06.5', '07.1']` |
-| [Story-07.3](./Story-07.3/story.md) | *(Superseded by `Story 07.2`)* Self-Contained Offline HTML Bundle & Vector PDF | `cancelled` | `2` | `['07.1', '06.3']` |
+| [Story-07.3](./Story-07.3/story.md) | Built-in Native Rust OOXML .pptx Exporter (Editable Native Shapes + Visual-Exact Fallback & Limitations Disclosure) | `completed` | `2` | `['07.1', '07.2']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 
@@ -135,4 +135,4 @@ flowchart TD
 |---|---|---|---|
 | [Story-07.1](./Story-07.1/story.md) | Pooled 1-Chromium Rust CDP Visual QC (lib-audit + slides-check), QC Overlay & 1-Click Auto-Fix | 05.4, 05.5, 06.2, 06.5 | refactored |
 | [Story-07.2](./Story-07.2/story.md) | Non-Tech Share & Present Export vs Developer Handoff (Offline HTML, Vector PDF & Plugin PPTX) | 06.1, 06.5, 07.1 | `completed` |
-| [Story-07.3](./Story-07.3/story.md) | Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080) | 07.1, 06.5 | cancelled |
+| [Story-07.3](./Story-07.3/story.md) | Built-in Native Rust OOXML .pptx Exporter (Editable Native Shapes + Visual-Exact Fallback & Limitations Disclosure) | 07.1, 07.2 | refactored |

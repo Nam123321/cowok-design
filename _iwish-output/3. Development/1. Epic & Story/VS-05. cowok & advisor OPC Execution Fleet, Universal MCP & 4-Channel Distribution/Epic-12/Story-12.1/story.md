@@ -4,7 +4,7 @@ id: "12.1"
 title: "Story 12.1: Kênh 1 — Single-Binary CLI (cowok-design) & Local Web Workbench (cargo / brew / npx)"
 description: "Nhúng toàn bộ tài sản giao diện React 19 Workbench, 7 Built-in Craft Skills + 7 DE Tools và Client Edge Support/Telemetry (14.1) vào một binary Rust duy nhất (cowok-design) hỗ trợ Axum /api/* parity alias (TDR-002 Phase 2), cowok-design up, cowok-design mcp và cowok-design feedback."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-12/Story-12.1/story.md"
-status: refactored
+status: completed
 risk_tier: 2
 delivery: core
 adr_ref: "ADR-008"
@@ -31,7 +31,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-30: Kênh 1 — Single-Binary CLI (uiux-os) & Local Web Workbench (cargo / brew / npx)](file:///Users/hatrang20061988/Desktop/AI%20Project/uxui-os/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 12: 4-Channel Packaging & Distribution Architecture](file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-05. cowok & advisor OPC Execution Fleet, Universal MCP & 4-Channel Distribution/Epic-12/epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `2`
 
 ## 1. Story Description & Context
@@ -47,10 +47,10 @@ Nhúng toàn bộ tài sản React 19 Workbench và **7 Built-in Craft Skills + 
 - **AC-04 (Focus-Free Headless Screenshot & HTML Visual Diff Suite CLI):** Cung cấp `cowok-design diff --suite` và `--screenshot` chạy qua Pooled 1-Chromium CDP ngầm tuyệt đối **không bao giờ cướp cửa sổ focus của hệ điều hành macOS**, xuất báo cáo HTML Visual Diff tự chứa độc lập.
 
 ## 4. Tasks
-- [ ] **Task 12.1.1**: Đóng gói tài sản Vite/React 19 + built-in skills vào single binary `uiux-os`, cài đặt subcommands `up`, `mcp`, `export`, `doctor` đạt `/api/*` parity (thỏa mãn `AC-01`, `AC-02`).
-- [ ] **Task 12.1.2**: Cấu hình phân phối `cargo`, Homebrew tap (`brew`), và `npx` wrapper tải đúng platform binary kèm SHA-256 verification (thỏa mãn `AC-01`).
-- [ ] **Task 12.1.3**: Cài đặt Zero Port Collision binder, `SIGINT` graceful reaper và read-only binary directory fallback `[EDGE-CASE]` (thỏa mãn `AC-03`).
-- [ ] **Task 12.1.4**: Cài đặt CLI command `cowok-design diff --suite` và `--screenshot` chạy focus-free qua Pooled CDP kèm HTML Visual Diff reporter (thỏa mãn `AC-04`).
+- [x] **Task 12.1.1**: Đóng gói tài sản Vite/React 19 + built-in skills vào single binary `uiux-os`, cài đặt subcommands `up`, `mcp`, `export`, `doctor` đạt `/api/*` parity (thỏa mãn `AC-01`, `AC-02`).
+- [x] **Task 12.1.2**: Cấu hình phân phối `cargo`, Homebrew tap (`brew`), và `npx` wrapper tải đúng platform binary kèm SHA-256 verification (thỏa mãn `AC-01`).
+- [x] **Task 12.1.3**: Cài đặt Zero Port Collision binder, `SIGINT` graceful reaper và read-only binary directory fallback `[EDGE-CASE]` (thỏa mãn `AC-03`).
+- [x] **Task 12.1.4**: Cài đặt CLI command `cowok-design diff --suite` và `--screenshot` chạy focus-free qua Pooled CDP kèm HTML Visual Diff reporter (thỏa mãn `AC-04`).
 
 ## 5. AC-to-Task Traceability Matrix
 

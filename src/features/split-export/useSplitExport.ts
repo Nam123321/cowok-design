@@ -1,4 +1,4 @@
-// @story 07.2
+// @story 07.2, 07.3
 // @implements AC-01, AC-02, AC-03, AC-04
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -12,6 +12,7 @@ import type {
   ExportHistoryItem,
   HtmlBundleExportData,
   PptxExportData,
+  PptxExportMode,
   QcGateSummary,
   VectorPdfExportData,
 } from "../../lib/validations/split-export";
@@ -37,6 +38,13 @@ export interface UseSplitExportOptions {
   client?: SplitExportApiClient;
   autoDownload?: boolean;
 }
+
+const HTTP_CONFLICT = 409;
+const HTTP_PAYLOAD_TOO_LARGE = 413;
+const DEFAULT_HISTORY_LIMIT = 20;
+const JSON_INDENT_SPACES = 2;
+const PPTX_MIME =
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
 const DEFAULT_QC_SUMMARY: QcGateSummary = {
   status: "UNSCANNED",
@@ -79,21 +87,172 @@ function decodeBase64ToUint8Array(base64: string): Uint8Array {
   return bytes;
 }
 
-export function useSplitExport(options: UseSplitExportOptions) {
-  const {
-    projectId,
-    projectTitle,
-    previewHtml = "",
-    enabled = true,
-    client = apiSplitExport,
-    autoDownload = true,
-  } = options;
-  const { t } = useTranslation();
-  const resolvedProjectTitle =
-    projectTitle || t("splitExport.defaultProjectTitle", "Bản trình chiếu");
+function downloadBase64Blob(base64: string, mimeType: string, fileName: string): void {
+  const bytes = decodeBase64ToUint8Array(base64);
+  const blob = new Blob([bytes.buffer as ArrayBuffer], { type: mimeType });
+  triggerBrowserBlobDownload(blob, fileName);
+}
 
+function buildFallbackDeckHtml(
+  previewHtml: string,
+  title: string,
+  fallbackBody: string
+): string {
+  const trimmed = previewHtml.trim();
+  if (trimmed) return trimmed;
+  return `<section data-slide="1"><h1>${escapeHtmlText(title)}</h1><p>${escapeHtmlText(fallbackBody)}</p></section>`;
+}
+
+function toSplitExportErrorNotice(
+  err: unknown,
+  currentP0Count: number,
+  genericFallback: string,
+  onQcBlocked: (p0Count: number) => void
+): SplitExportErrorNotice {
+  if (err instanceof SplitExportApiError) {
+    if (err.status === HTTP_CONFLICT || err.code === "QC_GATE_P0_BLOCKED") {
+      const count = Math.max(err.p0Count ?? currentP0Count, 1);
+      onQcBlocked(count);
+      return { kind: "qc_blocked", p0Count: count, message: err.message };
+    }
+    if (err.status === HTTP_PAYLOAD_TOO_LARGE || err.code === "ASSET_SIZE_LIMIT_EXCEEDED") {
+      return { kind: "size_exceeded", message: err.message };
+    }
+    return { kind: "generic", message: err.message };
+  }
+  const message = err instanceof Error && err.message ? err.message : genericFallback;
+  return { kind: "generic", message };
+}
+
+interface ExportRunContext {
+  projectId?: string;
+  resolvedTitle: string;
+  previewHtml: string;
+  overrideQcWarning: boolean;
+  locale: string;
+  pptxExportMode: PptxExportMode;
+  autoDownload: boolean;
+  client: SplitExportApiClient;
+  t: (key: string, defaultVal?: string) => string;
+  setActiveFormat: (f: SplitExportActiveFormat) => void;
+  setErrorNotice: (n: SplitExportErrorNotice | null) => void;
+  setHtmlResult: (d: HtmlBundleExportData | null) => void;
+  setPdfResult: (d: VectorPdfExportData | null) => void;
+  setPptxResult: (d: PptxExportData | null) => void;
+  setPptxPluginInstalled: (v: boolean) => void;
+  setPptxExportMode: (m: PptxExportMode) => void;
+  setDevHandoffResult: (d: DeveloperHandoffData | null) => void;
+  mapError: (err: unknown) => SplitExportErrorNotice;
+  refreshHistory: () => Promise<void>;
+}
+
+async function runGuardedExport<T>(
+  ctx: ExportRunContext,
+  format: Exclude<SplitExportActiveFormat, null>,
+  work: (projectId: string) => Promise<T>
+): Promise<T | null> {
+  if (!ctx.projectId) return null;
+  ctx.setActiveFormat(format);
+  ctx.setErrorNotice(null);
+  try {
+    const result = await work(ctx.projectId);
+    void ctx.refreshHistory();
+    return result;
+  } catch (err) {
+    ctx.setErrorNotice(ctx.mapError(err));
+    return null;
+  } finally {
+    ctx.setActiveFormat(null);
+  }
+}
+
+function executeOfflineHtml(ctx: ExportRunContext) {
+  return runGuardedExport(ctx, "html", async (projectId) => {
+    const fallback = ctx.t("splitExport.offlineHtmlFallbackBody", "Bản trình chiếu ngoại tuyến độc lập.");
+    const res = await ctx.client.exportOfflineHtml({
+      projectId,
+      title: ctx.resolvedTitle,
+      html: buildFallbackDeckHtml(ctx.previewHtml, ctx.resolvedTitle, fallback),
+      enablePresenter: true,
+      overrideQcWarning: ctx.overrideQcWarning,
+    });
+    ctx.setHtmlResult(res.data);
+    if (ctx.autoDownload) {
+      triggerBrowserBlobDownload(
+        new Blob([res.data.htmlContent], { type: "text/html;charset=utf-8" }),
+        res.data.fileName
+      );
+    }
+    return res.data;
+  });
+}
+
+function executeVectorPdf(ctx: ExportRunContext) {
+  return runGuardedExport(ctx, "pdf", async (projectId) => {
+    const res = await ctx.client.exportVectorPdf({
+      projectId,
+      title: ctx.resolvedTitle,
+      html: ctx.previewHtml || undefined,
+      overrideQcWarning: ctx.overrideQcWarning,
+    });
+    ctx.setPdfResult(res.data);
+    if (ctx.autoDownload) {
+      downloadBase64Blob(res.data.pdfBase64, "application/pdf", res.data.fileName);
+    }
+    return res.data;
+  });
+}
+
+function executePptx(ctx: ExportRunContext, modeOverride?: PptxExportMode) {
+  return runGuardedExport(ctx, "pptx", async (projectId) => {
+    const effectiveMode = modeOverride ?? ctx.pptxExportMode;
+    if (modeOverride) ctx.setPptxExportMode(modeOverride);
+    const fallback = ctx.t("splitExport.offlineHtmlFallbackBody", "Bản trình chiếu ngoại tuyến độc lập.");
+    const res = await ctx.client.exportPptx({
+      projectId,
+      title: ctx.resolvedTitle,
+      html: buildFallbackDeckHtml(ctx.previewHtml, ctx.resolvedTitle, fallback),
+      exportMode: effectiveMode,
+      locale: ctx.locale,
+      overrideQcWarning: ctx.overrideQcWarning,
+    });
+    ctx.setPptxPluginInstalled(res.pluginInstalled);
+    ctx.setPptxResult(res.data);
+    if (ctx.autoDownload && res.data.pptxBase64 && res.data.fileName) {
+      downloadBase64Blob(res.data.pptxBase64, PPTX_MIME, res.data.fileName);
+    }
+    return res.data;
+  });
+}
+
+function executeDeveloperHandoff(ctx: ExportRunContext) {
+  return runGuardedExport(ctx, "developer-handoff", async (projectId) => {
+    const res = await ctx.client.exportDeveloperHandoff({
+      projectId,
+      projectName: ctx.resolvedTitle,
+      htmlSource: ctx.previewHtml || undefined,
+      overrideQcWarning: ctx.overrideQcWarning,
+    });
+    ctx.setDevHandoffResult(res.data);
+    if (ctx.autoDownload) {
+      const payload = JSON.stringify(
+        { fileName: res.data.fileName, sha256: res.data.sha256, files: res.data.files },
+        null,
+        JSON_INDENT_SPACES
+      );
+      triggerBrowserBlobDownload(
+        new Blob([payload], { type: "application/json;charset=utf-8" }),
+        res.data.fileName
+      );
+    }
+    return res.data;
+  });
+}
+
+function useSplitExportState(projectId?: string, enabled = true) {
   const [qcGate, setQcGate] = useState<QcGateSummary>(DEFAULT_QC_SUMMARY);
-  const [pptxPluginInstalled, setPptxPluginInstalled] = useState<boolean>(false);
+  const [pptxPluginInstalled, setPptxPluginInstalled] = useState<boolean>(true);
+  const [pptxExportMode, setPptxExportMode] = useState<PptxExportMode>("editable");
   const [history, setHistory] = useState<ExportHistoryItem[]>([]);
   const [overrideQcWarning, setOverrideQcWarning] = useState<boolean>(false);
   const [activeFormat, setActiveFormat] = useState<SplitExportActiveFormat>(null);
@@ -103,11 +262,11 @@ export function useSplitExport(options: UseSplitExportOptions) {
   const [devHandoffResult, setDevHandoffResult] = useState<DeveloperHandoffData | null>(null);
   const [errorNotice, setErrorNotice] = useState<SplitExportErrorNotice | null>(null);
 
-  // Reset cross-project state & explicit QC override whenever projectId or modal enabled state changes
   useEffect(() => {
     setOverrideQcWarning(false);
     setQcGate(DEFAULT_QC_SUMMARY);
-    setPptxPluginInstalled(false);
+    setPptxPluginInstalled(true);
+    setPptxExportMode("editable");
     setHistory([]);
     setErrorNotice(null);
     setHtmlResult(null);
@@ -116,232 +275,88 @@ export function useSplitExport(options: UseSplitExportOptions) {
     setDevHandoffResult(null);
   }, [projectId, enabled]);
 
-  const refreshHistory = useCallback(
-    async (signal?: AbortSignal) => {
-      if (!projectId || !enabled) return;
-      try {
-        const res = await client.getExportHistory(projectId, 20, signal);
-        if (signal?.aborted) return;
-        setQcGate(res.data.qcGate);
-        setPptxPluginInstalled(res.data.pptxPluginInstalled);
-        setHistory(res.data.items);
-      } catch {
-        // Keep default unscanned state if history endpoint is temporarily unreachable or aborted
-      }
-    },
-    [client, enabled, projectId]
-  );
+  return {
+    qcGate, setQcGate, pptxPluginInstalled, setPptxPluginInstalled,
+    pptxExportMode, setPptxExportMode, history, setHistory,
+    overrideQcWarning, setOverrideQcWarning, activeFormat, setActiveFormat,
+    htmlResult, setHtmlResult, pdfResult, setPdfResult,
+    pptxResult, setPptxResult, devHandoffResult, setDevHandoffResult,
+    errorNotice, setErrorNotice,
+  };
+}
+
+interface SplitExportHistoryParams {
+  projectId?: string;
+  enabled: boolean;
+  client: SplitExportApiClient;
+  setQcGate: (v: QcGateSummary) => void;
+  setPptxPluginInstalled: (v: boolean) => void;
+  setHistory: (v: ExportHistoryItem[]) => void;
+}
+
+function useSplitExportHistory({
+  projectId,
+  enabled,
+  client,
+  setQcGate,
+  setPptxPluginInstalled,
+  setHistory,
+}: SplitExportHistoryParams) {
+  const refreshHistory = useCallback(async (signal?: AbortSignal) => {
+    if (!projectId || !enabled) return;
+    try {
+      const res = await client.getExportHistory(projectId, DEFAULT_HISTORY_LIMIT, signal);
+      if (signal?.aborted) return;
+      setQcGate(res.data.qcGate);
+      setPptxPluginInstalled(res.data.pptxPluginInstalled);
+      setHistory(res.data.items);
+    } catch {
+      // Keep default state when history endpoint is temporarily unreachable or aborted
+    }
+  }, [client, enabled, projectId, setHistory, setPptxPluginInstalled, setQcGate]);
 
   useEffect(() => {
     if (!projectId || !enabled) return;
     const controller = new AbortController();
     void refreshHistory(controller.signal);
-    return () => {
-      controller.abort();
-    };
+    return () => controller.abort();
   }, [enabled, projectId, refreshHistory]);
 
-  const mapExportError = useCallback((err: unknown): SplitExportErrorNotice => {
-    if (err instanceof SplitExportApiError) {
-      if (err.status === 409 || err.code === "QC_GATE_P0_BLOCKED") {
-        const count = err.p0Count ?? qcGate.p0Count;
-        setQcGate((prev) => ({
-          ...prev,
-          status: "FAIL",
-          p0Count: Math.max(prev.p0Count, count || 1),
-        }));
-        return {
-          kind: "qc_blocked",
-          p0Count: Math.max(count || 1, 1),
-          message: err.message,
-        };
-      }
-      if (err.status === 413 || err.code === "ASSET_SIZE_LIMIT_EXCEEDED") {
-        return {
-          kind: "size_exceeded",
-          message: err.message,
-        };
-      }
-      return { kind: "generic", message: err.message };
-    }
-    return {
-      kind: "generic",
-      message:
-        err instanceof Error && err.message
-          ? err.message
-          : t(
-              "splitExport.genericExportError",
-              "Không thể đóng gói tệp lúc này. Vui lòng thử lại sau giây lát."
-            ),
-    };
-  }, [qcGate.p0Count, t]);
+  return refreshHistory;
+}
 
-  const runOfflineHtmlExport = useCallback(async () => {
-    if (!projectId) return null;
-    setActiveFormat("html");
-    setErrorNotice(null);
-    try {
-      const fallbackBody = t(
-        "splitExport.offlineHtmlFallbackBody",
-        "Bản trình chiếu ngoại tuyến độc lập."
-      );
-      const res = await client.exportOfflineHtml({
-        projectId,
-        title: resolvedProjectTitle,
-        html:
-          previewHtml.trim() ||
-          `<section data-slide="1"><h1>${escapeHtmlText(resolvedProjectTitle)}</h1><p>${escapeHtmlText(fallbackBody)}</p></section>`,
-        enablePresenter: true,
-        overrideQcWarning,
-      });
-      setHtmlResult(res.data);
-      if (autoDownload) {
-        const blob = new Blob([res.data.htmlContent], {
-          type: "text/html;charset=utf-8",
-        });
-        triggerBrowserBlobDownload(blob, res.data.fileName);
-      }
-      void refreshHistory();
-      return res.data;
-    } catch (err) {
-      setErrorNotice(mapExportError(err));
-      return null;
-    } finally {
-      setActiveFormat(null);
-    }
-  }, [
-    autoDownload,
-    client,
-    mapExportError,
-    overrideQcWarning,
-    previewHtml,
-    projectId,
-    resolvedProjectTitle,
-    refreshHistory,
-    t,
-  ]);
+export function useSplitExport(options: UseSplitExportOptions) {
+  const { projectId, projectTitle, previewHtml = "", enabled = true, client = apiSplitExport, autoDownload = true } = options;
+  const { t, locale } = useTranslation();
+  const resolvedTitle = projectTitle || t("splitExport.defaultProjectTitle", "Bản trình chiếu");
+  const st = useSplitExportState(projectId, enabled);
+  const { setQcGate, setPptxPluginInstalled, setHistory } = st;
+  const refreshHistory = useSplitExportHistory({ projectId, enabled, client, setQcGate, setPptxPluginInstalled, setHistory });
 
-  const runVectorPdfExport = useCallback(async () => {
-    if (!projectId) return null;
-    setActiveFormat("pdf");
-    setErrorNotice(null);
-    try {
-      const res = await client.exportVectorPdf({
-        projectId,
-        title: resolvedProjectTitle,
-        html: previewHtml || undefined,
-        overrideQcWarning,
-      });
-      setPdfResult(res.data);
-      if (autoDownload) {
-        const bytes = decodeBase64ToUint8Array(res.data.pdfBase64);
-        const pdfBlob = new Blob([bytes.buffer as ArrayBuffer], {
-          type: "application/pdf",
-        });
-        triggerBrowserBlobDownload(pdfBlob, res.data.fileName);
-      }
-      void refreshHistory();
-      return res.data;
-    } catch (err) {
-      setErrorNotice(mapExportError(err));
-      return null;
-    } finally {
-      setActiveFormat(null);
-    }
-  }, [
-    autoDownload,
-    client,
-    mapExportError,
-    overrideQcWarning,
-    previewHtml,
-    projectId,
-    resolvedProjectTitle,
-    refreshHistory,
-  ]);
+  const mapError = useCallback((err: unknown) => toSplitExportErrorNotice(
+    err,
+    st.qcGate.p0Count,
+    t("splitExport.genericExportError", "Không thể đóng gói tệp lúc này. Vui lòng thử lại sau giây lát."),
+    (count) => setQcGate((prev) => ({ ...prev, status: "FAIL", p0Count: Math.max(prev.p0Count, count) }))
+  ), [setQcGate, st.qcGate.p0Count, t]);
 
-  const runPptxExport = useCallback(async () => {
-    if (!projectId) return null;
-    setActiveFormat("pptx");
-    setErrorNotice(null);
-    try {
-      const res = await client.exportPptx({
-        projectId,
-        title: resolvedProjectTitle,
-        overrideQcWarning,
-      });
-      setPptxPluginInstalled(res.pluginInstalled);
-      setPptxResult(res.data);
-      void refreshHistory();
-      return res.data;
-    } catch (err) {
-      setErrorNotice(mapExportError(err));
-      return null;
-    } finally {
-      setActiveFormat(null);
-    }
-  }, [client, mapExportError, overrideQcWarning, projectId, resolvedProjectTitle, refreshHistory]);
-
-  const runDeveloperHandoffExport = useCallback(async () => {
-    if (!projectId) return null;
-    setActiveFormat("developer-handoff");
-    setErrorNotice(null);
-    try {
-      const res = await client.exportDeveloperHandoff({
-        projectId,
-        projectName: resolvedProjectTitle,
-        htmlSource: previewHtml || undefined,
-        overrideQcWarning,
-      });
-      setDevHandoffResult(res.data);
-      if (autoDownload) {
-        const payload = JSON.stringify(
-          {
-            fileName: res.data.fileName,
-            sha256: res.data.sha256,
-            files: res.data.files,
-          },
-          null,
-          2
-        );
-        const blob = new Blob([payload], { type: "application/json;charset=utf-8" });
-        triggerBrowserBlobDownload(blob, res.data.fileName);
-      }
-      void refreshHistory();
-      return res.data;
-    } catch (err) {
-      setErrorNotice(mapExportError(err));
-      return null;
-    } finally {
-      setActiveFormat(null);
-    }
-  }, [
-    autoDownload,
-    client,
-    mapExportError,
-    overrideQcWarning,
-    previewHtml,
-    projectId,
-    resolvedProjectTitle,
-    refreshHistory,
-  ]);
+  const runCtx: ExportRunContext = {
+    projectId, resolvedTitle, previewHtml, overrideQcWarning: st.overrideQcWarning, locale,
+    pptxExportMode: st.pptxExportMode, autoDownload, client, t,
+    setActiveFormat: st.setActiveFormat, setErrorNotice: st.setErrorNotice,
+    setHtmlResult: st.setHtmlResult, setPdfResult: st.setPdfResult,
+    setPptxResult: st.setPptxResult, setPptxPluginInstalled, setPptxExportMode: st.setPptxExportMode,
+    setDevHandoffResult: st.setDevHandoffResult, mapError, refreshHistory,
+  };
 
   return {
-    qcGate,
-    pptxPluginInstalled,
-    history,
-    overrideQcWarning,
-    setOverrideQcWarning,
-    activeFormat,
-    htmlResult,
-    pdfResult,
-    pptxResult,
-    devHandoffResult,
-    errorNotice,
-    clearErrorNotice: () => setErrorNotice(null),
-    refreshHistory,
-    runOfflineHtmlExport,
-    runVectorPdfExport,
-    runPptxExport,
-    runDeveloperHandoffExport,
+    qcGate: st.qcGate, pptxPluginInstalled: st.pptxPluginInstalled, pptxExportMode: st.pptxExportMode,
+    setPptxExportMode: st.setPptxExportMode, history: st.history, overrideQcWarning: st.overrideQcWarning,
+    setOverrideQcWarning: st.setOverrideQcWarning, activeFormat: st.activeFormat, htmlResult: st.htmlResult,
+    pdfResult: st.pdfResult, pptxResult: st.pptxResult, devHandoffResult: st.devHandoffResult,
+    errorNotice: st.errorNotice, clearErrorNotice: () => st.setErrorNotice(null), refreshHistory,
+    runOfflineHtmlExport: () => executeOfflineHtml(runCtx), runVectorPdfExport: () => executeVectorPdf(runCtx),
+    runPptxExport: (mode?: PptxExportMode) => executePptx(runCtx, mode),
+    runDeveloperHandoffExport: () => executeDeveloperHandoff(runCtx),
   };
 }

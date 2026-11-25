@@ -492,9 +492,11 @@ export const ExportBundleModal: React.FC<ExportBundleModalProps> = ({
             pdfResult={splitExport.pdfResult}
             pptxResult={splitExport.pptxResult}
             pptxPluginInstalled={splitExport.pptxPluginInstalled}
+            pptxExportMode={splitExport.pptxExportMode}
+            onPptxExportModeChange={splitExport.setPptxExportMode}
             onExportOfflineHtml={() => void splitExport.runOfflineHtmlExport()}
             onExportVectorPdf={() => void splitExport.runVectorPdfExport()}
-            onExportPptx={() => void splitExport.runPptxExport()}
+            onExportPptx={(mode) => void splitExport.runPptxExport(mode)}
             onNavigatePluginInstall={onNavigatePluginInstall}
           />
         ) : (
