@@ -112,30 +112,94 @@ export const VectorPdfExportResponseSchema = z.object({
   requestId: z.string(),
 });
 
+export const PptxExportModeSchema = z.enum(["editable", "visual_exact"]);
+
+export const PptxFidelityWarningCodeSchema = z.enum([
+  "BACKDROP_FILTER_RASTERIZED",
+  "CSS_ANIMATION_OMITTED",
+  "HOVER_STATE_OMITTED",
+  "CANVAS_OR_3D_RASTERIZED",
+  "COMPLEX_SVG_RASTERIZED",
+  "SHAPE_BUDGET_RASTERIZED",
+  "CUSTOM_FONT_FALLBACK",
+  "STATIC_LAYOUT_FALLBACK",
+  "EXTERNAL_MEDIA_BLOCKED",
+  "VISUAL_EXACT_RASTER_UNAVAILABLE",
+  "INVALID_MEDIA_REJECTED",
+]);
+
+export const PptxFidelityWarningSeveritySchema = z.enum(["info", "warning"]);
+
+export const PptxFidelityWarningSchema = z.object({
+  slideIndex: z.number().int().positive(),
+  code: PptxFidelityWarningCodeSchema,
+  severity: PptxFidelityWarningSeveritySchema,
+  elementLabel: z.string().max(120).optional(),
+  fallbackApplied: z.string().min(1),
+  message: z.string().min(1),
+});
+
 export const PptxExportRequestSchema = z.object({
   projectId: z.string().min(1),
   title: z.string().min(1).max(160).default("Presentation"),
+  html: z.string().optional(),
+  inlineCss: z.string().optional(),
+  casAssets: z.record(z.string(), z.string()).optional(),
+  exportMode: PptxExportModeSchema.default("editable"),
+  locale: z.string().min(2).max(16).optional(),
   slideCount: z.number().int().positive().optional(),
   overrideQcWarning: z.boolean().default(false),
 });
 
-export const PptxExportDataSchema = z.object({
-  exportId: z.string().min(1),
-  projectId: z.string().min(1),
-  audienceMode: ExportAudienceModeSchema,
-  format: z.literal("PLUGIN_PPTX"),
-  pluginInstalled: z.boolean(),
-  pluginId: z.string().min(1),
-  pluginStatus: z.string().min(1),
-  installAction: SafeInstallActionSchema,
-  message: z.string().min(1),
-  fileName: z.string().nullable().optional(),
-  sha256: z.string().nullable().optional(),
-  byteSize: z.number().int().nonnegative(),
-  qcGateStatus: z.string().min(1),
-  qcOverrideAcknowledged: z.boolean(),
-  createdAt: z.number().int(),
-});
+export const PptxExportDataSchema = z
+  .object({
+    exportId: z.string().min(1),
+    projectId: z.string().min(1),
+    audienceMode: ExportAudienceModeSchema,
+    format: z.literal("PLUGIN_PPTX"),
+    pluginInstalled: z.boolean(),
+    pluginId: z.string().min(1),
+    pluginStatus: z.string().min(1),
+    installAction: SafeInstallActionSchema,
+    message: z.string().min(1),
+    exportMode: PptxExportModeSchema.optional(),
+    pptxBase64: z.string().min(1).nullable().optional(),
+    fileName: z.string().nullable().optional(),
+    sha256: z.string().nullable().optional(),
+    byteSize: z.number().int().nonnegative(),
+    slideCount: z.number().int().positive().optional(),
+    engine: z.string().min(1).optional(),
+    usedStaticFallback: z.boolean().optional(),
+    fidelityWarnings: z.array(PptxFidelityWarningSchema).default([]),
+    qcGateStatus: z.string().min(1),
+    qcOverrideAcknowledged: z.boolean(),
+    createdAt: z.number().int(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.pluginInstalled && val.pluginStatus === "BUILTIN_ACTIVE") {
+      if (!val.pptxBase64) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["pptxBase64"],
+          message: "pptxBase64 is required for BUILTIN_ACTIVE exports",
+        });
+      }
+      if (!val.sha256 || val.sha256.length !== SHA256_HEX_LEN) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["sha256"],
+          message: "sha256 must be 64 hex chars for BUILTIN_ACTIVE exports",
+        });
+      }
+      if (!val.fileName) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["fileName"],
+          message: "fileName is required for BUILTIN_ACTIVE exports",
+        });
+      }
+    }
+  });
 
 export const PptxExportResponseSchema = z.object({
   ok: z.literal(true),
@@ -236,6 +300,10 @@ export type VectorPdfSlide = z.input<typeof VectorPdfSlideSchema>;
 export type VectorPdfExportRequest = z.input<typeof VectorPdfExportRequestSchema>;
 export type VectorPdfExportData = z.infer<typeof VectorPdfExportDataSchema>;
 export type VectorPdfExportResponse = z.infer<typeof VectorPdfExportResponseSchema>;
+export type PptxExportMode = z.infer<typeof PptxExportModeSchema>;
+export type PptxFidelityWarningCode = z.infer<typeof PptxFidelityWarningCodeSchema>;
+export type PptxFidelityWarningSeverity = z.infer<typeof PptxFidelityWarningSeveritySchema>;
+export type PptxFidelityWarning = z.infer<typeof PptxFidelityWarningSchema>;
 export type PptxExportRequest = z.input<typeof PptxExportRequestSchema>;
 export type PptxExportData = z.infer<typeof PptxExportDataSchema>;
 export type PptxExportResponse = z.infer<typeof PptxExportResponseSchema>;

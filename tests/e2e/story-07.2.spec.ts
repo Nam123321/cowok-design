@@ -349,9 +349,16 @@ test.describe("Story 07.2 Split Export & ContextualStageToolbar (Full Button-to-
       pluginInstalled: boolean;
       pluginId: string;
       installAction: string;
+      data?: { pluginStatus?: string; pptxBase64?: string };
     };
-    expect(pptxBody.pluginId).toBe("pptx-deck-exporter-plugin");
-    if (!pptxBody.pluginInstalled) {
+    expect(["builtin-native-rust-pptx-exporter", "pptx-deck-exporter-plugin"]).toContain(
+      pptxBody.pluginId
+    );
+    if (pptxBody.data?.pluginStatus === "BUILTIN_ACTIVE") {
+      expect(pptxBody.pluginInstalled).toBe(true);
+      expect((pptxBody.data.pptxBase64 || "").length).toBeGreaterThan(200);
+      await expect(page.getByTestId("pptx-fidelity-warnings")).toBeVisible({ timeout: 8000 });
+    } else if (!pptxBody.pluginInstalled) {
       await expect(page.getByTestId("pptx-plugin-install-guide")).toBeVisible({ timeout: 8000 });
       const installCta = page.getByTestId("export-pptx-plugin-cta");
       await expect(installCta).toBeVisible();

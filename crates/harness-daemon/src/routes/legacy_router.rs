@@ -300,3 +300,131 @@ pub(crate) fn build_protected_legacy_router(state: DaemonAppState) -> Router<Dae
             legacy_project_auth_middleware,
         ))
 }
+
+/// Response header attached whenever a standalone `/api/*` request is rewritten to `/api/v1/*`.
+pub const STANDALONE_API_ALIAS_HEADER: &str = "x-cowok-api-alias";
+
+/// Rewrites `/api/<tail>` to `/api/v1/<tail>` when `<tail>` does not already target `v1`.
+/// Returns `None` for `/api/v1/*`, bare `/api`, or non-`/api/*` paths.
+pub fn normalize_standalone_api_alias_path(path: &str) -> Option<String> {
+    let tail = path.strip_prefix("/api/")?;
+    if tail.is_empty() || tail == "v1" || tail.starts_with("v1/") {
+        return None;
+    }
+    Some(format!("/api/v1/{tail}"))
+}
+
+async fn handle_standalone_api_not_found(req: axum::extract::Request) -> axum::response::Response {
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+    let path = req.uri().path().to_string();
+    let request_id = uuid::Uuid::new_v4().to_string();
+    (
+        StatusCode::NOT_FOUND,
+        axum::Json(serde_json::json!({
+            "error": {
+                "code": "NOT_FOUND",
+                "message": format!("API endpoint '{path}' was not found"),
+                "requestId": request_id,
+            }
+        })),
+    )
+        .into_response()
+}
+
+fn has_unsafe_path_tokens(path: &str) -> bool {
+    if path.contains("..") || path.contains('\\') || path.contains('\0') {
+        return true;
+    }
+    let lower = path.to_ascii_lowercase();
+    lower.contains("%2e%2e")
+        || lower.contains("%2e.")
+        || lower.contains(".%2e")
+        || lower.contains("%5c")
+        || lower.contains("%00")
+}
+
+fn handle_standalone_bad_request(path: &str) -> axum::response::Response {
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+    let request_id = uuid::Uuid::new_v4().to_string();
+    (
+        StatusCode::BAD_REQUEST,
+        axum::Json(serde_json::json!({
+            "error": {
+                "code": "BAD_REQUEST",
+                "message": format!("Unsafe path token rejected for '{path}'"),
+                "requestId": request_id,
+            }
+        })),
+    )
+        .into_response()
+}
+
+async fn standalone_parity_middleware(
+    axum::extract::State(spa): axum::extract::State<crate::static_spa::StaticSpaHandler>,
+    mut req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::http::{HeaderName, HeaderValue, Uri};
+
+    let original_path = req.uri().path().to_string();
+
+    if has_unsafe_path_tokens(&original_path) {
+        return handle_standalone_bad_request(&original_path);
+    }
+
+    if let Some(rewritten_path) = normalize_standalone_api_alias_path(&original_path) {
+        let path_and_query = match req.uri().query() {
+            Some(q) => format!("{rewritten_path}?{q}"),
+            None => rewritten_path,
+        };
+        let mut parts = req.uri().clone().into_parts();
+        if let Ok(pq) = path_and_query.parse() {
+            parts.path_and_query = Some(pq);
+            if let Ok(new_uri) = Uri::from_parts(parts) {
+                *req.uri_mut() = new_uri;
+            }
+        }
+        let mut resp = next.run(req).await;
+        resp.headers_mut().insert(
+            HeaderName::from_static(STANDALONE_API_ALIAS_HEADER),
+            HeaderValue::from_static("v1"),
+        );
+        return resp;
+    }
+
+    let collapsed_lower = original_path.trim_start_matches('/').to_ascii_lowercase();
+    if collapsed_lower == "api" || collapsed_lower.starts_with("api/") {
+        return next.run(req).await;
+    }
+
+    spa.handle_request(req.method(), &original_path)
+}
+
+/// Wraps a canonical `build_router(state)` instance with TDR-002 Phase 2 standalone parity:
+/// 1. Enforces `cors_and_loopback_middleware` as the OUTERMOST layer covering SPA requests,
+///    aliased `/api/*` routes, and JSON `404` fallback responses.
+/// 2. Rejects unsafe path tokens (`..`, `\`, `\0`) with JSON `400 BAD_REQUEST`.
+/// 3. Rewrites `/api/<tail>` (non-`v1`) to `/api/v1/<tail>` preserving method, query, headers,
+///    and body while attaching `x-cowok-api-alias: v1`.
+/// 4. Returns structured JSON `404` for unknown `/api/*` (and `//api/*`, `/API/*`) paths so
+///    they never fall through to SPA HTML.
+/// 5. Serves the embedded React 19 Workbench SPA / `dist/` for non-`/api/*` routes.
+pub fn wrap_with_standalone_parity(
+    api_router: Router,
+    state: DaemonAppState,
+    spa: crate::static_spa::StaticSpaHandler,
+) -> Router {
+    let api_with_json_404 = api_router.fallback(handle_standalone_api_not_found);
+    Router::new()
+        .fallback_service(api_with_json_404)
+        .layer(middleware::from_fn_with_state(
+            spa,
+            standalone_parity_middleware,
+        ))
+        .layer(middleware::from_fn_with_state(
+            state,
+            crate::daemon_auth::cors_and_loopback_middleware,
+        ))
+}

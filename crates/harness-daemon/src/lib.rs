@@ -4,14 +4,18 @@
 //! Harness Daemon entrypoint, loopback Axum control plane, `.cowok-design/daemon.lock`
 //! dynamic port discovery, and 9-Spec Synthesis Pipeline for `cowok-design`.
 
+pub mod cli;
 pub mod daemon_auth;
 pub mod flow_routes;
 pub mod flow_transition_handlers;
 pub mod lockfile;
+pub mod port_binder;
 pub mod routes;
+pub mod static_spa;
 pub mod support_edge;
 pub mod synthesis;
 pub mod vault;
+pub mod visual_diff;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -144,6 +148,137 @@ impl DaemonServer {
         telemetry_flusher.abort();
         serve_res
     }
+
+    /// Binds a standalone loopback server using zero-TOCTOU bound-FD port allocation,
+    /// read-only FS XDG fallback storage paths, standalone `/api/* -> /api/v1/*` parity
+    /// alias (`TDR-002 Phase 2`), and the embedded React 19 Workbench SPA handler.
+    pub fn bind_standalone_loopback(
+        preferred_port: Option<u16>,
+        storage: &crate::port_binder::RuntimeStoragePaths,
+        registry: Arc<SpecRegistry>,
+        spa: crate::static_spa::StaticSpaHandler,
+    ) -> Result<Self, HarnessError> {
+        let bound = crate::port_binder::bind_zero_collision_listener(preferred_port)?;
+        let actual_port = bound.port();
+        let lock_info = DaemonLockInfo {
+            pid: std::process::id(),
+            host: "127.0.0.1".to_string(),
+            port: actual_port,
+            started_at: domain::SafeJsInteger::new(chrono::Utc::now().timestamp_millis())?,
+            daemon_nonce: crate::lockfile::generate_csprng_hex_32(),
+            hmac_key_hex: crate::lockfile::generate_csprng_hex_32(),
+            schema_version: crate::lockfile::CURRENT_SCHEMA_VERSION,
+        };
+        let lock_path = write_standalone_lock_atomic(&storage.data_dir, &lock_info)?;
+        let pool = registry.pool().clone();
+        let auth = crate::daemon_auth::DaemonAuthState::from_lock_info_with_pool(
+            &lock_info,
+            Some(pool.clone()),
+        )?;
+        let state =
+            DaemonAppState::with_auth(registry, lock_info.host.clone(), lock_info.port, auth);
+        let _ = crate::routes::orchestrator::shared_write_actor_for_pool(&pool);
+        let active_workers = state.active_workers.clone();
+        let sse_tx = state.sse_tx.clone();
+        let app_state = state.clone();
+        let api_router = build_router(state);
+        let router = crate::routes::legacy_router::wrap_with_standalone_parity(
+            api_router,
+            app_state.clone(),
+            spa,
+        );
+        Ok(Self {
+            listener: bound.into_std(),
+            lock_info,
+            lock_path,
+            router,
+            app_state,
+            active_workers,
+            sse_tx,
+            pool,
+        })
+    }
+
+    /// Serves the bound loopback listener with `SIGINT`/`SIGTERM` graceful shutdown and
+    /// deterministic child process group + lockfile reaping via `ChildProcessReaper`.
+    pub async fn serve_with_reaper(
+        self,
+        reaper: crate::port_binder::ChildProcessReaper,
+    ) -> Result<(), HarnessError> {
+        let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+        let cron_pool = self.pool.clone();
+        let cron_ws = self.pool.workspace_root().to_path_buf();
+        let cron_sse = self.sse_tx.clone();
+        tokio::spawn(async move {
+            crate::routes::plugins_cron::spawn_plugin_cron_runtime(
+                cron_pool,
+                cron_ws,
+                Some(cron_sse),
+                shutdown_rx,
+            )
+            .await;
+        });
+        let telemetry_flusher =
+            crate::support_edge::spawn_telemetry_background_flusher(self.pool.clone());
+        let tokio_listener = tokio::net::TcpListener::from_std(self.listener).map_err(|e| {
+            HarnessError::ValidationFailed {
+                reason: format!("DAEMON_TOKIO_LISTENER_FAILED: {e}"),
+            }
+        })?;
+        let serve_res = axum::serve(tokio_listener, self.router)
+            .with_graceful_shutdown(crate::port_binder::wait_for_shutdown_signal())
+            .await
+            .map_err(|e| HarnessError::ValidationFailed {
+                reason: format!("DAEMON_SERVE_FAILED: {e}"),
+            });
+        let _ = shutdown_tx.send(true);
+        telemetry_flusher.abort();
+        let _ = reaper.reap_all();
+        serve_res
+    }
+}
+
+fn write_standalone_lock_atomic(
+    data_dir: &std::path::Path,
+    lock_info: &DaemonLockInfo,
+) -> Result<PathBuf, HarnessError> {
+    use std::io::Write;
+    crate::lockfile::reject_if_symlink(data_dir)?;
+    std::fs::create_dir_all(data_dir).map_err(|e| HarnessError::ValidationFailed {
+        reason: format!("STANDALONE_LOCK_DIR_CREATE_FAILED: {e}"),
+    })?;
+    crate::lockfile::reject_if_symlink(data_dir)?;
+    let target = data_dir.join("daemon.lock");
+    crate::lockfile::reject_if_symlink(&target)?;
+    let tmp = data_dir.join(format!(".daemon.lock.tmp.{}", Uuid::new_v4()));
+    let bytes =
+        serde_json::to_vec_pretty(lock_info).map_err(|e| HarnessError::ValidationFailed {
+            reason: e.to_string(),
+        })?;
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+        opts.custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC);
+    }
+    let write_res = opts
+        .open(&tmp)
+        .and_then(|mut f| f.write_all(&bytes).and_then(|_| f.sync_all()));
+    if let Err(err) = write_res {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(HarnessError::ValidationFailed {
+            reason: format!("STANDALONE_LOCK_WRITE_FAILED: {err}"),
+        });
+    }
+    if let Err(err) = std::fs::rename(&tmp, &target) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(HarnessError::ValidationFailed {
+            reason: format!("STANDALONE_LOCK_RENAME_FAILED: {err}"),
+        });
+    }
+    Ok(target)
 }
 
 /// Typed Client SDK (`DaemonHttpClient`) for invoking the `cowok-design` harness daemon

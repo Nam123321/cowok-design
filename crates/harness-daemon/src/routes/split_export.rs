@@ -18,23 +18,28 @@ use html_forge::export_bundler::{
     DeveloperHandoffInput, ExportBundlerError, OfflineHtmlInput, VectorPdfInput, VectorPdfSlide,
     MAX_BUNDLE_BYTES,
 };
+use html_forge::pptx_ir::{PptxExportMode, PptxFidelityWarning};
+use html_forge::pptx_layout::PptxExportInput;
+use html_forge::pptx_ooxml::build_pptx_deck;
 use rusqlite::{params, TransactionBehavior};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use spec_registry::retry_on_busy;
 use uuid::Uuid;
 
 use super::legacy_specs::verify_anti_idor_with_caller;
+use super::visual_qc::shared_cdp_evaluator;
 use super::DaemonAppState;
 use crate::daemon_auth::{is_valid_superadmin_bearer, LegacyAuthKind, VerifiedLegacyIngress};
 
 /// Slightly above `MAX_BUNDLE_BYTES` so JSON payloads slightly exceeding 25 MiB reach
 /// the bundler's typed `413 ASSET_SIZE_LIMIT_EXCEEDED` guard cleanly.
 const MAX_EXPORT_HTTP_BODY_BYTES: usize = MAX_BUNDLE_BYTES + (2 * 1024 * 1024);
-/// PPTX requests carry metadata only; reject oversized bodies upfront.
+/// Metadata-only legacy PPTX probe limit (Story 07.2 compatibility).
 const MAX_PPTX_HTTP_BODY_BYTES: usize = 1024 * 1024;
 const PPTX_PLUGIN_ID: &str = "pptx-deck-exporter-plugin";
 const PPTX_INSTALL_ACTION: &str = "/plugins?install=pptx-deck-exporter-plugin";
+const BUILTIN_PPTX_PLUGIN_ID: &str = "builtin-native-rust-pptx-exporter";
+const BUILTIN_PPTX_INSTALL_ACTION: &str = "/plugins";
 
 pub const V30_FALLBACK_DDL: &str =
     include_str!("../../../spec-registry/migrations/V30__story_07_2_split_export_audit.sql");
@@ -188,6 +193,16 @@ pub struct PptxExportRequest {
     #[serde(default = "default_export_title")]
     pub title: String,
     #[serde(default)]
+    pub html: Option<String>,
+    #[serde(default)]
+    pub inline_css: Option<String>,
+    #[serde(default)]
+    pub cas_assets: BTreeMap<String, String>,
+    #[serde(default)]
+    pub export_mode: Option<PptxExportMode>,
+    #[serde(default)]
+    pub locale: Option<String>,
+    #[serde(default)]
     pub slide_count: Option<usize>,
     #[serde(default)]
     pub override_qc_warning: bool,
@@ -218,10 +233,22 @@ pub struct PptxExportData {
     pub install_action: String,
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub export_mode: Option<PptxExportMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pptx_base64: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub file_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sha256: Option<String>,
     pub byte_size: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slide_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub engine: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub used_static_fallback: Option<bool>,
+    #[serde(default)]
+    pub fidelity_warnings: Vec<PptxFidelityWarning>,
     pub qc_gate_status: String,
     pub qc_override_acknowledged: bool,
     pub created_at: i64,
@@ -1084,11 +1111,11 @@ async fn handle_post_pptx(
     if let Err(resp) = require_export_role(&verified, &request_id) {
         return resp;
     }
-    if body.len() > MAX_PPTX_HTTP_BODY_BYTES {
+    if body.len() > MAX_EXPORT_HTTP_BODY_BYTES {
         return map_bundler_err(
             ExportBundlerError::AssetSizeExceeded {
                 actual_bytes: body.len(),
-                limit_bytes: MAX_PPTX_HTTP_BODY_BYTES,
+                limit_bytes: MAX_BUNDLE_BYTES,
             },
             request_id,
         );
@@ -1104,6 +1131,23 @@ async fn handle_post_pptx(
             );
         }
     };
+
+    let is_legacy_plugin_probe = req.html.is_none()
+        && req.inline_css.is_none()
+        && req.cas_assets.is_empty()
+        && req.export_mode.is_none()
+        && req.locale.is_none();
+
+    if (is_legacy_plugin_probe && body.len() > MAX_PPTX_HTTP_BODY_BYTES) || req.title.len() > 65_536
+    {
+        return map_bundler_err(
+            ExportBundlerError::AssetSizeExceeded {
+                actual_bytes: body.len(),
+                limit_bytes: MAX_PPTX_HTTP_BODY_BYTES,
+            },
+            request_id,
+        );
+    }
 
     let worker_req_id = request_id.clone();
     run_blocking_export(request_id, move || {
@@ -1140,11 +1184,13 @@ async fn handle_post_pptx(
             Err(resp) => return resp,
         };
 
-        let installed = is_pptx_plugin_installed(&state, &conn, &tenant_id, &req.project_id);
         let export_id = Uuid::new_v4().to_string();
         let created_at = Utc::now().timestamp_millis();
 
-        if !installed {
+        // Story 07.2 backward-compatible metadata-only plugin probe path
+        if is_legacy_plugin_probe
+            && !is_pptx_plugin_installed(&state, &conn, &tenant_id, &req.project_id)
+        {
             let message = "PowerPoint (.pptx) export is provided by an optional extension. Install it from the Extension Center to continue without needing LibreOffice.".to_string();
             let _ = persist_export_audit_run(
                 &mut conn,
@@ -1182,9 +1228,15 @@ async fn handle_post_pptx(
                         plugin_status: "NOT_INSTALLED".to_string(),
                         install_action: PPTX_INSTALL_ACTION.to_string(),
                         message,
+                        export_mode: None,
+                        pptx_base64: None,
                         file_name: None,
                         sha256: None,
                         byte_size: 0,
+                        slide_count: None,
+                        engine: None,
+                        used_static_fallback: None,
+                        fidelity_warnings: Vec::new(),
                         qc_gate_status,
                         qc_override_acknowledged,
                         created_at,
@@ -1195,44 +1247,26 @@ async fn handle_post_pptx(
                 .into_response();
         }
 
-        let safe_slug: String = req
-            .title
-            .trim()
-            .chars()
-            .map(|c| {
-                if c.is_ascii_alphanumeric() {
-                    c.to_ascii_lowercase()
-                } else {
-                    '-'
-                }
-            })
-            .collect::<String>()
-            .trim_matches('-')
-            .to_string();
-        let file_name = format!(
-            "{}.pptx",
-            if safe_slug.is_empty() {
-                "presentation"
-            } else {
-                &safe_slug
-            }
-        );
-        let receipt_payload = serde_json::json!({
-            "pluginId": PPTX_PLUGIN_ID,
-            "projectId": req.project_id,
-            "title": req.title,
-            "slideCount": req.slide_count.unwrap_or(1),
-            "dispatchedAt": created_at,
-        })
-        .to_string();
-        let mut hasher = Sha256::new();
-        hasher.update(receipt_payload.as_bytes());
-        let digest = hasher.finalize();
-        let mut sha256 = String::with_capacity(64);
-        for b in digest {
-            sha256.push_str(&format!("{b:02x}"));
-        }
-        let byte_size = receipt_payload.len();
+        // Story 07.3 Built-in Native Rust OOXML `.pptx` Exporter (ACTIVE default)
+        let export_mode = req.export_mode.unwrap_or(PptxExportMode::Editable);
+        let cdp_pool = shared_cdp_evaluator();
+        let pptx_bundle = match build_pptx_deck(
+            &PptxExportInput {
+                title: req.title.clone(),
+                html: req.html.clone().unwrap_or_default(),
+                inline_css: req.inline_css.clone(),
+                cas_assets: req.cas_assets.clone(),
+                export_mode,
+                locale: req.locale.clone(),
+                slide_count_hint: req.slide_count,
+                cdp_snapshot: None,
+                max_bytes: Some(MAX_BUNDLE_BYTES),
+            },
+            Some(cdp_pool.as_ref()),
+        ) {
+            Ok(b) => b,
+            Err(err) => return map_bundler_err(err, worker_req_id),
+        };
 
         if let Err(err) = persist_export_audit_run(
             &mut conn,
@@ -1242,32 +1276,35 @@ async fn handle_post_pptx(
                 project_id: &req.project_id,
                 audience_mode: "SHARE_PRESENT",
                 format: "PLUGIN_PPTX",
-                file_name: &file_name,
-                artifact_sha256: &sha256,
-                byte_size,
+                file_name: &pptx_bundle.file_name,
+                artifact_sha256: &pptx_bundle.sha256,
+                byte_size: pptx_bundle.byte_size,
                 external_cdn_refs_count: 0,
                 qc_gate_status: &qc_gate_status,
                 qc_override_acknowledged,
-                plugin_status: "INSTALLED_DISPATCHED",
+                plugin_status: "BUILTIN_ACTIVE",
                 created_at,
             },
         ) {
             return err_resp(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "EXPORT_AUDIT_PERSIST_FAILED",
-                &format!("Failed to persist PPTX plugin receipt: {err}"),
+                &format!("Failed to persist PPTX export receipt: {err}"),
                 worker_req_id,
             );
         }
 
-        let message = "Dispatched PowerPoint deck build to isolated extension plugin.".to_string();
+        let message = format!(
+            "Built PowerPoint deck ({} slide(s)) with built-in native Rust exporter.",
+            pptx_bundle.slide_count
+        );
         (
             StatusCode::OK,
             Json(PptxExportResponse {
                 ok: true,
                 plugin_installed: true,
-                plugin_id: PPTX_PLUGIN_ID.to_string(),
-                install_action: PPTX_INSTALL_ACTION.to_string(),
+                plugin_id: BUILTIN_PPTX_PLUGIN_ID.to_string(),
+                install_action: BUILTIN_PPTX_INSTALL_ACTION.to_string(),
                 message: message.clone(),
                 data: PptxExportData {
                     export_id,
@@ -1275,13 +1312,19 @@ async fn handle_post_pptx(
                     audience_mode: "SHARE_PRESENT".to_string(),
                     format: "PLUGIN_PPTX".to_string(),
                     plugin_installed: true,
-                    plugin_id: PPTX_PLUGIN_ID.to_string(),
-                    plugin_status: "INSTALLED_DISPATCHED".to_string(),
-                    install_action: PPTX_INSTALL_ACTION.to_string(),
+                    plugin_id: BUILTIN_PPTX_PLUGIN_ID.to_string(),
+                    plugin_status: "BUILTIN_ACTIVE".to_string(),
+                    install_action: BUILTIN_PPTX_INSTALL_ACTION.to_string(),
                     message,
-                    file_name: Some(file_name),
-                    sha256: Some(sha256),
-                    byte_size,
+                    export_mode: Some(pptx_bundle.export_mode),
+                    pptx_base64: Some(pptx_bundle.pptx_base64),
+                    file_name: Some(pptx_bundle.file_name),
+                    sha256: Some(pptx_bundle.sha256),
+                    byte_size: pptx_bundle.byte_size,
+                    slide_count: Some(pptx_bundle.slide_count),
+                    engine: Some(pptx_bundle.engine),
+                    used_static_fallback: Some(pptx_bundle.used_static_fallback),
+                    fidelity_warnings: pptx_bundle.fidelity_warnings,
                     qc_gate_status,
                     qc_override_acknowledged,
                     created_at,
@@ -1482,8 +1525,8 @@ async fn handle_get_export_history(
                 );
             }
         };
-        let pptx_plugin_installed =
-            is_pptx_plugin_installed(&state, &conn, &tenant_id, &query.project_id);
+        // Story 07.3: Built-in Native Rust OOXML PPTX Exporter is permanently active by default
+        let pptx_plugin_installed = true;
         let limit = query.limit.clamp(1, 100) as i64;
 
         let mut stmt = match conn.prepare(

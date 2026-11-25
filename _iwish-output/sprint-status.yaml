@@ -61,7 +61,7 @@ start_date: '2026-07-24'
 "Epic 07 - Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter": in-progress
 "Story 07.1 - Pooled 1-Chromium Rust CDP Visual QC (`lib-audit` + `slides-check`), QC Overlay & 1-Click Auto-Fix": completed
 "Story 07.2 - Split Export & Packaging Engine (Share & Present vs Developer Handoff — Offline HTML, Vector PDF & Plugin-Isolated PPTX)": completed
-"Story 07.3 - Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)": cancelled
+"Story 07.3 - Built-in Native Rust OOXML `.pptx` Exporter (Editable Native Shapes + Visual-Exact Fallback & Limitations Disclosure)": refactored
 
 # ==================================================
 # Feature Group: VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe

@@ -39,7 +39,7 @@ links_to:
 
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
-| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (`cowok-design`) & Local Web Workbench với `/api/*` Standalone Parity | `refactored` | `2` | `['07.2', '11.1', '11.2', '14.1']` |
+| [Story-12.1](./Story-12.1/story.md) | Kênh 1 — Single-Binary CLI (`cowok-design`) & Local Web Workbench với `/api/*` Standalone Parity | `completed` | `2` | `['07.2', '11.1', '11.2', '14.1']` |
 | [Story-12.2](./Story-12.2/story.md) | Kênh 2 & 3 — Ứng dụng Desktop `Tauri v2` (`.dmg`/`.msi`/`.AppImage`) & Universal Multi-Harness Plugin Pack (`Cowok.ai`, `Claude`, `Codex`, `Antigravity`, `Cursor`) | `refactored` | `3` | `['12.1', '08.6', '14.3']` |
 | [Story-12.3](./Story-12.3/story.md) | Kênh 4 — Container Image (`Docker` / `OCI`) kèm Pooled Headless Chromium cho Đội nhóm & CI/CD | `refactored` | `2` | `['07.1', '12.1']` |
 
