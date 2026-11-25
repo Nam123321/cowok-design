@@ -170,7 +170,7 @@ function SecurityPolicyFooter() {
         ))}
       </div>
       <div style={{ padding: "8px 10px", borderRadius: "8px", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", fontSize: "11px", color: "var(--text-muted)", fontWeight: FONT_WEIGHT_MEDIUM, lineHeight: BODY_LINE_HEIGHT }}>
-        {t("superadmin.auth.auditNotice", "Mọi thao tác ghi đều được lưu vào bảng admin_audit_logs chỉ-thêm (không thể sửa/xóa) kèm danh tính OIDC và trạng thái MFA.")}
+        {t("superadmin.auth.auditNotice", "Mọi thao tác ghi đều được lưu vào Nhật ký kiểm toán bất biến chỉ-thêm (không thể sửa/xóa) kèm danh tính OIDC và trạng thái MFA.")}
       </div>
     </div>
   );

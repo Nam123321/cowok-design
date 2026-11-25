@@ -4,7 +4,7 @@ id: "14.3"
 title: "Story 14.3: 4-Channel Distribution Ops — Canary Rollout, Ed25519 Signed Updater & Skill Quarantine Advisory, Offline Licenses & Cowok.ai Federation"
 description: "Hoàn thiện năng lực điều hành phân phối 4 kênh trên SuperAdmin Portal: phát hành Canary + ký Ed25519 manifest cập nhật Tauri, danh sách cách ly kỹ năng toàn cục (Global Quarantine Advisory), khóa bản quyền offline Ed25519 và liên thông Cowok.ai."
 resource: "iwish://cowok-design/development/epic-14/story-14.3"
-status: backlog
+status: completed
 risk_tier: 3
 delivery: cloud-control-plane
 adr_ref: "ADR-008"

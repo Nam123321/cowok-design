@@ -15,7 +15,9 @@ import { apiWorkbenchSettings } from "../../api/workbench-settings";
 import { CowokToast } from "../../components/ui/CowokToast";
 import { SupportRequestDrawer } from "../../features/support/SupportRequestDrawer";
 import { ProjectReadinessModal } from "../../features/visual-qc/ProjectReadinessModal";
+import { DesignTournamentStudioDrawer } from "../../features/tournament/DesignTournamentStudioDrawer";
 import { useVisualQcController } from "../../features/visual-qc/useVisualQcController";
+import { resolveStageTabKind, resolveStageTabTitle } from "./components/ContextualStageToolbar";
 
 export type { ThemeMode };
 
@@ -56,13 +58,28 @@ const WorkbenchConnectedBody: React.FC<{
   shell: ReturnType<typeof useWorkbenchShellState>;
   isOnboardingOpen: boolean;
   isSupportDrawerOpen: boolean;
+  isTournamentOpen: boolean;
+  tournamentRunCount: number;
+  onOpenVisualQc: () => void;
+  onOpenTournament: () => void;
   resolvedProjectName: string;
   resolvedProjectId: string;
   defaultSessionTitle: string;
-}> = ({ shell, isOnboardingOpen, isSupportDrawerOpen, resolvedProjectName, resolvedProjectId, defaultSessionTitle }) => {
+}> = ({
+  shell,
+  isOnboardingOpen,
+  isSupportDrawerOpen,
+  isTournamentOpen,
+  tournamentRunCount,
+  onOpenVisualQc,
+  onOpenTournament,
+  resolvedProjectName,
+  resolvedProjectId,
+  defaultSessionTitle,
+}) => {
   const { settings, sessionManager: sm, store, state } = shell;
   const anyShellModalOpen = Boolean(
-    settings.isSettingsOpen || sm.isNewConvoModalOpen || sm.pickerState.isOpen || isOnboardingOpen || isSupportDrawerOpen
+    settings.isSettingsOpen || sm.isNewConvoModalOpen || sm.pickerState.isOpen || isOnboardingOpen || isSupportDrawerOpen || isTournamentOpen
   );
   return (
     <WorkbenchBodyLayout
@@ -84,6 +101,9 @@ const WorkbenchConnectedBody: React.FC<{
       onTabChange={(id, format) => { shell.setActiveTabId(id); store.setActiveFormatTab(format); }}
       splitter={shell.splitter} attachments={shell.attachments} graphHandlers={shell.graphHandlers}
       isModalOpen={anyShellModalOpen}
+      onOpenVisualQc={onOpenVisualQc}
+      onOpenTournament={onOpenTournament}
+      activeTournamentRunCount={tournamentRunCount}
       state={state} store={store}
     />
   );
@@ -170,7 +190,11 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
 
   const [isOnboardingOpen, setIsOnboardingOpen] = React.useState<boolean>(false);
   const [isSupportDrawerOpen, setIsSupportDrawerOpen] = React.useState<boolean>(false);
+  const [isTournamentOpen, setIsTournamentOpen] = React.useState<boolean>(false);
+  const [tournamentRunCount, setTournamentRunCount] = React.useState<number>(0);
   const [daemonWarning, setDaemonWarning] = React.useState<string | null>(null);
+  const activeTabKind = resolveStageTabKind(shell.activeTabId, shell.state.activeFormatTab);
+  const activeTabTitle = resolveStageTabTitle(shell.activeTabId, shell.state.activeFormatTab);
   const visualQc = useVisualQcController({
     projectId: resolvedProjectId,
     targetId: shell.activeTabId || "workbench-stage",
@@ -198,12 +222,34 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
     setIsOnboardingOpen(false);
   };
 
+  React.useEffect(() => {
+    if (!isTournamentOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsTournamentOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isTournamentOpen]);
+
   return (
     <div className={`workbench-shell theme-${settings.themeMode}`} data-theme={settings.themeMode} data-flow-hydrated={shell.isFlowHydrated ? "true" : "false"} style={createWorkbenchShellStyle(settings.currentFontSize)}>
-      <WorkbenchTopNav projectId={resolvedProjectId} projectName={resolvedProjectName} activeSessionTitle={activeSession?.title} isStandaloneConversation={!activeSession?.projectId} themeMode={settings.themeMode} onOpenSupportDrawer={() => setIsSupportDrawerOpen(true)} onOpenVisualQc={() => visualQc.setIsReadinessOpen(true)} />
-      <WorkbenchConnectedBody shell={shell} isOnboardingOpen={isOnboardingOpen} isSupportDrawerOpen={isSupportDrawerOpen} resolvedProjectName={resolvedProjectName} resolvedProjectId={resolvedProjectId} defaultSessionTitle={t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới")} />
+      <WorkbenchTopNav projectId={resolvedProjectId} projectName={resolvedProjectName} activeSessionTitle={activeSession?.title} isStandaloneConversation={!activeSession?.projectId} themeMode={settings.themeMode} onOpenSupportDrawer={() => setIsSupportDrawerOpen(true)} />
+      <WorkbenchConnectedBody shell={shell} isOnboardingOpen={isOnboardingOpen} isSupportDrawerOpen={isSupportDrawerOpen} isTournamentOpen={isTournamentOpen} tournamentRunCount={tournamentRunCount} onOpenVisualQc={() => visualQc.setIsReadinessOpen(true)} onOpenTournament={() => setIsTournamentOpen(true)} resolvedProjectName={resolvedProjectName} resolvedProjectId={resolvedProjectId} defaultSessionTitle={t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới")} />
       <WorkbenchModalsAndToasts shell={shell} resolvedProjectId={resolvedProjectId} isOnboardingOpen={isOnboardingOpen} daemonWarning={daemonWarning} onCloseOnboarding={closeOnboarding} onSetDaemonWarning={setDaemonWarning} />
       <ProjectReadinessModal open={visualQc.isReadinessOpen} onClose={() => visualQc.setIsReadinessOpen(false)} runResult={visualQc.runResult} isRunning={visualQc.isRunning} onRunQc={() => void visualQc.runQc()} onDeterministicFix={() => void visualQc.runDeterministicFix()} />
+      <DesignTournamentStudioDrawer
+        isOpen={isTournamentOpen}
+        onClose={() => setIsTournamentOpen(false)}
+        projectId={resolvedProjectId}
+        activeTabTitle={activeTabTitle}
+        activeTabKind={activeTabKind}
+        onActiveRunCountChange={setTournamentRunCount}
+        onCommittedHtml={(mergedHtml) => {
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("cowok:tournament-committed", { detail: { projectId: resolvedProjectId, mergedHtml } }));
+          }
+        }}
+      />
       <SupportRequestDrawer isOpen={isSupportDrawerOpen} onClose={() => setIsSupportDrawerOpen(false)} locale={settings.currentLocale} />
     </div>
   );

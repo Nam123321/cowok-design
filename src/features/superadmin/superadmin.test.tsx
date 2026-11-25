@@ -468,6 +468,7 @@ describe("Story 14.2 SuperAdminPortalPage", () => {
     fireEvent.click(screen.getByTestId("superadmin-tab-governance"));
     const govPanel = screen.getByTestId("superadmin-panel-governance");
     expect(screen.getByTestId("superadmin-rbac-matrix")).toBeTruthy();
-    expect(govPanel.textContent).toContain("admin_audit_logs");
+    expect(govPanel.textContent).toMatch(/Nhật ký kiểm toán bất biến|immutable audit log/i);
+    expect(govPanel.textContent).not.toContain("admin_audit_logs");
   });
 });

@@ -46,7 +46,7 @@ const MODULE_SPECS: Record<SuperAdminPlannedSectionId, PlannedModuleSpec> = {
     badgeFallback: "Tính năng sắp ra mắt",
     bannerTone: "warning",
     titleKey: "superadmin.planned.pluginCatalogTitle",
-    titleFallback: "Vòng đời Danh mục Plugin GitHub Mặc định & Đề xuất",
+    titleFallback: "Vòng đời Danh mục Plugin Mặc định & Đề xuất",
     summaryKey: "superadmin.planned.pluginCatalogSummary",
     summaryFallback:
       "Quản trị tập trung các kho lưu trữ plugin GitHub mặc định và đề xuất, phân phối qua tệp catalog.json có chữ ký số Ed25519 mà không can thiệp ghi đè cấu hình cục bộ của người dùng.",

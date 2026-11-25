@@ -1,5 +1,6 @@
-// @story 05.3
-import React, { useMemo, useState } from "react";
+// @story 05.3, 07.2
+// @implements AC-01, AC-02, AC-03, AC-04
+import React, { useEffect, useMemo, useState } from "react";
 import { useFormatter } from "../../../hooks/useFormatter";
 import { useTranslation } from "../../../hooks/useTranslation";
 import type { ProjectIntegrationsStatus } from "../../../lib/validations/github-ide-integration";
@@ -11,13 +12,19 @@ import {
   type IdeTarget,
   type OpenIdeHandoffResponse,
 } from "../../../lib/validations/version-snapshot";
+import { DeveloperHandoffPanel } from "../../split-export/DeveloperHandoffPanel";
+import { QcGateBannerCard } from "../../split-export/QcGateBannerCard";
+import { SharePresentPanel } from "../../split-export/SharePresentPanel";
+import { useSplitExport } from "../../split-export/useSplitExport";
 import { GitHubAccountSection } from "./GitHubAccountSection";
 import { HandoffManifestPanel } from "./HandoffManifestPanel";
 
 const HTTP_NOT_IMPLEMENTED = 501;
 const SHORT_SHA_LEN = 16;
+const DEFAULT_WORKBENCH_PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 
 export type ExportInitialSection = "zip" | "github-pr" | "ide-handoff";
+export type ExportAudienceTab = "share-present" | "developer-handoff";
 
 export interface PrSubmissionError {
   status?: number;
@@ -30,6 +37,10 @@ export interface ExportBundleModalProps {
   metadata: ExportZipResponse | null;
   isExporting: boolean;
   initialSection?: ExportInitialSection;
+  defaultAudienceTab?: ExportAudienceTab;
+  projectId?: string;
+  projectTitle?: string;
+  previewHtml?: string;
   integrationsStatus?: ProjectIntegrationsStatus | null;
   integrationBusy?: boolean;
   prResult?: GitHubPRResponse | null;
@@ -43,6 +54,7 @@ export interface ExportBundleModalProps {
   onSelectGitHubAccount?: (login: string) => Promise<void>;
   onBindGitRemote?: (remoteUrl: string) => Promise<void>;
   onSetDefaultIde?: (ide: IdeTarget) => void;
+  onNavigatePluginInstall?: (installAction: string) => void;
   onClose: () => void;
 }
 
@@ -57,6 +69,26 @@ function isOfflineFallbackError(err: PrSubmissionError | null | undefined): bool
   if (!err) return false;
   if (err.status === HTTP_NOT_IMPLEMENTED) return true;
   return Boolean(err.code && OFFLINE_PR_CODES.has(err.code));
+}
+
+function resolveInitialAudienceTab(params: {
+  defaultAudienceTab?: ExportAudienceTab;
+  initialSection?: ExportInitialSection;
+  projectId?: string;
+  hasLegacyDevContext: boolean;
+}): ExportAudienceTab {
+  if (params.defaultAudienceTab) return params.defaultAudienceTab;
+  if (
+    params.initialSection === "zip" ||
+    params.initialSection === "github-pr" ||
+    params.initialSection === "ide-handoff"
+  ) {
+    return "developer-handoff";
+  }
+  if (!params.projectId && params.hasLegacyDevContext) {
+    return "developer-handoff";
+  }
+  return "share-present";
 }
 
 const RunnabilityChecklist: React.FC<{ metadata: ExportZipResponse }> = ({ metadata }) => {
@@ -85,8 +117,8 @@ const RunnabilityChecklist: React.FC<{ metadata: ExportZipResponse }> = ({ metad
 };
 
 const MetadataCard: React.FC<{ metadata: ExportZipResponse }> = ({ metadata }) => {
-  const { t } = useTranslation();
-  const { formatNumber } = useFormatter();
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
 
   return (
     <div className="snap-meta-card" data-testid="export-metadata-card">
@@ -119,7 +151,8 @@ const PrStatusBanners: React.FC<{
   isExporting: boolean;
   onDownloadZip: () => void;
 }> = ({ validationError, prError, prResult, isExporting, onDownloadZip }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const { formatNumber } = useFormatter({ locale });
   const showOfflineFallback = isOfflineFallbackError(prError);
   return (
     <>
@@ -137,7 +170,7 @@ const PrStatusBanners: React.FC<{
       )}
       {prResult && (
         <div className="snap-safety-banner" data-testid="pr-created-banner">
-          <p className="snap-safety-banner-title">{t("snapshots.prCreatedTitle", "Pull Request Ready")} #{prResult.prNumber}</p>
+          <p className="snap-safety-banner-title">{t("snapshots.prCreatedTitle", "Pull Request Ready")} #{formatNumber(prResult.prNumber)}</p>
           <a href={prResult.prUrl} target="_blank" rel="noreferrer" className="snap-meta-value">{prResult.prUrl}</a>
         </div>
       )}
@@ -179,22 +212,86 @@ const PrFormInputs: React.FC<{
 };
 
 const ExportModalFooter: React.FC<{
+  activeTab: ExportAudienceTab;
   isExporting: boolean;
   onClose: () => void;
   onCreatePR: () => void;
   onDownloadZip: () => void;
-}> = ({ isExporting, onClose, onCreatePR, onDownloadZip }) => {
+}> = ({ activeTab, isExporting, onClose, onCreatePR, onDownloadZip }) => {
   const { t } = useTranslation();
   return (
     <div className="snap-modal-actions">
       <button type="button" onClick={onClose} data-testid="export-modal-close-btn" className="snap-btn snap-btn--ghost">
-        {t("common.close", "Close")}
+        {t("common.close", "Đóng")}
       </button>
-      <button type="button" onClick={onCreatePR} disabled={isExporting} data-testid="export-create-pr-btn" className="snap-btn snap-btn--primary">
-        {t("snapshots.createPrBtn", "Create GitHub PR")}
+      {activeTab === "developer-handoff" && (
+        <>
+          <button type="button" onClick={onCreatePR} disabled={isExporting} data-testid="export-create-pr-btn" className="snap-btn snap-btn--primary">
+            {t("snapshots.createPrBtn", "Create GitHub PR")}
+          </button>
+          <button type="button" onClick={onDownloadZip} disabled={isExporting} data-testid="export-download-zip-btn" className="snap-btn snap-btn--emerald">
+            {isExporting ? t("snapshots.exportingBtn", "Exporting...") : t("snapshots.downloadZipBtn", "Download Full Repo ZIP")}
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
+
+const AudienceTabSwitcher: React.FC<{
+  activeTab: ExportAudienceTab;
+  onSelectTab: (tab: ExportAudienceTab) => void;
+}> = ({ activeTab, onSelectTab }) => {
+  const { t } = useTranslation();
+  const makeTabStyle = (active: boolean): React.CSSProperties => ({
+    flex: 1,
+    padding: "9px 14px",
+    borderRadius: "var(--radius-sm)",
+    border: active ? "1px solid var(--action-primary)" : "1px solid transparent",
+    backgroundColor: active ? "var(--bg-surface)" : "transparent",
+    color: active ? "var(--text-primary)" : "var(--text-secondary)",
+    fontWeight: active ? 600 : 500,
+    fontSize: "13px",
+    cursor: "pointer",
+    boxShadow: active ? "var(--shadow-sm)" : "none",
+  });
+
+  return (
+    <div
+      role="tablist"
+      aria-label={t("splitExport.audienceTabsAria", "Chọn luồng xuất bản")}
+      style={{
+        display: "flex",
+        gap: "6px",
+        padding: "4px",
+        borderRadius: "var(--radius-md)",
+        backgroundColor: "var(--bg-subtle)",
+        border: "1px solid var(--border-subtle)",
+        marginBottom: "14px",
+      }}
+      data-testid="split-export-tablist"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "share-present"}
+        style={makeTabStyle(activeTab === "share-present")}
+        onClick={() => onSelectTab("share-present")}
+        data-ff-id="share-present-tab"
+        data-testid="share-present-tab"
+      >
+        {t("splitExport.sharePresentTab", "Chia sẻ & Trình chiếu")}
       </button>
-      <button type="button" onClick={onDownloadZip} disabled={isExporting} data-testid="export-download-zip-btn" className="snap-btn snap-btn--emerald">
-        {isExporting ? t("snapshots.exportingBtn", "Exporting...") : t("snapshots.downloadZipBtn", "Download Full Repo ZIP")}
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "developer-handoff"}
+        style={makeTabStyle(activeTab === "developer-handoff")}
+        onClick={() => onSelectTab("developer-handoff")}
+        data-ff-id="developer-handoff-tab"
+        data-testid="developer-handoff-tab"
+      >
+        {t("splitExport.developerHandoffTab", "Bàn giao Lập trình viên")}
       </button>
     </div>
   );
@@ -205,11 +302,11 @@ const ExportModalHeader: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   return (
     <>
       <div className="snap-item-header">
-        <h3 className="snap-modal-title">{t("snapshots.exportModalTitle", "Full Repository Source Export")}</h3>
+        <h3 className="snap-modal-title">{t("splitExport.modalTitle", "Xuất bản & Chia sẻ dự án")}</h3>
         <button type="button" onClick={onClose} aria-label={t("common.close", "Close")} className="snap-drawer-close-btn">{"✕"}</button>
       </div>
       <p className="snap-modal-desc">
-        {t("snapshots.exportModalDesc", "Package standalone runnable project source code or create a GitHub PR.")}
+        {t("splitExport.modalDesc", "Chọn luồng trình chiếu ngoại tuyến nhanh cho người xem hoặc gói mã nguồn đầy đủ cho đội ngũ kỹ thuật.")}
       </p>
     </>
   );
@@ -276,7 +373,11 @@ export const ExportBundleModal: React.FC<ExportBundleModalProps> = ({
   isOpen,
   metadata,
   isExporting,
-  initialSection = "zip",
+  initialSection,
+  defaultAudienceTab,
+  projectId,
+  projectTitle,
+  previewHtml = "",
   integrationsStatus = null,
   integrationBusy = false,
   prResult = null,
@@ -290,18 +391,67 @@ export const ExportBundleModal: React.FC<ExportBundleModalProps> = ({
   onSelectGitHubAccount,
   onBindGitRemote,
   onSetDefaultIde,
+  onNavigatePluginInstall,
   onClose,
 }) => {
+  const { t } = useTranslation();
+  const isMountedInLiveWorkbench =
+    typeof document !== "undefined" && Boolean(document.querySelector(".workbench-shell"));
+  const effectiveProjectId =
+    projectId || (isMountedInLiveWorkbench ? DEFAULT_WORKBENCH_PROJECT_ID : undefined);
+  const resolvedProjectTitle =
+    projectTitle || t("splitExport.defaultProjectTitle", "Bản trình chiếu");
+  const hasLegacyDevContext = Boolean(metadata || prError || prResult || handoffResult || handoffError);
+  const [activeTab, setActiveTab] = useState<ExportAudienceTab>(() =>
+    resolveInitialAudienceTab({
+      defaultAudienceTab,
+      initialSection,
+      projectId,
+      hasLegacyDevContext,
+    })
+  );
   const [branch, setBranch] = useState("feature/design-intent-export");
   const [targetBranch, setTargetBranch] = useState("main");
   const [prTitle, setPrTitle] = useState("Sync executable UI design intent");
   const [prBody, setPrBody] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setActiveTab(
+      resolveInitialAudienceTab({
+        defaultAudienceTab,
+        initialSection,
+        projectId,
+        hasLegacyDevContext,
+      })
+    );
+  }, [defaultAudienceTab, hasLegacyDevContext, initialSection, isOpen, projectId]);
+
+  const splitExport = useSplitExport({
+    projectId: effectiveProjectId,
+    projectTitle: resolvedProjectTitle,
+    previewHtml,
+    enabled: isOpen && Boolean(effectiveProjectId),
+  });
+
   if (!isOpen) return null;
 
   const handleCreatePR = () => {
-    const parsed = GitHubPRSchema.safeParse({ branchName: branch.trim(), targetBranch: targetBranch.trim(), prTitle: prTitle.trim(), prBody, includeVisualDiffTable: true });
-    if (!parsed.success) { setValidationError(parsed.error.issues[0]?.message || "Invalid PR parameters"); return; }
+    const parsed = GitHubPRSchema.safeParse({
+      branchName: branch.trim(),
+      targetBranch: targetBranch.trim(),
+      prTitle: prTitle.trim(),
+      prBody,
+      includeVisualDiffTable: true,
+    });
+    if (!parsed.success) {
+      setValidationError(
+        parsed.error.issues[0]?.message ||
+          t("snapshots.invalidPrParams", "Tham số Pull Request không hợp lệ")
+      );
+      return;
+    }
     setValidationError(null);
     onCreateGitHubPR(parsed.data);
   };
@@ -311,11 +461,61 @@ export const ExportBundleModal: React.FC<ExportBundleModalProps> = ({
   const resProps = { metadata, handoffResult, handoffError, isExporting, prError, prResult, onOpenIde, onDownloadZip };
 
   return (
-    <div className="snap-modal-overlay" role="dialog" aria-modal="true" data-testid="export-bundle-modal">
+    <div
+      className="snap-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("splitExport.modalTitle", "Xuất bản & Chia sẻ dự án")}
+      data-testid="export-bundle-modal"
+      data-ff-id="export-bundle-modal"
+    >
       <div className="snap-modal-card snap-modal-card--wide">
         <ExportModalHeader onClose={onClose} />
-        <ExportModalBody {...formProps} {...intProps} {...resProps} />
-        <ExportModalFooter isExporting={isExporting} onClose={onClose} onCreatePR={handleCreatePR} onDownloadZip={onDownloadZip} />
+        <AudienceTabSwitcher activeTab={activeTab} onSelectTab={setActiveTab} />
+
+        {effectiveProjectId && (
+          <div style={{ marginBottom: "14px" }}>
+            <QcGateBannerCard
+              qcGate={splitExport.qcGate}
+              overrideQcWarning={splitExport.overrideQcWarning}
+              onToggleOverride={splitExport.setOverrideQcWarning}
+              errorNotice={splitExport.errorNotice}
+            />
+          </div>
+        )}
+
+        {activeTab === "share-present" ? (
+          <SharePresentPanel
+            activeFormat={splitExport.activeFormat}
+            disabled={!effectiveProjectId}
+            htmlResult={splitExport.htmlResult}
+            pdfResult={splitExport.pdfResult}
+            pptxResult={splitExport.pptxResult}
+            pptxPluginInstalled={splitExport.pptxPluginInstalled}
+            onExportOfflineHtml={() => void splitExport.runOfflineHtmlExport()}
+            onExportVectorPdf={() => void splitExport.runVectorPdfExport()}
+            onExportPptx={() => void splitExport.runPptxExport()}
+            onNavigatePluginInstall={onNavigatePluginInstall}
+          />
+        ) : (
+          <DeveloperHandoffPanel
+            activeFormat={splitExport.activeFormat}
+            disabled={isExporting}
+            hasProjectId={Boolean(effectiveProjectId)}
+            devHandoffResult={splitExport.devHandoffResult}
+            onExportDeveloperHandoff={() => void splitExport.runDeveloperHandoffExport()}
+          >
+            <ExportModalBody {...formProps} {...intProps} {...resProps} />
+          </DeveloperHandoffPanel>
+        )}
+
+        <ExportModalFooter
+          activeTab={activeTab}
+          isExporting={isExporting}
+          onClose={onClose}
+          onCreatePR={handleCreatePR}
+          onDownloadZip={onDownloadZip}
+        />
       </div>
     </div>
   );

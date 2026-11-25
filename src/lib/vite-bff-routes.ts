@@ -25,6 +25,7 @@ import {
 } from "./vite-bff-flow-routes";
 import { PLUGIN_ECOSYSTEM_ROUTES } from "./vite-bff-plugins-routes";
 import { CHAT_VAULT_ROUTES } from "./vite-bff-chat-vault-routes";
+import { WAVE_D_ROUTES } from "./vite-bff-wave-d-routes";
 import * as doctorRoute from "../app/api/doctor/route";
 import * as snapshotRoute from "../app/api/projects/[id]/flow/snapshot/route";
 import * as nodesRoute from "../app/api/projects/[id]/flow/nodes/route";
@@ -310,6 +311,7 @@ const ROUTE_TABLE: RouteEntry[] = [
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/slides\/([^/]+)\/charts\/validate$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]), slideUid: safeDecodeSegment(m[3]) }), resolveHandler: () => deckSlideChartsValidateRoute.POST },
   { method: "POST", pattern: /^\/api\/decks\/([^/]+)\/presenter\/handshake$/, extractParams: (m) => ({ deckId: safeDecodeSegment(m[1]) }), resolveHandler: () => deckPresenterHandshakeDirectRoute.POST },
   { method: "POST", pattern: /^\/api\/projects\/([^/]+)\/decks\/([^/]+)\/presenter\/handshake$/, extractParams: (m) => ({ id: safeDecodeSegment(m[1]), deckId: safeDecodeSegment(m[2]) }), resolveHandler: () => deckPresenterHandshakeProjectRoute.POST },
+  ...WAVE_D_ROUTES,
   ...FLOW_AND_WORKBENCH_ROUTES,
 ];
 

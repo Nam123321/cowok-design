@@ -60,7 +60,7 @@ start_date: '2026-07-24'
 # Epic 07: Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter
 "Epic 07 - Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter": in-progress
 "Story 07.1 - Pooled 1-Chromium Rust CDP Visual QC (`lib-audit` + `slides-check`), QC Overlay & 1-Click Auto-Fix": completed
-"Story 07.2 - Split Export & Packaging Engine (Share & Present vs Developer Handoff — Offline HTML, Vector PDF & Plugin-Isolated PPTX)": refactored
+"Story 07.2 - Split Export & Packaging Engine (Share & Present vs Developer Handoff — Offline HTML, Vector PDF & Plugin-Isolated PPTX)": completed
 "Story 07.3 - Bộ xuất bản Self-Contained Offline HTML Bundle & Vector PDF (1920x1080)": cancelled
 
 # ==================================================
@@ -91,7 +91,7 @@ start_date: '2026-07-24'
 "Epic 10 - `cowok` Master Orchestrator, File Leases, `Builder!=Scorer` & `CMP-07` Design Tournament": in-progress
 "Story 10.1 - `cowok` Master Orchestrator, `3-Lane Router`, Single MPSC SQLite Write Actor & `$UIUX_LIVE_SPEC` `<50ms` Hot-Apply": completed
 "Story 10.2 - Parallel Swarm Dispatch, Disjoint `V17 worker_file_leases`, `429` Semaphore Clamp & Independent `Builder != Scorer` QC (`E1..E4 >= 95%`)": completed
-"Story 10.3 - Anti-Slop Design Tournament (`CMP-07`, 4 Trục Trực giao `<=15s`, AST Distance `<=0.78`, Position-Swapped `RubricShield`), Cross-Variant Borrow & `advisor` 6-Step Loop": refactored
+"Story 10.3 - Anti-Slop Design Tournament (`CMP-07`, 4 Trục Trực giao `<=15s`, AST Distance `<=0.78`, Position-Swapped `RubricShield`), Cross-Variant Borrow & `advisor` 6-Step Loop": completed
 
 # Epic 11: POSIX BYOS/BYOK Runner (`0o600` FD + `-PGID`), Cross-CLI Normalizer & Universal Open MCP Gateway
 "Epic 11 - POSIX BYOS/BYOK Runner (`0o600` FD + `-PGID`), Cross-CLI Normalizer & Universal Open MCP Gateway": completed
@@ -121,5 +121,5 @@ start_date: '2026-07-24'
 "Epic 14 - Cloud Control Plane, Non-Tech Support Desk & SuperAdmin Portal (`cowok-design`)": in-progress
 "Story 14.1 - Client Edge — In-App Non-Tech Support/Request Drawer (No-GitHub), Zero-PII Diagnostic Scrubber & Multi-Channel Telemetry Outbox": completed
 "Story 14.2 - Cloud Ingestion API & SuperAdmin Portal MVP — OIDC/MFA/RBAC, 2-Way Non-Tech Helpdesk, Feature Request Clustering, Activation Funnel & Crash Center": completed
-"Story 14.3 - 4-Channel Distribution Ops — Canary Rollout, Ed25519 Signed Updater & Skill Quarantine Advisory, Offline Licenses & Cowok.ai Federation": backlog
+"Story 14.3 - 4-Channel Distribution Ops — Canary Rollout, Ed25519 Signed Updater & Skill Quarantine Advisory, Offline Licenses & Cowok.ai Federation": completed
 

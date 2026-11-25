@@ -1657,3 +1657,145 @@ model AdminAuditLog {
   @@index([actorSubject, action, createdAt], map: "idx_admin_audit_logs_actor_action")
   @@map("admin_audit_logs")
 }
+
+model ExportBundleRun {
+  id                     String @id
+  tenantId               String @default("local-default") @map("tenant_id")
+  projectId              String @map("project_id")
+  audienceMode           String @map("audience_mode")
+  format                 String
+  fileName               String @map("file_name")
+  artifactSha256         String @map("artifact_sha256")
+  byteSize               Int    @map("byte_size")
+  externalCdnRefsCount   Int    @default(0) @map("external_cdn_refs_count")
+  qcGateStatus           String @map("qc_gate_status")
+  qcOverrideAcknowledged Int    @default(0) @map("qc_override_acknowledged")
+  pluginStatus           String @default("NOT_APPLICABLE") @map("plugin_status")
+  createdAt              BigInt @map("created_at")
+
+  @@index([projectId, createdAt], map: "idx_export_bundle_runs_project_created")
+  @@map("export_bundle_runs")
+}
+
+model TournamentRun {
+  id                    String  @id
+  projectId             String  @map("project_id")
+  axesJson              String  @map("axes_json")
+  winningVariantId      String? @map("winning_variant_id")
+  borrowedFromVariantId String? @map("borrowed_from_variant_id")
+  borrowedFfId          String? @map("borrowed_ff_id")
+  generationEpoch       BigInt  @default(1) @map("generation_epoch")
+  createdAt             BigInt  @map("created_at")
+
+  @@index([projectId, createdAt], map: "idx_tournament_runs_project_created")
+  @@map("tournament_runs")
+}
+
+model TournamentVariant {
+  id                  String  @id
+  runId               String  @map("run_id")
+  axisProfile         String  @map("axis_profile")
+  artifactSha256      String  @map("artifact_sha256")
+  astSimilarity       Float   @map("ast_similarity")
+  cloneDistancePassed Int     @map("clone_distance_passed")
+  rubricVerdict       String? @map("rubric_verdict")
+  archived            Int     @default(0)
+
+  @@index([runId], map: "idx_tournament_variants_run")
+  @@map("tournament_variants")
+}
+
+model CreativeMemoryEvent {
+  id               String @id
+  projectId        String @map("project_id")
+  eventKind        String @map("event_kind")
+  payloadJson      String @map("payload_json")
+  regressionPassed Int    @default(1) @map("regression_passed")
+  createdAt        BigInt @map("created_at")
+
+  @@index([projectId, createdAt], map: "idx_creative_memory_events_project_created")
+  @@map("creative_memory_events")
+}
+
+model CloudReleaseRollout {
+  id               String @id
+  channel          String
+  version          String
+  versionSeq       BigInt @map("version_seq")
+  rolloutPercent   Int    @map("rollout_percent")
+  killSwitch       Int    @default(0) @map("kill_switch")
+  announcementJson String @default("{}") @map("announcement_json")
+  downloadUrl      String @map("download_url")
+  artifactSha256   String @map("artifact_sha256")
+  notes            String @default("")
+  publishedBy      String @map("published_by")
+  createdAt        BigInt @map("created_at")
+  updatedAt        BigInt @map("updated_at")
+
+  @@index([channel, versionSeq], map: "idx_cloud_release_rollouts_channel_seq")
+  @@map("cloud_release_rollouts")
+}
+
+model CloudPluginCatalogEntry {
+  pluginId          String  @id @map("plugin_id")
+  sourceKind        String  @map("source_kind")
+  lifecycleStatus   String  @map("lifecycle_status")
+  repoUrl           String? @map("repo_url")
+  pinnedCommitSha   String? @map("pinned_commit_sha")
+  minAppVersion     String  @default("0.1.0") @map("min_app_version")
+  defaultEnabled    Int     @default(1) @map("default_enabled")
+  defaultConfigJson String  @default("{}") @map("default_config_json")
+  titleI18nJson     String  @default("{}") @map("title_i18n_json")
+  summaryI18nJson   String  @default("{}") @map("summary_i18n_json")
+  manifestSeq       BigInt  @default(1) @map("manifest_seq")
+  updatedBy         String  @map("updated_by")
+  updatedAt         BigInt  @map("updated_at")
+
+  @@map("cloud_plugin_catalog_entries")
+}
+
+model CloudAbExperiment {
+  experimentKey String @id @map("experiment_key")
+  title         String
+  targetSurface String @map("target_surface")
+  status        String
+  variantsJson  String @map("variants_json")
+  killSwitch    Int    @default(0) @map("kill_switch")
+  manifestSeq   BigInt @default(1) @map("manifest_seq")
+  updatedBy     String @map("updated_by")
+  createdAt     BigInt @map("created_at")
+  updatedAt     BigInt @map("updated_at")
+
+  @@map("cloud_ab_experiments")
+}
+
+model CloudSkillAdvisory {
+  id              String  @id
+  skillOrPluginId String  @map("skill_or_plugin_id")
+  severity        String
+  action          String
+  reason          String
+  affectedSha256  String? @map("affected_sha256")
+  advisorySeq     BigInt  @map("advisory_seq")
+  issuedBy        String  @map("issued_by")
+  createdAt       BigInt  @map("created_at")
+
+  @@index([advisorySeq], map: "idx_cloud_skill_advisories_seq")
+  @@map("cloud_skill_advisories")
+}
+
+model CloudOfflineLicense {
+  licenseId   String  @id @map("license_id")
+  tier        String
+  subjectOrg  String  @map("subject_org")
+  cowokOrgId  String? @map("cowok_org_id")
+  maxSeats    Int     @default(1) @map("max_seats")
+  issuedAt    BigInt  @map("issued_at")
+  expiresAt   BigInt  @map("expires_at")
+  signedToken String  @map("signed_token")
+  revoked     Int     @default(0)
+  issuedBy    String  @map("issued_by")
+
+  @@index([cowokOrgId, issuedAt], map: "idx_cloud_offline_licenses_org")
+  @@map("cloud_offline_licenses")
+}

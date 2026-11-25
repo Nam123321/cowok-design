@@ -26,6 +26,7 @@ import {
 import type { LiveDirectionOption } from "../../../lib/validations/sketch-polish";
 import { useWorkbenchGraphHandlers } from "../hooks/useWorkbenchGraphHandlers";
 import { DEFAULT_FLOW_PROJECT_ID } from "../constants";
+import { ContextualStageToolbar } from "./ContextualStageToolbar";
 
 const DEFAULT_LIVE_DIRECTIONS: readonly LiveDirectionOption[] = [
   {
@@ -135,6 +136,9 @@ export interface WorkbenchCanvasTabAreaProps {
   onAttachFiles?: (fileNames: string[], snippetsByName?: Record<string, string>) => void;
   onClearAttachments?: () => void;
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
+  onOpenVisualQc?: () => void;
+  onOpenTournament?: () => void;
+  activeTournamentRunCount?: number;
   proposalController?: ReturnType<typeof useNodeProposalController>;
 }
 
@@ -290,35 +294,23 @@ const SketchPolishToolbarStrip: React.FC<{
   </div>
 );
 
-export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = ({
-  state, store, activeTabId, projectId = DEFAULT_FLOW_PROJECT_ID, chatProjectId, sessionId = "session-1", sessionEntryKind,
-  onTabChange, graphHandlers, onCommentOnNode, onAddQuoteChip, onOpenLeftChat, isLeftChatCollapsed = false,
-  attachmentChips, attachmentSnippets, onRemoveAttachmentChip, onAttachFiles, onClearAttachments,
-  onOpenSettings, proposalController,
-}) => {
-  const { t, locale } = useTranslation();
-  const [isDeploying, setIsDeploying] = useState(false);
+function useStageBrandController(opts: {
+  projectId: string;
+  screenId: string;
+  locale: "vi" | "en";
+  polish: ReturnType<typeof useSketchPolishController>;
+  onAddQuoteChip?: (text: string) => void;
+}) {
   const [appliedBrandStage, setAppliedBrandStage] = useState<{
     proposalId: string;
     modeId: string;
     cssVars: Record<string, string>;
   } | null>(null);
-  const handleDeployDraft = async () => { if (!isDeploying) { setIsDeploying(true); try { await store.syncDeployDraft(projectId); } finally { setIsDeploying(false); } } };
-  const handleSynthesizedFlow = (plan: SynthesizedFlowPlan) => {
-    const mapped = mapSynthesizedPlanToWorkbenchGraph(plan);
-    store.hydrate(mapped.nodes, mapped.transitions);
-  };
-  const orphanCount = findOrphanNodes(state.nodes.map((n) => ({ id: n.id })), state.transitions.map((tr) => ({ source: tr.sourceNodeId, target: tr.targetNodeId }))).length;
-  const polish = useSketchPolishController({
-    projectId,
-    screenId: state.selectedNodeId || state.nodes[0]?.id || "default",
-    locale: locale === "vi" ? "vi" : "en",
-  });
   const brandStudio = useBrandStudioController({
-    projectId,
-    screenId: state.selectedNodeId || state.nodes[0]?.id || "default",
-    locale: locale === "vi" ? "vi" : "en",
-    initialThemeModes: polish.themeModes,
+    projectId: opts.projectId,
+    screenId: opts.screenId,
+    locale: opts.locale,
+    initialThemeModes: opts.polish.themeModes,
     onApplyBrandTokens: (proposal, activeModeId) => {
       const mode = proposal.themeModes.find((m) => m.modeId === activeModeId) ?? proposal.themeModes[0];
       const cssVars: Record<string, string> = {
@@ -328,56 +320,77 @@ export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = ({
         "--font-mono": proposal.fontPairing.mono,
       };
       setAppliedBrandStage({ proposalId: proposal.id, modeId: activeModeId, cssVars });
-      polish.handleChangeSkin("brand-color", cssVars);
+      opts.polish.handleChangeSkin("brand-color", cssVars);
     },
     onSyncToMainChat: (summaryText) => {
-      onAddQuoteChip?.(summaryText);
+      opts.onAddQuoteChip?.(summaryText);
     },
   });
+  return { appliedBrandStage, brandStudio };
+}
+
+const WorkbenchStageOverlays: React.FC<{
+  props: WorkbenchCanvasTabAreaProps;
+  polish: ReturnType<typeof useSketchPolishController>;
+  brandStudio: ReturnType<typeof useBrandStudioController>;
+}> = ({ props, polish, brandStudio }) => (
+  <>
+    <SketchPolishOverlayModals polish={polish} />
+    <BrandVisualStudioModal controller={brandStudio} />
+    <HiddenSpecDrawer controller={brandStudio} />
+    <FloatingChatOverlay
+      visible={Boolean(props.isLeftChatCollapsed)}
+      activeTabId={props.activeTabId}
+      projectId={props.chatProjectId ?? ""}
+      sessionId={props.sessionId ?? "session-1"}
+      state={props.state}
+      store={props.store}
+      attachmentChips={props.attachmentChips}
+      attachmentSnippets={props.attachmentSnippets}
+      onRemoveAttachmentChip={props.onRemoveAttachmentChip}
+      onAttachFiles={props.onAttachFiles}
+      onClearAttachments={props.onClearAttachments}
+      onOpenLeftChat={props.onOpenLeftChat}
+      onOpenSettings={props.onOpenSettings}
+    />
+    {props.graphHandlers.graphError && (
+      <GraphErrorToast message={props.graphHandlers.graphError} onClose={props.graphHandlers.clearGraphError} />
+    )}
+  </>
+);
+
+export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = (props) => {
+  const { state, store, activeTabId, projectId = DEFAULT_FLOW_PROJECT_ID, sessionId = "session-1", sessionEntryKind, onTabChange, graphHandlers, onCommentOnNode, onAddQuoteChip, onOpenVisualQc, onOpenTournament, activeTournamentRunCount, proposalController } = props;
+  const { t, locale } = useTranslation();
+  const [isDeploying, setIsDeploying] = useState(false);
+  const handleDeployDraft = async () => { if (!isDeploying) { setIsDeploying(true); try { await store.syncDeployDraft(projectId); } finally { setIsDeploying(false); } } };
+  const handleSynthesizedFlow = (plan: SynthesizedFlowPlan) => {
+    const mapped = mapSynthesizedPlanToWorkbenchGraph(plan);
+    store.hydrate(mapped.nodes, mapped.transitions);
+  };
+  const orphanCount = findOrphanNodes(state.nodes.map((n) => ({ id: n.id })), state.transitions.map((tr) => ({ source: tr.sourceNodeId, target: tr.targetNodeId }))).length;
+  const resolvedLocale = locale === "vi" ? "vi" : "en";
+  const resolvedScreenId = state.selectedNodeId || state.nodes[0]?.id || "default";
+  const polish = useSketchPolishController({ projectId, screenId: resolvedScreenId, locale: resolvedLocale });
+  const { appliedBrandStage, brandStudio } = useStageBrandController({ projectId, screenId: resolvedScreenId, locale: resolvedLocale, polish, onAddQuoteChip });
   const isDeckFocus = activeTabId.includes("slide") || activeTabId.includes("deck");
-  const sketchPolishBarNode = isDeckFocus ? null : (
-    <SketchPolishToolbarStrip polish={polish} brandStudio={brandStudio} />
-  );
+  const sketchPolishBarNode = isDeckFocus ? null : <SketchPolishToolbarStrip polish={polish} brandStudio={brandStudio} />;
   const stageMainStyle: React.CSSProperties = {
-    flex: 1,
-    minWidth: 0,
-    height: "100%",
-    overflow: "hidden",
-    position: "relative",
-    backgroundColor: "var(--bg-canvas)",
+    flex: 1, minWidth: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", backgroundColor: "var(--bg-canvas)",
     ...(appliedBrandStage?.cssVars as React.CSSProperties | undefined),
   };
 
   return (
-    <main
-      data-brand-proposal={appliedBrandStage?.proposalId}
-      data-brand-mode={appliedBrandStage?.modeId}
-      style={stageMainStyle}
-    >
+    <main data-brand-proposal={appliedBrandStage?.proposalId} data-brand-mode={appliedBrandStage?.modeId} style={stageMainStyle}>
+      <ContextualStageToolbar projectId={projectId} activeTabId={activeTabId} activeFormatTab={state.activeFormatTab} onOpenVisualQc={onOpenVisualQc} onOpenTournament={onOpenTournament} activeTournamentRunCount={activeTournamentRunCount} />
+      <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
       <CompanionCanvasTab projectId={projectId} sessionId={sessionId} sessionEntryKind={sessionEntryKind} activeTabId={activeTabId} onTabChange={onTabChange} selectedNodeId={state.selectedNodeId} onSelectNode={(id) => store.selectNode(id, false)} nodes={state.nodes} isDraftDirty={state.isDraftDirty} orphanCount={orphanCount} conflictState={state.conflictState} canUndo={(state.undoStack?.length || 0) > 0} canRedo={(state.redoStack?.length || 0) > 0} onUndo={() => store.undo()} onRedo={() => store.redo()} onResolveConflict={(c) => { void store.resolveConflict(c); }} onDeployDraft={() => { void handleDeployDraft(); }} onDiscardDraft={() => store.discardDraft()} onAttachRegionToChat={onCommentOnNode} onQuoteText={onAddQuoteChip} onSelectNodeSubState={(nid, sub) => store.setNodeSubState(nid, sub)} proposalController={proposalController} stageSkin={polish.stageSkin} sketchPolishBarNode={sketchPolishBarNode} onRegisterStageSkinSwap={polish.onRegisterStageSkinSwap} onRegisterStageApplyHtml={polish.onRegisterStageApplyHtml} onLockedRuleReceipt={polish.handleLockedRuleNotice}>
         <ErrorBoundary fallbackTitle={t("errors.dagCanvasRender", "Lỗi hiển thị Canvas 2D DAG")} onReset={() => store.discardDraft()}>
           <DagCanvas2D state={state} projectId={projectId} sessionId={sessionId} onUpdatePosition={graphHandlers.handleUpdatePosition} onSetViewport={graphHandlers.handleSetViewport} onSelectNode={(id, multi) => store.selectNode(id, multi)} onSelectTransition={(id) => store.selectTransition(id)} onAddNode={graphHandlers.handleAddNode} onAutoLayout={() => store.autoLayoutNodes()} onSelectSubState={(id, sub) => store.setNodeSubState(id, sub)} onDuplicateNode={(id) => store.duplicateNode(id)} onRenameNode={(id, title) => store.renameNode(id, title)} onDeleteNode={(id) => store.deleteNode(id)} onAddTransition={graphHandlers.handleAddTransition} onUpdateTransition={(id, u) => store.updateTransition(id, u)} onReverseTransition={graphHandlers.handleReverseTransition} onDeleteTransition={(id) => store.deleteTransition(id)} onUpdateNodeNote={(id, note) => store.updateNodeNote(id, note)} onToggleMinimap={() => store.toggleMinimap()} onUndo={() => store.undo()} onRedo={() => store.redo()} onCommentOnNode={onCommentOnNode} onSynthesizedFlow={handleSynthesizedFlow} />
         </ErrorBoundary>
       </CompanionCanvasTab>
-      <SketchPolishOverlayModals polish={polish} />
-      <BrandVisualStudioModal controller={brandStudio} />
-      <HiddenSpecDrawer controller={brandStudio} />
-      <FloatingChatOverlay
-        visible={isLeftChatCollapsed}
-        activeTabId={activeTabId}
-        projectId={chatProjectId ?? ""}
-        sessionId={sessionId}
-        state={state}
-        store={store}
-        attachmentChips={attachmentChips}
-        attachmentSnippets={attachmentSnippets}
-        onRemoveAttachmentChip={onRemoveAttachmentChip}
-        onAttachFiles={onAttachFiles}
-        onClearAttachments={onClearAttachments}
-        onOpenLeftChat={onOpenLeftChat}
-        onOpenSettings={onOpenSettings}
-      />
-      {graphHandlers.graphError && <GraphErrorToast message={graphHandlers.graphError} onClose={graphHandlers.clearGraphError} />}
+      </div>
+      <WorkbenchStageOverlays props={props} polish={polish} brandStudio={brandStudio} />
     </main>
   );
 };

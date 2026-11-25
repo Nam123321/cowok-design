@@ -4,7 +4,7 @@ id: "07.2"
 title: "Story 07.2: Non-Tech Share & Present Export vs Developer Handoff (Offline HTML, Vector PDF & Plugin PPTX)"
 description: "Kế thừa phạm vi xuất bản từ Story 07.3 cũ: chia đôi ExportBundleModal & ExportActionDropdown thành tab Share & Present (mặc định cho non-tech) vs Developer Handoff <-> /api/v1/export/* <-> 1-file offline .html bundler (crates/html-forge, 0 external 404 via file://) + CDP Page.printToPDF Vector 1920x1080 .pdf + plugin-isolated .pptx (TDR-006)."
 resource: "file:///Users/hatrang20061988/Desktop/AI Project/uxui-os/_iwish-output/3. Development/1. Epic & Story/VS-03. HTML-Native 16:9 Presentation & Dual-Pane CMS Studio/Epic-07/Story-07.2/story.md"
-status: refactored
+status: completed
 risk_tier: 2
 delivery: hybrid
 adr_ref: "ADR-006"

@@ -12,6 +12,7 @@ pub mod adapters;
 pub mod byok_gateway;
 pub mod decision_cascade;
 pub mod design_jury;
+pub mod design_tournament;
 pub mod model_registry;
 pub mod normalizer;
 pub mod orchestrator;

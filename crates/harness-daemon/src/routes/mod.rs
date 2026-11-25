@@ -12,6 +12,9 @@ pub mod context_assemble;
 pub mod de_runtime;
 pub mod decision;
 pub mod deck_generation;
+pub mod design_tournament;
+pub mod distribution_ops;
+pub mod distribution_ops_crypto;
 pub mod doctor_usage;
 pub mod doctor_vault;
 pub mod execution_coordinator;
@@ -46,6 +49,7 @@ pub mod project_trash;
 pub mod rea_bridge;
 pub mod sketch_polish;
 pub mod skills_catalog;
+pub mod split_export;
 pub mod ssot_registry;
 pub mod support_telemetry;
 pub mod visual_qc;
@@ -212,6 +216,7 @@ pub fn build_router(state: DaemonAppState) -> Router {
         .merge(protected_legacy_router)
         .merge(flow_router)
         .merge(cloud_admin::cloud_admin_router())
+        .merge(distribution_ops::distribution_ops_mount_router())
         .layer(middleware::from_fn_with_state(
             cors_state,
             cors_and_loopback_middleware,

@@ -328,6 +328,9 @@ fn legacy_epic08_v9_to_v11_slots_rekey_to_v12_to_v14_and_backfill_epic05() {
             (27, spec_registry::pool::V27_MIGRATION_NAME.to_string()),
             (28, spec_registry::pool::V28_MIGRATION_NAME.to_string()),
             (29, spec_registry::pool::V29_MIGRATION_NAME.to_string()),
+            (30, spec_registry::pool::V30_MIGRATION_NAME.to_string()),
+            (31, spec_registry::pool::V31_MIGRATION_NAME.to_string()),
+            (32, spec_registry::pool::V32_MIGRATION_NAME.to_string()),
         ]
     );
 }

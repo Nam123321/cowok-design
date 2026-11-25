@@ -1313,18 +1313,54 @@ pub async fn legacy_project_auth_middleware(
         let is_deck_data_route = parts.method == axum::http::Method::POST
             && (parts.uri.path() == "/api/v1/decks/generate"
                 || parts.uri.path() == "/api/v1/decks/normalize-chart-source");
-        let max_bytes = if is_deck_data_route {
+        let is_split_export_route = parts.method == axum::http::Method::POST
+            && (parts.uri.path() == "/api/v1/export/html-bundle"
+                || parts.uri.path() == "/api/v1/export/vector-pdf"
+                || parts.uri.path() == "/api/v1/export/developer-handoff");
+        let max_bytes = if is_split_export_route {
+            27 * 1024 * 1024
+        } else if is_deck_data_route {
             7_500_000
         } else {
             MAX_BODY_BYTES * 2
         };
+        if let Some(cl_val) = parts
+            .headers
+            .get(axum::http::header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.trim().parse::<usize>().ok())
+        {
+            if cl_val > max_bytes {
+                return auth_err_resp(
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    if is_split_export_route {
+                        "ASSET_SIZE_LIMIT_EXCEEDED"
+                    } else {
+                        "PAYLOAD_TOO_LARGE"
+                    },
+                    if is_split_export_route {
+                        "Export payload exceeds 25 MiB asset limit"
+                    } else if is_deck_data_route {
+                        "Body exceeds 7.5 MB deck source limit"
+                    } else {
+                        "Body exceeds 2 MiB"
+                    },
+                );
+            }
+        }
         let b = match to_bytes(body, max_bytes).await {
             Ok(b) => b,
             Err(_) => {
                 return auth_err_resp(
                     StatusCode::PAYLOAD_TOO_LARGE,
-                    "PAYLOAD_TOO_LARGE",
-                    if is_deck_data_route {
+                    if is_split_export_route {
+                        "ASSET_SIZE_LIMIT_EXCEEDED"
+                    } else {
+                        "PAYLOAD_TOO_LARGE"
+                    },
+                    if is_split_export_route {
+                        "Export payload exceeds 25 MiB asset limit"
+                    } else if is_deck_data_route {
                         "Body exceeds 7.5 MB deck source limit"
                     } else {
                         "Body exceeds 2 MiB"

@@ -46,6 +46,9 @@ export interface WorkbenchBodyLayoutProps {
   attachments: ReturnType<typeof useWorkbenchAttachments>;
   graphHandlers: ReturnType<typeof useWorkbenchGraphHandlers>;
   isModalOpen?: boolean;
+  onOpenVisualQc?: () => void;
+  onOpenTournament?: () => void;
+  activeTournamentRunCount?: number;
   state: FlowWorkbenchState;
   store: ReturnType<typeof createNewFlowWorkbenchStore>;
 }
@@ -141,6 +144,9 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
           onAttachFiles={p.attachments.handleAddFileChips}
           onClearAttachments={p.attachments.handleClearAttachments}
           onOpenSettings={p.onOpenSettings} onOpenLeftChat={p.splitter.isChatShortened ? p.splitter.handleToggleShortenChat : undefined}
+          onOpenVisualQc={p.onOpenVisualQc}
+          onOpenTournament={p.onOpenTournament}
+          activeTournamentRunCount={p.activeTournamentRunCount}
           proposalController={proposalCtrl}
         />
       </div>

@@ -1,6 +1,6 @@
 // @story 07.1
 // @implements AC-01, AC-02, AC-03, AC-04
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { runVisualQc, runVisualQcAutoFix } from "../../api/visual-qc";
 import { useTranslation } from "../../hooks/useTranslation";
 import {
@@ -105,18 +105,22 @@ function isEditableEventTarget(target: EventTarget | null): boolean {
 }
 
 function useUndoShortcut(rollbackHtml: string | null, rollbackLastFix: () => void): void {
+  const latestRef = useRef({ rollbackHtml, rollbackLastFix });
+  latestRef.current = { rollbackHtml, rollbackLastFix };
+
   useEffect(() => {
-    if (typeof window === "undefined" || rollbackHtml === null) return;
+    if (typeof window === "undefined") return;
     const onKeyDown = (e: KeyboardEvent) => {
+      if (latestRef.current.rollbackHtml === null) return;
       if (isEditableEventTarget(e.target)) return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
         e.preventDefault();
-        rollbackLastFix();
+        latestRef.current.rollbackLastFix();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [rollbackHtml, rollbackLastFix]);
+  }, []);
 }
 
 function useRunQcAction(args: {
