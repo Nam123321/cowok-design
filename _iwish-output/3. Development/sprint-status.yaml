@@ -58,10 +58,10 @@ start_date: '2026-07-24'
 "Story 06.5 - End-to-End AI Multi-Slide Deck Generation, CSV/PDF-to-`ChartSpecV12` Normalizer & `<Stage>/<Window>/<Phone>` (`stageshow`) Flow": completed
 
 # Epic 07: Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter
-"Epic 07 - Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter": in-progress
+"Epic 07 - Pooled 1-Chromium CDP Visual QC & Split Share vs Developer Handoff Exporter": completed
 "Story 07.1 - Pooled 1-Chromium Rust CDP Visual QC (`lib-audit` + `slides-check`), QC Overlay & 1-Click Auto-Fix": completed
 "Story 07.2 - Split Export & Packaging Engine (Share & Present vs Developer Handoff — Offline HTML, Vector PDF & Plugin-Isolated PPTX)": completed
-"Story 07.3 - Built-in Native Rust OOXML `.pptx` Exporter (Editable Native Shapes + Visual-Exact Fallback & Limitations Disclosure)": refactored
+"Story 07.3 - Built-in Native Rust OOXML `.pptx` Exporter (Editable Native Shapes + Visual-Exact Fallback & Limitations Disclosure)": completed
 
 # ==================================================
 # Feature Group: VS-04. agentskills.io Plugin Ecosystem, Design-Only REA Forge & JEV — TypeSafe
@@ -100,18 +100,18 @@ start_date: '2026-07-24'
 "Story 11.3 - [DEPRECATED -> Story 11.2] Compiler-Grade Bidirectional Open MCP Server & 1-Click Host Installer UI": cancelled
 
 # Epic 12: 4-Channel Packaging, Standalone `/api/*` Parity & OCI Distribution
-"Epic 12 - 4-Channel Packaging, Standalone `/api/*` Parity & OCI Distribution": in-progress
-"Story 12.1 - Kênh 1 — Single-Binary CLI (`uiux-os`) có Standalone `/api/*` Parity & Focus-Free Diff Suite": refactored
-"Story 12.2 - Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (`.dmg/.msi/.AppImage`) & Universal Multi-Harness Plugin Pack (`Cowok.ai`, `Claude Code`, `Codex`, `Antigravity`, `Cursor`)": refactored
-"Story 12.3 - Kênh 4 — Container Image (Docker / OCI) kèm Pooled 1-Chromium CDP cho Đội nhóm & CI/CD": refactored
+"Epic 12 - 4-Channel Packaging, Standalone `/api/*` Parity & OCI Distribution": completed
+"Story 12.1 - Kênh 1 — Single-Binary CLI (`uiux-os`) có Standalone `/api/*` Parity & Focus-Free Diff Suite": completed
+"Story 12.2 - Kênh 2 & 3 — Ứng dụng Desktop Tauri v2 (`.dmg/.msi/.AppImage`) & Universal Multi-Harness Plugin Pack (`Cowok.ai`, `Claude Code`, `Codex`, `Antigravity`, `Cursor`)": completed
+"Story 12.3 - Kênh 4 — Container Image (Docker / OCI) kèm Pooled 1-Chromium CDP cho Đội nhóm & CI/CD": completed
 
 # ==================================================
 # Feature Group: VS-06. Release Certification & Anti-Goodhart Evaluation
 # ==================================================
 
 # Epic 13: End-to-End Sealed Anti-Goodhart Benchmark & 25-Case `/simulate-user` Certification Suite
-"Epic 13 - End-to-End Sealed Anti-Goodhart Benchmark & 25-Case `/simulate-user` Certification Suite": in-progress
-"Story 13.1 - End-to-End Sealed Anti-Goodhart Benchmark Runner & 25-Case `/simulate-user` `M1..M5` Certification Suite": refactored
+"Epic 13 - End-to-End Sealed Anti-Goodhart Benchmark & 25-Case `/simulate-user` Certification Suite": completed
+"Story 13.1 - End-to-End Sealed Anti-Goodhart Benchmark Runner & 25-Case `/simulate-user` `M1..M5` Certification Suite": completed
 
 # ==================================================
 # Feature Group: VS-07. Cloud Control Plane, Non-Tech Support Desk & SuperAdmin Portal

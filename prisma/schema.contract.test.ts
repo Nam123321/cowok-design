@@ -307,6 +307,12 @@ function openMigratedMemoryDb(): InstanceType<typeof DatabaseSync> {
       "utf-8"
     )
   );
+  db.exec(
+    fs.readFileSync(
+      path.join(migrationsDir, "V33__story_13_1_eval_benchmark_runs.sql"),
+      "utf-8"
+    )
+  );
   db.exec("PRAGMA foreign_keys = ON;");
   return db;
 }
@@ -410,10 +416,11 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
     expect(mappedTables).toContain("cloud_ab_experiments");
     expect(mappedTables).toContain("cloud_skill_advisories");
     expect(mappedTables).toContain("cloud_offline_licenses");
-    expect(mappedTables).toHaveLength(93);
+    expect(mappedTables).toContain("eval_benchmark_runs");
+    expect(mappedTables).toHaveLength(94);
   });
 
-  it("UT-DB-02: executes V1-V32 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
+  it("UT-DB-02: executes V1-V33 Rust migrations cleanly and matches 1:1 with schema.prisma @@map tables", () => {
     expect(fs.existsSync(migrationsDir)).toBe(true);
     const db = openMigratedMemoryDb();
 
@@ -868,5 +875,41 @@ describe("P1 Persistence Contract & SQLite WAL V1-V15 Mirror Verification (ADR-0
       db.prepare("SELECT COUNT(*) as c FROM decision_audit_log").get() as { c: number }
     ).c;
     expect(auditCount).toBe(0);
+  });
+
+  it("UT-DB-13: verifies Story 13.1 V33 eval_benchmark_runs Prisma parity, CHECK constraints, and indexes", () => {
+    const db = openMigratedMemoryDb();
+    const schemaText = fs.readFileSync(schemaPath, "utf-8");
+
+    const pragmaRows = db
+      .prepare("PRAGMA table_info(eval_benchmark_runs)")
+      .all() as Array<{ name: string }>;
+    const sqliteCols = pragmaRows.map((r) => r.name).sort();
+    const prismaCols = parsePrismaModelColumns(schemaText, "EvalBenchmarkRun");
+    expect(sqliteCols).toEqual(prismaCols);
+
+    const idxNames = (
+      db.prepare("PRAGMA index_list(eval_benchmark_runs)").all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    expect(idxNames).toContain("idx_eval_benchmark_runs_tenant_created");
+    expect(idxNames).toContain("idx_eval_benchmark_runs_tier_created");
+
+    const now = Date.now();
+    // Invalid tier must fail CHECK constraint
+    expect(() => {
+      db.prepare(
+        "INSERT INTO eval_benchmark_runs (id, tier, sealed_manifest_sha256, manifest_pin_source, security_gates_passed, verdict, duration_ms, created_at) VALUES ('eval-bad', 'nightly', 'a', 'compiled_binary', 1, 'PASS', 10, ?)"
+      ).run(now);
+    }).toThrow();
+
+    // Valid row persists cleanly
+    db.prepare(
+      "INSERT INTO eval_benchmark_runs (id, tier, offline_enforced, sealed_manifest_sha256, manifest_pin_source, security_gates_passed, verdict, duration_ms, created_at) VALUES ('eval-1', 'pr', 1, '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'compiled_binary', 1, 'PASS', 42, ?)"
+    ).run(now);
+
+    const count = (
+      db.prepare("SELECT COUNT(*) as c FROM eval_benchmark_runs").get() as { c: number }
+    ).c;
+    expect(count).toBe(1);
   });
 });

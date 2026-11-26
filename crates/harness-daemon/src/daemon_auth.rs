@@ -1501,7 +1501,8 @@ pub async fn legacy_project_auth_middleware(
         || path == "/api/v1/learn/studio-corrections"
         || path.starts_with("/api/v1/skills/catalog")
         || path.starts_with("/api/v1/models/registry")
-        || path.starts_with("/api/v1/cognitive/");
+        || path.starts_with("/api/v1/cognitive/")
+        || path.starts_with("/api/v1/eval/");
 
     if let Some(ref caller) = verified {
         if requires_strict_non_legacy_bearer

@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-13"
 title: "Epic 13: End-to-End Sealed Anti-Goodhart Benchmark & 25-Case /simulate-user Certification Suite"
-status: in-progress
+status: completed
 track: "Stream-6"
 wave: 4
 provides: ["Workbench M1..M5 Certification Drawer", "CLI uiux-os eval run --tier pr|stage|release", "Sealed chmod 444 SHA-256 tests/eval/sealed/ Runner (Paired with_skill vs baseline, 3-provider Decision Calibration, Swarm Fault Injection)", "Automated 25-Case /simulate-user Playwright E2E Golden Suite (UC-01..UC-25)"]
@@ -37,7 +37,7 @@ links_to:
 
 | Story ID | Title | Status | Risk Tier | Dependencies |
 | :--- | :--- | :---: | :---: | :--- |
-| [Story-13.1](./Story-13.1/story.md) | End-to-End Sealed Anti-Goodhart Benchmark Runner & 25-Case `/simulate-user` `M1..M5` Certification Suite | `refactored` | `3` | `['07.1', '08.5', '09.2', '10.3', '12.1']` |
+| [Story-13.1](./Story-13.1/story.md) | End-to-End Sealed Anti-Goodhart Benchmark Runner & 25-Case `/simulate-user` `M1..M5` Certification Suite | `completed` | `3` | `['07.1', '08.5', '09.2', '10.3', '12.1']` |
 
 ## 5. QA Simulator Guardian Scorecard (7-Row Hybrid Scorecard)
 

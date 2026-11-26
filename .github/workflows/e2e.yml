@@ -46,8 +46,8 @@ jobs:
         with:
           workspaces: "."
 
-      - name: Build Rust Backend Daemon
-        run: cargo build --bin harness-daemon
+      - name: Build Rust Backend Daemon & CLI
+        run: cargo build --bin harness-daemon --bin cowok-design
 
       - name: Build Production Frontend
         run: pnpm run build
@@ -68,6 +68,11 @@ jobs:
             rm -rf "$WORK_DIR"
           }
           trap cleanup EXIT
+
+          # Provision isolated Story 13.1 sealed fixtures (chmod 0444) and design-craft manifest
+          ./target/debug/cowok-design eval init-sealed --workspace "$WORK_DIR" --json >/dev/null
+          mkdir -p "$WORK_DIR/packages/design-craft"
+          cp packages/design-craft/plugin.json "$WORK_DIR/packages/design-craft/plugin.json"
 
           ./target/debug/harness-daemon >/tmp/harness-daemon-e2e.log 2>&1 &
           DAEMON_PID=$!

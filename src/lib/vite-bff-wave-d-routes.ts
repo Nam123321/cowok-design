@@ -1,5 +1,5 @@
-// @story 07.2, 10.3, 14.3
-// @implements Wave D BFF Route Subtable (Split Export, Design Tournament & Distribution Ops)
+// @story 07.2, 10.3, 13.1, 14.3
+// @implements Wave D BFF Route Subtable (Split Export, Design Tournament, Release Certification & Distribution Ops)
 import { guardedRoute } from "./api-guard";
 import { forwardToDaemonFlow } from "./daemon-client";
 import type { RouteEntry, RouteFn } from "./vite-bff-flow-routes";
@@ -74,6 +74,10 @@ export const WAVE_D_ROUTES: RouteEntry[] = [
   entry("GET", /^\/api\/tournament\/runs$/, "/api/v1/tournament/runs"),
   entry("POST", /^\/api\/crystallize$/, "/api/v1/crystallize"),
   entry("POST", /^\/api\/advisor\/evolve$/, "/api/v1/advisor/evolve"),
+
+  // Story 13.1 — Sealed Anti-Goodhart Benchmark & 25-Case M1..M5 Certification
+  entry("POST", /^\/api\/eval\/run$/, "/api/v1/eval/run"),
+  entry("GET", /^\/api\/eval\/history$/, "/api/v1/eval/history"),
 
   // Story 14.3 — Distribution Ops, Plugin Catalog Lifecycle, A/B Experiments & Offline Licenses
   entry("GET", /^\/api\/distribution-ops\/releases\/rollout$/, "/v1/admin/releases/rollout", true),

@@ -48,6 +48,7 @@ export interface WorkbenchBodyLayoutProps {
   isModalOpen?: boolean;
   onOpenVisualQc?: () => void;
   onOpenTournament?: () => void;
+  onOpenCertification?: () => void;
   activeTournamentRunCount?: number;
   state: FlowWorkbenchState;
   store: ReturnType<typeof createNewFlowWorkbenchStore>;
@@ -146,6 +147,7 @@ export const WorkbenchBodyLayout: React.FC<WorkbenchBodyLayoutProps> = (p) => {
           onOpenSettings={p.onOpenSettings} onOpenLeftChat={p.splitter.isChatShortened ? p.splitter.handleToggleShortenChat : undefined}
           onOpenVisualQc={p.onOpenVisualQc}
           onOpenTournament={p.onOpenTournament}
+          onOpenCertification={p.onOpenCertification}
           activeTournamentRunCount={p.activeTournamentRunCount}
           proposalController={proposalCtrl}
         />

@@ -7,6 +7,8 @@
 pub mod ci_gate;
 pub mod cli;
 pub mod daemon_auth;
+pub mod eval_runner;
+pub mod eval_runner_suites;
 pub mod flow_routes;
 pub mod flow_transition_handlers;
 pub mod lockfile;

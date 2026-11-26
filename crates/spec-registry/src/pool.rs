@@ -291,6 +291,15 @@ pub fn v32_migration_checksum() -> String {
     static CACHE: OnceLock<String> = OnceLock::new();
     cached_migration_sha256(&CACHE, V32_MIGRATION_SQL)
 }
+
+pub const V33_MIGRATION_SQL: &str =
+    include_str!("../migrations/V33__story_13_1_eval_benchmark_runs.sql");
+pub const V33_MIGRATION_NAME: &str = "V33__story_13_1_eval_benchmark_runs.sql";
+
+pub fn v33_migration_checksum() -> String {
+    static CACHE: OnceLock<String> = OnceLock::new();
+    cached_migration_sha256(&CACHE, V33_MIGRATION_SQL)
+}
 /// Configuration for the embedded SQLite WAL connection pool.
 #[derive(Debug, Clone)]
 pub struct SqliteWalConfig {
@@ -582,6 +591,7 @@ impl SqlitePool {
             Self::apply_v30_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v31_migration_if_needed(&mut conn, &config.db_path)?;
             Self::apply_v32_migration_if_needed(&mut conn, &config.db_path)?;
+            Self::apply_v33_migration_if_needed(&mut conn, &config.db_path)?;
         }
         harden_sqlite_files(&config.db_path)?;
 
@@ -1381,6 +1391,8 @@ impl SqlitePool {
             .map_err(|e| map_sqlite_error(e, "genesis_v31"))?;
         tx.execute_batch(V32_MIGRATION_SQL)
             .map_err(|e| map_sqlite_error(e, "genesis_v32"))?;
+        tx.execute_batch(V33_MIGRATION_SQL)
+            .map_err(|e| map_sqlite_error(e, "genesis_v33"))?;
 
         let now = Utc::now().timestamp_millis();
         for (version, name, sha) in [
@@ -1414,6 +1426,7 @@ impl SqlitePool {
             (30i64, V30_MIGRATION_NAME, v30_migration_checksum()),
             (31i64, V31_MIGRATION_NAME, v31_migration_checksum()),
             (32i64, V32_MIGRATION_NAME, v32_migration_checksum()),
+            (33i64, V33_MIGRATION_NAME, v33_migration_checksum()),
         ] {
             tx.execute(
                 "INSERT INTO schema_migrations (version, name, checksum_sha256, applied_at)
@@ -2994,6 +3007,20 @@ impl SqlitePool {
             V32_MIGRATION_NAME,
             V32_MIGRATION_SQL,
             v32_migration_checksum(),
+        )
+    }
+
+    fn apply_v33_migration_if_needed(
+        conn: &mut Connection,
+        _db_path: &Path,
+    ) -> Result<(), HarnessError> {
+        Self::apply_simple_additive_migration_if_needed(
+            conn,
+            33,
+            "V33",
+            V33_MIGRATION_NAME,
+            V33_MIGRATION_SQL,
+            v33_migration_checksum(),
         )
     }
 

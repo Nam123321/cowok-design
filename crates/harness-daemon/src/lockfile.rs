@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub const DEFAULT_DAEMON_PORT: u16 = 4170;
-pub const CURRENT_SCHEMA_VERSION: u32 = 32;
-pub const DAEMON_MIN_SCHEMA_VERSION: u32 = 32;
+pub const CURRENT_SCHEMA_VERSION: u32 = 33;
+pub const DAEMON_MIN_SCHEMA_VERSION: u32 = 33;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

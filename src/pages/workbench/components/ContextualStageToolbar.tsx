@@ -1,4 +1,4 @@
-// @story 04.1, 07.1, 10.3
+// @story 04.1, 07.1, 10.3, 13.1
 // @implements PA-3 2-Tier Scope Separation — Tab-Local Contextual Stage Toolbar
 import React from "react";
 import { BrandIcon } from "../../../components/ui/BrandIcon";
@@ -15,6 +15,7 @@ export interface ContextualStageToolbarProps {
   activeFormatTab?: "dag" | "slide-cms" | "md" | "assets" | "code";
   onOpenVisualQc?: () => void;
   onOpenTournament?: () => void;
+  onOpenCertification?: () => void;
   activeTournamentRunCount?: number;
 }
 
@@ -166,6 +167,28 @@ const VisualQcTriggerButton: React.FC<{ label: string; onClick: () => void }> = 
   </button>
 );
 
+const CertificationLauncherButton: React.FC<{ label: string; onClick: () => void }> = ({
+  label,
+  onClick,
+}) => (
+  <button
+    type="button"
+    data-testid="nav-certification-btn"
+    aria-label={label}
+    title={label}
+    onClick={onClick}
+    style={ACTION_BTN_STYLE}
+  >
+    <BrandIcon
+      name="shield-check"
+      size={ICON_SIZE_SM}
+      strokeWidth={ICON_STROKE}
+      color="currentColor"
+    />
+    <span>{label}</span>
+  </button>
+);
+
 const TournamentLauncherButton: React.FC<{
   label: string;
   activeRunCount: number;
@@ -235,17 +258,29 @@ export const ContextualStageToolbar: React.FC<ContextualStageToolbarProps> = ({
   activeFormatTab,
   onOpenVisualQc,
   onOpenTournament,
+  onOpenCertification,
   activeTournamentRunCount = 0,
 }) => {
   const { t } = useTranslation();
   const tabKind = resolveStageTabKind(activeTabId, activeFormatTab);
+  const certBtn = onOpenCertification ? (
+    <CertificationLauncherButton
+      label={t("evalCertification.navButton", "Chứng nhận Phát hành")}
+      onClick={onOpenCertification}
+    />
+  ) : null;
 
   if (tabKind === "md") {
     return (
       <StageToolbarFrame
         tabKind={tabKind}
         leftSlot={<StageContextBadge iconName="wiki" label={t("workbench.stageContextMd", "Ngữ cảnh Đặc tả · Markdown")} />}
-        rightSlot={onOpenTournament && <TournamentLauncherButton label={t("tournament.launchFromSpecButton", "Tạo Đấu trường từ Spec")} activeRunCount={activeTournamentRunCount} onClick={onOpenTournament} />}
+        rightSlot={
+          <>
+            {onOpenTournament && <TournamentLauncherButton label={t("tournament.launchFromSpecButton", "Tạo Đấu trường từ Spec")} activeRunCount={activeTournamentRunCount} onClick={onOpenTournament} />}
+            {certBtn}
+          </>
+        }
       />
     );
   }
@@ -255,7 +290,12 @@ export const ContextualStageToolbar: React.FC<ContextualStageToolbarProps> = ({
       <StageToolbarFrame
         tabKind={tabKind}
         leftSlot={<StageContextBadge iconName="code" label={t("workbench.stageContextCode", "Ngữ cảnh Mã nguồn · TSX")} />}
-        rightSlot={onOpenVisualQc && <VisualQcTriggerButton label={t("visualQc.checkTokenButton", "Kiểm tra Token (QC)")} onClick={onOpenVisualQc} />}
+        rightSlot={
+          <>
+            {onOpenVisualQc && <VisualQcTriggerButton label={t("visualQc.checkTokenButton", "Kiểm tra Token (QC)")} onClick={onOpenVisualQc} />}
+            {certBtn}
+          </>
+        }
       />
     );
   }
@@ -268,6 +308,7 @@ export const ContextualStageToolbar: React.FC<ContextualStageToolbarProps> = ({
         <>
           {onOpenVisualQc && <VisualQcTriggerButton label={t("visualQc.navReadinessPill", "Kiểm định QC")} onClick={onOpenVisualQc} />}
           {onOpenTournament && <TournamentLauncherButton label={t("tournament.navButton", "Đấu trường Thiết kế")} activeRunCount={activeTournamentRunCount} onClick={onOpenTournament} />}
+          {certBtn}
         </>
       }
     />

@@ -48,6 +48,24 @@ pub enum McpSubcommand {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvalSubcommand {
+    Run {
+        tier: crate::eval_runner_suites::EvalTier,
+        project_id: Option<String>,
+        design_craft_candidate_dir: Option<String>,
+        run_simulated_users: bool,
+        seal_if_clean: bool,
+    },
+    Seal,
+    InitSealed,
+    History {
+        limit: usize,
+        tier: Option<crate::eval_runner_suites::EvalTier>,
+        project_id: Option<String>,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum CliCommand {
     Up {
@@ -127,6 +145,11 @@ pub enum CliCommand {
         workspace: Option<PathBuf>,
         json: bool,
     },
+    Eval {
+        action: EvalSubcommand,
+        workspace: Option<PathBuf>,
+        json: bool,
+    },
     InspectPrompt {
         raw_args: Vec<String>,
         workspace: Option<PathBuf>,
@@ -187,6 +210,7 @@ COMMANDS:
   feedback    Submit Zero-PII scrubbed local support ticket (1:1 /api/v1/support/tickets parity)
   install     Install Universal Multi-Harness Plugin Pack (`--target cowok|claude|codex|antigravity|cursor|all`)
   ci gate     Run headless CI/CD Visual QC + 7 DE Tools gate with container /dev/shm & cgroup guards
+  eval        Run Sealed Anti-Goodhart Benchmark & 25-Case /simulate-user certification (`run | seal | init-sealed | history`)
 
 GLOBAL OPTIONS:
   --json      Emit deterministic JSON envelope matching /api/v1/* HTTP schema
@@ -251,6 +275,7 @@ pub fn parse_cli_args(args: &[String]) -> Result<CliCommand, CliParseError> {
         "feedback" => parse_feedback(&rest[1..], global_json, json_anywhere),
         "install" => parse_install(&rest[1..], global_json, json_anywhere),
         "ci" => parse_ci(&rest[1..], global_json, json_anywhere),
+        "eval" => parse_eval(&rest[1..], global_json, json_anywhere),
         other => Err(CliParseError {
             code: "UNKNOWN_SUBCOMMAND",
             message: format!("Unknown subcommand '{other}'. Run `{CLI_BIN_NAME} --help`."),
@@ -1025,6 +1050,244 @@ fn parse_ci(
         workspace,
         json,
     })
+}
+
+fn parse_eval(
+    args: &[String],
+    global_json: bool,
+    json_hint: bool,
+) -> Result<CliCommand, CliParseError> {
+    let Some(sub) = args.first().map(|s| s.as_str()) else {
+        return Err(CliParseError {
+            code: "MISSING_EVAL_SUBCOMMAND",
+            message: "Expected `eval <run|seal|init-sealed|history> [OPTIONS]`".to_string(),
+            json_requested: json_hint,
+        });
+    };
+    if matches!(sub, "-h" | "--help") {
+        return Ok(CliCommand::Help);
+    }
+
+    let mut workspace: Option<PathBuf> = None;
+    let mut json = global_json;
+
+    match sub {
+        "run" => {
+            let mut tier: Option<crate::eval_runner_suites::EvalTier> = None;
+            let mut project_id: Option<String> = None;
+            let mut candidate_dir: Option<String> = None;
+            let mut run_simulated_users = true;
+            let mut seal_if_clean = false;
+            let mut i = 1;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--tier" => {
+                        let raw = next_flag_value(args, &mut i, "--tier", json_hint)?;
+                        tier = Some(crate::eval_runner_suites::EvalTier::parse(&raw).ok_or_else(
+                            || CliParseError {
+                                code: "INVALID_TIER",
+                                message: format!(
+                                    "Invalid --tier '{raw}'; expected pr, stage, or release"
+                                ),
+                                json_requested: json_hint,
+                            },
+                        )?);
+                    }
+                    "--project" => {
+                        project_id = Some(next_flag_value(args, &mut i, "--project", json_hint)?);
+                    }
+                    "--design-craft-candidate" => {
+                        candidate_dir = Some(next_flag_value(
+                            args,
+                            &mut i,
+                            "--design-craft-candidate",
+                            json_hint,
+                        )?);
+                    }
+                    "--skip-sim" => run_simulated_users = false,
+                    "--seal-if-clean" => seal_if_clean = true,
+                    "--workspace" => {
+                        workspace = Some(PathBuf::from(next_flag_value(
+                            args,
+                            &mut i,
+                            "--workspace",
+                            json_hint,
+                        )?));
+                    }
+                    "--json" => json = true,
+                    "-h" | "--help" => return Ok(CliCommand::Help),
+                    other => {
+                        return Err(CliParseError {
+                            code: "UNKNOWN_OPTION",
+                            message: format!("Unknown option '{other}' for `eval run`"),
+                            json_requested: json_hint,
+                        });
+                    }
+                }
+                i += 1;
+            }
+            let tier = tier.ok_or_else(|| CliParseError {
+                code: "MISSING_TIER",
+                message: "Option `--tier <pr|stage|release>` is required for `eval run`"
+                    .to_string(),
+                json_requested: json_hint,
+            })?;
+            if !run_simulated_users && tier != crate::eval_runner_suites::EvalTier::Pr {
+                return Err(CliParseError {
+                    code: "VALIDATION_ERROR",
+                    message: "--skip-sim is only permitted for --tier pr; stage and release require full 25-case simulation"
+                        .to_string(),
+                    json_requested: json_hint,
+                });
+            }
+            Ok(CliCommand::Eval {
+                action: EvalSubcommand::Run {
+                    tier,
+                    project_id,
+                    design_craft_candidate_dir: candidate_dir,
+                    run_simulated_users,
+                    seal_if_clean,
+                },
+                workspace,
+                json,
+            })
+        }
+        "seal" => {
+            let mut i = 1;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--workspace" => {
+                        workspace = Some(PathBuf::from(next_flag_value(
+                            args,
+                            &mut i,
+                            "--workspace",
+                            json_hint,
+                        )?));
+                    }
+                    "--json" => json = true,
+                    "-h" | "--help" => return Ok(CliCommand::Help),
+                    other => {
+                        return Err(CliParseError {
+                            code: "UNKNOWN_OPTION",
+                            message: format!("Unknown option '{other}' for `eval seal`"),
+                            json_requested: json_hint,
+                        });
+                    }
+                }
+                i += 1;
+            }
+            Ok(CliCommand::Eval {
+                action: EvalSubcommand::Seal,
+                workspace,
+                json,
+            })
+        }
+        "init-sealed" => {
+            let mut i = 1;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--workspace" => {
+                        workspace = Some(PathBuf::from(next_flag_value(
+                            args,
+                            &mut i,
+                            "--workspace",
+                            json_hint,
+                        )?));
+                    }
+                    "--json" => json = true,
+                    "-h" | "--help" => return Ok(CliCommand::Help),
+                    other => {
+                        return Err(CliParseError {
+                            code: "UNKNOWN_OPTION",
+                            message: format!("Unknown option '{other}' for `eval init-sealed`"),
+                            json_requested: json_hint,
+                        });
+                    }
+                }
+                i += 1;
+            }
+            Ok(CliCommand::Eval {
+                action: EvalSubcommand::InitSealed,
+                workspace,
+                json,
+            })
+        }
+        "history" => {
+            let mut limit: usize = 20;
+            let mut tier: Option<crate::eval_runner_suites::EvalTier> = None;
+            let mut project_id: Option<String> = None;
+            let mut i = 1;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--limit" => {
+                        let raw = next_flag_value(args, &mut i, "--limit", json_hint)?;
+                        let parsed = raw.parse::<usize>().map_err(|_| CliParseError {
+                            code: "INVALID_LIMIT",
+                            message: format!("Invalid --limit '{raw}'; expected 1..=100"),
+                            json_requested: json_hint,
+                        })?;
+                        if !(1..=100).contains(&parsed) {
+                            return Err(CliParseError {
+                                code: "INVALID_LIMIT",
+                                message: "--limit must be between 1 and 100".to_string(),
+                                json_requested: json_hint,
+                            });
+                        }
+                        limit = parsed;
+                    }
+                    "--tier" => {
+                        let raw = next_flag_value(args, &mut i, "--tier", json_hint)?;
+                        tier = Some(crate::eval_runner_suites::EvalTier::parse(&raw).ok_or_else(
+                            || CliParseError {
+                                code: "INVALID_TIER",
+                                message: format!(
+                                    "Invalid --tier '{raw}'; expected pr, stage, or release"
+                                ),
+                                json_requested: json_hint,
+                            },
+                        )?);
+                    }
+                    "--project" => {
+                        project_id = Some(next_flag_value(args, &mut i, "--project", json_hint)?);
+                    }
+                    "--workspace" => {
+                        workspace = Some(PathBuf::from(next_flag_value(
+                            args,
+                            &mut i,
+                            "--workspace",
+                            json_hint,
+                        )?));
+                    }
+                    "--json" => json = true,
+                    "-h" | "--help" => return Ok(CliCommand::Help),
+                    other => {
+                        return Err(CliParseError {
+                            code: "UNKNOWN_OPTION",
+                            message: format!("Unknown option '{other}' for `eval history`"),
+                            json_requested: json_hint,
+                        });
+                    }
+                }
+                i += 1;
+            }
+            Ok(CliCommand::Eval {
+                action: EvalSubcommand::History {
+                    limit,
+                    tier,
+                    project_id,
+                },
+                workspace,
+                json,
+            })
+        }
+        other => Err(CliParseError {
+            code: "UNKNOWN_EVAL_SUBCOMMAND",
+            message: format!(
+                "Unknown `eval` subcommand '{other}'; expected run, seal, init-sealed, or history"
+            ),
+            json_requested: json_hint,
+        }),
+    }
 }
 
 /// Top-level CLI runner invoked by `src/bin/cowok_design.rs`.

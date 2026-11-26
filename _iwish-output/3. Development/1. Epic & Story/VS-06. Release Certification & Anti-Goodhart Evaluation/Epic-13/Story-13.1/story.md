@@ -4,7 +4,7 @@ id: "13.1"
 title: "Story 13.1: End-to-End Sealed Anti-Goodhart Benchmark Runner & 25-Case /simulate-user M1..M5 Certification Suite"
 description: "Xây dựng Workbench M1..M5 Certification Drawer + CLI uiux-os eval run --tier pr|stage|release <-> /api/v1/eval/* <-> Fixed-Ruler chmod 444 SHA-256 tests/eval/sealed/ Runner (Paired with_skill vs baseline ablation >=12 briefs, 3-provider Decision calibration, Swarm Builder != Scorer fault-injection >=95% catch, Automated 25-Case /simulate-user Playwright E2E Golden Suite UC-01..UC-25) -> V18 eval_benchmark_runs + .cowok-design/evals/gate-history.jsonl."
 resource: "iwish://uxui-os/development/epic-13/story-13.1"
-status: refactored
+status: completed
 risk_tier: 3
 delivery: core
 adr_ref: "ADR-007, ADR-009"
@@ -36,7 +36,7 @@ consumes_apis:
 
 - **FR Covered:** [FR-36: Sealed Anti-Goodhart Benchmark & 25-Case /simulate-user Suite](file:///Users/hatrang20061988/.gemini/antigravity/worktrees/uxui-os/complete_story_zero_four/_iwish-output/2.%20Product%20Planning/2.1.%20product-brief-or-prd.md)
 - **Epic:** [Epic 13: End-to-End Sealed Anti-Goodhart Benchmark & 25-Case /simulate-user Certification Suite](../epic.md)
-- **Status:** `refactored`
+- **Status:** `completed`
 - **Risk Tier:** `3`
 
 ## 1. Story Description & Context
@@ -54,10 +54,10 @@ Khóa chuẩn nghiệm thu khách quan cho toàn bộ `cowok-design`: bộ bench
 - **AC-05 ([EDGE-CASE] Security/Integrity Non-Masking & Sealed File Mutation Guard):** Từ chối ghi nhận `PASSED` nếu thiếu bất kỳ ca bảo mật/toàn vẹn bắt buộc nào across `M1..M5` (`M1` secret intercept, `M2` CSP/XSS & localStorage zero split-brain, `M3` RCE Tool Jail, `M4` `0` float leak, `M5` `0` offline 404) kể cả khi tổng điểm đạt `>=22/25`; phát `SEALED_EVAL_TAMPER_ERROR` ngay nếu phát hiện symlink hoặc quyền ghi writable trên `tests/eval/sealed/`.
 
 ## 4. Tasks
-- [ ] **Task 13.1.1**: Thiết lập `tests/eval/sealed/` (`chmod 444` + out-of-band SHA-256 manifest verifier `SEALED_EVAL_TAMPER_ERROR`), migration slot `V18c eval_benchmark_runs`, `/api/v1/eval/*`, single-flight lock và `.cowok-design/evals/gate-history.jsonl` (thỏa mãn `AC-01`, `AC-04`, `AC-05`).
-- [ ] **Task 13.1.2**: Triển khai CLI `cowok-design eval run --tier pr|stage|release` cùng Paired Ablation (`>=12` briefs bao gồm cặp Data Storytelling `data-viz-storyteller` + `dashboard-design`), cổng kiểm định `design-craft` SemVer PR release (`ADR-009`), 3-provider Decision calibration và Swarm `Builder != Scorer` fault injection (`>=95%`) (thỏa mãn `AC-02`).
-- [ ] **Task 13.1.3**: Cài đặt Playwright E2E Golden Suite 25 ca `/simulate-user` (`UC-01..UC-25` trên `M1..M5`) và Workbench `M1..M5` Certification Drawer UI (thỏa mãn `AC-03`, `AC-04`).
-- [ ] **Task 13.1.4**: Chạy kiểm chứng PR CI `<15s` (`$0`), tamper detection (`100% SEALED_EVAL_TAMPER_ERROR`) và báo cáo 25 ca E2E (thỏa mãn `AC-01..05`).
+- [x] **Task 13.1.1**: Thiết lập `tests/eval/sealed/` (`chmod 444` + out-of-band SHA-256 manifest verifier `SEALED_EVAL_TAMPER_ERROR`), migration slot `V33 eval_benchmark_runs`, `/api/v1/eval/*`, single-flight lock và `.cowok-design/evals/gate-history.jsonl` (thỏa mãn `AC-01`, `AC-04`, `AC-05`).
+- [x] **Task 13.1.2**: Triển khai CLI `cowok-design eval run --tier pr|stage|release` cùng Paired Ablation (`>=12` briefs bao gồm cặp Data Storytelling `data-viz-storyteller` + `dashboard-design`), cổng kiểm định `design-craft` SemVer PR release (`ADR-009`), 3-provider Decision calibration và Swarm `Builder != Scorer` fault injection (`>=95%`) (thỏa mãn `AC-02`).
+- [x] **Task 13.1.3**: Cài đặt Playwright E2E Golden Suite 25 ca `/simulate-user` (`UC-01..UC-25` trên `M1..M5`) và Workbench `M1..M5` Certification Drawer UI (thỏa mãn `AC-03`, `AC-04`).
+- [x] **Task 13.1.4**: Chạy kiểm chứng PR CI `<15s` (`$0`), tamper detection (`100% SEALED_EVAL_TAMPER_ERROR`) và báo cáo 25 ca E2E (thỏa mãn `AC-01..05`).
 
 ## 5. AC-to-Task Traceability Matrix
 

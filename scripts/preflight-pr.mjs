@@ -64,7 +64,7 @@ async function waitForDaemonHealth(port, childProc, logPath) {
 }
 
 async function runIsolatedE2E() {
-  runStep('Build harness-daemon binary', 'cargo build --bin harness-daemon');
+  runStep('Build harness-daemon & cowok-design binaries', 'cargo build --bin harness-daemon --bin cowok-design');
   runStep('Build production frontend bundle', 'pnpm run build');
 
   const tempWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), 'cowok-e2e-clean-'));
@@ -73,6 +73,18 @@ async function runIsolatedE2E() {
   const daemonLogPath = path.join(tempWorkspace, 'harness-daemon.log');
   const logFd = fs.openSync(daemonLogPath, 'w');
   const daemonBin = path.join(REPO_ROOT, 'target', 'debug', 'harness-daemon');
+  const cliBin = path.join(REPO_ROOT, 'target', 'debug', 'cowok-design');
+
+  runStep(
+    'Provision isolated Story 13.1 sealed fixtures (chmod 0444)',
+    `"${cliBin}" eval init-sealed --workspace "${tempWorkspace}" --json`
+  );
+  const pkgDestDir = path.join(tempWorkspace, 'packages', 'design-craft');
+  fs.mkdirSync(pkgDestDir, { recursive: true });
+  fs.copyFileSync(
+    path.join(REPO_ROOT, 'packages', 'design-craft', 'plugin.json'),
+    path.join(pkgDestDir, 'plugin.json')
+  );
 
   console.log(`\n▶ [preflight] Launching isolated harness-daemon (port=${daemonPort}, workspace=${tempWorkspace})`);
   const daemonProc = spawn(daemonBin, [], {

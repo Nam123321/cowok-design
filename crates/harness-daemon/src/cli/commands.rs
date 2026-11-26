@@ -30,7 +30,8 @@ use spec_registry::{retry_on_busy, SpecRegistry, SqlitePool, SqliteWalConfig};
 use uuid::Uuid;
 
 use crate::cli::{
-    render_help_text, CliCommand, CliOutput, ExportFormat, McpSubcommand, CLI_BIN_NAME, CLI_VERSION,
+    render_help_text, CliCommand, CliOutput, EvalSubcommand, ExportFormat, McpSubcommand,
+    CLI_BIN_NAME, CLI_VERSION,
 };
 use crate::daemon_auth::FlowPrincipal;
 use crate::lockfile::{reject_if_symlink, CURRENT_SCHEMA_VERSION, DEFAULT_DAEMON_PORT};
@@ -342,6 +343,11 @@ pub fn execute_cli_command(cmd: CliCommand) -> CliOutput {
             };
             crate::ci_gate::execute_ci_gate_cli(req, json)
         }
+        CliCommand::Eval {
+            action,
+            workspace,
+            json,
+        } => exec_eval(action, workspace.as_deref(), json),
         CliCommand::InspectPrompt {
             raw_args,
             workspace,
@@ -471,6 +477,260 @@ fn run_async<F: std::future::Future<Output = CliOutput>>(fut: F) -> CliOutput {
         {
             Ok(rt) => rt.block_on(fut),
             Err(err) => CliOutput::err(1, format!("Failed starting async runtime: {err}")),
+        }
+    }
+}
+
+fn exec_eval(action: EvalSubcommand, workspace: Option<&Path>, json: bool) -> CliOutput {
+    let ws_root = workspace
+        .map(Path::to_path_buf)
+        .or_else(|| std::env::var_os("UXUI_OS_WORKSPACE_ROOT").map(PathBuf::from))
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+    match action {
+        EvalSubcommand::Seal => match crate::eval_runner::seal_sealed_eval_dir(&ws_root) {
+            Ok(snapshot) => {
+                if json {
+                    CliOutput::ok(format_json_success(&snapshot))
+                } else {
+                    CliOutput::ok(format!(
+                        "Sealed {} file(s) at 0444 (manifest sha256={})",
+                        snapshot.sealed_files_count, snapshot.sealed_manifest_sha256
+                    ))
+                }
+            }
+            Err(err) => cli_err(
+                3,
+                "SEALED_EVAL_TAMPER_ERROR",
+                &format!(
+                    "Sealed eval verification failed [{}]: {}",
+                    err.reason, err.detail
+                ),
+                Some("sealedManifestSha256"),
+                json,
+            ),
+        },
+        EvalSubcommand::InitSealed => match crate::eval_runner::init_sealed_eval_dir(&ws_root) {
+            Ok(snapshot) => {
+                if json {
+                    CliOutput::ok(format_json_success(&snapshot))
+                } else {
+                    CliOutput::ok(format!(
+                        "Initialized and sealed {} file(s) at 0444 (manifest sha256={})",
+                        snapshot.sealed_files_count, snapshot.sealed_manifest_sha256
+                    ))
+                }
+            }
+            Err(err) => cli_err(
+                3,
+                &err.reason,
+                &format!(
+                    "Sealed eval initialization failed [{}]: {}",
+                    err.reason, err.detail
+                ),
+                Some("sealedManifestSha256"),
+                json,
+            ),
+        },
+        EvalSubcommand::Run {
+            tier,
+            project_id,
+            design_craft_candidate_dir,
+            run_simulated_users,
+            seal_if_clean,
+        } => {
+            if !run_simulated_users && tier != crate::eval_runner_suites::EvalTier::Pr {
+                return cli_err(
+                    2,
+                    "VALIDATION_ERROR",
+                    "--skip-sim is only permitted for --tier pr; stage and release require full 25-case simulation",
+                    Some("runSimulatedUsers"),
+                    json,
+                );
+            }
+            let candidate_dir = match design_craft_candidate_dir.as_deref() {
+                Some(raw) => {
+                    match crate::eval_runner::validate_candidate_dir_in_workspace(&ws_root, raw) {
+                        Ok(d) => Some(d),
+                        Err(crate::eval_runner::EvalRunnerError::InvalidInput {
+                            field,
+                            message,
+                        }) => {
+                            return cli_err(2, "VALIDATION_ERROR", &message, Some(field), json);
+                        }
+                        Err(_) => {
+                            return cli_err(
+                                2,
+                                "VALIDATION_ERROR",
+                                "Invalid --design-craft-candidate path",
+                                Some("designCraftCandidateDir"),
+                                json,
+                            );
+                        }
+                    }
+                }
+                None => None,
+            };
+            let (_storage, pool, _) = match open_cli_storage(Some(&ws_root)) {
+                Ok(v) => v,
+                Err(msg) => return cli_err(1, "STORAGE_UNAVAILABLE", &msg, None, json),
+            };
+            let validated_project_id = if let Some(raw_pid) = project_id {
+                let trimmed = raw_pid.trim();
+                if trimmed.is_empty() || trimmed.len() > 128 {
+                    return cli_err(
+                        2,
+                        "VALIDATION_ERROR",
+                        "projectId must be between 1 and 128 characters",
+                        Some("project"),
+                        json,
+                    );
+                }
+                let conn = match pool.connection() {
+                    Ok(c) => c,
+                    Err(err) => {
+                        return cli_err(
+                            1,
+                            "STORAGE_UNAVAILABLE",
+                            &format!("Failed opening storage connection: {err}"),
+                            None,
+                            json,
+                        );
+                    }
+                };
+                let exists: Option<i64> = match conn
+                    .query_row(
+                        "SELECT 1 FROM projects WHERE id = ?1 AND tenant_id = ?2 AND trash_deleted_at IS NULL",
+                        params![trimmed, "local-default"],
+                        |r| r.get(0),
+                    )
+                    .optional()
+                {
+                    Ok(v) => v,
+                    Err(err) => {
+                        return cli_err(
+                            1,
+                            "STORAGE_ERROR",
+                            &format!("Failed validating project '{trimmed}': {err}"),
+                            None,
+                            json,
+                        );
+                    }
+                };
+                if exists.is_none() {
+                    return cli_err(
+                        2,
+                        "PROJECT_NOT_FOUND",
+                        &format!("Project '{trimmed}' not found"),
+                        Some("project"),
+                        json,
+                    );
+                }
+                Some(trimmed.to_string())
+            } else {
+                None
+            };
+            let opts = crate::eval_runner::EvalRunOptions {
+                tier,
+                tenant_id: "local-default".to_string(),
+                project_id: validated_project_id,
+                design_craft_candidate_dir: candidate_dir,
+                run_simulated_users,
+                triggered_by: "cli".to_string(),
+                seal_if_clean,
+            };
+            match crate::eval_runner::execute_eval_run(&pool, &ws_root, opts) {
+                Ok(dto) => {
+                    let exit_code = match dto.verdict {
+                        crate::eval_runner_suites::EvalVerdict::Pass => 0,
+                        crate::eval_runner_suites::EvalVerdict::Fail => 1,
+                        crate::eval_runner_suites::EvalVerdict::SealedEvalTamperError => 3,
+                    };
+                    let stdout = if json {
+                        format_json_success(&dto)
+                    } else {
+                        format!(
+                            "cowok-design eval [tier={}]: verdict={} sim={}/{} fault_catch={:.1}% lift=+{:.1}% duration={}ms cost=${:.2}",
+                            dto.tier.as_str(),
+                            dto.verdict.as_str(),
+                            dto.sim_cases_passed,
+                            dto.sim_cases_total,
+                            dto.fault_injection.catch_rate_percent,
+                            dto.ablation.lift_percent,
+                            dto.duration_ms,
+                            dto.estimated_cost_usd
+                        )
+                    };
+                    CliOutput {
+                        exit_code,
+                        stdout,
+                        stderr: String::new(),
+                    }
+                }
+                Err(crate::eval_runner::EvalRunnerError::AlreadyRunning) => cli_err(
+                    4,
+                    "EVAL_ALREADY_RUNNING",
+                    "Another evaluation benchmark run is currently in progress",
+                    None,
+                    json,
+                ),
+                Err(crate::eval_runner::EvalRunnerError::TamperDetected {
+                    reason, detail, ..
+                }) => cli_err(
+                    3,
+                    "SEALED_EVAL_TAMPER_ERROR",
+                    &format!("Sealed eval tamper detected [{reason}]: {detail}"),
+                    Some("sealedManifestSha256"),
+                    json,
+                ),
+                Err(crate::eval_runner::EvalRunnerError::InvalidInput { field, message }) => {
+                    cli_err(2, "VALIDATION_ERROR", &message, Some(field), json)
+                }
+                Err(crate::eval_runner::EvalRunnerError::Storage(msg)) => {
+                    cli_err(1, "STORAGE_ERROR", &msg, None, json)
+                }
+            }
+        }
+        EvalSubcommand::History {
+            limit,
+            tier,
+            project_id,
+        } => {
+            let (_storage, pool, _) = match open_cli_storage(Some(&ws_root)) {
+                Ok(v) => v,
+                Err(msg) => return cli_err(1, "STORAGE_UNAVAILABLE", &msg, None, json),
+            };
+            match crate::eval_runner::list_eval_history(
+                &pool,
+                &ws_root,
+                "local-default",
+                limit,
+                tier,
+                project_id.as_deref(),
+            ) {
+                Ok(history) => {
+                    if json {
+                        CliOutput::ok(format_json_success(&history))
+                    } else {
+                        CliOutput::ok(format!(
+                            "eval history: total={} integrity_ok={} manifest={}",
+                            history.total_runs,
+                            history.sealed_integrity_ok,
+                            history.sealed_manifest_sha256
+                        ))
+                    }
+                }
+                Err(crate::eval_runner::EvalRunnerError::Storage(msg)) => {
+                    cli_err(1, "STORAGE_ERROR", &msg, None, json)
+                }
+                Err(_) => cli_err(
+                    1,
+                    "EVAL_HISTORY_FAILED",
+                    "Failed loading eval history",
+                    None,
+                    json,
+                ),
+            }
         }
     }
 }

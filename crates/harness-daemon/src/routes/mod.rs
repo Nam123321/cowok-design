@@ -17,6 +17,7 @@ pub mod distribution_ops;
 pub mod distribution_ops_crypto;
 pub mod doctor_usage;
 pub mod doctor_vault;
+pub mod eval_certification;
 pub mod execution_coordinator;
 pub mod execution_coordinator_sql;
 pub mod execution_events;
