@@ -55,10 +55,13 @@ jobs:
 
       - name: Resolve Release Metadata & Verify 6-Manifest Version Parity
         id: meta
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            node scripts/release-version-sync.mjs --check --tag "${{ github.ref_name }}"
-            VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$REF_TYPE" = "tag" ]; then
+            node scripts/release-version-sync.mjs --check --tag "$REF_NAME"
+            VERSION="${REF_NAME#v}"
             echo "is_tag_release=true" >> "$GITHUB_OUTPUT"
           else
             node scripts/release-version-sync.mjs --check
