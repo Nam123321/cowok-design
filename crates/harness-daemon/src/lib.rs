@@ -4,16 +4,19 @@
 //! Harness Daemon entrypoint, loopback Axum control plane, `.cowok-design/daemon.lock`
 //! dynamic port discovery, and 9-Spec Synthesis Pipeline for `cowok-design`.
 
+pub mod ci_gate;
 pub mod cli;
 pub mod daemon_auth;
 pub mod flow_routes;
 pub mod flow_transition_handlers;
 pub mod lockfile;
+pub mod plugin_pack;
 pub mod port_binder;
 pub mod routes;
 pub mod static_spa;
 pub mod support_edge;
 pub mod synthesis;
+pub mod tauri_trust;
 pub mod vault;
 pub mod visual_diff;
 

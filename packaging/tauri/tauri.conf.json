@@ -1,0 +1,72 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Cowok Design",
+  "version": "0.1.0",
+  "identifier": "ai.cowok.design",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Cowok Design — Local AI Design Workbench",
+        "width": 1360,
+        "height": 880,
+        "minWidth": 1024,
+        "minHeight": 680,
+        "resizable": true,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; worker-src 'self'; frame-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:*; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*; object-src 'none'; base-uri 'self'",
+      "capabilities": [
+        "default"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "dmg",
+      "msi",
+      "appimage"
+    ],
+    "externalBin": [
+      "binaries/cowok-design"
+    ],
+    "createUpdaterArtifacts": true,
+    "category": "DeveloperTool",
+    "shortDescription": "Lightweight local-first AI design workbench with embedded cowok-design Rust engine.",
+    "longDescription": "Cowok Design packages the React 19 Workbench with the single-binary cowok-design sidecar, HMAC-isolated drag-and-drop workspace capabilities, In-App Support Drawer, and Ed25519 signed auto-updater.",
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "hardenedRuntime": true
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      }
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": true,
+      "pubkey": "__COWOK_RELEASE_ED25519_PUBKEY_INJECTED_AT_BUILD__",
+      "endpoints": [
+        "https://releases.cowok.ai/desktop/{{target}}/{{arch}}/{{current_version}}"
+      ]
+    }
+  }
+}

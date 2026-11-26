@@ -110,6 +110,23 @@ pub enum CliCommand {
         workspace: Option<PathBuf>,
         json: bool,
     },
+    Install {
+        target: String,
+        install_root: Option<PathBuf>,
+        workspace: Option<PathBuf>,
+        binary_path: Option<PathBuf>,
+        json: bool,
+    },
+    CiGate {
+        project_id: Option<String>,
+        target_id: Option<String>,
+        html_path: Option<PathBuf>,
+        max_memory_mb: Option<u64>,
+        force_no_browser: bool,
+        fail_on_unverified: bool,
+        workspace: Option<PathBuf>,
+        json: bool,
+    },
     InspectPrompt {
         raw_args: Vec<String>,
         workspace: Option<PathBuf>,
@@ -168,6 +185,8 @@ COMMANDS:
   de          Run 7 built-in Rust Design Engineering tools (1:1 /api/v1/de/run parity)
   diff        Run focus-free headless screenshot / suite visual diff with offline HTML report
   feedback    Submit Zero-PII scrubbed local support ticket (1:1 /api/v1/support/tickets parity)
+  install     Install Universal Multi-Harness Plugin Pack (`--target cowok|claude|codex|antigravity|cursor|all`)
+  ci gate     Run headless CI/CD Visual QC + 7 DE Tools gate with container /dev/shm & cgroup guards
 
 GLOBAL OPTIONS:
   --json      Emit deterministic JSON envelope matching /api/v1/* HTTP schema
@@ -230,6 +249,8 @@ pub fn parse_cli_args(args: &[String]) -> Result<CliCommand, CliParseError> {
         "de" => parse_de(&rest[1..], global_json, json_anywhere),
         "diff" => parse_diff(&rest[1..], global_json, json_anywhere),
         "feedback" => parse_feedback(&rest[1..], global_json, json_anywhere),
+        "install" => parse_install(&rest[1..], global_json, json_anywhere),
+        "ci" => parse_ci(&rest[1..], global_json, json_anywhere),
         other => Err(CliParseError {
             code: "UNKNOWN_SUBCOMMAND",
             message: format!("Unknown subcommand '{other}'. Run `{CLI_BIN_NAME} --help`."),
@@ -845,6 +866,162 @@ fn parse_feedback(
         category,
         email,
         include_diagnostics,
+        workspace,
+        json,
+    })
+}
+
+fn parse_install(
+    args: &[String],
+    global_json: bool,
+    json_hint: bool,
+) -> Result<CliCommand, CliParseError> {
+    let mut target: Option<String> = None;
+    let mut install_root: Option<PathBuf> = None;
+    let mut workspace: Option<PathBuf> = None;
+    let mut binary_path: Option<PathBuf> = None;
+    let mut json = global_json;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--target" => {
+                target = Some(next_flag_value(args, &mut i, "--target", json_hint)?);
+            }
+            "--install-root" | "--out" => {
+                let flag = args[i].as_str();
+                install_root = Some(PathBuf::from(next_flag_value(
+                    args, &mut i, flag, json_hint,
+                )?));
+            }
+            "--workspace" => {
+                workspace = Some(PathBuf::from(next_flag_value(
+                    args,
+                    &mut i,
+                    "--workspace",
+                    json_hint,
+                )?));
+            }
+            "--binary-path" => {
+                binary_path = Some(PathBuf::from(next_flag_value(
+                    args,
+                    &mut i,
+                    "--binary-path",
+                    json_hint,
+                )?));
+            }
+            "--json" => json = true,
+            "-h" | "--help" => return Ok(CliCommand::Help),
+            other => {
+                return Err(CliParseError {
+                    code: "UNKNOWN_OPTION",
+                    message: format!("Unknown option '{other}' for `install`"),
+                    json_requested: json_hint,
+                });
+            }
+        }
+        i += 1;
+    }
+
+    let target = target.ok_or_else(|| CliParseError {
+        code: "MISSING_TARGET",
+        message: "Option `--target <cowok|claude|codex|antigravity|cursor|all>` is required for `install`"
+            .to_string(),
+        json_requested: json_hint,
+    })?;
+
+    Ok(CliCommand::Install {
+        target,
+        install_root,
+        workspace,
+        binary_path,
+        json,
+    })
+}
+
+fn parse_ci(
+    args: &[String],
+    global_json: bool,
+    json_hint: bool,
+) -> Result<CliCommand, CliParseError> {
+    let Some(sub) = args.first().map(|s| s.as_str()) else {
+        return Err(CliParseError {
+            code: "MISSING_CI_SUBCOMMAND",
+            message: "Expected `ci gate [OPTIONS]`".to_string(),
+            json_requested: json_hint,
+        });
+    };
+    if matches!(sub, "-h" | "--help") {
+        return Ok(CliCommand::Help);
+    }
+    if sub != "gate" {
+        return Err(CliParseError {
+            code: "UNKNOWN_CI_SUBCOMMAND",
+            message: format!("Unknown `ci` subcommand '{sub}'; expected `gate`"),
+            json_requested: json_hint,
+        });
+    }
+
+    let mut project_id: Option<String> = None;
+    let mut target_id: Option<String> = None;
+    let mut html_path: Option<PathBuf> = None;
+    let mut max_memory_mb: Option<u64> = None;
+    let mut force_no_browser = false;
+    let mut fail_on_unverified = false;
+    let mut workspace: Option<PathBuf> = None;
+    let mut json = global_json;
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--project" => {
+                project_id = Some(next_flag_value(args, &mut i, "--project", json_hint)?);
+            }
+            "--target" => {
+                target_id = Some(next_flag_value(args, &mut i, "--target", json_hint)?);
+            }
+            "--html" => {
+                html_path = Some(PathBuf::from(next_flag_value(
+                    args, &mut i, "--html", json_hint,
+                )?));
+            }
+            "--max-memory-mb" => {
+                let raw = next_flag_value(args, &mut i, "--max-memory-mb", json_hint)?;
+                let parsed = raw.parse::<u64>().map_err(|_| CliParseError {
+                    code: "INVALID_MAX_MEMORY_MB",
+                    message: format!("Invalid --max-memory-mb value '{raw}'"),
+                    json_requested: json_hint,
+                })?;
+                max_memory_mb = Some(parsed);
+            }
+            "--force-no-browser" => force_no_browser = true,
+            "--fail-on-unverified" => fail_on_unverified = true,
+            "--workspace" => {
+                workspace = Some(PathBuf::from(next_flag_value(
+                    args,
+                    &mut i,
+                    "--workspace",
+                    json_hint,
+                )?));
+            }
+            "--json" => json = true,
+            "-h" | "--help" => return Ok(CliCommand::Help),
+            other => {
+                return Err(CliParseError {
+                    code: "UNKNOWN_OPTION",
+                    message: format!("Unknown option '{other}' for `ci gate`"),
+                    json_requested: json_hint,
+                });
+            }
+        }
+        i += 1;
+    }
+
+    Ok(CliCommand::CiGate {
+        project_id,
+        target_id,
+        html_path,
+        max_memory_mb,
+        force_no_browser,
+        fail_on_unverified,
         workspace,
         json,
     })
