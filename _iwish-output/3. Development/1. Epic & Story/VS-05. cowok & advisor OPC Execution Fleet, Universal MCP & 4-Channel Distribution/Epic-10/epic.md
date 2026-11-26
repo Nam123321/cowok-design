@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-10"
 title: "Epic 10: cowok Master Orchestrator, File Leases, Builder!=Scorer & CMP-07 Design Tournament"
-status: in-progress
+status: completed
 track: "Stream-5"
 wave: 3
 provides: ["3-Lane Router + MPSC SQLite Write Actor + $UIUX_LIVE_SPEC <50ms + Cmd+Z", "worker_file_leases (fencing_token) + 429 Clamp + Builder!=Scorer + Design Jury", "CMP-07 DesignTournamentArena (Blind Wipe + Cross-Variant Borrow + AST Distance <=0.78) + advisor 6-Step Loop"]

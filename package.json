@@ -1,6 +1,6 @@
 {
   "name": "cowok-design",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.1",
   "type": "module",
   "private": true,
   "description": "cowok-design (UI/UX OS — FlowForge Harness OS) — Day-1 Rust Core + React 19 Hybrid Monorepo",

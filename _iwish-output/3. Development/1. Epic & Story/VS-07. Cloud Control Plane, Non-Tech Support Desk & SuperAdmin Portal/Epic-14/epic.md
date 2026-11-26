@@ -2,7 +2,7 @@
 type: I-Wish Epic
 id: "Epic-14"
 title: "Epic 14: Cloud Control Plane, Non-Tech Support Desk & SuperAdmin Portal (cowok-design)"
-status: in-progress
+status: completed
 track: "Stream-6"
 wave: "Wave-B..Wave-D"
 provides:
