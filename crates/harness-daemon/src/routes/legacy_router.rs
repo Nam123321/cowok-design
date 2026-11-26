@@ -15,6 +15,7 @@ use crate::routes::de_runtime::build_de_runtime_router;
 use crate::routes::decision::build_decision_router;
 use crate::routes::deck_generation::build_deck_generation_router;
 use crate::routes::design_tournament::design_tournament_router;
+use crate::routes::eval_certification::eval_certification_router;
 use crate::routes::fleet_swarm::fleet_swarm_router;
 use crate::routes::flow_synthesize::build_flow_synthesize_router;
 use crate::routes::fs_jail;
@@ -294,6 +295,7 @@ pub(crate) fn build_protected_legacy_router(state: DaemonAppState) -> Router<Dae
         .merge(split_export_router())
         .merge(fleet_swarm_router())
         .merge(design_tournament_router())
+        .merge(eval_certification_router())
         .merge(mcp_gateway_router())
         .route_layer(middleware::from_fn_with_state(
             state,

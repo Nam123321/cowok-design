@@ -1799,3 +1799,44 @@ model CloudOfflineLicense {
   @@index([cowokOrgId, issuedAt], map: "idx_cloud_offline_licenses_org")
   @@map("cloud_offline_licenses")
 }
+
+model EvalBenchmarkRun {
+  id                          String  @id
+  tenantId                    String  @default("local-default") @map("tenant_id")
+  projectId                   String? @map("project_id")
+  tier                        String
+  offlineEnforced             Int     @default(0) @map("offline_enforced")
+  sealedManifestSha256        String  @map("sealed_manifest_sha256")
+  manifestPinSource           String  @map("manifest_pin_source")
+  tamperDetected              Int     @default(0) @map("tamper_detected")
+  tamperReason                String? @map("tamper_reason")
+  ablationBriefsCount         Int     @default(0) @map("ablation_briefs_count")
+  ablationLiftPercent         Float?  @map("ablation_lift_percent")
+  ablationRegressions         Int     @default(0) @map("ablation_regressions")
+  designCraftSemverPassed     Int     @default(1) @map("design_craft_semver_passed")
+  decisionProvidersCalibrated Int     @default(0) @map("decision_providers_calibrated")
+  decisionFloatLeaks          Int     @default(0) @map("decision_float_leaks")
+  faultInjectedCount          Int     @default(0) @map("fault_injected_count")
+  faultCaughtCount            Int     @default(0) @map("fault_caught_count")
+  faultCatchRate              Float?  @map("fault_catch_rate")
+  simCasesPassed              Int     @default(0) @map("sim_cases_passed")
+  simCasesBlocked             Int     @default(0) @map("sim_cases_blocked")
+  simCasesGap                 Int     @default(0) @map("sim_cases_gap")
+  simCasesTotal               Int     @default(25) @map("sim_cases_total")
+  securityGatesPassed         Int     @map("security_gates_passed")
+  verdict                     String
+  milestonesJson              String  @default("[]") @map("milestones_json")
+  simCasesJson                String  @default("[]") @map("sim_cases_json")
+  ablationJson                String  @default("{}") @map("ablation_json")
+  calibrationJson             String  @default("{}") @map("calibration_json")
+  faultInjectionJson          String  @default("{}") @map("fault_injection_json")
+  securityBlockersJson        String  @default("[]") @map("security_blockers_json")
+  durationMs                  BigInt  @map("duration_ms")
+  estimatedCostUsd            Float   @default(0.0) @map("estimated_cost_usd")
+  triggeredBy                 String  @default("workbench") @map("triggered_by")
+  createdAt                   BigInt  @map("created_at")
+
+  @@index([tenantId, createdAt], map: "idx_eval_benchmark_runs_tenant_created")
+  @@index([tier, createdAt], map: "idx_eval_benchmark_runs_tier_created")
+  @@map("eval_benchmark_runs")
+}

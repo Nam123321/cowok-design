@@ -14,6 +14,7 @@ import { useTranslation } from "../../hooks/useTranslation";
 import { apiWorkbenchSettings } from "../../api/workbench-settings";
 import { CowokToast } from "../../components/ui/CowokToast";
 import { SupportRequestDrawer } from "../../features/support/SupportRequestDrawer";
+import { CertificationDrawer } from "../../features/eval-certification/CertificationDrawer";
 import { ProjectReadinessModal } from "../../features/visual-qc/ProjectReadinessModal";
 import { DesignTournamentStudioDrawer } from "../../features/tournament/DesignTournamentStudioDrawer";
 import { useVisualQcController } from "../../features/visual-qc/useVisualQcController";
@@ -59,9 +60,11 @@ const WorkbenchConnectedBody: React.FC<{
   isOnboardingOpen: boolean;
   isSupportDrawerOpen: boolean;
   isTournamentOpen: boolean;
+  isCertificationOpen: boolean;
   tournamentRunCount: number;
   onOpenVisualQc: () => void;
   onOpenTournament: () => void;
+  onOpenCertification: () => void;
   resolvedProjectName: string;
   resolvedProjectId: string;
   defaultSessionTitle: string;
@@ -70,16 +73,18 @@ const WorkbenchConnectedBody: React.FC<{
   isOnboardingOpen,
   isSupportDrawerOpen,
   isTournamentOpen,
+  isCertificationOpen,
   tournamentRunCount,
   onOpenVisualQc,
   onOpenTournament,
+  onOpenCertification,
   resolvedProjectName,
   resolvedProjectId,
   defaultSessionTitle,
 }) => {
   const { settings, sessionManager: sm, store, state } = shell;
   const anyShellModalOpen = Boolean(
-    settings.isSettingsOpen || sm.isNewConvoModalOpen || sm.pickerState.isOpen || isOnboardingOpen || isSupportDrawerOpen || isTournamentOpen
+    settings.isSettingsOpen || sm.isNewConvoModalOpen || sm.pickerState.isOpen || isOnboardingOpen || isSupportDrawerOpen || isTournamentOpen || isCertificationOpen
   );
   return (
     <WorkbenchBodyLayout
@@ -103,6 +108,7 @@ const WorkbenchConnectedBody: React.FC<{
       isModalOpen={anyShellModalOpen}
       onOpenVisualQc={onOpenVisualQc}
       onOpenTournament={onOpenTournament}
+      onOpenCertification={onOpenCertification}
       activeTournamentRunCount={tournamentRunCount}
       state={state} store={store}
     />
@@ -191,6 +197,7 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
   const [isOnboardingOpen, setIsOnboardingOpen] = React.useState<boolean>(false);
   const [isSupportDrawerOpen, setIsSupportDrawerOpen] = React.useState<boolean>(false);
   const [isTournamentOpen, setIsTournamentOpen] = React.useState<boolean>(false);
+  const [isCertificationOpen, setIsCertificationOpen] = React.useState<boolean>(false);
   const [tournamentRunCount, setTournamentRunCount] = React.useState<number>(0);
   const [daemonWarning, setDaemonWarning] = React.useState<string | null>(null);
   const activeTabKind = resolveStageTabKind(shell.activeTabId, shell.state.activeFormatTab);
@@ -234,7 +241,7 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
   return (
     <div className={`workbench-shell theme-${settings.themeMode}`} data-theme={settings.themeMode} data-flow-hydrated={shell.isFlowHydrated ? "true" : "false"} style={createWorkbenchShellStyle(settings.currentFontSize)}>
       <WorkbenchTopNav projectId={resolvedProjectId} projectName={resolvedProjectName} activeSessionTitle={activeSession?.title} isStandaloneConversation={!activeSession?.projectId} themeMode={settings.themeMode} onOpenSupportDrawer={() => setIsSupportDrawerOpen(true)} />
-      <WorkbenchConnectedBody shell={shell} isOnboardingOpen={isOnboardingOpen} isSupportDrawerOpen={isSupportDrawerOpen} isTournamentOpen={isTournamentOpen} tournamentRunCount={tournamentRunCount} onOpenVisualQc={() => visualQc.setIsReadinessOpen(true)} onOpenTournament={() => setIsTournamentOpen(true)} resolvedProjectName={resolvedProjectName} resolvedProjectId={resolvedProjectId} defaultSessionTitle={t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới")} />
+      <WorkbenchConnectedBody shell={shell} isOnboardingOpen={isOnboardingOpen} isSupportDrawerOpen={isSupportDrawerOpen} isTournamentOpen={isTournamentOpen} isCertificationOpen={isCertificationOpen} tournamentRunCount={tournamentRunCount} onOpenVisualQc={() => visualQc.setIsReadinessOpen(true)} onOpenTournament={() => setIsTournamentOpen(true)} onOpenCertification={() => setIsCertificationOpen(true)} resolvedProjectName={resolvedProjectName} resolvedProjectId={resolvedProjectId} defaultSessionTitle={t("workbench.defaultNewSessionTitle", "Phiên thiết kế mới")} />
       <WorkbenchModalsAndToasts shell={shell} resolvedProjectId={resolvedProjectId} isOnboardingOpen={isOnboardingOpen} daemonWarning={daemonWarning} onCloseOnboarding={closeOnboarding} onSetDaemonWarning={setDaemonWarning} />
       <ProjectReadinessModal open={visualQc.isReadinessOpen} onClose={() => visualQc.setIsReadinessOpen(false)} runResult={visualQc.runResult} isRunning={visualQc.isRunning} onRunQc={() => void visualQc.runQc()} onDeterministicFix={() => void visualQc.runDeterministicFix()} />
       <DesignTournamentStudioDrawer
@@ -251,6 +258,7 @@ export const WorkbenchShell: React.FC<WorkbenchShellProps> = ({
         }}
       />
       <SupportRequestDrawer isOpen={isSupportDrawerOpen} onClose={() => setIsSupportDrawerOpen(false)} locale={settings.currentLocale} />
+      <CertificationDrawer isOpen={isCertificationOpen} onClose={() => setIsCertificationOpen(false)} projectId={activeProjObj?.id} locale={settings.currentLocale} />
     </div>
   );
 };

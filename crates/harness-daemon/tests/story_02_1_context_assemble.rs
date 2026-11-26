@@ -128,7 +128,7 @@ fn seed_story_01_3_specs(reg: &SpecRegistry, proj_id_str: &str) {
 
 #[tokio::test]
 async fn story_02_1_daemon_assemble_idempotency_portal_guard_and_telemetry_cursor() {
-    assert_eq!(CURRENT_SCHEMA_VERSION, 32);
+    assert_eq!(CURRENT_SCHEMA_VERSION, 33);
     let tmp = TempDir::new().expect("tempdir");
     let (state, router, tok) = setup_daemon(&tmp);
     let proj_id = create_project(&router, &tok, "ctx-daemon-proj").await;

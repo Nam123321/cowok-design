@@ -138,6 +138,7 @@ export interface WorkbenchCanvasTabAreaProps {
   onOpenSettings?: (tab?: "general" | "models" | "mcp" | "automations") => void;
   onOpenVisualQc?: () => void;
   onOpenTournament?: () => void;
+  onOpenCertification?: () => void;
   activeTournamentRunCount?: number;
   proposalController?: ReturnType<typeof useNodeProposalController>;
 }
@@ -360,7 +361,7 @@ const WorkbenchStageOverlays: React.FC<{
 );
 
 export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = (props) => {
-  const { state, store, activeTabId, projectId = DEFAULT_FLOW_PROJECT_ID, sessionId = "session-1", sessionEntryKind, onTabChange, graphHandlers, onCommentOnNode, onAddQuoteChip, onOpenVisualQc, onOpenTournament, activeTournamentRunCount, proposalController } = props;
+  const { state, store, activeTabId, projectId = DEFAULT_FLOW_PROJECT_ID, sessionId = "session-1", sessionEntryKind, onTabChange, graphHandlers, onCommentOnNode, onAddQuoteChip, onOpenVisualQc, onOpenTournament, onOpenCertification, activeTournamentRunCount, proposalController } = props;
   const { t, locale } = useTranslation();
   const [isDeploying, setIsDeploying] = useState(false);
   const handleDeployDraft = async () => { if (!isDeploying) { setIsDeploying(true); try { await store.syncDeployDraft(projectId); } finally { setIsDeploying(false); } } };
@@ -382,7 +383,7 @@ export const WorkbenchCanvasTabArea: React.FC<WorkbenchCanvasTabAreaProps> = (pr
 
   return (
     <main data-brand-proposal={appliedBrandStage?.proposalId} data-brand-mode={appliedBrandStage?.modeId} style={stageMainStyle}>
-      <ContextualStageToolbar projectId={projectId} activeTabId={activeTabId} activeFormatTab={state.activeFormatTab} onOpenVisualQc={onOpenVisualQc} onOpenTournament={onOpenTournament} activeTournamentRunCount={activeTournamentRunCount} />
+      <ContextualStageToolbar projectId={projectId} activeTabId={activeTabId} activeFormatTab={state.activeFormatTab} onOpenVisualQc={onOpenVisualQc} onOpenTournament={onOpenTournament} onOpenCertification={onOpenCertification} activeTournamentRunCount={activeTournamentRunCount} />
       <div style={{ flex: 1, minHeight: 0, position: "relative", overflow: "hidden" }}>
       <CompanionCanvasTab projectId={projectId} sessionId={sessionId} sessionEntryKind={sessionEntryKind} activeTabId={activeTabId} onTabChange={onTabChange} selectedNodeId={state.selectedNodeId} onSelectNode={(id) => store.selectNode(id, false)} nodes={state.nodes} isDraftDirty={state.isDraftDirty} orphanCount={orphanCount} conflictState={state.conflictState} canUndo={(state.undoStack?.length || 0) > 0} canRedo={(state.redoStack?.length || 0) > 0} onUndo={() => store.undo()} onRedo={() => store.redo()} onResolveConflict={(c) => { void store.resolveConflict(c); }} onDeployDraft={() => { void handleDeployDraft(); }} onDiscardDraft={() => store.discardDraft()} onAttachRegionToChat={onCommentOnNode} onQuoteText={onAddQuoteChip} onSelectNodeSubState={(nid, sub) => store.setNodeSubState(nid, sub)} proposalController={proposalController} stageSkin={polish.stageSkin} sketchPolishBarNode={sketchPolishBarNode} onRegisterStageSkinSwap={polish.onRegisterStageSkinSwap} onRegisterStageApplyHtml={polish.onRegisterStageApplyHtml} onLockedRuleReceipt={polish.handleLockedRuleNotice}>
         <ErrorBoundary fallbackTitle={t("errors.dagCanvasRender", "Lỗi hiển thị Canvas 2D DAG")} onReset={() => store.discardDraft()}>
