@@ -3,7 +3,7 @@
 # Rust Core Daemon + Universal MCP Gateway + Pooled 1-Chromium CDP (ADR-006)
 # Release CI pins base images by @sha256:... digest via `docker buildx bake` (reproducible builds).
 
-FROM --platform=$TARGETPLATFORM rust:1.85-slim-bookworm AS builder
+FROM --platform=$TARGETPLATFORM rust:1-slim-bookworm AS builder
 ARG TARGETPLATFORM
 ARG TARGETARCH
 WORKDIR /build

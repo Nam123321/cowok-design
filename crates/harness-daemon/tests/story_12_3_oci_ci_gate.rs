@@ -92,7 +92,7 @@ fn ut_12_3_01_oci_contract_multiarch_nonroot_zero_libreoffice() {
     assert!(platforms.iter().any(|p| p == "linux/arm64"));
 
     let dockerfile = fs::read_to_string(&dockerfile_path).unwrap();
-    assert!(dockerfile.contains("FROM --platform=$TARGETPLATFORM rust:1.85-slim-bookworm"));
+    assert!(dockerfile.contains("FROM --platform=$TARGETPLATFORM rust:1-slim-bookworm"));
     assert!(dockerfile.contains("COPY packages/builtin-skills ./packages/builtin-skills"));
     assert!(dockerfile.contains("COPY packaging/plugins ./packaging/plugins"));
     assert!(dockerfile.contains("--locked"));

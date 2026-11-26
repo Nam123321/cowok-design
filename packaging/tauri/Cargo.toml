@@ -3,7 +3,7 @@
 # `cargo check --workspace` and `cargo test --workspace` without GTK/WebKit2GTK OS packages.
 [package]
 name = "cowok-design-desktop"
-version = "0.1.0"
+version = "1.0.0-rc.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Tauri v2 Desktop Host packaging the cowok-design sidecar with HMAC capability isolation and Ed25519 updater verification."

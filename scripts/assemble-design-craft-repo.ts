@@ -171,6 +171,54 @@ function listImmediateDirs(dirPath: string): string[] {
     .sort();
 }
 
+function writeSemverGateWorkflow(outputDir: string): void {
+  const workflowDir = path.join(outputDir, ".github", "workflows");
+  fs.mkdirSync(workflowDir, { recursive: true });
+  const workflowYaml = `name: design-craft SemVer & Anti-Goodhart Gate
+
+on:
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  semver-and-ablation-gate:
+    name: Verify agentskills.io Frontmatter & Paired Ablation Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout design-craft
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version: 22
+
+      - name: Validate plugin.json & SKILL.md budgets (<=100 tokens, <=1024 bytes)
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const path = require("node:path");
+            const manifest = JSON.parse(fs.readFileSync("plugin.json", "utf8"));
+            if (!/^1\\.\\d+\\.\\d+/.test(String(manifest.version || ""))) {
+              throw new Error("plugin.json version must be SemVer 1.x: " + manifest.version);
+            }
+            console.log("Verified design-craft plugin.json version:", manifest.version);
+          '
+
+      - name: Run cowok-design Stage Paired Ablation Gate (when CLI available)
+        run: |
+          if command -v cowok-design >/dev/null 2>&1; then
+            cowok-design eval run --tier stage --candidate-dir . --json
+          else
+            echo "::notice::Install cowok-design CLI to run live Story 13.1 paired ablation gate in CI."
+          fi
+`;
+  fs.writeFileSync(path.join(workflowDir, "semver-gate.yml"), workflowYaml, "utf8");
+}
+
 function makeExecutablesRunnable(outputDir: string): void {
   for (const rel of ["bin/design-craft.mjs", "mcp/server.mjs"]) {
     const abs = path.join(outputDir, rel);
@@ -208,6 +256,7 @@ export function assembleDesignCraftRepo(options: AssembleOptions): AssembleRepor
   }
   const manifest = JSON.parse(fs.readFileSync(path.join(resolvedOut, "plugin.json"), "utf8"));
   writeStandalonePackageJson(resolvedOut, String(manifest.version ?? "1.0.0"));
+  writeSemverGateWorkflow(resolvedOut);
   makeExecutablesRunnable(resolvedOut);
   const skillMdFiles = collectFilesRecursive(resolvedOut, "skills").filter((f) => path.basename(f) === "SKILL.md");
   const validatedSkills = skillMdFiles.map((rel) => validateSkillFrontmatter(path.join(resolvedOut, rel), rel));

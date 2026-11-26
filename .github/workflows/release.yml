@@ -5,16 +5,29 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      dry_run_version:
+        description: "Optional version label for workflow_dispatch dry-run verification"
+        required: false
+        default: ""
 
 permissions: read-all
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # ==========================================
-  # PRE-RELEASE VERIFICATION GATE
+  # PRE-RELEASE CERTIFICATION & PARITY GATE
   # ==========================================
   release-verify:
-    name: Pre-Release Verification Gate
+    name: Pre-Release Verification & Story 13.1 Certification Gate
     runs-on: ubuntu-latest
+    outputs:
+      release_version: ${{ steps.meta.outputs.release_version }}
+      is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
+      is_tag_release: ${{ steps.meta.outputs.is_tag_release }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -26,6 +39,8 @@ jobs:
 
       - name: Rust Cache
         uses: swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2.7.7
+        with:
+          workspaces: "."
 
       - name: Install pnpm
         uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
@@ -38,38 +53,83 @@ jobs:
           node-version: 22
           cache: "pnpm"
 
+      - name: Resolve Release Metadata & Verify 6-Manifest Version Parity
+        id: meta
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            node scripts/release-version-sync.mjs --check --tag "${{ github.ref_name }}"
+            VERSION="${GITHUB_REF_NAME#v}"
+            echo "is_tag_release=true" >> "$GITHUB_OUTPUT"
+          else
+            node scripts/release-version-sync.mjs --check
+            VERSION=$(node -e 'console.log(JSON.parse(require("node:fs").readFileSync("package.json","utf8")).version)')
+            echo "is_tag_release=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "release_version=${VERSION}" >> "$GITHUB_OUTPUT"
+          if echo "$VERSION" | grep -q '-'; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Verify Rust & Frontend Suites
         run: |
+          cargo fmt --all --check
+          cargo clippy --workspace --all-targets -- -D warnings
           cargo test --workspace --locked
           pnpm install --frozen-lockfile
           pnpm run typecheck
           pnpm run test
           pnpm run build
 
+      - name: Verify 4-Channel Contracts & Standalone design-craft Clean-Room Assembly
+        run: |
+          node packaging/docker/verify-oci-contract.mjs
+          node packaging/tauri/scripts/verify-desktop-bundle.mjs
+          TMP_DC=$(mktemp -d)
+          npx tsx scripts/assemble-design-craft-repo.ts --out "$TMP_DC"
+          test -f "$TMP_DC/.github/workflows/semver-gate.yml"
+          rm -rf "$TMP_DC"
+
+      - name: Run Story 13.1 Release Certification Gate (--tier release)
+        run: |
+          cargo build --locked --bin cowok-design
+          EVAL_WS=$(mktemp -d)
+          trap 'rm -rf "$EVAL_WS"' EXIT
+          mkdir -p "$EVAL_WS/packages/design-craft"
+          cp packages/design-craft/plugin.json "$EVAL_WS/packages/design-craft/plugin.json"
+          ./target/debug/cowok-design eval init-sealed --workspace "$EVAL_WS" --json
+          ./target/debug/cowok-design eval run --tier release --workspace "$EVAL_WS" --json
+
   # ==========================================
   # CHANNEL 1: CROSS-PLATFORM SINGLE-BINARY CLI
   # ==========================================
   release-cli:
-    name: Build Binary (${{ matrix.target }})
+    name: Channel 1 CLI (${{ matrix.target }})
     needs: release-verify
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: cowok-design-linux-x64
+            ext: ""
+            archive: tar.gz
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact_name: cowok-design-macos-arm64
+            ext: ""
+            archive: tar.gz
           - os: macos-15-intel
             target: x86_64-apple-darwin
-            artifact_name: cowok-design-macos-x64
+            ext: ""
+            archive: tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: cowok-design-windows-x64.exe
+            ext: ".exe"
+            archive: zip
 
     steps:
       - name: Checkout Repository
@@ -83,72 +143,309 @@ jobs:
 
       - name: Rust Cache
         uses: swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2.7.7
+        with:
+          workspaces: "."
 
-      - name: Build Release Binary
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Build Unified Single-Binary CLI (cowok-design)
+        run: cargo build --release --locked --bin cowok-design --target ${{ matrix.target }}
 
-      - name: Stage Binary Artifact
+      - name: Stage Raw Binary, Archive & SHA-256 Checksums
         shell: bash
+        env:
+          REL_VER: ${{ needs.release-verify.outputs.release_version }}
+          IS_PRERELEASE: ${{ needs.release-verify.outputs.is_prerelease }}
+          IS_TAG_RELEASE: ${{ needs.release-verify.outputs.is_tag_release }}
+          SIGNING_KEY_PRESENT: ${{ secrets.COWOK_RELEASE_ED25519_PRIVATE_KEY != '' }}
         run: |
-          mkdir -p dist-bin
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            SRC="target/${{ matrix.target }}/release/harness-daemon.exe"
-            if [ ! -f "$SRC" ]; then
-              echo "::error::Release binary not found at $SRC"
-              exit 1
-            fi
-            cp "$SRC" "dist-bin/${{ matrix.artifact_name }}"
-          else
-            SRC="target/${{ matrix.target }}/release/harness-daemon"
-            if [ ! -f "$SRC" ]; then
-              echo "::error::Release binary not found at $SRC"
-              exit 1
-            fi
-            cp "$SRC" "dist-bin/${{ matrix.artifact_name }}"
-            chmod +x "dist-bin/${{ matrix.artifact_name }}"
+          mkdir -p dist-bin stage-pkg
+          BIN_NAME="cowok-design${{ matrix.ext }}"
+          SRC="target/${{ matrix.target }}/release/${BIN_NAME}"
+          if [ ! -f "$SRC" ]; then
+            echo "::error::Release binary not found at $SRC"
+            exit 1
           fi
 
-      - name: Upload Binary to Release
+          RAW_ASSET="cowok-design-v${REL_VER}-${{ matrix.target }}${{ matrix.ext }}"
+          cp "$SRC" "dist-bin/${RAW_ASSET}"
+          cp "$SRC" "stage-pkg/${BIN_NAME}"
+
+          if [ "${{ matrix.archive }}" = "tar.gz" ]; then
+            chmod +x "dist-bin/${RAW_ASSET}" "stage-pkg/${BIN_NAME}"
+            tar -czf "dist-bin/cowok-design-v${REL_VER}-${{ matrix.target }}.tar.gz" -C stage-pkg "${BIN_NAME}"
+          else
+            powershell -Command "Compress-Archive -Path stage-pkg/${BIN_NAME} -DestinationPath dist-bin/cowok-design-v${REL_VER}-${{ matrix.target }}.zip"
+          fi
+
+          (
+            cd dist-bin
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum * > "SHA256SUMS-${{ matrix.target }}.txt"
+            else
+              shasum -a 256 * > "SHA256SUMS-${{ matrix.target }}.txt"
+            fi
+          )
+
+          if [ "$SIGNING_KEY_PRESENT" = "true" ]; then
+            echo "✅ Ed25519 signing key detected for ${{ matrix.target }} checksums."
+          elif [ "$IS_TAG_RELEASE" = "true" ] && [ "$IS_PRERELEASE" = "false" ]; then
+            echo "::error::GA tag v${REL_VER} requires COWOK_RELEASE_ED25519_PRIVATE_KEY secret for strict signing."
+            exit 1
+          else
+            echo "::warning::Proceeding in graceful unsigned RC/dry-run mode (COWOK_RELEASE_ED25519_PRIVATE_KEY not configured)."
+          fi
+
+      - name: Upload CLI Artifacts (Dry-Run Retention)
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: cli-${{ matrix.target }}
+          path: dist-bin/*
+          retention-days: 7
+
+      - name: Attach CLI Artifacts to GitHub Release
+        if: needs.release-verify.outputs.is_tag_release == 'true'
         uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
         with:
+          prerelease: ${{ needs.release-verify.outputs.is_prerelease == 'true' }}
           files: dist-bin/*
 
   # ==========================================
-  # CHANNEL 4: DOCKER OCI CONTAINER IMAGE (GHCR)
+  # CHANNEL 2: TAURI V2 DESKTOP APP (.dmg/.msi/.AppImage)
   # ==========================================
-  release-docker:
-    name: Build & Push OCI Container
+  release-desktop:
+    name: Channel 2 Desktop Tauri v2 (${{ matrix.target }})
     needs: release-verify
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     permissions:
-      contents: read
-      packages: write
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            ext: ""
+            bundle_glob: packaging/tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            ext: ""
+            bundle_glob: packaging/tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: ".exe"
+            bundle_glob: packaging/tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: ""
+            bundle_glob: packaging/tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Install Linux Tauri v2 System Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2.7.7
+        with:
+          workspaces: "."
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+        with:
+          version: 9
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install Frontend Dependencies & Build Sidecar
+        shell: bash
+        run: |
+          pnpm install --frozen-lockfile
+          cargo build --release --locked --bin cowok-design --target ${{ matrix.target }}
+          mkdir -p packaging/tauri/binaries
+          cp "target/${{ matrix.target }}/release/cowok-design${{ matrix.ext }}" \
+            "packaging/tauri/binaries/cowok-design-${{ matrix.target }}${{ matrix.ext }}"
+
+      - name: Configure Signing Policy (Strict on GA, Graceful Unsigned on RC)
+        shell: bash
+        env:
+          REL_VER: ${{ needs.release-verify.outputs.release_version }}
+          IS_PRERELEASE: ${{ needs.release-verify.outputs.is_prerelease }}
+          IS_TAG_RELEASE: ${{ needs.release-verify.outputs.is_tag_release }}
+          UPDATER_PUBKEY: ${{ secrets.COWOK_RELEASE_ED25519_PUBKEY }}
+          TAURI_KEY_PRESENT: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        run: |
+          if [ -n "$UPDATER_PUBKEY" ]; then
+            node -e '
+              const fs = require("node:fs");
+              const p = "packaging/tauri/tauri.conf.json";
+              const cfg = JSON.parse(fs.readFileSync(p, "utf8"));
+              cfg.plugins.updater.pubkey = process.env.UPDATER_PUBKEY;
+              fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + "\n", "utf8");
+            '
+            echo "✅ Injected Ed25519 updater pubkey into tauri.conf.json."
+          elif [ "$IS_TAG_RELEASE" = "true" ] && [ "$IS_PRERELEASE" = "false" ]; then
+            echo "::error::GA tag v${REL_VER} requires COWOK_RELEASE_ED25519_PUBKEY and TAURI_SIGNING_PRIVATE_KEY."
+            exit 1
+          else
+            echo "::warning::RC/dry-run desktop build running in graceful unsigned mode (updater artifacts disabled)."
+            node -e '
+              const fs = require("node:fs");
+              const p = "packaging/tauri/tauri.conf.json";
+              const cfg = JSON.parse(fs.readFileSync(p, "utf8"));
+              cfg.bundle.createUpdaterArtifacts = false;
+              fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + "\n", "utf8");
+            '
+          fi
+
+      - name: Build Tauri v2 Desktop Installer
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          pnpm dlx @tauri-apps/cli@2 build --config packaging/tauri/tauri.conf.json --target ${{ matrix.target }}
+
+      - name: Upload Desktop Artifacts (Dry-Run Retention)
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: desktop-${{ matrix.target }}
+          path: ${{ matrix.bundle_glob }}
+          retention-days: 7
+
+      - name: Attach Desktop Installer to GitHub Release
+        if: needs.release-verify.outputs.is_tag_release == 'true'
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
+        with:
+          prerelease: ${{ needs.release-verify.outputs.is_prerelease == 'true' }}
+          files: ${{ matrix.bundle_glob }}
+
+  # ==========================================
+  # CHANNEL 3: 5-HOST PLUGIN PACK & DESIGN-CRAFT MODEL C BUNDLE
+  # ==========================================
+  release-plugins:
+    name: Channel 3 Universal 5-Host Plugin Pack & design-craft Bundle
+    needs: release-verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+        with:
+          version: 9
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Assemble 5-Host Plugin Pack, Standalone design-craft & Formula/NPM Tarballs
+        env:
+          REL_VER: ${{ needs.release-verify.outputs.release_version }}
+        run: |
+          pnpm install --frozen-lockfile
+          mkdir -p dist-plugins stage-dc stage-pack
+
+          # 1. Clean-room standalone design-craft repository bundle (Model C)
+          npx tsx scripts/assemble-design-craft-repo.ts --out stage-dc/design-craft
+          tar -czf "dist-plugins/design-craft-v${REL_VER}.tar.gz" -C stage-dc design-craft
+
+          # 2. Universal 5-Host Plugin Pack manifest & packaging helpers
+          cp -R packaging/plugins stage-pack/plugins
+          cp -R packaging/homebrew stage-pack/homebrew
+          cp -R packaging/npm stage-pack/npm
+          tar -czf "dist-plugins/cowok-design-plugins-v${REL_VER}.tar.gz" -C stage-pack .
+
+          (
+            cd dist-plugins
+            sha256sum * > "SHA256SUMS-plugins.txt"
+          )
+
+      - name: Upload Plugin Pack Artifacts (Dry-Run Retention)
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: plugins-and-design-craft
+          path: dist-plugins/*
+          retention-days: 7
+
+      - name: Attach Plugin Pack & design-craft Bundle to GitHub Release
+        if: needs.release-verify.outputs.is_tag_release == 'true'
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
+        with:
+          prerelease: ${{ needs.release-verify.outputs.is_prerelease == 'true' }}
+          files: dist-plugins/*
+
+  # ==========================================
+  # CHANNEL 4: MULTI-ARCH DOCKER OCI IMAGE (GHCR)
+  # ==========================================
+  release-docker:
+    name: Channel 4 Multi-Arch OCI Container (amd64 + arm64)
+    needs: release-verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Verify OCI Image Contract Before Build
+        run: node packaging/docker/verify-oci-contract.mjs
+
+      - name: Enable QEMU Multi-Arch Emulation (arm64)
+        run: docker run --privileged --rm tonistiigi/binfmt --install arm64
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
       - name: Log in to GHCR
+        if: needs.release-verify.outputs.is_tag_release == 'true'
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
+      - name: Extract Docker Metadata
         id: meta
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
         with:
           images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ needs.release-verify.outputs.is_tag_release == 'true' && needs.release-verify.outputs.is_prerelease == 'false' }}
 
-      - name: Build and Push Docker Image
+      - name: Build & Push Multi-Arch OCI Image
         uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
         with:
           context: .
-          push: true
+          file: packaging/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ needs.release-verify.outputs.is_tag_release == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

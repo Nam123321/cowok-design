@@ -3,7 +3,7 @@
 class CowokDesign < Formula
   desc "Single-binary Rust Design Harness CLI, Standalone Local Workbench & Open MCP Server"
   homepage "https://github.com/cowok-ai/cowok-design"
-  version "0.1.0"
+  version "1.0.0-rc.1"
   license "Apache-2.0"
 
   on_macos do
